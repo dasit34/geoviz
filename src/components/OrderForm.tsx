@@ -144,7 +144,7 @@ export function OrderForm({
         type="url"
         placeholder="https://competitor.com (optional)"
         error={fieldErrors.competitorUrl?.[0]}
-        hint="Optional. We’ll add a quick comparison if provided."
+        hint="Optional — we’ll compare your visibility directly against them."
       />
 
       {error ? (
@@ -165,12 +165,13 @@ export function OrderForm({
           ? "Checkout not yet configured"
           : submitting
             ? "Redirecting to checkout…"
-            : "Continue to checkout · $147"}
+            : "Continue to Secure Checkout — $97"}
       </button>
 
       <p className="text-center text-xs text-white/40">
-        Secure payment via Stripe. One-time charge of $147 USD. Report delivered
-        by email.
+        Secure payment via Stripe. One-time charge of $97 USD. Delivered by
+        email within 24 hours, generated using AI-assisted analysis across
+        ChatGPT, Claude, Perplexity, and Gemini.
       </p>
 
       {testBypassEnabled ? (

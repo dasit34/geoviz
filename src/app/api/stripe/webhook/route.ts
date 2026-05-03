@@ -83,7 +83,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       email,
       businessName,
       competitorUrl,
-      amount: session.amount_total ?? 14700,
+      amount: session.amount_total ?? 9700,
       currency: session.currency ?? "usd",
       paymentStatus: paid ? "paid" : "pending",
       auditStatus: "pending",

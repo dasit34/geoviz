@@ -1,0 +1,22 @@
+# GeoViz
+
+GeoViz audits AI visibility for local businesses.
+
+## What GeoViz does
+- Checks how ChatGPT, Claude, Perplexity, and Gemini see a business website
+- Provides an AI Visibility Score from 0 to 100
+- Identifies the specific issues hurting AI recommendations
+- Delivers a prioritized action plan in plain language
+
+## Service offered
+- AI Visibility Audit — $97 (early-customer pricing; normally $147)
+- GEO Foundation Fix — $497 (done-for-you implementation of the audit fixes)
+
+## Who it's for
+Local service businesses: roofers, HVAC companies, contractors, lawyers,
+dentists, med spas, real estate agents, and similar professionals who want
+to be recommended when customers ask AI platforms for help.
+
+## Where to start
+- Sample report: https://geoviz.app/sample-report
+- Order an audit: https://geoviz.app/order

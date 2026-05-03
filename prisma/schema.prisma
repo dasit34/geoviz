@@ -25,7 +25,7 @@ model AuditOrder {
   businessName     String?
   competitorUrl    String?
   stripeSessionId  String        @unique
-  amount           Int           @default(14700)
+  amount           Int           @default(9700)
   currency         String        @default("usd")
   paymentStatus    PaymentStatus @default(pending)
   auditStatus      AuditStatus   @default(pending)

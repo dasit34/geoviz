@@ -1,6 +1,6 @@
 # GeoViz
 
-Lean MVP that sells **AI Visibility Audits** ($147) for local service businesses. GeoViz audits whether ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews can find, understand, and recommend a business.
+Lean MVP that sells **AI Visibility Audits** at **$97 (early-customer pricing; normally $147)** for local service businesses. GeoViz audits whether ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews can find, understand, and recommend a business.
 
 This repo is the customer-facing site + order flow + admin queue. **Audit fulfillment is manual.**
 
@@ -8,7 +8,7 @@ This repo is the customer-facing site + order flow + admin queue. **Audit fulfil
 - Next.js 14 (App Router) + TypeScript (strict)
 - Tailwind CSS
 - Prisma + PostgreSQL
-- Stripe Checkout (one-time $147)
+- Stripe Checkout (one-time $97; the Stripe Price object must be set to $97 separately on the Stripe dashboard)
 - Resend (admin email notification)
 
 ## Pages
@@ -38,7 +38,7 @@ This repo is the customer-facing site + order flow + admin queue. **Audit fulfil
    - `NEXT_PUBLIC_APP_URL` — your deployed URL (or `http://localhost:3000`)
 
 3. **Stripe setup**
-   - Create a one-time Product/Price for **$147** in the Stripe dashboard. Use the Price ID for `STRIPE_PRICE_ID`.
+   - Create a one-time Product/Price for **$97** in the Stripe dashboard. Use the Price ID for `STRIPE_PRICE_ID`. (The site copy frames this as "Normally $147 — currently $97 for early customers.")
    - For local webhook testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook` and copy the `whsec_...` into `STRIPE_WEBHOOK_SECRET`.
 
 4. **Database**

@@ -65,29 +65,31 @@ export default function Page() {
               Visibility Audit
             </span>
             <h1 className="h1 mt-5">
-              When customers ask{" "}
+              Can{" "}
               <span className="bg-gradient-to-r from-accent to-accent-glow bg-clip-text text-transparent">
                 ChatGPT
               </span>{" "}
-              who to hire, does your business show up?
+              find your business — or is it recommending your competitors?
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/70">
-              AI search is becoming the new front door for customers. GeoViz
-              audits your website and shows whether AI tools can find,
-              understand, and recommend your business.
+              We audit how ChatGPT, Claude, Perplexity, and Gemini see your
+              business — and show exactly how to fix it.
             </p>
 
-            <HeroForm />
-
-            <div className="mt-4 flex items-center gap-3 text-xs text-white/50">
-              <Link href="/sample-report" className="underline-offset-4 hover:text-white hover:underline">
-                See sample report →
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <Link href="/order" className="btn-primary text-base">
+                Get My Audit — $97
               </Link>
-              <span className="hidden sm:inline">·</span>
-              <span className="hidden sm:inline">
-                Full report delivered by email. Includes AI visibility score,
-                crawler checks, schema review, and top fixes.
-              </span>
+              <Link href="/sample-report" className="btn-ghost text-base">
+                View a Real Audit (2 min)
+              </Link>
+            </div>
+            <p className="mt-3 text-xs italic text-white/50">
+              We run a limited number of audits per day to keep results accurate.
+            </p>
+
+            <div className="mt-8">
+              <HeroForm />
             </div>
 
             <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -111,6 +113,41 @@ export default function Page() {
             <div className="absolute -inset-10 -z-10 bg-radial-orange opacity-60" />
             <div className="animate-floatY">
               <ReportPreview />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* WHAT YOU'LL SEE — directly under hero */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-16">
+          <div className="grid gap-10 md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <p className="section-eyebrow">What you’ll see in your audit</p>
+              <h2 className="h2 mt-3">Your real numbers, your real fixes.</h2>
+              <ul className="mt-6 space-y-3 text-base text-white/85">
+                <li className="flex items-start gap-3">
+                  <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-accent" />
+                  <span>Visibility Score: 38/100</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span aria-hidden className="text-base">❌</span>
+                  <span>Not recommended by ChatGPT for key local searches</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span aria-hidden className="text-base">⚠️</span>
+                  <span>Weak presence in sources AI platforms rely on</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span aria-hidden className="text-base">✅</span>
+                  <span>Clear fix plan to improve AI visibility</span>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <Link href="/sample-report" className="btn-ghost">
+                See Full Sample Report →
+              </Link>
             </div>
           </div>
         </div>
@@ -228,12 +265,16 @@ export default function Page() {
             <div className="card relative overflow-hidden">
               <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-accent/20 blur-3xl" />
               <p className="pill">AI Visibility Audit</p>
-              <div className="mt-5 flex items-end gap-2">
-                <span className="text-5xl font-bold text-white">$147</span>
+              <div className="mt-5 flex items-end gap-3">
+                <span className="text-5xl font-bold text-white">$97</span>
+                <span className="text-2xl text-white/40 line-through">$147</span>
                 <span className="pb-1 text-sm text-white/50">
                   one-time · delivered by email
                 </span>
               </div>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-accent">
+                Normally $147 — currently $97 for early customers
+              </p>
               <ul className="mt-6 space-y-3 text-sm text-white/80">
                 <PricingBullet>Full AI visibility audit</PricingBullet>
                 <PricingBullet>AI Visibility Score (0–100)</PricingBullet>
@@ -245,13 +286,40 @@ export default function Page() {
                 href="/order"
                 className="btn-primary mt-8 w-full justify-center text-base"
               >
-                Run My Audit
+                Get My Audit — $97
               </Link>
-              <p className="mt-3 text-center text-xs text-white/40">
-                Secure checkout via Stripe · No subscription · Report in ~24 hours
+              <p className="mt-3 text-center text-xs italic text-white/50">
+                We run a limited number of audits per day to keep results accurate.
+              </p>
+              <p className="mt-2 text-center text-xs text-white/40">
+                Delivered by email within 24 hours. Each report is generated
+                using AI-assisted analysis across ChatGPT, Claude, Perplexity,
+                and Gemini, then reviewed for clarity before delivery.
               </p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* TRUST */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-16">
+          <p className="section-eyebrow">Trust</p>
+          <h2 className="h2 mt-3">Built for businesses adapting to AI search.</h2>
+          <ul className="mt-8 grid gap-4 sm:grid-cols-2">
+            <li className="rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/80">
+              Platforms checked: ChatGPT, Claude, Perplexity, Gemini
+            </li>
+            <li className="rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/80">
+              Designed for local businesses and service providers
+            </li>
+            <li className="rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/80">
+              Each audit is reviewed for clarity before delivery
+            </li>
+            <li className="rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/80">
+              Early customers and case studies will be added here
+            </li>
+          </ul>
         </div>
       </section>
 
@@ -263,43 +331,47 @@ export default function Page() {
             <div className="grid gap-8 md:grid-cols-[1.4fr_1fr] md:items-center">
               <div>
                 <p className="section-eyebrow text-accent-blue">After the audit</p>
-                <h2 className="h2 mt-3">Want us to fix it for you?</h2>
-                <p className="muted mt-4 max-w-xl">
-                  Once you have your audit, our team can implement the fixes for
-                  you. Schema, llms.txt, robots.txt, homepage clarity, service
-                  pages, FAQ structure — done end-to-end with a clean
-                  before/after comparison.
+                <h2 className="h2 mt-3">GEO Foundation Fix — $497</h2>
+                <ul className="mt-6 space-y-3 text-sm text-white/80">
+                  <PricingBullet>Fix the issues found in your audit</PricingBullet>
+                  <PricingBullet>
+                    Improve AI visibility across ChatGPT and other platforms
+                  </PricingBullet>
+                  <PricingBullet>
+                    Optimize structured data and business signals
+                  </PricingBullet>
+                  <PricingBullet>Re-check your visibility after fixes</PricingBullet>
+                </ul>
+                <p className="muted mt-5 text-sm">
+                  More complex cases are quoted upfront.
                 </p>
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <span className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70">
-                    Schema implementation
-                  </span>
-                  <span className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70">
-                    llms.txt
-                  </span>
-                  <span className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70">
-                    robots.txt for AI crawlers
-                  </span>
-                  <span className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70">
-                    Service page clarity
-                  </span>
-                  <span className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70">
-                    FAQ structure
-                  </span>
-                </div>
               </div>
               <div className="rounded-xl border border-white/10 bg-ink-800/60 p-6 text-center">
                 <p className="text-xs uppercase tracking-[0.2em] text-white/50">
                   GEO Foundation Fix
                 </p>
-                <p className="mt-3 text-4xl font-bold text-white">
-                  from $497
-                </p>
+                <p className="mt-3 text-4xl font-bold text-white">$497</p>
                 <p className="mt-2 text-sm text-white/60">
-                  Available after your audit. We’ll quote based on findings.
+                  Available after your audit.
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* WHY GEOVIZ EXISTS */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-16">
+          <div className="mx-auto max-w-3xl">
+            <p className="section-eyebrow">Why GeoViz exists</p>
+            <h2 className="h2 mt-3">A new front door for customers.</h2>
+            <p className="mt-5 text-base leading-relaxed text-white/80">
+              More customers are using ChatGPT and other AI platforms to find
+              businesses. But many companies that rank on Google are invisible
+              in AI answers. GeoViz shows you exactly how these systems see
+              your business — and what needs to change.
+            </p>
           </div>
         </div>
       </section>
@@ -308,20 +380,24 @@ export default function Page() {
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-20 text-center">
           <h2 className="h2 mx-auto max-w-3xl">
-            Find out if AI tools recommend your business.
+            Find out if ChatGPT, Claude, Perplexity, and Gemini recommend your business.
           </h2>
           <p className="muted mx-auto mt-4 max-w-xl">
-            Run your AI Visibility Audit today. Full report by email — usually
-            within 24 hours.
+            Delivered by email within 24 hours. Each report is generated using
+            AI-assisted analysis across ChatGPT, Claude, Perplexity, and
+            Gemini, then reviewed for clarity before delivery.
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Link href="/order" className="btn-primary">
-              Run My Audit · $147
+              Get My Audit — $97
             </Link>
             <Link href="/sample-report" className="btn-ghost">
-              See sample report
+              View a Real Audit (2 min)
             </Link>
           </div>
+          <p className="mt-3 text-xs italic text-white/50">
+            We run a limited number of audits per day to keep results accurate.
+          </p>
         </div>
       </section>
 

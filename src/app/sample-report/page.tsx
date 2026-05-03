@@ -32,7 +32,7 @@ export default function SampleReportPage() {
               </p>
             </div>
             <Link href="/order" className="btn-primary">
-              Run my real audit · $147
+              Get My Audit — $97
             </Link>
           </div>
         </div>
@@ -55,12 +55,15 @@ export default function SampleReportPage() {
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Link href="/order" className="btn-primary">
-              Run My Audit · $147
+              Get My Audit — $97
             </Link>
             <Link href="/" className="btn-ghost">
               Back to homepage
             </Link>
           </div>
+          <p className="mt-3 text-xs italic text-white/50">
+            We run a limited number of audits per day to keep results accurate.
+          </p>
         </div>
       </section>
 

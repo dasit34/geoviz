@@ -36,7 +36,7 @@ Local service businesses:
 - real estate agents
 
 ## Core Offer
-AI Visibility Audit — $147
+AI Visibility Audit — $97 (early-customer pricing; normally $147)
 
 User provides:
 - website URL
@@ -53,7 +53,7 @@ They receive:
 - professional PDF report
 
 ## Upsell
-GEO Foundation Fix — starting at $497
+GEO Foundation Fix — $497 (more complex cases quoted upfront)
 
 Includes:
 - schema implementation or repair

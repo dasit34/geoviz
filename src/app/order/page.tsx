@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Order your AI Visibility Audit · GeoViz",
   description:
-    "Order your $147 AI Visibility Audit. Full report delivered by email — typically within 24 hours.",
+    "Order your $97 AI Visibility Audit. We audit how ChatGPT, Claude, Perplexity, and Gemini see your business and deliver a full report by email within 24 hours.",
 };
 
 export default function OrderPage({
@@ -30,8 +30,15 @@ export default function OrderPage({
             <h1 className="h2 mt-3">Tell us where to look.</h1>
             <p className="muted mt-4 max-w-md">
               Give us your website and email. Next step is a secure Stripe
-              checkout — $147 one-time. Report by email, usually within 24
-              hours.
+              checkout — $97 one-time (normally $147).
+            </p>
+            <p className="mt-3 max-w-md text-sm text-white/70">
+              Delivered by email within 24 hours. Each report is generated
+              using AI-assisted analysis across ChatGPT, Claude, Perplexity,
+              and Gemini, then reviewed for clarity before delivery.
+            </p>
+            <p className="mt-3 text-xs italic text-white/50">
+              We run a limited number of audits per day to keep results accurate.
             </p>
 
             <ul className="mt-8 space-y-3 text-sm text-white/75">

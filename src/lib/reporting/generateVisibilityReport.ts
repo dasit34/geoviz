@@ -616,11 +616,13 @@ export function generateVisibilityReport(audit: RawAuditJson): VisibilityReport 
 
   const upsellSection: UpsellSection = {
     title: "Want us to handle this for you?",
-    copy: "You don’t need to figure this out — we fix it for you.",
-    offer: "GEO Foundation Fix — starting at $497",
+    copy: "You don’t need to figure this out — we fix it for you. More complex cases are quoted upfront.",
+    offer: "GEO Foundation Fix — $497",
     includes: [
-      "A higher score and stronger AI recommendations, typically within 5 business days.",
-      "Zero time from you — we ship the fixes and re-score the audit.",
+      "Fix the issues found in your audit",
+      "Improve AI visibility across ChatGPT and other platforms",
+      "Optimize structured data and business signals",
+      "Re-check your visibility after fixes",
     ],
   };
 
