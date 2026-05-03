@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+}
+
+enum AuditStatus {
+  pending
+  completed
+}
+
+model AuditOrder {
+  id               String        @id @default(cuid())
+  websiteUrl       String
+  email            String
+  businessName     String?
+  competitorUrl    String?
+  stripeSessionId  String        @unique
+  amount           Int           @default(14700)
+  currency         String        @default("usd")
+  paymentStatus    PaymentStatus @default(pending)
+  auditStatus      AuditStatus   @default(pending)
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([email])
+  @@index([createdAt])
+}
