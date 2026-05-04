@@ -1,0 +1,2 @@
+[run-geo-audit.sh] running: claude -p ... --allowedTools "WebFetch WebSearch Read Grep Glob Write Bash" --output-format text
+[run-geo-audit.sh] target: https://ricksaffordableheating.com

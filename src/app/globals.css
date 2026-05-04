@@ -77,3 +77,137 @@ body {
   background-size: 44px 44px;
   mask-image: radial-gradient(ellipse at top, black 30%, transparent 75%);
 }
+
+/* Rendered-markdown report styling — used by /admin/orders/[id] and any
+   future customer-facing report viewer. Keeps the GeoViz dark aesthetic
+   while making the markdown readable like a real client deliverable. */
+.report-prose {
+  color: rgba(232, 236, 246, 0.88);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+.report-prose h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  margin: 0 0 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.report-prose h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: -0.005em;
+  margin: 2.25rem 0 0.85rem;
+}
+.report-prose h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 1.75rem 0 0.6rem;
+}
+.report-prose h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 1.4rem 0 0.5rem;
+}
+.report-prose p {
+  margin: 0 0 1rem;
+}
+.report-prose strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+.report-prose em {
+  color: rgba(255, 255, 255, 0.85);
+}
+.report-prose a {
+  color: #ff7a18;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255, 122, 24, 0.4);
+}
+.report-prose a:hover {
+  text-decoration-color: rgba(255, 122, 24, 0.9);
+}
+.report-prose ul,
+.report-prose ol {
+  margin: 0 0 1.1rem;
+  padding-left: 1.4rem;
+}
+.report-prose li {
+  margin: 0.35rem 0;
+}
+.report-prose ul li::marker {
+  color: rgba(255, 122, 24, 0.7);
+}
+.report-prose ol li::marker {
+  color: rgba(255, 122, 24, 0.7);
+  font-weight: 600;
+}
+.report-prose blockquote {
+  margin: 1.25rem 0;
+  padding: 0.6rem 1rem;
+  border-left: 3px solid #ff7a18;
+  background: rgba(255, 122, 24, 0.05);
+  color: rgba(255, 255, 255, 0.92);
+  font-style: italic;
+}
+.report-prose code {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.85em;
+  color: rgba(255, 255, 255, 0.95);
+}
+.report-prose pre {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  margin: 1rem 0 1.25rem;
+}
+.report-prose pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.report-prose hr {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 2.25rem 0;
+}
+.report-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0 1.4rem;
+  font-size: 0.875rem;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.report-prose th,
+.report-prose td {
+  padding: 0.6rem 0.85rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.report-prose th {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+.report-prose tr:last-child td {
+  border-bottom: 0;
+}

@@ -155,3 +155,52 @@ This MVP exists for one goal:
 → get first 5 paying customers
 
 Everything else is secondary.
+
+## GEO Audit Engine (geo-seo-claude)
+
+Audit fulfillment uses the `geo-seo-claude` Claude Code skill installed at `~/.claude/skills/geo/`. There is **no standalone Python CLI** — the audit is orchestrated by the `geo-audit` skill via WebFetch + sub-agents. We always invoke it through the wrapper script, never inline.
+
+### Exact audit command
+
+```bash
+scripts/run-geo-audit.sh <URL> [COMPETITOR_URL]
+```
+
+Example:
+
+```bash
+scripts/run-geo-audit.sh https://ricksaffordableheating.com > tmp/geo-audit-test-ricks.md
+```
+
+The wrapper invokes:
+
+```bash
+claude -p '<prompt>' --output-format text --allowedTools WebFetch WebSearch Read Grep Glob Write Bash
+```
+
+passing the prompt via stdin so long URLs / competitor strings can't trip shell quoting.
+
+### Prerequisites (verified by the wrapper)
+
+- `claude` CLI v2.x on PATH (`command -v claude`)
+- `~/.claude/skills/geo/SKILL.md` exists (run `vendor/geo-seo-claude/install.sh` if missing)
+- `~/.claude/skills/geo/.venv/bin/python3` exists (Python 3.10+ required for the bundled deps; if `install.sh` provisions a 3.9 venv, recreate with `python3.11 -m venv ~/.claude/skills/geo/.venv`)
+- `ANTHROPIC_API_KEY` in env, or the host is logged in via `claude login`
+
+### Wrapper exit codes
+
+- `0` — markdown written to stdout
+- `1` — bad usage (no URL)
+- `2` — prerequisite missing (claude CLI / SKILL.md / venv)
+- `3` — `claude -p` exited non-zero
+
+### Programmatic invocation
+
+`src/lib/run-geo-audit.ts` spawns the wrapper from Node. The admin route `POST /api/admin/orders/[id]/run-geo-audit` calls it with a 5-minute timeout and persists the markdown to `AuditOrder.reportMarkdown`.
+
+### Troubleshooting
+
+- **Empty / instant return when running `claude -p` directly without the wrapper** — the skill's WebFetch and WebSearch were blocked by the permission gate. Always go through `scripts/run-geo-audit.sh`, which passes `--allowedTools` so headless runs aren't gated.
+- **`Pillow` install failure during `install.sh`** — bundled `requirements.txt` needs Python 3.10+. The macOS system Python 3.9 will fail. Recreate the venv with Homebrew Python 3.11: `rm -rf ~/.claude/skills/geo/.venv && /opt/homebrew/bin/python3.11 -m venv ~/.claude/skills/geo/.venv && ~/.claude/skills/geo/.venv/bin/python3 -m pip install -r vendor/geo-seo-claude/requirements.txt`.
+- **`claude -p` returns text but no markdown report** — the geo skill's sub-agents may be running. Bump the wrapper timeout via the `timeoutMs` option in `runGeoAudit` (default 5 min) or rerun. The full audit typically takes 1–3 minutes.
+- **Sandboxed CLI sessions block the spawn** — the Claude Code CLI sandbox blocks recursive `claude -p` invocations of skills that fetch from external GitHub repos. This affects automated test runs from a CLI session but not the admin API route running under `npm run dev`.

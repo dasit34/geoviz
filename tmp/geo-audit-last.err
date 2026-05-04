@@ -1,0 +1,36 @@
+════════════════════════════════════════════════════════════
+ geo-audit wrapper · diagnostics
+════════════════════════════════════════════════════════════
+  cwd                : /Users/davidshinavar/geoviz
+  repo root          : /Users/davidshinavar/geoviz
+  target URL         : https://example.com
+  err file           : /Users/davidshinavar/geoviz/tmp/geo-audit-last.err
+  claude CLI         : /Users/davidshinavar/.local/bin/claude  (2.1.126 (Claude Code))
+  geo SKILL.md       : /Users/davidshinavar/.claude/skills/geo/SKILL.md  (10341 bytes)
+  geo .venv          : /Users/davidshinavar/.claude/skills/geo/.venv  (Python 3.11.15)
+  ANTHROPIC_API_KEY  : not set (assuming `claude login` session)
+
+── smoke test: claude -p "Reply with GEO_AUDIT_READY" ──
+── smoke test stderr ──
+
+── smoke test stdout ──
+GEO_AUDIT_READY
+── smoke test exit code: 0 ──
+  smoke ok           : "GEO_AUDIT_READY"
+
+── audit run ──
+  command            : claude -p <prompt-via-stdin> --output-format text --allowedTools WebFetch WebSearch Read Grep Glob Write Bash
+  prompt bytes       : 220
+
+
+── audit stderr ──
+
+── audit exit code: 0 ──
+
+── done ──
+  audit exit code    : 0
+  full stderr saved  : /Users/davidshinavar/geoviz/tmp/geo-audit-last.err
+
+Verify report length with:
+  wc -l <output-file>
+If it's 0 lines, inspect /Users/davidshinavar/geoviz/tmp/geo-audit-last.err for the actual cause.

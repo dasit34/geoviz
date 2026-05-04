@@ -31,6 +31,14 @@ model AuditOrder {
   auditStatus      AuditStatus   @default(pending)
   notes            String?
   adminEmailSentAt DateTime?
+  reportStatus     String        @default("pending")
+  reportMarkdown   String?
+  reportError      String?
+  reportGeneratedAt DateTime?
+  reportSentToCustomerAt DateTime?
+  reviewStatus     String        @default("pending")
+  adminNotes       String?
+  qualityScore     Int?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
