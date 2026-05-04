@@ -147,7 +147,7 @@ function buildAuditPrompt(
     : "\n**Competitor URL**: (none provided)\n";
 
   if (options.fast) {
-    // Fast mode — score + top 3 issues + top 3 fixes + outcome. Target <60s.
+    // Fast mode — sections 1-5 only (no Tech Details). Target <60s.
     return `You are a senior digital visibility consultant — not an SEO technician.
 You are writing for a local business owner who paid for this audit.
 They want to know what is broken, why it costs them leads, and what to
@@ -167,39 +167,43 @@ one of those fetches.
 closing remarks. Voice: blunt consultant, short sentences. No SEO
 jargon — if you must use a term, explain it once in plain English.
 
-# AI Visibility Report — <business name>
+# GEO Visibility Report
 
 **Site:** ${websiteUrl}  ·  **Generated:** <today, plain English>
 
-## 1. Score
-**<N>/100 — <Status>** (one of: Poor / At Risk / Competitive / Strong / Elite)
+## 1. Your AI Visibility Score
+**<N>/100 — <Status>** (one of: Strong / Needs Work / At Risk)
 
-One sentence in plain language: what does this score mean for getting
-recommended by AI when local customers ask?
+One short sentence in plain language on what this score means for
+getting recommended by AI when local customers ask.
 
-## 2. Why You're Not Showing Up
-The 3 biggest issues. Numbered. For each:
+## 2. Why Your Business Is Not Showing Up
+Top 3 issues only. Numbered. For each:
 - One-line headline (no jargon)
-- 2 sentences explaining the impact in terms of visibility, lost
-  leads, or weakened trust — never in technical terms
-- One specific quote of what's missing or broken (e.g. "your homepage
-  never names a single city")
+- **What is wrong** — one sentence
+- **Why it hurts visibility** — one sentence
+- **How it can cost leads or trust** — one sentence
 
-## 3. What to Fix First
-The 3 highest-leverage fixes. Numbered. For each:
-- **What to do** — one concrete action a developer could pick up
+## 3. What To Fix First
+Top 3 fixes only. Numbered. For each:
+- **What to do** — one concrete action a developer can pick up
 - **Why it matters** — one sentence linking the fix to lost leads or
   competitor advantage
 - **Expected outcome** — one sentence on what changes for the customer
-  after the fix lands
 
 ## 4. What Happens If You Fix This
-3–4 sentences in plain business language. Frame the upside as: better
-visibility in AI answers, stronger trust signals when prospects compare
-you to competitors, and more inbound leads from AI-driven search. No
-specific score promises. No fabricated traffic numbers.
+3–4 sentences in plain business-owner language. Frame: better AI
+visibility, stronger trust signals, higher chance of being recommended,
+more inbound lead opportunity. No score promises. No fabricated traffic
+numbers.
 
-End immediately. No closing summary.`;
+## 5. Recommended Next Step
+2–3 short sentences offering the customer two paths:
+- They can hand this report to their web developer.
+- Or GeoViz can implement the fixes for them.
+End with: "Reply to this email or request a fix plan to get started."
+
+End immediately after the next-step CTA. No closing summary.`;
   }
 
   return `You are a senior digital visibility consultant — not an SEO technician.
@@ -229,45 +233,45 @@ no closing remarks.
 - No long paragraphs. Punchy and actionable.
 - No repeating the same issue across sections.
 
-# AI Visibility Report — <business name>
+# GEO Visibility Report
 
 **Site:** ${websiteUrl}  ·  **Generated:** <today, plain English>
 
-## 1. Score
-**<N>/100 — <Status>** (one of: Poor / At Risk / Competitive / Strong / Elite)
+## 1. Your AI Visibility Score
+**<N>/100 — <Status>** (one of: Strong / Needs Work / At Risk)
 
-One short sentence on what the score means in plain language. Tie it
-to whether AI tools currently recommend this business when local
-customers ask for the service.
+One short sentence in plain language on what this score means for
+getting recommended by AI when local customers ask.
 
-## 2. Why You're Not Showing Up
-The 3 biggest issues. **Top 3 only.** Numbered. For each:
+## 2. Why Your Business Is Not Showing Up
+Top 3 issues only. Numbered. For each:
 - One-line headline (no jargon)
-- 2 sentences explaining the impact in terms of visibility, lost
-  leads, or weakened trust — never in technical terms
-- One specific quote or count of what's missing or broken
-  (e.g. "your homepage doesn't name a single city" or
-  "9 of 12 photos have no descriptions")
+- **What is wrong** — one sentence
+- **Why it hurts visibility** — one sentence
+- **How it can cost leads or trust** — one sentence
 
-## 3. What to Fix First
-The 3 highest-leverage fixes. **Top 3 only.** Numbered. For each:
-- **What to do** — one concrete action a developer could pick up
+## 3. What To Fix First
+Top 3 fixes only. Numbered. For each:
+- **What to do** — one concrete action a developer can pick up
 - **Why it matters** — one sentence linking the fix to lost leads or
   competitor advantage
 - **Expected outcome** — one sentence on what changes for the customer
-  after the fix lands
-
-Each fix is 3 short lines max.
 
 ## 4. What Happens If You Fix This
-3–4 sentences in plain business language. Frame the upside as: better
-visibility in AI answers, stronger trust signals when prospects compare
-you to competitors, and more inbound leads from AI-driven search. No
-specific score promises. No fabricated traffic numbers.
+3–4 sentences in plain business-owner language. Frame: better AI
+visibility, stronger trust signals, higher chance of being recommended,
+more inbound lead opportunity. No score promises. No fabricated traffic
+numbers.
 
-## 5. Tech Details (for your developer)
+## 5. Recommended Next Step
+2–3 short sentences offering the customer two paths:
+- They can hand this report to their web developer.
+- Or GeoViz can implement the fixes for them.
+End with: "Reply to this email or request a fix plan to get started."
+
+## 6. Technical Details
 <details>
-<summary>Schema, robots.txt, llms.txt — implementation notes</summary>
+<summary>Schema, robots.txt, llms.txt — implementation notes for your developer</summary>
 
 **Schema (JSON-LD)** — one paste-ready code block for the single most
 impactful missing schema (LocalBusiness preferred). Skip anything you
@@ -280,6 +284,9 @@ Skip the ones that are fully allowed.
 
 **llms.txt** — one sentence on whether it exists. If missing, ONE
 paste-ready block (≤25 lines) tailored to this business.
+
+**Metadata + crawlability** — one or two short bullets on title, meta
+description, H1 structure, and any obvious crawlability blockers.
 
 </details>
 

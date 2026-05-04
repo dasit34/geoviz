@@ -22,29 +22,22 @@ export type GeneratePdfArgs = {
   orderId: string;
   /** Public-ish base URL the headless browser will fetch (e.g. https://geoviz.app) */
   baseUrl: string;
-  /** Admin secret threaded through the print page query param. */
-  adminSecret: string;
   /** Hard timeout for the whole PDF generation in ms (default 60s). */
   timeoutMs?: number;
 };
 
 export async function generateAuditPdf(args: GeneratePdfArgs): Promise<Buffer> {
-  const { orderId, baseUrl, adminSecret } = args;
+  const { orderId, baseUrl } = args;
   const timeoutMs = args.timeoutMs ?? 60_000;
 
-  if (!adminSecret) {
-    throw new Error(
-      "ADMIN_SECRET not set — print-page auth requires it. Set ADMIN_SECRET in Vercel → Project → Variables.",
-    );
-  }
-
-  const printUrl = `${baseUrl.replace(/\/$/, "")}/report/${encodeURIComponent(orderId)}/print?key=${encodeURIComponent(adminSecret)}`;
+  // Print page is publicly accessible — order ID is the access token.
+  const printUrl = `${baseUrl.replace(/\/$/, "")}/report/${encodeURIComponent(orderId)}/print`;
 
   const executablePath =
     process.env.PUPPETEER_EXECUTABLE_PATH ?? (await chromium.executablePath());
 
   console.log(
-    `[generate-pdf] launching chromium executablePath=${executablePath ? "(set)" : "(none)"} url=${printUrl.replace(adminSecret, "<redacted>")}`,
+    `[generate-pdf] launching chromium executablePath=${executablePath ? "(set)" : "(none)"} url=${printUrl}`,
   );
 
   let browser: Browser | undefined;

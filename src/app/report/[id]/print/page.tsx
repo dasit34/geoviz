@@ -1,17 +1,18 @@
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { prisma } from "@/lib/db";
-import { isValidAdminKey } from "@/lib/admin-secret";
+import { parseReportScore } from "@/lib/parse-report-score";
 import "./print.css";
 
 /**
- * Print-optimized rendering of a generated audit. Used by:
- *   1. Admins who want a printable preview (load with ?key=ADMIN_SECRET)
- *   2. The Puppeteer PDF generator at /api/report/[id]/pdf, which loads
- *      this page server-to-server and prints it.
+ * Print-optimized hosted view of a generated audit. Used by:
+ *   1. Customers — open the link from their delivery email
+ *   2. Admins — preview before sending
+ *   3. Puppeteer — server-side render at /api/report/[id]/pdf
  *
- * Forces light theme and clean typography. No header / footer chrome,
- * no buttons, no markdown raw text — just the report.
+ * Auth: anyone with the URL can view. Order IDs are 25-char cuids
+ * (~120 bits of entropy) so practically unguessable. Metadata is
+ * noindex/nofollow to prevent search-engine indexing.
  */
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,13 +23,9 @@ export const metadata = {
 
 export default async function PrintPage({
   params,
-  searchParams,
 }: {
   params: { id: string };
-  searchParams?: { key?: string };
 }) {
-  if (!isValidAdminKey(searchParams?.key)) notFound();
-
   const order = await prisma.auditOrder.findUnique({
     where: { id: params.id },
   });
@@ -42,10 +39,31 @@ export default async function PrintPage({
     day: "numeric",
   });
 
+  const scoreInfo = parseReportScore(order.reportMarkdown);
+  const scoreTone =
+    scoreInfo === null
+      ? "muted"
+      : scoreInfo.score >= 75
+        ? "ok"
+        : scoreInfo.score >= 50
+          ? "warn"
+          : "bad";
+
   return (
     <div className="print-root">
       <header className="print-header">
-        <div className="print-brand">GeoViz · GEO Audit Report</div>
+        <div className="print-brand-row">
+          <div className="print-brand">GeoViz · GEO Audit Report</div>
+          {scoreInfo ? (
+            <div
+              className={`print-score-badge tone-${scoreTone}`}
+              aria-label={`Score ${scoreInfo.score} of 100`}
+            >
+              <div className="print-score-num">{scoreInfo.score}</div>
+              <div className="print-score-label">/ 100</div>
+            </div>
+          ) : null}
+        </div>
         <dl className="print-meta">
           <div>
             <dt>Business</dt>
@@ -61,9 +79,18 @@ export default async function PrintPage({
           </div>
         </dl>
       </header>
+
       <article className="print-prose">
         <ReactMarkdown>{order.reportMarkdown}</ReactMarkdown>
       </article>
+
+      <footer className="print-footer">
+        <div className="print-footer-brand">GeoViz</div>
+        <div className="print-footer-meta">
+          AI Visibility Audits for local businesses · geoviz.app
+        </div>
+        <div className="print-footer-id">Report ID: {order.id}</div>
+      </footer>
     </div>
   );
 }

@@ -128,6 +128,23 @@ async function persistOrder(
   console.log(
     `[stripe-webhook] order persisted id=${order.id} payment=${order.paymentStatus}`,
   );
+
+  // Auto-queue the report for the Railway worker as soon as payment is
+  // confirmed. Guarded by `reportStatus: "pending"` so webhook replays
+  // never knock a row already in `running`/`generated`/`failed` back to
+  // `queued` — the transition is idempotent.
+  if (paid) {
+    const promoted = await prisma.auditOrder.updateMany({
+      where: { id: order.id, reportStatus: "pending" },
+      data: { reportStatus: "queued", reportQueuedAt: new Date() },
+    });
+    if (promoted.count > 0) {
+      console.log(
+        `[stripe-webhook] order=${order.id} auto-queued for worker`,
+      );
+    }
+  }
+
   return order;
 }
 

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { buildPdfBaseUrl, generateAuditPdf } from "@/lib/generate-pdf";
 
 /**
@@ -24,13 +23,9 @@ export async function GET(
   req: Request,
   { params }: { params: { id: string } },
 ) {
-  if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
-
+  // Auth: anyone with the URL can download. Order IDs are 25-char cuids
+  // (~120 bits of entropy) so URL-as-token is the access model. Same as
+  // the print page at /report/[id]/print.
   const order = await prisma.auditOrder.findUnique({
     where: { id: params.id },
     select: {
@@ -56,14 +51,6 @@ export async function GET(
     );
   }
 
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret) {
-    return NextResponse.json(
-      { error: "Server misconfigured — ADMIN_SECRET not set." },
-      { status: 503 },
-    );
-  }
-
   const baseUrl = buildPdfBaseUrl(req);
 
   console.log(
@@ -76,7 +63,6 @@ export async function GET(
     pdf = await generateAuditPdf({
       orderId: order.id,
       baseUrl,
-      adminSecret,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
