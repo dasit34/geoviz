@@ -172,12 +172,47 @@ section.** It is mandatory. Paste it verbatim from the template
 below as section 5 — do not paraphrase, do not change wording, do
 not change pricing, do not drop bullets.
 
+**Scoring rubric — REQUIRED.** Score each category from the evidence
+you actually fetched. The total MUST equal the sum of the six
+category scores (no rounding, no fudging). Do NOT default to a
+preset score (e.g. 28/100) — every score must be tied to specific
+findings on this site. Score conservatively when evidence is
+missing and explain why in the relevant report section.
+
+  - Structured Data / Schema: 0–25
+    LocalBusiness/Service JSON-LD present and complete = 20–25.
+    Generic Organization only = 8–14. Missing schema entirely = 0–6.
+  - AI Crawler Readiness: 0–20
+    llms.txt present + AI bots allowed = 16–20. AI bots allowed but
+    no llms.txt = 9–14. AI bots blocked or unclear in robots.txt =
+    0–6.
+  - Local Trust Signals: 0–20
+    Visible reviews/ratings, awards, established date, NAP
+    consistency = 14–20. Some signals = 7–13. Few or none = 0–6.
+  - Content Depth + FAQ Quality: 0–15
+    Thorough service pages + FAQ section = 11–15. Thin service
+    pages, no FAQ = 4–10. Mostly homepage marketing copy = 0–3.
+  - Brand / Entity Clarity: 0–10
+    Clear name, location, phone, service area, single-sentence
+    "what we do" = 7–10. Partial = 3–6. Ambiguous or missing = 0–2.
+  - Technical Accessibility: 0–10
+    Crawlable, valid metadata, working H1, no crawl blockers = 7–10.
+    Some metadata gaps = 3–6. Major gaps or broken pages = 0–2.
+
 # GEO Visibility Report
 
 **Site:** ${websiteUrl}  ·  **Generated:** <today, plain English>
 
-## 1. Your AI Visibility Score
-**<N>/100 — <Status>** (one of: Strong / Needs Work / At Risk)
+## 1. AI Visibility Score
+**Overall Score: <N>/100** (sum of the six category scores below)
+
+Breakdown:
+- Structured Data / Schema: <n>/25
+- AI Crawler Readiness: <n>/20
+- Local Trust Signals: <n>/20
+- Content Depth + FAQ Quality: <n>/15
+- Brand / Entity Clarity: <n>/10
+- Technical Accessibility: <n>/10
 
 One short sentence in plain language on what this score means for
 getting recommended by AI when local customers ask.
@@ -259,12 +294,47 @@ no closing remarks.
   below as section 5 — do not paraphrase, do not change wording,
   do not change pricing, do not drop bullets.
 
+**Scoring rubric — REQUIRED.** Score each category from the evidence
+you actually fetched. The overall score MUST equal the sum of the
+six category scores (no rounding, no fudging). Do NOT default to a
+preset score (e.g. 28/100) — every score must be tied to specific
+findings on this site. Score conservatively when evidence is
+missing and explain why in the relevant report section.
+
+  - Structured Data / Schema: 0–25
+    LocalBusiness/Service JSON-LD present and complete = 20–25.
+    Generic Organization only = 8–14. Missing schema entirely = 0–6.
+  - AI Crawler Readiness: 0–20
+    llms.txt present + AI bots allowed = 16–20. AI bots allowed but
+    no llms.txt = 9–14. AI bots blocked or unclear in robots.txt =
+    0–6.
+  - Local Trust Signals: 0–20
+    Visible reviews/ratings, awards, established date, NAP
+    consistency = 14–20. Some signals = 7–13. Few or none = 0–6.
+  - Content Depth + FAQ Quality: 0–15
+    Thorough service pages + FAQ section = 11–15. Thin service
+    pages, no FAQ = 4–10. Mostly homepage marketing copy = 0–3.
+  - Brand / Entity Clarity: 0–10
+    Clear name, location, phone, service area, single-sentence
+    "what we do" = 7–10. Partial = 3–6. Ambiguous or missing = 0–2.
+  - Technical Accessibility: 0–10
+    Crawlable, valid metadata, working H1, no crawl blockers = 7–10.
+    Some metadata gaps = 3–6. Major gaps or broken pages = 0–2.
+
 # GEO Visibility Report
 
 **Site:** ${websiteUrl}  ·  **Generated:** <today, plain English>
 
-## 1. Your AI Visibility Score
-**<N>/100 — <Status>** (one of: Strong / Needs Work / At Risk)
+## 1. AI Visibility Score
+**Overall Score: <N>/100** (sum of the six category scores below)
+
+Breakdown:
+- Structured Data / Schema: <n>/25
+- AI Crawler Readiness: <n>/20
+- Local Trust Signals: <n>/20
+- Content Depth + FAQ Quality: <n>/15
+- Brand / Entity Clarity: <n>/10
+- Technical Accessibility: <n>/10
 
 One short sentence in plain language on what this score means for
 getting recommended by AI when local customers ask.
@@ -662,6 +732,58 @@ function tail(text: string, lineCount: number): string {
   return lines.slice(Math.max(0, lines.length - lineCount)).join("\n");
 }
 
+/**
+ * Pull the six category scores out of the rendered markdown so Railway
+ * logs show exactly how each audit was scored. Returns a single
+ * compact line like "schema=12/25 crawler=5/20 trust=10/20 content=7/15
+ * brand=6/10 tech=4/10 total=44/100" — easy to grep and easy to spot
+ * if the model drifts back to a default score.
+ */
+function formatScoreBreakdownForLog(markdown: string): string | null {
+  if (!markdown) return null;
+  const pull = (label: RegExp, max: number): number | null => {
+    const re = new RegExp(
+      `${label.source}\\s*[:\\-—]?\\s*\\*?\\*?(\\d{1,3})\\s*/\\s*${max}\\b`,
+      "i",
+    );
+    const m = re.exec(markdown);
+    return m ? Number(m[1]) : null;
+  };
+  const schema = pull(/Structured\s*Data(?:\s*\/\s*Schema)?/, 25);
+  const crawler = pull(/AI\s*Crawler\s*Readiness/, 20);
+  const trust = pull(/Local\s*Trust\s*Signals/, 20);
+  const content = pull(/Content\s*Depth(?:\s*\+\s*FAQ\s*Quality)?/, 15);
+  const brand = pull(/Brand(?:\s*\/\s*Entity)?\s*Clarity/, 10);
+  const tech = pull(/Technical\s*Accessibility/, 10);
+  const overallMatch =
+    /Overall\s*Score\s*[:\-—]?\s*\*?\*?(\d{1,3})\s*\/\s*100/i.exec(
+      markdown,
+    ) ?? /\b(\d{1,3})\s*\/\s*100\b/.exec(markdown);
+  const overall = overallMatch ? Number(overallMatch[1]) : null;
+
+  const allNull =
+    schema === null &&
+    crawler === null &&
+    trust === null &&
+    content === null &&
+    brand === null &&
+    tech === null &&
+    overall === null;
+  if (allNull) return null;
+
+  const cell = (n: number | null, max: number) =>
+    n === null ? `?/${max}` : `${n}/${max}`;
+  return [
+    `schema=${cell(schema, 25)}`,
+    `crawler=${cell(crawler, 20)}`,
+    `trust=${cell(trust, 20)}`,
+    `content=${cell(content, 15)}`,
+    `brand=${cell(brand, 10)}`,
+    `tech=${cell(tech, 10)}`,
+    `total=${overall ?? "?"}/100`,
+  ].join(" ");
+}
+
 // ---- per-job pipeline ----
 type PollResult = "processed" | "claimed-by-other" | "no-jobs";
 
@@ -743,6 +865,12 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
         log(
           `[geo-worker] report saved orderId=${candidate.id} dbReportStatus=${saved.reportStatus} reportGeneratedAt=${saved.reportGeneratedAt?.toISOString() ?? "null"} bytes=${result.markdown.length}`,
         );
+        const breakdownLog = formatScoreBreakdownForLog(result.markdown);
+        if (breakdownLog) {
+          log(
+            `[geo-worker] score breakdown orderId=${candidate.id} ${breakdownLog}`,
+          );
+        }
         log(
           `[geo-worker] audit completed orderId=${candidate.id} elapsedMs=${result.elapsedMs}`,
         );
