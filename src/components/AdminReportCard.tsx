@@ -435,6 +435,28 @@ export function AdminReportCard({
         >
           {expanded ? "Hide Report" : "View Report"}
         </button>
+        <a
+          href={`/api/report/${order.id}/pdf?key=${encodeURIComponent(adminKey)}`}
+          target="_blank"
+          rel="noreferrer noopener"
+          className={
+            !markdown || reportStatus !== "generated"
+              ? "btn-ghost text-sm pointer-events-none opacity-50"
+              : "btn-ghost text-sm"
+          }
+          aria-disabled={!markdown || reportStatus !== "generated"}
+          onClick={(e) => {
+            if (!markdown || reportStatus !== "generated") {
+              e.preventDefault();
+            } else {
+              console.log(
+                `[admin-card] download PDF orderId=${order.id}`,
+              );
+            }
+          }}
+        >
+          Download PDF
+        </a>
         <button
           type="button"
           disabled={markDisabled}

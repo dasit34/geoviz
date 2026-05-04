@@ -1,0 +1,227 @@
+/* Force light theme on the print surface — globals.css sets a dark
+   background on body which would carry into the PDF otherwise. */
+html,
+body {
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+.print-root {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 64px 64px;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
+/* ---- header ---- */
+.print-header {
+  border-bottom: 2px solid #ff7a18;
+  padding-bottom: 18px;
+  margin-bottom: 36px;
+}
+.print-brand {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: #ff7a18;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+}
+.print-meta {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  font-size: 12px;
+}
+.print-meta div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.print-meta dt {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #888;
+  font-weight: 600;
+}
+.print-meta dd {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1a1a1a;
+  word-break: break-all;
+}
+
+/* ---- markdown body ---- */
+.print-prose h1 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #111;
+  margin: 0 0 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e8e8e8;
+  page-break-after: avoid;
+}
+.print-prose h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 26px 0 10px;
+  page-break-after: avoid;
+}
+.print-prose h3 {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 18px 0 6px;
+  page-break-after: avoid;
+}
+.print-prose h4 {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #333;
+  margin: 14px 0 4px;
+  page-break-after: avoid;
+}
+.print-prose p {
+  margin: 0 0 12px;
+  color: #2a2a2a;
+}
+.print-prose strong {
+  color: #111;
+  font-weight: 600;
+}
+.print-prose em {
+  color: #2a2a2a;
+}
+.print-prose a {
+  color: #ff7a18;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+.print-prose ul,
+.print-prose ol {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+.print-prose li {
+  margin: 4px 0;
+  color: #2a2a2a;
+}
+.print-prose ul li::marker {
+  color: #ff7a18;
+}
+.print-prose ol li::marker {
+  color: #ff7a18;
+  font-weight: 600;
+}
+.print-prose blockquote {
+  margin: 14px 0;
+  padding: 8px 14px;
+  border-left: 3px solid #ff7a18;
+  background: #fff8f1;
+  color: #1a1a1a;
+  font-style: italic;
+  page-break-inside: avoid;
+}
+.print-prose code {
+  background: #f4f4f4;
+  border: 1px solid #e6e6e6;
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 0.85em;
+  color: #1a1a1a;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    "Liberation Mono", monospace;
+}
+.print-prose pre {
+  background: #f8f8f8;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin: 12px 0 16px;
+  page-break-inside: avoid;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    "Liberation Mono", monospace;
+}
+.print-prose pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #1a1a1a;
+}
+.print-prose hr {
+  border: 0;
+  border-top: 1px solid #e8e8e8;
+  margin: 28px 0;
+}
+.print-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 18px;
+  font-size: 12px;
+  page-break-inside: avoid;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.print-prose th,
+.print-prose td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #ededed;
+}
+.print-prose th {
+  background: #fafafa;
+  color: #555;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+.print-prose tr:last-child td {
+  border-bottom: 0;
+}
+.print-prose details {
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 14px 0;
+  background: #fafafa;
+}
+.print-prose details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+/* ---- print rules ---- */
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+  }
+  .print-root {
+    margin: 0;
+    padding: 0;
+    max-width: none;
+  }
+  .print-prose details {
+    /* expand collapsed sections in PDF so all content prints */
+  }
+  .print-prose details > *:not(summary) {
+    display: block !important;
+  }
+}

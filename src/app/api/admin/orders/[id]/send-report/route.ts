@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { getResend, FROM_EMAIL } from "@/lib/resend";
+import { buildPdfBaseUrl, generateAuditPdf } from "@/lib/generate-pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// PDF generation can take 20–40s — bump beyond Vercel's default 10s.
+export const maxDuration = 60;
 
 export async function POST(
   req: Request,
@@ -89,6 +92,43 @@ export async function POST(
       ? [ccAddress]
       : undefined;
 
+  // Generate the PDF attachment. If generation fails we still send the
+  // text-only email (better deliverable than nothing) and log the failure
+  // so the admin can re-send manually after fixing the underlying cause.
+  let pdfBuffer: Buffer | undefined;
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (adminSecret) {
+    try {
+      console.log(`[admin-send] generating PDF for orderId=${order.id}`);
+      pdfBuffer = await generateAuditPdf({
+        orderId: order.id,
+        baseUrl: buildPdfBaseUrl(req),
+        adminSecret,
+      });
+      console.log(
+        `[admin-send] PDF ready orderId=${order.id} bytes=${pdfBuffer.length}`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[admin-send] PDF generation failed orderId=${order.id} (sending text-only): ${message}`,
+      );
+    }
+  } else {
+    console.warn(
+      "[admin-send] ADMIN_SECRET not set — skipping PDF attachment, sending text-only.",
+    );
+  }
+
+  const attachments = pdfBuffer
+    ? [
+        {
+          filename: pdfFilenameFor(order.id, order.businessName),
+          content: pdfBuffer,
+        },
+      ]
+    : undefined;
+
   let resendId: string | undefined;
   try {
     const result = await getResend().emails.send({
@@ -97,6 +137,7 @@ export async function POST(
       cc,
       subject,
       text: body,
+      attachments,
     });
     if (result.error) {
       console.error(
@@ -132,5 +173,17 @@ export async function POST(
     status: "sent",
     to: order.email,
     resendId: resendId ?? null,
+    attached: Boolean(pdfBuffer),
   });
+}
+
+function pdfFilenameFor(id: string, businessName: string | null): string {
+  const slug =
+    (businessName ?? "audit")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "audit";
+  const shortId = id.slice(-6);
+  return `geoviz-${slug}-${shortId}.pdf`;
 }
