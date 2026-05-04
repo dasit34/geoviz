@@ -7,27 +7,7 @@ import { AdminReviewForm } from "@/components/AdminReviewForm";
 import { ReportViewerClient } from "@/components/ReportViewerClient";
 import { prisma } from "@/lib/db";
 import { isValidAdminKey } from "@/lib/admin-secret";
-
-/**
- * Best-effort parse of the GEO Score line out of the audit markdown so the
- * detail page can show a real-looking score header without re-running the
- * scoring engine. Falls back to null if the audit format changes.
- */
-function extractScoreAndStatus(
-  md: string | null,
-): { score: number; status: string | null } | null {
-  if (!md) return null;
-  const m =
-    /\b(\d{1,3})\s*\/\s*100[ \t]*[—\-–:][ \t]*([A-Za-z][A-Za-z _\-]+)/.exec(md);
-  if (m) {
-    const score = Math.max(0, Math.min(100, Number(m[1])));
-    const status = m[2]!.trim();
-    return { score, status };
-  }
-  const m2 = /\b(\d{1,3})\s*\/\s*100\b/.exec(md);
-  if (m2) return { score: Number(m2[1]), status: null };
-  return null;
-}
+import { parseReportScore } from "@/lib/parse-report-score";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -52,7 +32,7 @@ export default async function AdminOrderDetailPage({
   if (!order) notFound();
 
   const key = searchParams!.key!;
-  const scoreInfo = extractScoreAndStatus(order.reportMarkdown);
+  const scoreInfo = parseReportScore(order.reportMarkdown);
   const scoreTone =
     scoreInfo === null
       ? "muted"
@@ -156,8 +136,9 @@ export default async function AdminOrderDetailPage({
           <p className="section-eyebrow">Actions</p>
           <h2 className="h3 mt-2">Run audit · Send report</h2>
           <p className="muted mt-2 text-sm">
-            "Run GEO Audit" spawns the geo-seo-claude skill on the host. "Send
-            Report Email" delivers the generated markdown to{" "}
+            "Run GEO Audit" enqueues the job; the geo-worker process picks
+            it up out-of-band and writes the markdown back to the database.
+            "Send Report Email" delivers the generated markdown to{" "}
             <code className="text-white/85">{order.email}</code> via Resend.
             Both actions have duplicate protection — pass force to override.
           </p>

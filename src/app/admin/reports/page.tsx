@@ -66,10 +66,14 @@ export default async function AdminReportsPage({
         </p>
 
         {orders.length === 0 ? (
-          <div className="mt-10 rounded-xl border border-white/10 bg-white/[0.02] p-12 text-center">
-            <p className="muted text-sm">
-              No paid orders yet. They&apos;ll appear here as soon as Stripe
-              confirms payment.
+          <div className="mt-10 rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-12 text-center">
+            <p className="text-base font-semibold text-white">
+              No paid orders yet.
+            </p>
+            <p className="muted mt-2 text-sm">
+              Paid orders appear here as soon as Stripe confirms payment. To
+              test the flow without a real charge, use the local test bypass
+              on the order page in dev mode.
             </p>
           </div>
         ) : (

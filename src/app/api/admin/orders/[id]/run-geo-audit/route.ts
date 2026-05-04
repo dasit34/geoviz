@@ -1,14 +1,27 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
-import { runGeoAudit } from "@/lib/run-geo-audit";
 
+/**
+ * Enqueue-only handler.
+ *
+ * IMPORTANT: This route MUST NOT spawn the GEO audit engine. Vercel
+ * functions are serverless / short-lived / sandboxed and cannot run
+ * `claude` CLI, the geo-seo-claude skill, or any long-running Python
+ * pipeline. The actual audit runs out-of-band by `scripts/geo-worker.ts`
+ * on a host that has the engine installed (your local machine, a Railway
+ * worker, etc.).
+ *
+ * Lifecycle:
+ *   admin clicks "Run GEO Audit"
+ *     → this route flips reportStatus to "queued"
+ *   worker polls
+ *     → claims the row (queued → running)
+ *     → spawns scripts/run-geo-audit.sh
+ *     → writes reportMarkdown + sets reportStatus to "generated" or "failed"
+ */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// The audit can take a couple of minutes — bump the maxDuration so the
-// route doesn't get killed by the platform-default 10s timeout. Vercel
-// honors this; on other hosts it's a no-op.
-export const maxDuration = 300;
 
 export async function POST(
   req: Request,
@@ -24,7 +37,7 @@ export async function POST(
     const body = (await req.json().catch(() => ({}))) as { force?: boolean };
     force = body.force === true;
   } catch {
-    // ignore — empty body is allowed
+    // empty body is fine
   }
 
   const order = await prisma.auditOrder.findUnique({
@@ -34,75 +47,52 @@ export async function POST(
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
+  // Already-generated guard. Pass {force:true} to re-queue.
   if (order.reportStatus === "generated" && !force) {
     console.log(
-      `[admin-audit] orderId=${order.id} already generated — skipping (pass force=true to re-run)`,
+      `[admin-audit] orderId=${order.id} already generated — skipping enqueue`,
     );
     return NextResponse.json(
       {
         status: "already-generated",
         message:
-          "Report already generated. Pass {force:true} to re-run the audit.",
-        markdown: order.reportMarkdown,
+          "Report already generated. Pass {force:true} to re-queue the audit.",
       },
       { status: 409 },
     );
   }
 
-  console.log(
-    `[admin-audit] audit started orderId=${order.id} url=${order.websiteUrl}`,
-  );
-
-  await prisma.auditOrder.update({
-    where: { id: order.id },
-    data: { reportStatus: "running", reportError: null },
-  });
-
-  const result = await runGeoAudit(order.websiteUrl, {
-    competitorUrl: order.competitorUrl,
-  });
-
-  console.log(`[admin-audit] audit command: ${result.command}`);
-
-  if (result.ok) {
+  // In-flight guard. The worker is already on it.
+  if (order.reportStatus === "queued" || order.reportStatus === "running") {
     console.log(
-      `[admin-audit] audit completed orderId=${order.id} bytes=${result.markdown.length}`,
+      `[admin-audit] orderId=${order.id} already in flight (status=${order.reportStatus})`,
     );
-    const updated = await prisma.auditOrder.update({
-      where: { id: order.id },
-      data: {
-        reportStatus: "generated",
-        reportMarkdown: result.markdown,
-        reportError: null,
-        reportGeneratedAt: new Date(),
+    return NextResponse.json(
+      {
+        status: order.reportStatus,
+        message: `Audit is already ${order.reportStatus}. The worker will pick it up — refresh in a minute.`,
       },
-    });
-    return NextResponse.json({
-      status: "generated",
-      generatedAt: updated.reportGeneratedAt,
-      bytes: result.markdown.length,
-      markdown: result.markdown,
-    });
+      { status: 409 },
+    );
   }
 
-  const errorMsg = result.stderr
-    ? `${result.error}\n---stderr---\n${result.stderr}`
-    : result.error;
-
-  console.error(
-    `[admin-audit] audit failed orderId=${order.id}: ${result.error}`,
-  );
-
-  await prisma.auditOrder.update({
+  const updated = await prisma.auditOrder.update({
     where: { id: order.id },
     data: {
-      reportStatus: "failed",
-      reportError: errorMsg,
+      reportStatus: "queued",
+      reportQueuedAt: new Date(),
+      reportError: null,
     },
   });
 
-  return NextResponse.json(
-    { status: "failed", error: result.error, stderr: result.stderr },
-    { status: 500 },
+  console.log(
+    `[admin-audit] queued orderId=${order.id} url=${order.websiteUrl} (force=${force})`,
   );
+
+  return NextResponse.json({
+    status: "queued",
+    queuedAt: updated.reportQueuedAt,
+    message:
+      "Audit queued. Run `npm run geo-worker` on the host that has the GEO engine installed.",
+  });
 }

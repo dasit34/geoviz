@@ -34,6 +34,7 @@ model AuditOrder {
   reportStatus     String        @default("pending")
   reportMarkdown   String?
   reportError      String?
+  reportQueuedAt   DateTime?
   reportGeneratedAt DateTime?
   reportSentToCustomerAt DateTime?
   reviewStatus     String        @default("pending")
