@@ -615,21 +615,61 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
       log(
         `[geo-worker] markdown length orderId=${candidate.id} bytes=${result.markdown.length}`,
       );
-      await prisma.auditOrder.update({
-        where: { id: candidate.id },
-        data: {
-          reportStatus: "generated",
-          reportMarkdown: result.markdown,
-          reportError: null,
-          reportGeneratedAt: new Date(),
-        },
-      });
-      wroteTerminal = true;
-      log(`[geo-worker] report saved orderId=${candidate.id}`);
       log(
-        `[geo-worker] audit completed orderId=${candidate.id} elapsedMs=${result.elapsedMs}`,
+        `[geo-worker] saving report orderId=${candidate.id} bytes=${result.markdown.length}`,
       );
-      return "processed";
+
+      // Wrap the success-path DB write in its own try/catch so a save
+      // failure is loudly visible instead of being swallowed by the outer
+      // catch (which would mark the row "failed" with a vaguer message).
+      try {
+        const saved = await prisma.auditOrder.update({
+          where: { id: candidate.id },
+          data: {
+            reportStatus: "generated",
+            reportMarkdown: result.markdown,
+            reportError: null,
+            reportGeneratedAt: new Date(),
+          },
+        });
+        wroteTerminal = true;
+        log(
+          `[geo-worker] report saved orderId=${candidate.id} dbReportStatus=${saved.reportStatus} reportGeneratedAt=${saved.reportGeneratedAt?.toISOString() ?? "null"} bytes=${result.markdown.length}`,
+        );
+        log(
+          `[geo-worker] audit completed orderId=${candidate.id} elapsedMs=${result.elapsedMs}`,
+        );
+        return "processed";
+      } catch (saveErr) {
+        const message =
+          saveErr instanceof Error ? saveErr.message : String(saveErr);
+        logErr(
+          `[geo-worker] DB SAVE FAILED orderId=${candidate.id} after successful Anthropic response (${result.markdown.length} bytes): ${message}`,
+        );
+        // Recovery: mark the row failed so the UI doesn't stick at
+        // "running" forever. We still couldn't preserve the markdown,
+        // but at least the dashboard flips to a terminal state.
+        try {
+          await prisma.auditOrder.update({
+            where: { id: candidate.id },
+            data: {
+              reportStatus: "failed",
+              reportError: `Anthropic returned ${result.markdown.length} bytes but DB save failed: ${message}`,
+            },
+          });
+          wroteTerminal = true;
+          logErr(
+            `[geo-worker] recovered orderId=${candidate.id} to failed (markdown lost — re-queue to retry)`,
+          );
+        } catch (markErr) {
+          const markMessage =
+            markErr instanceof Error ? markErr.message : String(markErr);
+          logErr(
+            `[geo-worker] CRITICAL — could not mark failed after save error orderId=${candidate.id}: ${markMessage}`,
+          );
+        }
+        return "processed";
+      }
     }
 
     // Failure — preserve the last 20 lines of stderr in reportError.
