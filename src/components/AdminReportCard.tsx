@@ -154,26 +154,67 @@ export function AdminReportCard({
       body: JSON.stringify(body),
     });
 
+  // Refetch the order from the server. Used after Run / Send / Review so
+  // the UI reflects DB truth, not optimistic guesses.
+  const refetchOrder = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/admin/orders/${order.id}?key=${encodeURIComponent(adminKey)}`,
+        { headers: { "x-admin-secret": adminKey }, cache: "no-store" },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        order?: Parameters<typeof applyOrderUpdate>[0];
+      };
+      if (data.success && data.order) {
+        console.log(
+          `[admin-card] refetchOrder orderId=${order.id} dbReportStatus=${data.order.reportStatus}`,
+        );
+        applyOrderUpdate(data.order);
+      }
+    } catch (err) {
+      console.error("[admin-card] refetch error:", err);
+    }
+  }, [order.id, adminKey, applyOrderUpdate]);
+
   const onRun = async (force = false) => {
     setRunning(true);
     setMessage("Queueing audit…");
     setTone("warn");
+    console.log(
+      `[admin-card] onRun POST orderId=${order.id} force=${force}`,
+    );
     try {
       const res = await post(
         `/api/admin/orders/${order.id}/run-geo-audit`,
         force ? { force: true } : {},
       );
       const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
         status?: string;
         message?: string;
         error?: string;
         queuedAt?: string;
+        previousStatus?: string;
+        newStatus?: string;
+        dbHost?: string;
       };
-      if (res.ok && data.status === "queued") {
+      console.log(
+        `[admin-card] onRun response orderId=${order.id} httpStatus=${res.status} success=${data.success} newStatus=${data.newStatus} dbHost=${data.dbHost}`,
+      );
+
+      if (res.ok && data.success && data.status === "queued") {
         setTone("ok");
-        applyOrderUpdate({ reportStatus: "queued", reportError: null });
+        // Take the server's reported newStatus, not a hardcoded optimistic value.
+        applyOrderUpdate({
+          reportStatus: data.newStatus ?? "queued",
+          reportError: null,
+        });
+        // Server is source of truth — refetch to confirm DB state. Polling
+        // useEffect will then continue every 5s while status is queued/running.
+        await refetchOrder();
         setMessage(
-          "Queued for the worker. Run `npm run geo-worker:dev` (loop mode) — UI will auto-update when it completes.",
+          `Queued (was ${data.previousStatus}). Worker picks up in ~12s.`,
         );
       } else if (res.status === 409) {
         // Either already-generated (use force=true) or already in flight.
@@ -182,13 +223,19 @@ export function AdminReportCard({
         if (data.status === "queued" || data.status === "running") {
           applyOrderUpdate({ reportStatus: data.status });
         }
+        // Refetch anyway so UI reflects whatever the DB actually has.
+        await refetchOrder();
+      } else if (res.status === 401) {
+        setTone("err");
+        setMessage(
+          "Unauthorized — refresh the page with a valid ?key=ADMIN_SECRET.",
+        );
       } else {
         setTone("err");
-        applyOrderUpdate({
-          reportStatus: "failed",
-          reportError: data.error ?? `HTTP ${res.status}`,
-        });
         setMessage(`Queue failed: ${data.error ?? `HTTP ${res.status}`}`);
+        // Don't optimistically mark failed — the worker handles real failures.
+        // Just refetch so UI shows what's actually in the DB.
+        await refetchOrder();
       }
     } catch (err) {
       setTone("err");

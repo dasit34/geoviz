@@ -109,28 +109,58 @@ export async function POST(
   }
 
   // Allowed to (re)queue from: pending, failed, or generated+force.
-  const updated = await prisma.auditOrder.update({
-    where: { id: order.id },
-    data: {
-      reportStatus: "queued",
-      reportQueuedAt: new Date(),
-      reportError: null,
-    },
-  });
-
   console.log(
-    `[admin-audit] queued orderId=${order.id} previousStatus=${previousStatus} newStatus=${updated.reportStatus} url=${order.websiteUrl} force=${force} dbHost=${dbHost ?? "unknown"}`,
+    `[admin-audit] BEFORE update orderId=${order.id} previousStatus=${previousStatus} url=${order.websiteUrl} force=${force} dbHost=${dbHost ?? "unknown"}`,
   );
 
-  return NextResponse.json({
+  let updated;
+  try {
+    updated = await prisma.auditOrder.update({
+      where: { id: order.id },
+      data: {
+        reportStatus: "queued",
+        reportQueuedAt: new Date(),
+        reportError: null,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[admin-audit] UPDATE FAILED orderId=${order.id} error=${message}`,
+    );
+    return NextResponse.json(
+      {
+        success: false,
+        status: "error",
+        orderId: order.id,
+        previousStatus,
+        newStatus: previousStatus,
+        dbHost,
+        error: `Database update failed: ${message}`,
+      },
+      { status: 500 },
+    );
+  }
+
+  console.log(
+    `[admin-audit] AFTER update orderId=${order.id} dbReportStatus=${updated.reportStatus} reportQueuedAt=${updated.reportQueuedAt?.toISOString() ?? "null"}`,
+  );
+
+  const responsePayload = {
     success: true,
-    status: "queued",
+    status: "queued" as const,
     orderId: order.id,
     previousStatus,
     newStatus: updated.reportStatus,
     dbHost,
     queuedAt: updated.reportQueuedAt,
     message:
-      "Audit queued. Run `npm run geo-worker` (or `:dev` for loop mode) on the host that has the GEO engine installed.",
-  });
+      "Audit queued. The worker will pick it up within ~12s.",
+  };
+
+  console.log(
+    `[admin-audit] RETURNING orderId=${order.id} success=true newStatus=${updated.reportStatus}`,
+  );
+
+  return NextResponse.json(responsePayload);
 }
