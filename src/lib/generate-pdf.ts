@@ -33,17 +33,28 @@ export async function generateAuditPdf(args: GeneratePdfArgs): Promise<Buffer> {
   // Print page is publicly accessible — order ID is the access token.
   const printUrl = `${baseUrl.replace(/\/$/, "")}/report/${encodeURIComponent(orderId)}/print`;
 
-  const executablePath =
-    process.env.PUPPETEER_EXECUTABLE_PATH ?? (await chromium.executablePath());
+  // Resolve the chromium binary. On Vercel @sparticuz/chromium ships
+  // its own packed binary inside node_modules; calling executablePath()
+  // unpacks it to /tmp on first run. Locally on macOS we override with
+  // PUPPETEER_EXECUTABLE_PATH (the @sparticuz binary is Linux-only).
+  let executablePath =
+    process.env.PUPPETEER_EXECUTABLE_PATH ??
+    (await chromium.executablePath());
+  if (!executablePath) {
+    // Last-ditch fallback for environments where the bundle path
+    // resolution returns null (rare — usually means the package wasn't
+    // marked external and got relocated by the bundler).
+    executablePath = "/tmp/chromium";
+  }
 
   console.log(
-    `[generate-pdf] launching chromium executablePath=${executablePath ? "(set)" : "(none)"} url=${printUrl}`,
+    `[generate-pdf] launching chromium executablePath=${executablePath} url=${printUrl}`,
   );
 
   let browser: Browser | undefined;
   try {
     browser = await puppeteer.launch({
-      args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+      args: chromium.args,
       defaultViewport: { width: 1240, height: 1754 },
       executablePath,
       headless: true,
