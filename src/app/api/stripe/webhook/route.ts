@@ -130,17 +130,25 @@ async function persistOrder(
   );
 
   // Auto-queue the report for the Railway worker as soon as payment is
-  // confirmed. Guarded by `reportStatus: "pending"` so webhook replays
-  // never knock a row already in `running`/`generated`/`failed` back to
-  // `queued` — the transition is idempotent.
+  // confirmed. Eligible: `pending` (fresh paid order) or `failed` (a
+  // prior worker run errored — paid customer deserves a retry). Excluded:
+  // `queued` / `running` / `generated` — those are in-flight or done and
+  // a webhook replay must not knock them back. Idempotent.
   if (paid) {
     const promoted = await prisma.auditOrder.updateMany({
-      where: { id: order.id, reportStatus: "pending" },
-      data: { reportStatus: "queued", reportQueuedAt: new Date() },
+      where: {
+        id: order.id,
+        reportStatus: { in: ["pending", "failed"] },
+      },
+      data: {
+        reportStatus: "queued",
+        reportQueuedAt: new Date(),
+        reportError: null,
+      },
     });
     if (promoted.count > 0) {
       console.log(
-        `[stripe-webhook] order=${order.id} auto-queued for worker`,
+        `[stripe-webhook] paid order queued orderId=${order.id}`,
       );
     }
   }
