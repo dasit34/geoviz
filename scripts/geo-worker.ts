@@ -616,9 +616,14 @@ function tail(text: string, lineCount: number): string {
 type PollResult = "processed" | "claimed-by-other" | "no-jobs";
 
 async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
+  // Newest-first: when an admin clicks "Run GEO Audit" we want the audit
+  // they JUST queued to be the next one processed, not whatever stale row
+  // happens to be oldest in the queue. reportQueuedAt is set to now()
+  // every time the API route flips a row to "queued", so descending order
+  // on that column always puts the most recent click at the head.
   const candidate = await prisma.auditOrder.findFirst({
     where: { reportStatus: "queued" },
-    orderBy: { reportQueuedAt: "asc" },
+    orderBy: { reportQueuedAt: "desc" },
   });
 
   if (!candidate) {
@@ -628,10 +633,17 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
     return "no-jobs";
   }
 
-  // Atomic claim — only succeed if still queued.
+  // Atomic claim — only succeed if still queued. The
+  // `WHERE reportStatus = "queued"` guard makes this race-safe even if
+  // two workers fetched the same candidate. We also stamp
+  // reportStartedAt so we can tell from the DB how long the worker has
+  // been on the job.
   const claim = await prisma.auditOrder.updateMany({
     where: { id: candidate.id, reportStatus: "queued" },
-    data: { reportStatus: "running" },
+    data: {
+      reportStatus: "running",
+      reportStartedAt: new Date(),
+    },
   });
   if (claim.count === 0) {
     log(
@@ -641,9 +653,9 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
   }
 
   log(
-    `[geo-worker] queued job found orderId=${candidate.id} url=${candidate.websiteUrl}${
+    `[geo-worker] picked job orderId=${candidate.id} url=${candidate.websiteUrl}${
       candidate.competitorUrl ? ` (vs ${candidate.competitorUrl})` : ""
-    }`,
+    } reportQueuedAt=${candidate.reportQueuedAt?.toISOString() ?? "null"}`,
   );
   log(`[geo-worker] audit started orderId=${candidate.id}`);
 
