@@ -167,6 +167,11 @@ one of those fetches.
 closing remarks. Voice: blunt consultant, short sentences. No SEO
 jargon — if you must use a term, explain it once in plain English.
 
+**Never omit the "Recommended Next Step: GEO Foundation Fix"
+section.** It is mandatory. Paste it verbatim from the template
+below as section 5 — do not paraphrase, do not change wording, do
+not change pricing, do not drop bullets.
+
 # GEO Visibility Report
 
 **Site:** ${websiteUrl}  ·  **Generated:** <today, plain English>
@@ -197,11 +202,28 @@ visibility, stronger trust signals, higher chance of being recommended,
 more inbound lead opportunity. No score promises. No fabricated traffic
 numbers.
 
-## 5. Recommended Next Step
-2–3 short sentences offering the customer two paths:
-- They can hand this report to their web developer.
-- Or GeoViz can implement the fixes for them.
-End with: "Reply to this email or request a fix plan to get started."
+## 5. Recommended Next Step: GEO Foundation Fix
+
+Paste this section EXACTLY as written below. Do not paraphrase. Do
+not modify pricing. Do not drop bullets:
+
+If you want this handled for you, GeoViz offers a done-for-you GEO Foundation Fix.
+
+**What we implement:**
+- LocalBusiness / Service schema setup
+- AI crawler guidance with llms.txt
+- robots.txt review and cleanup if needed
+- FAQ content structure for AI answers
+- service/location signal improvements
+- priority fixes from this report
+
+**Why it matters:** These are the foundational signals AI systems use to understand, trust, and recommend a local business.
+
+**Timeline:** Typically completed in 3–5 business days.
+
+**Investment:** $497 one-time
+
+**Next step:** Reply to this email or click the fix request link to have GeoViz handle it.
 
 End immediately after the next-step CTA. No closing summary.`;
   }
@@ -232,6 +254,10 @@ no closing remarks.
   explain it once in plain English.
 - No long paragraphs. Punchy and actionable.
 - No repeating the same issue across sections.
+- **Never omit the "Recommended Next Step: GEO Foundation Fix"
+  section.** It is mandatory. Paste it verbatim from the template
+  below as section 5 — do not paraphrase, do not change wording,
+  do not change pricing, do not drop bullets.
 
 # GEO Visibility Report
 
@@ -263,11 +289,28 @@ visibility, stronger trust signals, higher chance of being recommended,
 more inbound lead opportunity. No score promises. No fabricated traffic
 numbers.
 
-## 5. Recommended Next Step
-2–3 short sentences offering the customer two paths:
-- They can hand this report to their web developer.
-- Or GeoViz can implement the fixes for them.
-End with: "Reply to this email or request a fix plan to get started."
+## 5. Recommended Next Step: GEO Foundation Fix
+
+Paste this section EXACTLY as written below. Do not paraphrase. Do
+not modify pricing. Do not drop bullets:
+
+If you want this handled for you, GeoViz offers a done-for-you GEO Foundation Fix.
+
+**What we implement:**
+- LocalBusiness / Service schema setup
+- AI crawler guidance with llms.txt
+- robots.txt review and cleanup if needed
+- FAQ content structure for AI answers
+- service/location signal improvements
+- priority fixes from this report
+
+**Why it matters:** These are the foundational signals AI systems use to understand, trust, and recommend a local business.
+
+**Timeline:** Typically completed in 3–5 business days.
+
+**Investment:** $497 one-time
+
+**Next step:** Reply to this email or click the fix request link to have GeoViz handle it.
 
 ## 6. Technical Details
 <details>
