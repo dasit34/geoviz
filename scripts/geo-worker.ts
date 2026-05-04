@@ -49,8 +49,10 @@ const TIMEOUT_MS = Number(process.env.GEO_WORKER_TIMEOUT_MS ?? 300_000); // 5 mi
 const POLL_MS = Number(process.env.GEO_WORKER_POLL_MS ?? 12_000); // loop-mode poll cadence
 const LOOP_MODE =
   process.env.GEO_WORKER_LOOP === "true" || process.argv.includes("--loop");
-// "api" (production default — direct Anthropic SDK call)
-// "cli" (dev fallback — spawns scripts/run-geo-audit.sh; requires Claude CLI)
+// "api"  (production default — direct Anthropic SDK call, full 6-section audit)
+// "fast" (API call with abbreviated prompt — summary + quick wins + score only,
+//         target <60s)
+// "cli"  (dev fallback — spawns scripts/run-geo-audit.sh; requires Claude CLI)
 //
 // Env-parse is whitespace- and case-insensitive so a value like " API " or
 // "api\r" (which can happen with copy/pasted values in some hosts) still
@@ -58,7 +60,14 @@ const LOOP_MODE =
 const AUDIT_MODE =
   (process.env.GEO_AUDIT_MODE ?? "").trim().toLowerCase() || "api";
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
-const ANTHROPIC_MAX_TOKENS = Number(process.env.ANTHROPIC_MAX_TOKENS ?? 8_000);
+// Hard default 8000 even if the env var is set to a malformed value.
+const ANTHROPIC_MAX_TOKENS = (() => {
+  const raw = Number(process.env.ANTHROPIC_MAX_TOKENS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 8_000;
+})();
+// Warn (don't fail) when a single audit takes longer than this. Helps spot
+// trends before they hit the hard timeout.
+const SLOW_WARN_MS = Number(process.env.GEO_WORKER_SLOW_WARN_MS ?? 90_000);
 const SCRIPT_PATH = path.resolve(
   process.cwd(),
   "scripts",
@@ -118,7 +127,7 @@ function runAudit(
   competitorUrl: string | null,
 ): Promise<WrapperResult> {
   if (AUDIT_MODE === "cli") return runWrapperCli(websiteUrl, competitorUrl);
-  return runViaApi(websiteUrl, competitorUrl);
+  return runViaApi(websiteUrl, competitorUrl, { fast: AUDIT_MODE === "fast" });
 }
 
 // ---- API mode (production default) ----
@@ -131,10 +140,45 @@ function runAudit(
 function buildAuditPrompt(
   websiteUrl: string,
   competitorUrl: string | null,
+  options: { fast?: boolean } = {},
 ): string {
   const competitorClause = competitorUrl
     ? `\n**Competitor URL** (compare against this): ${competitorUrl}\n`
     : "\n**Competitor URL**: (none provided)\n";
+
+  if (options.fast) {
+    // Fast mode — summary + quick wins + score only. Target <60s.
+    return `You are a senior GEO (Generative Engine Optimization) consultant. Produce
+a compact AI-visibility report.
+
+**Target URL**: ${websiteUrl}${competitorClause}
+GEO = optimizing a site so ChatGPT, Claude, Perplexity, Gemini, and Google
+AI Overviews can find, understand, cite, and recommend it.
+
+**Web access — minimal.** Fetch ONLY:
+  1. The target homepage
+  2. /robots.txt
+Do NOT crawl. Do NOT fetch sitemap.xml. Do NOT fetch llms.txt unless
+robots.txt explicitly references it. Do NOT fabricate findings.
+
+**Output budget: 800–1,200 words total.** Be direct. Markdown only, no
+preamble, no closing remarks.
+
+# GEO Audit Report
+
+## 1. Summary (5–7 bullets)
+- Biggest issues (3–4 bullets)
+- Biggest opportunities (2–3 bullets)
+
+## 5. Quick Wins (Top 5)
+Numbered 1–5 by ROI. Each: one-line action + one-line "why".
+
+## 6. Score (0–100)
+Score + status (Poor / At Risk / Competitive / Strong / Elite). 2–3 line
+reasoning.
+
+End immediately after the score reasoning. No closing summary.`;
+  }
 
   return `You are a senior GEO (Generative Engine Optimization) consultant. Produce
 a concise, client-ready AI-visibility audit in markdown.
@@ -152,53 +196,58 @@ Do NOT crawl every page on the site. Do NOT fetch sitemap.xml unless
 robots.txt directly references it. Do NOT fabricate findings — every
 claim must trace back to one of those fetches.
 
-**Output budget: 1,500–3,000 words total.** Be direct. Cut filler. No
-preamble, no closing remarks. Markdown only.
+**Output budget: 1,500–2,500 words total.** Be direct. Cut filler. No
+preamble, no closing remarks. Markdown only. No repeating the same
+issue across sections.
 
-# AI Visibility Report — <business name>
+# GEO Audit Report
 
-**Site:** <target URL>  ·  **Generated:** <today, plain English>
+## 1. Summary (5–7 bullets)
+- Biggest issues (3–4 bullets)
+- Biggest opportunities (2–3 bullets)
 
-## Executive Summary
-3–4 sentences. Lead with the verdict and one concrete consequence.
+## 2. Technical Issues
+Cover only what's actually visible on the homepage:
+- SEO basics (title, meta description, h1/h2 structure)
+- Performance issues (page weight, render-blocking, large unoptimized images)
+- Mobile / responsiveness signals
+- Broken or missing elements (404 assets, empty links, missing favicon)
+3–6 bullets max. One sentence each. Skip anything you can't substantiate.
 
-## AI Visibility Score
-A score out of 100 + a status label (Poor / At Risk / Competitive / Strong / Elite). One sentence justifying the number.
+## 3. Content & Messaging
+- Clarity of offer (what they sell, in plain words)
+- Trust signals (reviews, testimonials, certifications, years in business)
+- Conversion issues (above-the-fold clarity, friction)
+- CTA quality (visible, specific, action-verb)
+3–5 bullets. Each: one-line gap + one-line lost-lead consequence.
 
-## AI Crawler Accessibility
-Bullet list of crawlers (GPTBot, ChatGPT-User, ClaudeBot, anthropic-ai,
-PerplexityBot, Google-Extended, Googlebot) and their access state from
-robots.txt. One quote per blocked or partially-allowed bot, max.
+## 4. Local SEO (VERY IMPORTANT)
+- Location signals (city/region named in title/H1/copy)
+- Service area clarity (cities, zips, neighborhoods listed)
+- NAP consistency (name / address / phone visible and consistent)
+- Schema (LocalBusiness, Service, FAQPage — note what's present from
+  the rendered HTML, what's missing)
+3–5 bullets. If a critical schema is missing, include ONE paste-ready
+JSON-LD block (LocalBusiness preferred).
 
-## llms.txt
-One sentence on whether it exists. If missing, ONE paste-ready /llms.txt
-block (≤ 30 lines) tailored to this business.
+## 5. Quick Wins (Top 5)
+Numbered 1–5 by ROI. Each item: one-line action + one-line "why this
+first". Must be fast to implement (<2 hours of work each).
 
-## Schema Recommendations
-One paragraph on what's currently present. ONE paste-ready JSON-LD block
-for the most impactful missing schema (LocalBusiness or Organization).
-Skip schemas you can't substantiate from the page.
+## 6. Score (0–100)
+Score + status label (Poor / At Risk / Competitive / Strong / Elite).
+2–3 lines of reasoning — what drove the number.
 
-## Content Gaps
-3–5 bullet points max. Each: one-sentence gap + one-sentence lost-lead
-consequence. No fluff.
-
-## Local Authority Checks
-3–5 bullets covering NAP consistency, GBP presence (if discoverable),
-review signals, third-party citations, sameAs graph.
-
-## Priority Fixes (Top 5)
-Numbered 1–5 by impact. Each item: one-line action + one-line
-"why this first". Include paste-ready code only for the top 1–2 items.
-
-End immediately after fix #5. No closing summary.`;
+End immediately after the score reasoning. No closing summary.`;
 }
 
 async function runViaApi(
   websiteUrl: string,
   competitorUrl: string | null,
+  options: { fast?: boolean } = {},
 ): Promise<WrapperResult> {
   const startedAt = Date.now();
+  const profile = options.fast ? "fast" : "full";
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -214,15 +263,25 @@ async function runViaApi(
   }
 
   log(
-    `[geo-worker] starting audit (api mode) model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS} timeoutMs=${TIMEOUT_MS}`,
+    `[geo-worker] starting audit (api mode · profile=${profile}) model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS} timeoutMs=${TIMEOUT_MS}`,
   );
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  // Soft warning if a single audit runs past SLOW_WARN_MS (default 90s).
+  // Doesn't abort — just logs so trends are visible before they hit the
+  // hard timeout.
+  const slowWarn = setTimeout(() => {
+    logErr(
+      `[geo-worker] slow_generation_warning · audit running >${Math.round(
+        SLOW_WARN_MS / 1000,
+      )}s · model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS} profile=${profile}`,
+    );
+  }, SLOW_WARN_MS);
 
   try {
     const client = new Anthropic({ apiKey });
-    const prompt = buildAuditPrompt(websiteUrl, competitorUrl);
+    const prompt = buildAuditPrompt(websiteUrl, competitorUrl, options);
 
     const response = await client.messages.create(
       {
@@ -241,6 +300,7 @@ async function runViaApi(
       { signal: controller.signal },
     );
     clearTimeout(timer);
+    clearTimeout(slowWarn);
 
     const elapsedMs = Date.now() - startedAt;
     const markdown = response.content
@@ -273,6 +333,7 @@ async function runViaApi(
     };
   } catch (err) {
     clearTimeout(timer);
+    clearTimeout(slowWarn);
     const elapsedMs = Date.now() - startedAt;
     if (controller.signal.aborted) {
       return {
@@ -679,18 +740,20 @@ function preflightOrExit(): void {
   }
 
   // 2. Audit-mode-specific checks.
-  if (AUDIT_MODE !== "api" && AUDIT_MODE !== "cli") {
+  if (AUDIT_MODE !== "api" && AUDIT_MODE !== "fast" && AUDIT_MODE !== "cli") {
     logErr(
-      `[geo-worker] PREFLIGHT FAILED — unknown GEO_AUDIT_MODE='${AUDIT_MODE}'. Use 'api' (production) or 'cli' (dev fallback).`,
+      `[geo-worker] PREFLIGHT FAILED — unknown GEO_AUDIT_MODE='${AUDIT_MODE}'. Use 'api' (full report), 'fast' (summary + quick wins + score), or 'cli' (dev fallback).`,
     );
     process.exit(1);
   }
 
-  if (AUDIT_MODE === "api") {
-    log("[geo-worker] api mode — skipping Claude CLI / wrapper checks");
+  if (AUDIT_MODE === "api" || AUDIT_MODE === "fast") {
+    log(
+      `[geo-worker] ${AUDIT_MODE} mode — skipping Claude CLI / wrapper checks`,
+    );
     if (!process.env.ANTHROPIC_API_KEY) {
       logErr(
-        "[geo-worker] PREFLIGHT FAILED — ANTHROPIC_API_KEY not set (required for GEO_AUDIT_MODE=api).",
+        `[geo-worker] PREFLIGHT FAILED — ANTHROPIC_API_KEY not set (required for GEO_AUDIT_MODE=${AUDIT_MODE}).`,
       );
       logErr(
         "[geo-worker]   Set it in Railway → Service → Variables and redeploy.",
@@ -698,7 +761,7 @@ function preflightOrExit(): void {
       process.exit(1);
     }
     log(
-      `[geo-worker] preflight ok · mode=api · model=${ANTHROPIC_MODEL} · maxTokens=${ANTHROPIC_MAX_TOKENS} · timeoutMs=${TIMEOUT_MS} · ANTHROPIC_API_KEY length=${process.env.ANTHROPIC_API_KEY.length}`,
+      `[geo-worker] preflight ok · mode=${AUDIT_MODE} · model=${ANTHROPIC_MODEL} · maxTokens=${ANTHROPIC_MAX_TOKENS} · timeoutMs=${TIMEOUT_MS} · slowWarnMs=${SLOW_WARN_MS} · ANTHROPIC_API_KEY length=${process.env.ANTHROPIC_API_KEY.length}`,
     );
     return;
   }
