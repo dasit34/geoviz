@@ -4,18 +4,30 @@ html,
 body {
   background: #ffffff !important;
   color: #1a1a1a !important;
+  margin: 0;
+  padding: 0;
+}
+
+/* Physical page setup. With preferCSSPageSize:true, puppeteer honors
+   this @page rule for PDF margins instead of its JS defaults. The
+   `margin: 0 auto` on .print-root centers the content column inside
+   that printable area. */
+@page {
+  size: A4;
+  margin: 14mm 14mm 18mm 14mm;
 }
 
 .print-root {
   max-width: 760px;
   margin: 0 auto;
-  padding: 48px 64px 64px;
+  padding: 56px 56px 64px;
   background: #ffffff;
   color: #1a1a1a;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
     "Helvetica Neue", Arial, sans-serif;
   font-size: 14.5px;
   line-height: 1.65;
+  box-sizing: border-box;
 }
 
 /* ---- header ---- */
@@ -131,14 +143,14 @@ body {
   font-size: 17px;
   font-weight: 700;
   color: #1a1a1a;
-  margin: 26px 0 10px;
+  margin: 30px 0 10px;
   page-break-after: avoid;
 }
 .print-prose h3 {
   font-size: 13.5px;
   font-weight: 700;
   color: #1a1a1a;
-  margin: 18px 0 6px;
+  margin: 22px 0 6px;
   page-break-after: avoid;
 }
 .print-prose h4 {
@@ -149,7 +161,7 @@ body {
   page-break-after: avoid;
 }
 .print-prose p {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   color: #2a2a2a;
 }
 .print-prose strong {
@@ -167,7 +179,7 @@ body {
 }
 .print-prose ul,
 .print-prose ol {
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   padding-left: 22px;
 }
 .print-prose li {
@@ -299,14 +311,20 @@ body {
   html,
   body {
     background: #ffffff !important;
+    color: #1a1a1a !important;
   }
+  /* Keep the column centered inside the printable area defined by
+     @page. The previous version unset max-width which flushed
+     content to the left edge of A4 and looked unprofessional. */
   .print-root {
-    margin: 0;
-    padding: 0;
-    max-width: none;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    max-width: 720px !important;
+    width: auto !important;
   }
+  /* Expand collapsed details so the whole report prints. */
   .print-prose details {
-    /* expand collapsed sections in PDF so all content prints */
+    page-break-inside: avoid;
   }
   .print-prose details > *:not(summary) {
     display: block !important;
