@@ -45,7 +45,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { PrismaClient } from "@prisma/client";
 import { getDbFingerprint } from "../src/lib/db-fingerprint";
 
-const TIMEOUT_MS = Number(process.env.GEO_WORKER_TIMEOUT_MS ?? 120_000); // 2 min hard cap
+const TIMEOUT_MS = Number(process.env.GEO_WORKER_TIMEOUT_MS ?? 300_000); // 5 min hard cap
 const POLL_MS = Number(process.env.GEO_WORKER_POLL_MS ?? 12_000); // loop-mode poll cadence
 const LOOP_MODE =
   process.env.GEO_WORKER_LOOP === "true" || process.argv.includes("--loop");
@@ -58,7 +58,7 @@ const LOOP_MODE =
 const AUDIT_MODE =
   (process.env.GEO_AUDIT_MODE ?? "").trim().toLowerCase() || "api";
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
-const ANTHROPIC_MAX_TOKENS = Number(process.env.ANTHROPIC_MAX_TOKENS ?? 16_000);
+const ANTHROPIC_MAX_TOKENS = Number(process.env.ANTHROPIC_MAX_TOKENS ?? 8_000);
 const SCRIPT_PATH = path.resolve(
   process.cwd(),
   "scripts",
@@ -136,70 +136,62 @@ function buildAuditPrompt(
     ? `\n**Competitor URL** (compare against this): ${competitorUrl}\n`
     : "\n**Competitor URL**: (none provided)\n";
 
-  return `You are a senior GEO (Generative Engine Optimization) consultant. Run a full
-AI-visibility audit of a local-business website and produce a complete
-client-ready report in markdown.
+  return `You are a senior GEO (Generative Engine Optimization) consultant. Produce
+a concise, client-ready AI-visibility audit in markdown.
 
 **Target URL**: ${websiteUrl}${competitorClause}
-GEO is the practice of optimizing a site so AI tools (ChatGPT, Claude,
-Perplexity, Gemini, Google AI Overviews) can find, understand, cite, and
-recommend it to local customers.
+GEO = optimizing a site so ChatGPT, Claude, Perplexity, Gemini, and Google
+AI Overviews can find, understand, cite, and recommend it.
 
-**Use the web_search tool** to fetch the live target page, its robots.txt,
-its sitemap.xml, and check for an /llms.txt. If a competitor URL is
-provided, fetch it too. Do NOT fabricate findings — every claim must
-trace back to something you actually fetched in this session.
+**Web access — use sparingly.** Fetch ONLY:
+  1. The target homepage
+  2. /robots.txt
+  3. /llms.txt (if present; if 404, note it)
+  4. The competitor homepage if provided
+Do NOT crawl every page on the site. Do NOT fetch sitemap.xml unless
+robots.txt directly references it. Do NOT fabricate findings — every
+claim must trace back to one of those fetches.
 
-**Output a markdown report with the following sections, in this order:**
+**Output budget: 1,500–3,000 words total.** Be direct. Cut filler. No
+preamble, no closing remarks. Markdown only.
 
-# AI Visibility Report — <business name inferred from the page>
+# AI Visibility Report — <business name>
 
-**Site:** <target URL>
-**Generated:** <today's date in plain English>
+**Site:** <target URL>  ·  **Generated:** <today, plain English>
 
 ## Executive Summary
-3–5 short sentences. Lead with the verdict.
+3–4 sentences. Lead with the verdict and one concrete consequence.
 
 ## AI Visibility Score
-A score out of 100 plus a status label (one of: **Poor**, **At Risk**,
-**Competitive**, **Strong**, **Elite**). Two-sentence justification.
+A score out of 100 + a status label (Poor / At Risk / Competitive / Strong / Elite). One sentence justifying the number.
 
 ## AI Crawler Accessibility
-robots.txt + meta-robots policy for: GPTBot, ChatGPT-User, ClaudeBot,
-anthropic-ai, PerplexityBot, Google-Extended, Googlebot. Note any blocks
-or partial allows. Quote the relevant lines.
+Bullet list of crawlers (GPTBot, ChatGPT-User, ClaudeBot, anthropic-ai,
+PerplexityBot, Google-Extended, Googlebot) and their access state from
+robots.txt. One quote per blocked or partially-allowed bot, max.
 
 ## llms.txt
-Whether the site has /llms.txt today. If missing, include an exact paste-
-ready /llms.txt block tailored to this business.
+One sentence on whether it exists. If missing, ONE paste-ready /llms.txt
+block (≤ 30 lines) tailored to this business.
 
 ## Schema Recommendations
-Identify currently-present schema (LocalBusiness, Service, FAQPage,
-Organization, Review). Provide paste-ready JSON-LD code blocks for what's
-missing or wrong.
+One paragraph on what's currently present. ONE paste-ready JSON-LD block
+for the most impactful missing schema (LocalBusiness or Organization).
+Skip schemas you can't substantiate from the page.
 
 ## Content Gaps
-Service clarity, location clarity, FAQ presence, citable Q&A, content
-depth. Each gap must connect to a lost-lead consequence in plain language.
+3–5 bullet points max. Each: one-sentence gap + one-sentence lost-lead
+consequence. No fluff.
 
-## Local / Business Authority Checks
-NAP (name / address / phone) consistency, Google Business Profile presence
-(note if discoverable), review signals, third-party citations, sameAs
-entity graph.
+## Local Authority Checks
+3–5 bullets covering NAP consistency, GBP presence (if discoverable),
+review signals, third-party citations, sameAs graph.
 
-## Action Plan
-Numbered list, prioritized. Top fix first. Each item: one-sentence
-concrete action + one-sentence "why this first".
+## Priority Fixes (Top 5)
+Numbered 1–5 by impact. Each item: one-line action + one-line
+"why this first". Include paste-ready code only for the top 1–2 items.
 
-## Priority Fixes
-The 3–5 highest-impact fixes. Include paste-ready code (HTML / JSON-LD /
-robots.txt directives) where appropriate.
-
-Tone: senior consultant explaining to a local business owner. Direct,
-business-focused, no SEO jargon. Each finding should connect to lost
-leads or a competitor advantage.
-
-Output markdown only — no preamble, no closing remarks. Begin output now.`;
+End immediately after fix #5. No closing summary.`;
 }
 
 async function runViaApi(
@@ -222,7 +214,7 @@ async function runViaApi(
   }
 
   log(
-    `[geo-worker] starting audit (api mode) model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS}`,
+    `[geo-worker] starting audit (api mode) model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS} timeoutMs=${TIMEOUT_MS}`,
   );
 
   const controller = new AbortController();
@@ -258,7 +250,7 @@ async function runViaApi(
       .trim();
 
     log(
-      `[geo-worker] api response received elapsedMs=${elapsedMs} stopReason=${response.stop_reason} bytes=${markdown.length}`,
+      `[geo-worker] api response received model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS} timeoutMs=${TIMEOUT_MS} elapsedMs=${elapsedMs} stopReason=${response.stop_reason} bytes=${markdown.length}`,
     );
 
     if (!markdown) {
@@ -706,7 +698,7 @@ function preflightOrExit(): void {
       process.exit(1);
     }
     log(
-      `[geo-worker] preflight ok · mode=api · model=${ANTHROPIC_MODEL} · ANTHROPIC_API_KEY length=${process.env.ANTHROPIC_API_KEY.length}`,
+      `[geo-worker] preflight ok · mode=api · model=${ANTHROPIC_MODEL} · maxTokens=${ANTHROPIC_MAX_TOKENS} · timeoutMs=${TIMEOUT_MS} · ANTHROPIC_API_KEY length=${process.env.ANTHROPIC_API_KEY.length}`,
     );
     return;
   }
