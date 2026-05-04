@@ -32,10 +32,17 @@
  */
 import "dotenv/config";
 
-import { spawn } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import {
+  accessSync,
+  appendFileSync,
+  constants as fsConstants,
+  existsSync,
+  mkdirSync,
+} from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { getDbFingerprint } from "../src/lib/db-fingerprint";
 
 const TIMEOUT_MS = Number(process.env.GEO_WORKER_TIMEOUT_MS ?? 120_000); // 2 min hard cap
 const POLL_MS = Number(process.env.GEO_WORKER_POLL_MS ?? 12_000); // loop-mode poll cadence
@@ -228,6 +235,72 @@ function runWrapper(
   });
 }
 
+// ---- DB diagnostics (safe — no credentials ever logged) ----
+async function fetchStatusCounts(
+  prisma: PrismaClient,
+): Promise<{ counts: Record<string, number>; sentCount: number; total: number }> {
+  const total = await prisma.auditOrder.count();
+  const grouped = await prisma.auditOrder.groupBy({
+    by: ["reportStatus"],
+    _count: { _all: true },
+  });
+  const counts: Record<string, number> = {
+    pending: 0,
+    queued: 0,
+    running: 0,
+    generated: 0,
+    failed: 0,
+  };
+  for (const row of grouped) {
+    counts[row.reportStatus] =
+      (counts[row.reportStatus] ?? 0) + row._count._all;
+  }
+  const sentCount = await prisma.auditOrder.count({
+    where: { reportSentToCustomerAt: { not: null } },
+  });
+  return { counts, sentCount, total };
+}
+
+async function logDbDiagnostics(prisma: PrismaClient): Promise<void> {
+  const fp = getDbFingerprint();
+  if (fp) {
+    log(
+      `[geo-worker] db host=${fp.host}${fp.port ? `:${fp.port}` : ""} name=${fp.database} fingerprint=${fp.fingerprint}`,
+    );
+  } else {
+    log("[geo-worker] db fingerprint unavailable (DATABASE_URL not parseable)");
+  }
+
+  try {
+    const { counts, sentCount, total } = await fetchStatusCounts(prisma);
+    log(
+      `[geo-worker] AuditOrder count=${total} byReportStatus={pending:${counts.pending} queued:${counts.queued} running:${counts.running} generated:${counts.generated} failed:${counts.failed}} sent=${sentCount}`,
+    );
+
+    const latest = await prisma.auditOrder.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        businessName: true,
+        websiteUrl: true,
+        paymentStatus: true,
+        reportStatus: true,
+        createdAt: true,
+      },
+    });
+    log(`[geo-worker] latest ${latest.length} order(s):`);
+    for (const o of latest) {
+      log(
+        `  - id=${o.id} pay=${o.paymentStatus} report=${o.reportStatus} biz="${o.businessName ?? "(no name)"}" url=${o.websiteUrl} created=${o.createdAt.toISOString()}`,
+      );
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logErr(`[geo-worker] db diagnostics query failed — ${message}`);
+  }
+}
+
 // ---- last-N-lines helper ----
 function tail(text: string, lineCount: number): string {
   const lines = text.split(/\r?\n/);
@@ -235,15 +308,19 @@ function tail(text: string, lineCount: number): string {
 }
 
 // ---- per-job pipeline ----
-async function processOneJob(prisma: PrismaClient): Promise<void> {
+type PollResult = "processed" | "claimed-by-other" | "no-jobs";
+
+async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
   const candidate = await prisma.auditOrder.findFirst({
     where: { reportStatus: "queued" },
     orderBy: { reportQueuedAt: "asc" },
   });
 
   if (!candidate) {
-    log("[geo-worker] no queued jobs — exiting");
-    return;
+    // The function just returns "no-jobs" — the caller decides whether to
+    // exit (single-shot) or wait and poll again (loop). We DO NOT log
+    // "exiting" here; that decision belongs to main().
+    return "no-jobs";
   }
 
   // Atomic claim — only succeed if still queued.
@@ -253,9 +330,9 @@ async function processOneJob(prisma: PrismaClient): Promise<void> {
   });
   if (claim.count === 0) {
     log(
-      `[geo-worker] orderId=${candidate.id} was claimed by another worker — exiting`,
+      `[geo-worker] orderId=${candidate.id} was claimed by another worker — skipping`,
     );
-    return;
+    return "claimed-by-other";
   }
 
   log(
@@ -292,7 +369,7 @@ async function processOneJob(prisma: PrismaClient): Promise<void> {
       log(
         `[geo-worker] audit completed orderId=${candidate.id} elapsedMs=${result.elapsedMs}`,
       );
-      return;
+      return "processed";
     }
 
     // Failure — preserve the last 20 lines of stderr in reportError.
@@ -322,6 +399,7 @@ async function processOneJob(prisma: PrismaClient): Promise<void> {
     logErr(
       `[geo-worker] audit failed orderId=${candidate.id} reason=${result.reason} exit=${result.exitCode ?? "null"} elapsedMs=${result.elapsedMs}: ${result.error}`,
     );
+    return "processed";
   } catch (err) {
     // Catch-all for any unexpected exception inside the worker (DB blip,
     // promise rejection, etc.). Mark the row failed so it doesn't stick.
@@ -366,6 +444,7 @@ async function processOneJob(prisma: PrismaClient): Promise<void> {
       }
     }
   }
+  return "processed";
 }
 
 // ---- main ----
@@ -383,17 +462,51 @@ function sleep(ms: number, isShuttingDown: () => boolean): Promise<void> {
   });
 }
 
-async function main(): Promise<void> {
+function preflightOrExit(): void {
+  // 1. DATABASE_URL must be set (the worker is useless without it).
   if (!process.env.DATABASE_URL) {
-    logErr("[geo-worker] DATABASE_URL is not set. Aborting.");
-    process.exit(1);
-  }
-  if (!existsSync(SCRIPT_PATH)) {
     logErr(
-      `[geo-worker] wrapper script missing at ${SCRIPT_PATH}. Aborting.`,
+      "[geo-worker] PREFLIGHT FAILED — DATABASE_URL is not set. " +
+        "Set it in Railway → Service → Variables (use the same Postgres URL Vercel reads).",
     );
     process.exit(1);
   }
+
+  // 2. Wrapper script must exist AND be executable.
+  if (!existsSync(SCRIPT_PATH)) {
+    logErr(
+      `[geo-worker] PREFLIGHT FAILED — wrapper script missing at ${SCRIPT_PATH}. ` +
+        "Confirm scripts/run-geo-audit.sh is in the repo and the deploy includes it.",
+    );
+    process.exit(1);
+  }
+  try {
+    accessSync(SCRIPT_PATH, fsConstants.X_OK);
+  } catch {
+    logErr(
+      `[geo-worker] PREFLIGHT FAILED — wrapper script at ${SCRIPT_PATH} is not executable. ` +
+        "Run: chmod +x scripts/run-geo-audit.sh (and commit). On Railway/Nixpacks add the chmod to the build step.",
+    );
+    process.exit(1);
+  }
+
+  // 3. Claude CLI must be on PATH — the wrapper invokes `claude -p`.
+  const probe = spawnSync("claude", ["--version"], { encoding: "utf8" });
+  if (probe.error || probe.status !== 0) {
+    const reason =
+      probe.error?.message ?? `exit code ${probe.status ?? "unknown"}`;
+    logErr(
+      `[geo-worker] PREFLIGHT FAILED — Claude CLI not callable on PATH (${reason}). ` +
+        "Install Claude Code on the host: https://claude.com/claude-code · " +
+        "On Railway add it to the build/start image. The worker cannot run audits without it.",
+    );
+    process.exit(1);
+  }
+  log(`[geo-worker] preflight ok · claude ${probe.stdout.trim()}`);
+}
+
+async function main(): Promise<void> {
+  preflightOrExit();
 
   const prisma = new PrismaClient();
 
@@ -403,6 +516,7 @@ async function main(): Promise<void> {
   try {
     await prisma.$connect();
     log("[geo-worker] Prisma connected successfully");
+    await logDbDiagnostics(prisma);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // Strip any accidental URL leakage from the message before logging.
@@ -424,16 +538,29 @@ async function main(): Promise<void> {
     log(
       `[geo-worker] starting (single-shot) · timeout=${TIMEOUT_MS}ms · script=${SCRIPT_PATH} · log=${LOG_FILE}`,
     );
+    let result: PollResult = "no-jobs";
     try {
-      await processOneJob(prisma);
+      result = await processOneJob(prisma);
     } finally {
       await prisma.$disconnect();
+    }
+    if (result === "no-jobs") {
+      try {
+        const { counts } = await fetchStatusCounts(prisma).catch(() => ({
+          counts: { pending: 0, queued: 0, running: 0, generated: 0, failed: 0 },
+        }));
+        log(
+          `[geo-worker] no queued jobs — exiting (single-shot · counts: pending=${counts.pending} queued=${counts.queued} running=${counts.running} generated=${counts.generated} failed=${counts.failed})`,
+        );
+      } catch {
+        log("[geo-worker] no queued jobs — exiting (single-shot)");
+      }
     }
     log("[geo-worker] done");
     return;
   }
 
-  // ---- loop mode ----
+  // ---- loop mode (runs forever, exits only on SIGINT/SIGTERM) ----
   log(
     `[geo-worker] starting (loop) · poll=${POLL_MS}ms · timeout=${TIMEOUT_MS}ms · script=${SCRIPT_PATH} · log=${LOG_FILE}`,
   );
@@ -447,21 +574,40 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => onSignal("SIGINT"));
   process.on("SIGTERM", () => onSignal("SIGTERM"));
 
+  let pollCount = 0;
   try {
     while (!shutdown) {
+      pollCount++;
+      log(`[geo-worker] poll #${pollCount} starting`);
+      let result: PollResult = "no-jobs";
       try {
-        await processOneJob(prisma);
+        result = await processOneJob(prisma);
       } catch (err) {
-        logErr("[geo-worker] poll-level error:", err);
+        logErr("[geo-worker] poll-level error (loop continues):", err);
       }
       if (shutdown) break;
+
+      if (result === "no-jobs") {
+        log(
+          `[geo-worker] poll #${pollCount} done · no queued jobs · waiting ${Math.round(POLL_MS / 1000)}s before next poll`,
+        );
+      } else if (result === "claimed-by-other") {
+        log(
+          `[geo-worker] poll #${pollCount} done · row claimed by another worker · waiting ${Math.round(POLL_MS / 1000)}s before next poll`,
+        );
+      } else {
+        log(
+          `[geo-worker] poll #${pollCount} done · job processed · waiting ${Math.round(POLL_MS / 1000)}s before next poll`,
+        );
+      }
+
       await sleep(POLL_MS, () => shutdown);
     }
   } finally {
     await prisma.$disconnect();
   }
 
-  log("[geo-worker] shut down cleanly");
+  log(`[geo-worker] shut down cleanly · processed ${pollCount} poll(s)`);
 }
 
 main().catch((err) => {

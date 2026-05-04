@@ -2,6 +2,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { AdminReportCard } from "@/components/AdminReportCard";
 import { prisma, isDatabaseConfigured } from "@/lib/db";
+import { getDbFingerprint } from "@/lib/db-fingerprint";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -53,6 +54,40 @@ export default async function AdminReportsPage({
     take: 200,
   });
 
+  // ---- Debug DB diagnostics (no credentials ever rendered) ----
+  const fp = getDbFingerprint();
+  const totalCount = await prisma.auditOrder.count();
+  const grouped = await prisma.auditOrder.groupBy({
+    by: ["reportStatus"],
+    _count: { _all: true },
+  });
+  const statusCounts: Record<string, number> = {
+    pending: 0,
+    queued: 0,
+    running: 0,
+    generated: 0,
+    failed: 0,
+  };
+  for (const row of grouped) {
+    statusCounts[row.reportStatus] =
+      (statusCounts[row.reportStatus] ?? 0) + row._count._all;
+  }
+  const sentCount = await prisma.auditOrder.count({
+    where: { reportSentToCustomerAt: { not: null } },
+  });
+  const latestFive = await prisma.auditOrder.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    select: {
+      id: true,
+      businessName: true,
+      websiteUrl: true,
+      paymentStatus: true,
+      reportStatus: true,
+      createdAt: true,
+    },
+  });
+
   return (
     <main>
       <Header />
@@ -64,6 +99,92 @@ export default async function AdminReportsPage({
           to review it inline, mark it approved, then send it to the customer
           via email — all without leaving this page.
         </p>
+
+        <details className="mt-6 rounded-lg border border-white/10 bg-white/[0.02] p-4 text-xs">
+          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55 hover:text-white">
+            Debug DB
+          </summary>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <dl className="space-y-1.5 font-mono text-[11px]">
+              <div className="flex justify-between gap-3">
+                <dt className="text-white/45">Host</dt>
+                <dd className="text-white/85">
+                  {fp ? `${fp.host}${fp.port ? `:${fp.port}` : ""}` : "(unset)"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-white/45">Database</dt>
+                <dd className="text-white/85">{fp?.database ?? "(unknown)"}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-white/45">Fingerprint</dt>
+                <dd className="text-white/85 break-all">
+                  {fp?.fingerprint ?? "(n/a)"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-white/45">Total orders</dt>
+                <dd className="text-white/85">{totalCount}</dd>
+              </div>
+            </dl>
+            <dl className="space-y-1.5 font-mono text-[11px]">
+              {(
+                [
+                  "pending",
+                  "queued",
+                  "running",
+                  "generated",
+                  "failed",
+                ] as const
+              ).map((s) => (
+                <div key={s} className="flex justify-between gap-3">
+                  <dt className="text-white/45">reportStatus = {s}</dt>
+                  <dd className="text-white/85">{statusCounts[s] ?? 0}</dd>
+                </div>
+              ))}
+              <div className="flex justify-between gap-3">
+                <dt className="text-white/45">sent (customer)</dt>
+                <dd className="text-white/85">{sentCount}</dd>
+              </div>
+            </dl>
+          </div>
+          <div className="mt-4">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-white/45">
+              Latest 5 orders
+            </p>
+            <ul className="mt-2 space-y-1 font-mono text-[11px]">
+              {latestFive.map((o) => (
+                <li
+                  key={o.id}
+                  className="rounded border border-white/[0.06] bg-black/20 px-2 py-1.5"
+                >
+                  <span className="text-white/45">id=</span>
+                  <span className="text-white/85">{o.id}</span>
+                  <span className="text-white/45"> · pay=</span>
+                  <span className="text-white/85">{o.paymentStatus}</span>
+                  <span className="text-white/45"> · report=</span>
+                  <span className="text-white/85">{o.reportStatus}</span>
+                  <span className="text-white/45"> · biz=</span>
+                  <span className="text-white/85">
+                    "{o.businessName ?? "(no name)"}"
+                  </span>
+                  <div className="mt-0.5 text-white/55">
+                    <span className="text-white/45">url=</span>
+                    {o.websiteUrl}
+                    <span className="text-white/45"> · created=</span>
+                    {o.createdAt.toISOString()}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="mt-4 text-[10px] leading-relaxed text-white/45">
+            Worker startup logs print this same fingerprint and counts.
+            If the two don&apos;t match, Vercel and the worker are pointed
+            at different databases. Compare against the worker&apos;s
+            <code className="mx-1">[geo-worker] db host=…</code> line.
+          </p>
+        </details>
 
         {orders.length === 0 ? (
           <div className="mt-10 rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-12 text-center">

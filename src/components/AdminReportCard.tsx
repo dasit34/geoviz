@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ReportViewerClient } from "./ReportViewerClient";
 import { parseReportScore, scoreTone } from "@/lib/parse-report-score";
 
@@ -63,6 +63,84 @@ export function AdminReportCard({
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"ok" | "warn" | "err">("ok");
 
+  /**
+   * Single source of truth for state updates. Every report-side state
+   * transition flows through this helper, regardless of whether it came
+   * from a POST response or a polling GET. Logs every update so network
+   * → state propagation is observable in the console.
+   */
+  const applyOrderUpdate = useCallback(
+    (server: {
+      reportStatus?: string;
+      reportMarkdown?: string | null;
+      reportError?: string | null;
+      reportGeneratedAt?: string | null;
+      reportSentToCustomerAt?: string | null;
+      reviewStatus?: string;
+      adminNotes?: string | null;
+      qualityScore?: number | null;
+    }) => {
+      if (server.reportStatus !== undefined) {
+        setReportStatus(server.reportStatus);
+        // Auto-expand the report when status flips to generated.
+        if (server.reportStatus === "generated") setExpanded(true);
+      }
+      if (server.reportMarkdown !== undefined) setMarkdown(server.reportMarkdown);
+      if (server.reportError !== undefined) setReportError(server.reportError);
+      if (server.reportGeneratedAt !== undefined)
+        setReportGeneratedAt(server.reportGeneratedAt);
+      if (server.reportSentToCustomerAt !== undefined)
+        setReportSentAt(server.reportSentToCustomerAt);
+      if (server.reviewStatus !== undefined) setReviewStatus(server.reviewStatus);
+      if (server.adminNotes !== undefined)
+        setAdminNotes(server.adminNotes ?? "");
+      if (server.qualityScore !== undefined)
+        setQualityScore(
+          typeof server.qualityScore === "number"
+            ? String(server.qualityScore)
+            : "",
+        );
+      console.log(
+        `[admin-card] orderId=${order.id} reportStatus=${server.reportStatus ?? reportStatus}`,
+      );
+    },
+    [order.id, reportStatus],
+  );
+
+  // Poll the GET endpoint every 5s while the row is queued or running so
+  // the dashboard auto-reconciles with whatever the worker writes back.
+  // Stops automatically the moment status becomes terminal (generated /
+  // failed / pending / etc.) because the effect re-runs and exits early.
+  useEffect(() => {
+    if (reportStatus !== "queued" && reportStatus !== "running") return;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(
+          `/api/admin/orders/${order.id}?key=${encodeURIComponent(adminKey)}`,
+          { headers: { "x-admin-secret": adminKey }, cache: "no-store" },
+        );
+        if (cancelled) return;
+        const data = (await res.json().catch(() => ({}))) as {
+          success?: boolean;
+          order?: Parameters<typeof applyOrderUpdate>[0];
+        };
+        if (data.success && data.order) {
+          applyOrderUpdate(data.order);
+        }
+      } catch (err) {
+        console.error("[admin-card] poll error:", err);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [reportStatus, order.id, adminKey, applyOrderUpdate]);
+
   const post = (
     path: string,
     body: Record<string, unknown> = {},
@@ -93,20 +171,23 @@ export function AdminReportCard({
       };
       if (res.ok && data.status === "queued") {
         setTone("ok");
-        setReportStatus("queued");
-        setReportError(null);
+        applyOrderUpdate({ reportStatus: "queued", reportError: null });
         setMessage(
-          "Queued for the worker. Run `npm run geo-worker` and refresh in a minute.",
+          "Queued for the worker. Run `npm run geo-worker:dev` (loop mode) — UI will auto-update when it completes.",
         );
       } else if (res.status === 409) {
         // Either already-generated (use force=true) or already in flight.
         setTone("warn");
         setMessage(data.message ?? data.error ?? "Already in progress.");
         if (data.status === "queued" || data.status === "running") {
-          setReportStatus(data.status);
+          applyOrderUpdate({ reportStatus: data.status });
         }
       } else {
         setTone("err");
+        applyOrderUpdate({
+          reportStatus: "failed",
+          reportError: data.error ?? `HTTP ${res.status}`,
+        });
         setMessage(`Queue failed: ${data.error ?? `HTTP ${res.status}`}`);
       }
     } catch (err) {
@@ -131,7 +212,7 @@ export function AdminReportCard({
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (res.ok) {
-        setReviewStatus("approved");
+        applyOrderUpdate({ reviewStatus: "approved" });
         setTone("ok");
         setMessage("Marked reviewed.");
       } else {
@@ -174,7 +255,9 @@ export function AdminReportCard({
         setTone("ok");
         const id = data.resendId ? ` · id ${data.resendId}` : "";
         setMessage(`Sent to ${data.to ?? order.email}${id}`);
-        setReportSentAt(new Date().toISOString());
+        applyOrderUpdate({
+          reportSentToCustomerAt: new Date().toISOString(),
+        });
       } else if (res.status === 409) {
         setTone("warn");
         setMessage(data.message ?? data.error ?? "Already sent.");
@@ -215,7 +298,7 @@ export function AdminReportCard({
       if (res.ok) {
         setTone("ok");
         setMessage("Review saved.");
-        if (overrideStatus) setReviewStatus(overrideStatus);
+        if (overrideStatus) applyOrderUpdate({ reviewStatus: overrideStatus });
       } else {
         setTone("err");
         setMessage(data.error ?? `HTTP ${res.status}`);
@@ -525,14 +608,16 @@ function StatusBadges({
             : reportStatus === "failed"
               ? "Audit Failed"
               : reportStatus;
-  const reportToneClass: "ok" | "warn" | "err" | "muted" =
+  const reportToneClass: "ok" | "warn" | "err" | "muted" | "info" =
     reportStatus === "generated"
       ? "ok"
       : reportStatus === "failed"
         ? "err"
-        : reportStatus === "running" || reportStatus === "queued"
-          ? "warn"
-          : "muted";
+        : reportStatus === "running"
+          ? "info"
+          : reportStatus === "queued"
+            ? "warn"
+            : "muted";
 
   const showReview =
     reviewStatus === "approved" || reviewStatus === "needs_changes";
@@ -609,7 +694,7 @@ function Pill({
   tone,
   children,
 }: {
-  tone: "ok" | "warn" | "err" | "muted";
+  tone: "ok" | "warn" | "err" | "muted" | "info";
   children: React.ReactNode;
 }) {
   const cls =
@@ -619,7 +704,9 @@ function Pill({
         ? "border-amber-300/30 bg-amber-300/10 text-amber-200"
         : tone === "err"
           ? "border-red-400/30 bg-red-400/10 text-red-200"
-          : "border-white/15 bg-white/[0.04] text-white/60";
+          : tone === "info"
+            ? "border-sky-300/40 bg-sky-300/10 text-sky-200"
+            : "border-white/15 bg-white/[0.04] text-white/60";
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${cls}`}

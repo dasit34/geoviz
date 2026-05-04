@@ -1,24 +1,30 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
+import { getDbFingerprint } from "@/lib/db-fingerprint";
 
 /**
  * Enqueue-only handler.
  *
- * IMPORTANT: This route MUST NOT spawn the GEO audit engine. Vercel
- * functions are serverless / short-lived / sandboxed and cannot run
- * `claude` CLI, the geo-seo-claude skill, or any long-running Python
- * pipeline. The actual audit runs out-of-band by `scripts/geo-worker.ts`
- * on a host that has the engine installed (your local machine, a Railway
- * worker, etc.).
+ * Vercel functions can't run the GEO audit engine — the worker
+ * (`scripts/geo-worker.ts`) does that out-of-band. This route flips
+ * the row's reportStatus to "queued" and the worker picks it up.
  *
- * Lifecycle:
- *   admin clicks "Run GEO Audit"
- *     → this route flips reportStatus to "queued"
- *   worker polls
- *     → claims the row (queued → running)
- *     → spawns scripts/run-geo-audit.sh
- *     → writes reportMarkdown + sets reportStatus to "generated" or "failed"
+ * Always returns JSON of shape:
+ *   {
+ *     success: boolean,
+ *     orderId: string,
+ *     previousStatus: string,
+ *     newStatus: string,
+ *     dbHost: string | null,         // host:port/dbname (no creds)
+ *     status: "queued" | "already-generated" | "queued" | "running" | "error",
+ *     message?: string,
+ *     queuedAt?: string,
+ *   }
+ *
+ * The dbHost fingerprint is included so an operator can compare what
+ * Vercel writes against what the local worker sees — same fingerprint
+ * means same database.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,9 +33,15 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string } },
 ) {
+  const fp = getDbFingerprint();
+  const dbHost = fp ? fp.fingerprint : null;
+
   if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
     console.warn(`[admin-audit] unauthorized request for orderId=${params.id}`);
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: "Unauthorized", dbHost },
+      { status: 401 },
+    );
   }
 
   let force = false;
@@ -44,17 +56,32 @@ export async function POST(
     where: { id: params.id },
   });
   if (!order) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return NextResponse.json(
+      {
+        success: false,
+        orderId: params.id,
+        error: "Order not found",
+        dbHost,
+      },
+      { status: 404 },
+    );
   }
+
+  const previousStatus = order.reportStatus;
 
   // Already-generated guard. Pass {force:true} to re-queue.
   if (order.reportStatus === "generated" && !force) {
     console.log(
-      `[admin-audit] orderId=${order.id} already generated — skipping enqueue`,
+      `[admin-audit] orderId=${order.id} already generated — not re-queueing (force=false)`,
     );
     return NextResponse.json(
       {
+        success: false,
         status: "already-generated",
+        orderId: order.id,
+        previousStatus,
+        newStatus: previousStatus,
+        dbHost,
         message:
           "Report already generated. Pass {force:true} to re-queue the audit.",
       },
@@ -62,20 +89,26 @@ export async function POST(
     );
   }
 
-  // In-flight guard. The worker is already on it.
+  // In-flight guard — worker is already on it.
   if (order.reportStatus === "queued" || order.reportStatus === "running") {
     console.log(
       `[admin-audit] orderId=${order.id} already in flight (status=${order.reportStatus})`,
     );
     return NextResponse.json(
       {
+        success: false,
         status: order.reportStatus,
+        orderId: order.id,
+        previousStatus,
+        newStatus: previousStatus,
+        dbHost,
         message: `Audit is already ${order.reportStatus}. The worker will pick it up — refresh in a minute.`,
       },
       { status: 409 },
     );
   }
 
+  // Allowed to (re)queue from: pending, failed, or generated+force.
   const updated = await prisma.auditOrder.update({
     where: { id: order.id },
     data: {
@@ -86,13 +119,18 @@ export async function POST(
   });
 
   console.log(
-    `[admin-audit] queued orderId=${order.id} url=${order.websiteUrl} (force=${force})`,
+    `[admin-audit] queued orderId=${order.id} previousStatus=${previousStatus} newStatus=${updated.reportStatus} url=${order.websiteUrl} force=${force} dbHost=${dbHost ?? "unknown"}`,
   );
 
   return NextResponse.json({
+    success: true,
     status: "queued",
+    orderId: order.id,
+    previousStatus,
+    newStatus: updated.reportStatus,
+    dbHost,
     queuedAt: updated.reportQueuedAt,
     message:
-      "Audit queued. Run `npm run geo-worker` on the host that has the GEO engine installed.",
+      "Audit queued. Run `npm run geo-worker` (or `:dev` for loop mode) on the host that has the GEO engine installed.",
   });
 }
