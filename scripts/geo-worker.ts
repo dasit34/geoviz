@@ -51,7 +51,12 @@ const LOOP_MODE =
   process.env.GEO_WORKER_LOOP === "true" || process.argv.includes("--loop");
 // "api" (production default — direct Anthropic SDK call)
 // "cli" (dev fallback — spawns scripts/run-geo-audit.sh; requires Claude CLI)
-const AUDIT_MODE = (process.env.GEO_AUDIT_MODE ?? "api").toLowerCase();
+//
+// Env-parse is whitespace- and case-insensitive so a value like " API " or
+// "api\r" (which can happen with copy/pasted values in some hosts) still
+// resolves to "api". Empty / unset → defaults to "api".
+const AUDIT_MODE =
+  (process.env.GEO_AUDIT_MODE ?? "").trim().toLowerCase() || "api";
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 const ANTHROPIC_MAX_TOKENS = Number(process.env.ANTHROPIC_MAX_TOKENS ?? 16_000);
 const SCRIPT_PATH = path.resolve(
@@ -665,6 +670,13 @@ function sleep(ms: number, isShuttingDown: () => boolean): Promise<void> {
 }
 
 function preflightOrExit(): void {
+  // Surface what mode we resolved to and what Railway actually delivered.
+  // Critical for debugging cases where the env value has stray whitespace
+  // or the deploy is running stale code.
+  log(
+    `[geo-worker] resolved AUDIT_MODE='${AUDIT_MODE}' (raw GEO_AUDIT_MODE=${JSON.stringify(process.env.GEO_AUDIT_MODE ?? null)})`,
+  );
+
   // 1. DATABASE_URL must be set (the worker is useless without it).
   if (!process.env.DATABASE_URL) {
     logErr(
@@ -683,6 +695,7 @@ function preflightOrExit(): void {
   }
 
   if (AUDIT_MODE === "api") {
+    log("[geo-worker] api mode — skipping Claude CLI / wrapper checks");
     if (!process.env.ANTHROPIC_API_KEY) {
       logErr(
         "[geo-worker] PREFLIGHT FAILED — ANTHROPIC_API_KEY not set (required for GEO_AUDIT_MODE=api).",
