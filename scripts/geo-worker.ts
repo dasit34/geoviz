@@ -41,6 +41,7 @@ import {
   mkdirSync,
 } from "node:fs";
 import path from "node:path";
+import Anthropic from "@anthropic-ai/sdk";
 import { PrismaClient } from "@prisma/client";
 import { getDbFingerprint } from "../src/lib/db-fingerprint";
 
@@ -48,6 +49,11 @@ const TIMEOUT_MS = Number(process.env.GEO_WORKER_TIMEOUT_MS ?? 120_000); // 2 mi
 const POLL_MS = Number(process.env.GEO_WORKER_POLL_MS ?? 12_000); // loop-mode poll cadence
 const LOOP_MODE =
   process.env.GEO_WORKER_LOOP === "true" || process.argv.includes("--loop");
+// "api" (production default — direct Anthropic SDK call)
+// "cli" (dev fallback — spawns scripts/run-geo-audit.sh; requires Claude CLI)
+const AUDIT_MODE = (process.env.GEO_AUDIT_MODE ?? "api").toLowerCase();
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+const ANTHROPIC_MAX_TOKENS = Number(process.env.ANTHROPIC_MAX_TOKENS ?? 16_000);
 const SCRIPT_PATH = path.resolve(
   process.cwd(),
   "scripts",
@@ -101,7 +107,203 @@ type WrapperResult =
       elapsedMs: number;
     };
 
-function runWrapper(
+// ---- audit mode dispatcher ----
+function runAudit(
+  websiteUrl: string,
+  competitorUrl: string | null,
+): Promise<WrapperResult> {
+  if (AUDIT_MODE === "cli") return runWrapperCli(websiteUrl, competitorUrl);
+  return runViaApi(websiteUrl, competitorUrl);
+}
+
+// ---- API mode (production default) ----
+//
+// Direct call to the Anthropic Messages API with the web_search tool
+// enabled so the model can fetch the target page, robots.txt, sitemap.xml,
+// and llms.txt itself. Returns the assistant's text content as the
+// markdown report. NEVER fabricates findings — every claim must come
+// from a search the model performed during this single call.
+function buildAuditPrompt(
+  websiteUrl: string,
+  competitorUrl: string | null,
+): string {
+  const competitorClause = competitorUrl
+    ? `\n**Competitor URL** (compare against this): ${competitorUrl}\n`
+    : "\n**Competitor URL**: (none provided)\n";
+
+  return `You are a senior GEO (Generative Engine Optimization) consultant. Run a full
+AI-visibility audit of a local-business website and produce a complete
+client-ready report in markdown.
+
+**Target URL**: ${websiteUrl}${competitorClause}
+GEO is the practice of optimizing a site so AI tools (ChatGPT, Claude,
+Perplexity, Gemini, Google AI Overviews) can find, understand, cite, and
+recommend it to local customers.
+
+**Use the web_search tool** to fetch the live target page, its robots.txt,
+its sitemap.xml, and check for an /llms.txt. If a competitor URL is
+provided, fetch it too. Do NOT fabricate findings — every claim must
+trace back to something you actually fetched in this session.
+
+**Output a markdown report with the following sections, in this order:**
+
+# AI Visibility Report — <business name inferred from the page>
+
+**Site:** <target URL>
+**Generated:** <today's date in plain English>
+
+## Executive Summary
+3–5 short sentences. Lead with the verdict.
+
+## AI Visibility Score
+A score out of 100 plus a status label (one of: **Poor**, **At Risk**,
+**Competitive**, **Strong**, **Elite**). Two-sentence justification.
+
+## AI Crawler Accessibility
+robots.txt + meta-robots policy for: GPTBot, ChatGPT-User, ClaudeBot,
+anthropic-ai, PerplexityBot, Google-Extended, Googlebot. Note any blocks
+or partial allows. Quote the relevant lines.
+
+## llms.txt
+Whether the site has /llms.txt today. If missing, include an exact paste-
+ready /llms.txt block tailored to this business.
+
+## Schema Recommendations
+Identify currently-present schema (LocalBusiness, Service, FAQPage,
+Organization, Review). Provide paste-ready JSON-LD code blocks for what's
+missing or wrong.
+
+## Content Gaps
+Service clarity, location clarity, FAQ presence, citable Q&A, content
+depth. Each gap must connect to a lost-lead consequence in plain language.
+
+## Local / Business Authority Checks
+NAP (name / address / phone) consistency, Google Business Profile presence
+(note if discoverable), review signals, third-party citations, sameAs
+entity graph.
+
+## Action Plan
+Numbered list, prioritized. Top fix first. Each item: one-sentence
+concrete action + one-sentence "why this first".
+
+## Priority Fixes
+The 3–5 highest-impact fixes. Include paste-ready code (HTML / JSON-LD /
+robots.txt directives) where appropriate.
+
+Tone: senior consultant explaining to a local business owner. Direct,
+business-focused, no SEO jargon. Each finding should connect to lost
+leads or a competitor advantage.
+
+Output markdown only — no preamble, no closing remarks. Begin output now.`;
+}
+
+async function runViaApi(
+  websiteUrl: string,
+  competitorUrl: string | null,
+): Promise<WrapperResult> {
+  const startedAt = Date.now();
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return {
+      ok: false,
+      reason: "spawn-failed",
+      error:
+        "ANTHROPIC_API_KEY not set. Set it in Railway → Service → Variables and redeploy.",
+      stderr: "",
+      exitCode: null,
+      elapsedMs: Date.now() - startedAt,
+    };
+  }
+
+  log(
+    `[geo-worker] starting audit (api mode) model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS}`,
+  );
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const prompt = buildAuditPrompt(websiteUrl, competitorUrl);
+
+    const response = await client.messages.create(
+      {
+        model: ANTHROPIC_MODEL,
+        max_tokens: ANTHROPIC_MAX_TOKENS,
+        // Server-hosted web_search tool — lets the model fetch the live
+        // page + robots.txt + sitemap.xml during the audit.
+        tools: [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+          } as unknown as Anthropic.Messages.Tool,
+        ],
+        messages: [{ role: "user", content: prompt }],
+      },
+      { signal: controller.signal },
+    );
+    clearTimeout(timer);
+
+    const elapsedMs = Date.now() - startedAt;
+    const markdown = response.content
+      .filter((b): b is Anthropic.Messages.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+
+    log(
+      `[geo-worker] api response received elapsedMs=${elapsedMs} stopReason=${response.stop_reason} bytes=${markdown.length}`,
+    );
+
+    if (!markdown) {
+      return {
+        ok: false,
+        reason: "empty-output",
+        error: `Anthropic API returned no text content (stop_reason=${response.stop_reason}).`,
+        stderr: JSON.stringify(response.content).slice(0, 4000),
+        exitCode: 0,
+        elapsedMs,
+      };
+    }
+
+    return {
+      ok: true,
+      markdown,
+      exitCode: 0,
+      stderr: "",
+      elapsedMs,
+    };
+  } catch (err) {
+    clearTimeout(timer);
+    const elapsedMs = Date.now() - startedAt;
+    if (controller.signal.aborted) {
+      return {
+        ok: false,
+        reason: "timeout",
+        error: `Anthropic API call timed out after ${Math.round(TIMEOUT_MS / 1000)}s`,
+        stderr: "",
+        exitCode: null,
+        elapsedMs,
+      };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      reason: "non-zero-exit",
+      error: `Anthropic API error: ${message}`,
+      stderr: "",
+      exitCode: null,
+      elapsedMs,
+    };
+  }
+}
+
+// ---- CLI mode (dev fallback only) ----
+//
+// Spawns scripts/run-geo-audit.sh. Requires `claude` CLI on PATH. Kept
+// for local-dev convenience only — production must use API mode.
+function runWrapperCli(
   websiteUrl: string,
   competitorUrl: string | null,
 ): Promise<WrapperResult> {
@@ -346,7 +548,7 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
   // a row stuck in "running".
   let wroteTerminal = false;
   try {
-    const result = await runWrapper(
+    const result = await runAudit(
       candidate.websiteUrl,
       candidate.competitorUrl,
     );
@@ -472,11 +674,34 @@ function preflightOrExit(): void {
     process.exit(1);
   }
 
-  // 2. Wrapper script must exist AND be executable.
+  // 2. Audit-mode-specific checks.
+  if (AUDIT_MODE !== "api" && AUDIT_MODE !== "cli") {
+    logErr(
+      `[geo-worker] PREFLIGHT FAILED — unknown GEO_AUDIT_MODE='${AUDIT_MODE}'. Use 'api' (production) or 'cli' (dev fallback).`,
+    );
+    process.exit(1);
+  }
+
+  if (AUDIT_MODE === "api") {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      logErr(
+        "[geo-worker] PREFLIGHT FAILED — ANTHROPIC_API_KEY not set (required for GEO_AUDIT_MODE=api).",
+      );
+      logErr(
+        "[geo-worker]   Set it in Railway → Service → Variables and redeploy.",
+      );
+      process.exit(1);
+    }
+    log(
+      `[geo-worker] preflight ok · mode=api · model=${ANTHROPIC_MODEL} · ANTHROPIC_API_KEY length=${process.env.ANTHROPIC_API_KEY.length}`,
+    );
+    return;
+  }
+
+  // ---- cli mode (dev fallback) ----
   if (!existsSync(SCRIPT_PATH)) {
     logErr(
-      `[geo-worker] PREFLIGHT FAILED — wrapper script missing at ${SCRIPT_PATH}. ` +
-        "Confirm scripts/run-geo-audit.sh is in the repo and the deploy includes it.",
+      `[geo-worker] PREFLIGHT FAILED — wrapper script missing at ${SCRIPT_PATH} (required for GEO_AUDIT_MODE=cli).`,
     );
     process.exit(1);
   }
@@ -484,25 +709,24 @@ function preflightOrExit(): void {
     accessSync(SCRIPT_PATH, fsConstants.X_OK);
   } catch {
     logErr(
-      `[geo-worker] PREFLIGHT FAILED — wrapper script at ${SCRIPT_PATH} is not executable. ` +
-        "Run: chmod +x scripts/run-geo-audit.sh (and commit). On Railway/Nixpacks add the chmod to the build step.",
+      `[geo-worker] PREFLIGHT FAILED — wrapper script at ${SCRIPT_PATH} is not executable. Run: chmod +x scripts/run-geo-audit.sh`,
     );
     process.exit(1);
   }
-
-  // 3. Claude CLI must be on PATH — the wrapper invokes `claude -p`.
   const probe = spawnSync("claude", ["--version"], { encoding: "utf8" });
   if (probe.error || probe.status !== 0) {
     const reason =
-      probe.error?.message ?? `exit code ${probe.status ?? "unknown"}`;
+      (probe.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT"
+        ? "spawnSync claude ENOENT — binary not on PATH"
+        : probe.error?.message ?? `exit code ${probe.status ?? "unknown"}`;
     logErr(
       `[geo-worker] PREFLIGHT FAILED — Claude CLI not callable on PATH (${reason}). ` +
-        "Install Claude Code on the host: https://claude.com/claude-code · " +
-        "On Railway add it to the build/start image. The worker cannot run audits without it.",
+        "GEO_AUDIT_MODE=cli requires the Claude CLI. " +
+        "Switch to GEO_AUDIT_MODE=api (production default) or install Claude Code locally.",
     );
     process.exit(1);
   }
-  log(`[geo-worker] preflight ok · claude ${probe.stdout.trim()}`);
+  log(`[geo-worker] preflight ok · mode=cli · claude ${probe.stdout.trim()}`);
 }
 
 async function main(): Promise<void> {
