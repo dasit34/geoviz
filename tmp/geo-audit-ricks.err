@@ -1,2 +1,25 @@
-[run-geo-audit.sh] running: claude -p ... --allowedTools "WebFetch WebSearch Read Grep Glob Write Bash" --output-format text
-[run-geo-audit.sh] target: https://ricksaffordableheating.com
+════════════════════════════════════════════════════════════
+ geo-audit wrapper · diagnostics
+════════════════════════════════════════════════════════════
+  cwd                : /Users/davidshinavar/geoviz
+  repo root          : /Users/davidshinavar/geoviz
+  target URL         : https://ricksaffordableheating.com
+  err file           : /Users/davidshinavar/geoviz/tmp/geo-audit-last.err
+  claude CLI         : /Users/davidshinavar/.local/bin/claude  (2.1.126 (Claude Code))
+  geo SKILL.md       : /Users/davidshinavar/.claude/skills/geo/SKILL.md  (10341 bytes)
+  geo .venv          : /Users/davidshinavar/.claude/skills/geo/.venv  (Python 3.11.15)
+  ANTHROPIC_API_KEY  : set (length=108)
+
+STARTING AUDIT
+── smoke test: claude -p "Reply with GEO_AUDIT_READY" ──
+  smoke ok           : "GEO_AUDIT_READY"
+
+── audit run ──
+  command            : claude -p <prompt-via-stdin> --output-format text --allowedTools WebFetch WebSearch Read Grep Glob Write Bash
+  prompt byte
+ERROR: claude -p exited non-zero (exit=1).
+
+Last 100 lines of audit stderr (also in /Users/davidshinavar/geoviz/tmp/geo-audit-last.err):
+
+davidshinavar/geoviz/tmp/geo-audit-last.err):
+

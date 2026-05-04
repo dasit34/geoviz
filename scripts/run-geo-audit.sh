@@ -115,6 +115,8 @@ fi
 
 log ""
 
+echo "STARTING AUDIT" >&2
+
 # ============================================================
 # Phase 2: Smoke test — confirm claude CLI replies
 # ============================================================
@@ -170,6 +172,8 @@ log "  command            : claude -p <prompt-via-stdin> --output-format text --
 log "  prompt bytes       : ${#PROMPT}"
 log ""
 
+echo "RUNNING CLAUDE..." >&2
+
 # Capture the audit's stderr separately, append to ERR_FILE on completion.
 AUDIT_ERR_FILE="$(mktemp)"
 AUDIT_EXIT=0
@@ -196,12 +200,13 @@ rm -f "${AUDIT_ERR_FILE}"
 # looks empty.
 
 if [ "${AUDIT_EXIT}" -ne 0 ]; then
+  echo "CLAUDE FAILED" >&2
   log ""
   log "ERROR: claude -p exited non-zero (exit=${AUDIT_EXIT})."
   log ""
   log "Last 100 lines of audit stderr (also in ${ERR_FILE}):"
   printf '%s\n' "${AUDIT_ERR}" | tail -n 100 >&2
-  exit 3
+  exit 2
 fi
 
 # If we can detect empty output, surface that loud. We can't always tell
@@ -213,12 +218,13 @@ fi
 # We do a best-effort check: if AUDIT_EXIT was 0 and stderr looks like a
 # permission/auth error, surface it. Pattern-match common failure modes.
 if printf '%s' "${AUDIT_ERR}" | grep -qiE '(permission denied|not authenticated|please run.*login|no api key|rate.?limit|invalid api key)'; then
+  echo "CLAUDE FAILED" >&2
   log ""
   log "ERROR: audit appears to have failed (stderr suggests auth/permission issue)."
   log ""
   log "Last 100 lines of audit stderr:"
   printf '%s\n' "${AUDIT_ERR}" | tail -n 100 >&2
-  exit 4
+  exit 2
 fi
 
 log ""
