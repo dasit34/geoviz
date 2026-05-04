@@ -30,6 +30,7 @@ model AuditOrder {
   paymentStatus    PaymentStatus @default(pending)
   auditStatus      AuditStatus   @default(pending)
   notes            String?
+  adminEmailSentAt DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 

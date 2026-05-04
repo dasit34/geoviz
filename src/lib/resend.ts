@@ -20,6 +20,7 @@ export function isResendConfigured(): boolean {
 }
 
 export const FROM_EMAIL =
+  process.env.RESEND_EMAIL_FROM ??
   process.env.EMAIL_FROM ??
   process.env.RESEND_FROM_EMAIL ??
   "GeoViz <orders@geoviz.local>";
