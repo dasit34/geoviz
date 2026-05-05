@@ -302,6 +302,67 @@ export function cleanScoreSectionBody(body: string): string {
   return out.replace(/\n{3,}/g, "\n\n").trim();
 }
 
+export type EnumeratedItem = {
+  title: string;
+  body: string;
+};
+
+/**
+ * Parses an enumerated body (the kind sections 2 and 3 produce — top 3
+ * issues / top 3 fixes) into individual {title, body} pairs so each
+ * one can render as its own sub-card.
+ *
+ * Tolerates two emission patterns the model uses interchangeably:
+ *   1. `### N. Headline\n  body…` (preferred)
+ *   2. `N. **Headline**\n  body…` (numbered list with bold)
+ *
+ * Returns an empty array when neither pattern matches — caller falls
+ * back to plain markdown so we never lose copy.
+ */
+export function parseEnumeratedItems(body: string): EnumeratedItem[] {
+  const cleaned = body.trim();
+  if (!cleaned) return [];
+
+  // Pattern 1: ### N. Headline
+  const h3Re = /^###\s+(?:(\d+)\.\s+)?(.+?)\s*$/gm;
+  const h3Matches: Array<{ index: number; title: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = h3Re.exec(cleaned)) !== null) {
+    h3Matches.push({ index: m.index, title: m[2].replace(/\*\*/g, "").trim() });
+  }
+  if (h3Matches.length >= 2) {
+    const out: EnumeratedItem[] = [];
+    for (let i = 0; i < h3Matches.length; i++) {
+      const cur = h3Matches[i];
+      const next = h3Matches[i + 1];
+      const start = cleaned.indexOf("\n", cur.index) + 1;
+      const end = next ? next.index : cleaned.length;
+      out.push({ title: cur.title, body: cleaned.slice(start, end).trim() });
+    }
+    return out;
+  }
+
+  // Pattern 2: N. **Headline**
+  const olRe = /^\s*(\d+)\.\s+\*\*(.+?)\*\*\s*$/gm;
+  const olMatches: Array<{ index: number; title: string }> = [];
+  while ((m = olRe.exec(cleaned)) !== null) {
+    olMatches.push({ index: m.index, title: m[2].trim() });
+  }
+  if (olMatches.length >= 2) {
+    const out: EnumeratedItem[] = [];
+    for (let i = 0; i < olMatches.length; i++) {
+      const cur = olMatches[i];
+      const next = olMatches[i + 1];
+      const start = cleaned.indexOf("\n", cur.index) + 1;
+      const end = next ? next.index : cleaned.length;
+      out.push({ title: cur.title, body: cleaned.slice(start, end).trim() });
+    }
+    return out;
+  }
+
+  return [];
+}
+
 /**
  * Strip arithmetic/score-math from any rendered section body. The
  * ScoreCard already shows the breakdown visually; arithmetic

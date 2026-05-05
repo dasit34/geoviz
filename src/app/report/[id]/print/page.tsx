@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import {
   bandLabelForOverall,
   cleanScoreSectionBody,
+  parseEnumeratedItems,
   parseReportScoreBreakdown,
   parseReportSections,
   scoreToneFromOverall,
@@ -80,6 +81,13 @@ export default async function PrintPage({
   const scoreProse = scoreSection
     ? cleanScoreSectionBody(scoreSection.body)
     : "";
+  // First sentence of the score prose becomes the hero one-liner.
+  const heroAssessment = scoreProse.split(/(?<=[.!?])\s/).find((s) =>
+    s.trim().length > 12,
+  );
+
+  const issueItems = whySection ? parseEnumeratedItems(whySection.body) : [];
+  const fixItems = fixSection ? parseEnumeratedItems(fixSection.body) : [];
 
   return (
     <div className="report-host bg-ink-950 text-white">
@@ -90,8 +98,17 @@ export default async function PrintPage({
         <header className="report-hero">
           <p className="section-eyebrow">GeoViz · GEO Audit Report</p>
           <h1 className="h1 mt-4 max-w-3xl">
-            {businessLabel} — your AI visibility report
+            {businessLabel}
           </h1>
+          <p className="report-hero-subtitle">
+            Your AI Visibility Report —{" "}
+            <span className={`report-band-inline report-band-inline-${tone}`}>
+              {band}
+            </span>
+          </p>
+          {heroAssessment ? (
+            <p className="report-hero-assessment">{heroAssessment}</p>
+          ) : null}
           <dl className="report-meta">
             <div>
               <dt>Site</dt>
@@ -111,7 +128,7 @@ export default async function PrintPage({
               <dd>{dateLabel}</dd>
             </div>
             <div>
-              <dt>Band</dt>
+              <dt>Status</dt>
               <dd className={`report-band-pill report-band-pill-${tone}`}>
                 {band}
               </dd>
@@ -129,23 +146,29 @@ export default async function PrintPage({
           ) : null}
         </section>
 
-        {/* Why customers don't see you — diagnosis card */}
+        {/* Why customers don't see you — issue cards */}
         {whySection ? (
-          <SectionCard
-            section={whySection}
+          <ItemListSection
+            heading={whySection.heading}
+            items={issueItems}
+            fallbackBody={whySection.body}
             tone="diagnosis"
             number="02"
             badge="Top 3 issues"
+            itemKind="issue"
           />
         ) : null}
 
-        {/* What to fix first — action checklist card */}
+        {/* What to fix first — checklist cards */}
         {fixSection ? (
-          <SectionCard
-            section={fixSection}
+          <ItemListSection
+            heading={fixSection.heading}
+            items={fixItems}
+            fallbackBody={fixSection.body}
             tone="action"
             number="03"
             badge="Top 3 fixes"
+            itemKind="fix"
           />
         ) : null}
 
@@ -180,13 +203,13 @@ export default async function PrintPage({
           </div>
         ) : null}
 
-        {/* Technical details — collapsed appendix */}
+        {/* Technical Details (Advanced) — collapsed appendix */}
         {techSection ? (
-          <details className="report-tech-details mt-10">
+          <details className="report-tech-details mt-12">
             <summary>
-              <span className="section-eyebrow">{SECTION_EYEBROWS["tech-details"]}</span>
+              <span className="section-eyebrow">Appendix</span>
               <span className="report-tech-summary-title">
-                {techSection.heading}
+                Technical Details (Advanced)
               </span>
               <span className="report-tech-summary-hint">
                 Click to expand — for your developer
@@ -208,6 +231,109 @@ export default async function PrintPage({
         </footer>
       </div>
     </div>
+  );
+}
+
+type EnumeratedItem = { title: string; body: string };
+
+function ItemListSection({
+  heading,
+  items,
+  fallbackBody,
+  tone,
+  number,
+  badge,
+  itemKind,
+}: {
+  heading: string;
+  items: EnumeratedItem[];
+  fallbackBody: string;
+  tone: "diagnosis" | "action";
+  number: string;
+  badge: string;
+  itemKind: "issue" | "fix";
+}) {
+  const eyebrowKey = tone === "diagnosis" ? "why" : "fix-first";
+  const eyebrow = SECTION_EYEBROWS[eyebrowKey] ?? `Section ${number}`;
+  return (
+    <section className={`report-section-card report-section-${tone}`}>
+      <div className="report-section-card-header">
+        <p className="section-eyebrow">{eyebrow}</p>
+        {badge ? <span className="pill">{badge}</span> : null}
+      </div>
+      <h2 className="h2 mt-3">{heading}</h2>
+      {items.length >= 2 ? (
+        <ol className="report-item-list">
+          {items.map((it, i) => (
+            <ItemCard key={`${it.title}-${i}`} item={it} index={i + 1} kind={itemKind} />
+          ))}
+        </ol>
+      ) : (
+        <div className="report-prose mt-5">
+          <ReactMarkdown>{stripScoreMath(fallbackBody)}</ReactMarkdown>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ItemCard({
+  item,
+  index,
+  kind,
+}: {
+  item: EnumeratedItem;
+  index: number;
+  kind: "issue" | "fix";
+}) {
+  return (
+    <li className={`report-item-card report-item-card-${kind}`}>
+      <div className="report-item-card-head">
+        <span className={`report-item-card-icon report-item-card-icon-${kind}`}>
+          {kind === "issue" ? <WarningIcon /> : <WrenchIcon />}
+        </span>
+        <span className="report-item-card-index">#{index}</span>
+        <h3 className="report-item-card-title">{item.title}</h3>
+      </div>
+      <div className="report-prose report-item-card-body">
+        <ReactMarkdown>{stripScoreMath(item.body)}</ReactMarkdown>
+      </div>
+    </li>
+  );
+}
+
+function WarningIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path
+        d="M10 2 L18.5 17 L1.5 17 Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 8 L10 12"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <circle cx="10" cy="14.5" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+function WrenchIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path
+        d="M14.5 5 a3 3 0 0 0 -3.6 3.6 L4.5 15 a1.4 1.4 0 0 0 2 2 l6.4 -6.4 a3 3 0 0 0 3.6 -3.6 l-1.7 1.7 -1.4 0 0 -1.4 z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

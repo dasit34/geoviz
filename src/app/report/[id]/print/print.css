@@ -20,7 +20,38 @@
 /* ---- hero ---- */
 .report-hero {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding-bottom: 28px;
+  padding-bottom: 32px;
+}
+.report-hero-subtitle {
+  margin-top: 14px;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  max-width: 60ch;
+}
+.report-band-inline {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.report-band-inline-ok {
+  color: #6ce39a;
+}
+.report-band-inline-warn {
+  color: #ffc46b;
+}
+.report-band-inline-bad {
+  color: #ff9a3c;
+}
+.report-band-inline-muted {
+  color: rgba(255, 255, 255, 0.7);
+}
+.report-hero-assessment {
+  margin-top: 14px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 64ch;
 }
 .report-meta {
   display: grid;
@@ -268,6 +299,83 @@
   border-color: rgba(108, 227, 154, 0.18);
 }
 
+/* ---- item cards (issues / fixes) ---- */
+.report-item-list {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.report-item-card {
+  position: relative;
+  padding: 18px 20px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.025);
+  page-break-inside: avoid;
+}
+.report-item-card-issue {
+  border-left: 3px solid rgba(255, 122, 24, 0.7);
+}
+.report-item-card-fix {
+  border-left: 3px solid rgba(43, 139, 255, 0.7);
+}
+.report-item-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.report-item-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  flex: 0 0 28px;
+}
+.report-item-card-icon-issue {
+  background: rgba(255, 122, 24, 0.14);
+  color: #ff9a3c;
+  border: 1px solid rgba(255, 122, 24, 0.3);
+}
+.report-item-card-icon-fix {
+  background: rgba(43, 139, 255, 0.14);
+  color: #6ea8ff;
+  border: 1px solid rgba(43, 139, 255, 0.3);
+}
+.report-item-card-index {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+.report-item-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.report-item-card-body {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.report-item-card-body p {
+  margin: 0 0 8px;
+  max-width: 64ch;
+}
+.report-item-card-body p:last-child {
+  margin-bottom: 0;
+}
+
 /* ---- markdown prose inside dark cards ---- */
 .report-prose {
   font-size: 14.5px;
@@ -294,6 +402,7 @@
 }
 .report-prose p {
   margin: 0 0 14px;
+  max-width: 68ch;
 }
 .report-prose strong {
   color: #ffffff;
@@ -539,6 +648,55 @@
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   font-size: 10.5px;
   color: rgba(255, 255, 255, 0.35);
+}
+
+/* ---- mobile responsive ---- */
+@media (max-width: 640px) {
+  .report-meta {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .score-card-bars {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .score-card-overall-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .score-card-overall-num {
+    font-size: 56px;
+  }
+  .report-section-card {
+    padding: 22px 20px 24px;
+  }
+  .score-card,
+  .cta-card-body {
+    padding: 22px 20px 24px;
+  }
+  .cta-card-headline {
+    font-size: 24px;
+  }
+  .cta-card-badges {
+    gap: 8px;
+  }
+  .cta-card-badge-price {
+    font-size: 17px;
+    padding: 8px 16px;
+  }
+  .report-hero-subtitle {
+    font-size: 16px;
+  }
+  .report-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .report-footer-meta {
+    text-align: left;
+  }
+  .report-item-card-head {
+    gap: 8px;
+  }
 }
 
 /* ---- print rules — preserve dark theme in PDF (PDF is secondary,
