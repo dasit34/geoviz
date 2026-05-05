@@ -120,15 +120,23 @@ export async function crawlPage(
   const structuredData: unknown[] = [];
   $('script[type="application/ld+json"]').each((_, el) => {
     const raw = $(el).contents().text().trim();
-    if (!raw) return;
+    // Defensive: never JSON.parse an empty string. Skip silently — an
+    // empty <script type="application/ld+json"> is a no-op, not a bug.
+    if (!raw || typeof raw !== "string") return;
     try {
       const parsed = JSON.parse(raw);
+      if (parsed === undefined || parsed === null) return;
       if (Array.isArray(parsed)) structuredData.push(...parsed);
       else structuredData.push(parsed);
     } catch (err) {
-      errors.push(
-        `invalid JSON-LD block: ${err instanceof Error ? err.message : "parse error"}`,
+      const message =
+        err instanceof Error ? err.message : "parse error";
+      // Log truncated bad value + source URL so a malformed JSON-LD
+      // block in the wild is debuggable without crashing the crawl.
+      console.warn(
+        `[crawl] invalid JSON-LD url=${url} preview="${raw.slice(0, 120).replace(/\s+/g, " ")}" err=${message}`,
       );
+      errors.push(`invalid JSON-LD block: ${message}`);
     }
   });
 
