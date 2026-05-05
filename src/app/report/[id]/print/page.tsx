@@ -1,7 +1,13 @@
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { prisma } from "@/lib/db";
-import { parseReportScore } from "@/lib/parse-report-score";
+import {
+  parseReportScoreBreakdown,
+  scoreToneFromOverall,
+  splitReportLayout,
+} from "@/lib/parse-report";
+import { ReportScoreCard } from "@/components/ReportScoreCard";
+import { ReportCtaCard } from "@/components/ReportCtaCard";
 import "./print.css";
 
 /**
@@ -9,6 +15,15 @@ import "./print.css";
  *   1. Customers — open the link from their delivery email
  *   2. Admins — preview before sending
  *   3. Puppeteer — server-side render at /api/report/[id]/pdf
+ *
+ * The page replaces two raw-markdown sections with styled UI so the
+ * report doesn't look like raw markdown:
+ *   - The score section becomes a `<ReportScoreCard>` (overall + risk
+ *     label + per-category bars).
+ *   - The "Done-For-You Fix" section becomes a `<ReportCtaCard>`
+ *     (offer panel with headline, badges, checkmarked bullets, and a
+ *     mailto CTA). Surrounding markdown chunks render normally so we
+ *     never lose the rest of the report.
  *
  * Auth: anyone with the URL can view. Order IDs are 25-char cuids
  * (~120 bits of entropy) so practically unguessable. Metadata is
@@ -39,27 +54,22 @@ export default async function PrintPage({
     day: "numeric",
   });
 
-  const scoreInfo = parseReportScore(order.reportMarkdown);
-  const scoreTone =
-    scoreInfo === null
-      ? "muted"
-      : scoreInfo.score >= 75
-        ? "ok"
-        : scoreInfo.score >= 50
-          ? "warn"
-          : "bad";
+  const score = parseReportScoreBreakdown(order.reportMarkdown);
+  const layout = splitReportLayout(order.reportMarkdown);
+  const businessLabel = order.businessName ?? order.email;
+  const headerTone = scoreToneFromOverall(score.overall);
 
   return (
     <div className="print-root">
       <header className="print-header">
         <div className="print-brand-row">
           <div className="print-brand">GeoViz · GEO Audit Report</div>
-          {scoreInfo ? (
+          {typeof score.overall === "number" ? (
             <div
-              className={`print-score-badge tone-${scoreTone}`}
-              aria-label={`Score ${scoreInfo.score} of 100`}
+              className={`print-score-badge tone-${headerTone}`}
+              aria-label={`Score ${score.overall} of 100`}
             >
-              <div className="print-score-num">{scoreInfo.score}</div>
+              <div className="print-score-num">{score.overall}</div>
               <div className="print-score-label">/ 100</div>
             </div>
           ) : null}
@@ -67,7 +77,7 @@ export default async function PrintPage({
         <dl className="print-meta">
           <div>
             <dt>Business</dt>
-            <dd>{order.businessName ?? order.email}</dd>
+            <dd>{businessLabel}</dd>
           </div>
           <div>
             <dt>Site</dt>
@@ -80,9 +90,21 @@ export default async function PrintPage({
         </dl>
       </header>
 
+      <ReportScoreCard score={score} />
+
       <article className="print-prose">
-        <ReactMarkdown>{order.reportMarkdown}</ReactMarkdown>
+        <ReactMarkdown>{layout.before}</ReactMarkdown>
       </article>
+
+      {layout.hasCta ? (
+        <ReportCtaCard orderId={order.id} businessLabel={businessLabel} />
+      ) : null}
+
+      {layout.after.trim() ? (
+        <article className="print-prose">
+          <ReactMarkdown>{layout.after}</ReactMarkdown>
+        </article>
+      ) : null}
 
       <footer className="print-footer">
         <div className="print-footer-brand">GeoViz</div>

@@ -2,9 +2,31 @@
 
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
+import {
+  parseReportScoreBreakdown,
+  splitReportLayout,
+} from "@/lib/parse-report";
+import { ReportScoreCard } from "./ReportScoreCard";
+import { ReportCtaCard } from "./ReportCtaCard";
 
-export function ReportViewerClient({ markdown }: { markdown: string }) {
+/**
+ * Admin-facing report preview. Shares the same styled blocks as the
+ * customer-facing print page (ReportScoreCard, ReportCtaCard) so the
+ * dashboard preview matches what the customer sees in their email
+ * link and PDF. Toggle to raw markdown when triaging audit output.
+ */
+export function ReportViewerClient({
+  markdown,
+  orderId,
+  businessLabel,
+}: {
+  markdown: string;
+  orderId?: string;
+  businessLabel?: string;
+}) {
   const [showRaw, setShowRaw] = useState(false);
+  const score = parseReportScoreBreakdown(markdown);
+  const layout = splitReportLayout(markdown);
 
   return (
     <div>
@@ -27,9 +49,23 @@ export function ReportViewerClient({ markdown }: { markdown: string }) {
 {markdown}
         </pre>
       ) : (
-        <article className="report-prose">
-          <ReactMarkdown>{markdown}</ReactMarkdown>
-        </article>
+        <div className="report-rendered">
+          <ReportScoreCard score={score} />
+          <article className="report-prose">
+            <ReactMarkdown>{layout.before}</ReactMarkdown>
+          </article>
+          {layout.hasCta ? (
+            <ReportCtaCard
+              orderId={orderId ?? "preview"}
+              businessLabel={businessLabel ?? "your business"}
+            />
+          ) : null}
+          {layout.after.trim() ? (
+            <article className="report-prose">
+              <ReactMarkdown>{layout.after}</ReactMarkdown>
+            </article>
+          ) : null}
+        </div>
       )}
     </div>
   );

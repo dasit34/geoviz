@@ -564,7 +564,11 @@ export function AdminReportCard({
               : ""}
           </p>
           <div className="mt-3 rounded-xl border border-white/10 bg-ink-900/80 p-6 md:p-8">
-            <ReportViewerClient markdown={markdown} />
+            <ReportViewerClient
+              markdown={markdown}
+              orderId={order.id}
+              businessLabel={businessLabel}
+            />
           </div>
         </div>
       ) : null}
