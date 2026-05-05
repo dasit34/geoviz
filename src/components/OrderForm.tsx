@@ -138,14 +138,10 @@ export function OrderForm({
         placeholder="Acme Roofing (optional)"
         error={fieldErrors.businessName?.[0]}
       />
-      <Field
-        id="competitorUrl"
-        label="Competitor URL"
-        type="url"
-        placeholder="https://competitor.com (optional)"
-        error={fieldErrors.competitorUrl?.[0]}
-        hint="Optional — we’ll compare your visibility directly against them."
-      />
+      {/* Competitor URL field hidden on the public form for v1.
+          Backend (schema, checkout, webhook) still supports the
+          field for admin / API use, so existing audits keep
+          competitor data when supplied programmatically. */}
 
       {error ? (
         <div

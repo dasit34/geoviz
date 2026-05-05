@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  bandLabelForOverall,
   scoreToneFromOverall,
   type ReportScore,
 } from "@/lib/parse-report";
@@ -15,7 +16,14 @@ import {
 export function ReportScoreCard({ score }: { score: ReportScore }) {
   const tone = scoreToneFromOverall(score.overall);
   const overallLabel = typeof score.overall === "number" ? score.overall : "—";
-  const status = score.status ?? riskLabelForTone(tone);
+  // Band label always derives from the numeric overall — that's the
+  // single source of truth from the rubric, not whatever status word
+  // the model happened to type. Falls back to a parsed status only
+  // when the overall couldn't be extracted.
+  const status =
+    typeof score.overall === "number"
+      ? bandLabelForOverall(score.overall)
+      : score.status ?? riskLabelForTone(tone);
 
   return (
     <section className={`score-card score-card-tone-${tone}`}>
@@ -60,7 +68,7 @@ export function ReportScoreCard({ score }: { score: ReportScore }) {
 function riskLabelForTone(tone: "ok" | "warn" | "bad" | "muted"): string {
   switch (tone) {
     case "ok":
-      return "Strong";
+      return "Competitive";
     case "warn":
       return "Needs Work";
     case "bad":

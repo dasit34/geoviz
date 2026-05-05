@@ -153,8 +153,12 @@ export function parseReportScoreBreakdown(
   const overall = overallMatch ? clamp(Number(overallMatch[1]), 0, 100) : null;
 
   const statusMatch =
-    /\b(Strong|Needs\s+Work|At\s+Risk|Competitive|Elite|Poor)\b/i.exec(md);
-  const status = statusMatch ? statusMatch[1].replace(/\s+/g, " ") : null;
+    /\b(AI[-\s]?Ready|Competitive|Needs\s+Work|At\s+Risk|Invisible|Strong|Elite|Poor)\b/i.exec(
+      md,
+    );
+  const status = statusMatch
+    ? statusMatch[1].replace(/\s+/g, " ").replace(/^AI[-\s]?Ready$/i, "AI-Ready")
+    : null;
 
   return { overall, status, categories };
 }
@@ -163,9 +167,20 @@ export function scoreToneFromOverall(
   overall: number | null,
 ): "ok" | "warn" | "bad" | "muted" {
   if (typeof overall !== "number") return "muted";
-  if (overall >= 75) return "ok";
-  if (overall >= 50) return "warn";
+  // Tone tracks the 5-band rubric: AI-Ready/Competitive = ok,
+  // Needs Work = warn, At Risk/Invisible = bad.
+  if (overall >= 66) return "ok";
+  if (overall >= 46) return "warn";
   return "bad";
+}
+
+export function bandLabelForOverall(overall: number | null): string {
+  if (typeof overall !== "number") return "Pending";
+  if (overall >= 81) return "AI-Ready";
+  if (overall >= 66) return "Competitive";
+  if (overall >= 46) return "Needs Work";
+  if (overall >= 26) return "At Risk";
+  return "Invisible";
 }
 
 function clamp(n: number, lo: number, hi: number): number {

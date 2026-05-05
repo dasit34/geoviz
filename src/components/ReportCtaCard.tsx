@@ -31,11 +31,14 @@ export function ReportCtaCard({
       <div className="cta-card-accent" />
       <div className="cta-card-body">
         <div className="cta-card-eyebrow">Done-for-you GEO Foundation Fix</div>
-        <h2 className="cta-card-headline">Let Us Fix This For You</h2>
+        <h2 className="cta-card-headline">
+          Want GeoViz to fix this for you?
+        </h2>
         <p className="cta-card-lede">
-          If you don&rsquo;t want to deal with technical changes, we can
-          handle everything for you so AI tools can find, understand, and
-          recommend your business.
+          Skip the technical work. We&rsquo;ll handle every fix in this
+          report so AI tools like ChatGPT, Claude, and Perplexity can
+          find, understand, and recommend your business when local
+          customers ask.
         </p>
 
         <div className="cta-card-badges">

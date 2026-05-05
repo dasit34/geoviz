@@ -195,40 +195,115 @@ findings on this site. Score conservatively when evidence is
 missing and explain why in the relevant report section.
 
   - Structured Data / Schema: 0–25
-    LocalBusiness/Service JSON-LD present and complete = 20–25.
-    Generic Organization only = 8–14. Missing schema entirely = 0–6.
+    Sub-checks (look for each in the page source / JSON-LD):
+      • LocalBusiness or Service schema with NAP + hours + areaServed
+      • Review / AggregateRating schema (rating + count)
+      • FAQPage schema (Q&A blocks)
+      • Organization / business identity schema
+      • sameAs links (BBB, Google Business Profile, Yelp, Facebook)
+    Bands:
+      • Complete LocalBusiness/Service + reviews + FAQ + sameAs = 20–25.
+      • LocalBusiness or Service present but incomplete = 10–19.
+      • Generic Organization only = 4–9.
+      • **HARD FLOOR: NO structured data of any kind on the page →
+        score MUST be 0–6 / 25.** This single check alone is enough
+        to push a site into the "At Risk" band.
   - AI Crawler Readiness: 0–20
-    llms.txt present + AI **citation** bots allowed (OAI-SearchBot
-    for ChatGPT Search, ClaudeBot for Claude, PerplexityBot,
-    Bingbot for Copilot, Google-Extended for Gemini AI Overviews)
-    = 16–20. AI citation bots allowed but no llms.txt = 9–14. Any
-    citation bot blocked, OR robots.txt unclear = 0–6.
-    NOTE: Blocking *training-only* bots (GPTBot, anthropic-ai,
-    CCBot) is acceptable and does NOT lower the score — those
-    bots train models, they don't decide who gets cited.
+    Sub-checks:
+      • robots.txt clarity (does it exist, is it parseable, no
+        obvious crawler-trapping patterns)
+      • llms.txt presence + structure
+      • AI **citation** bot access — OAI-SearchBot (ChatGPT Search),
+        ClaudeBot (Claude), PerplexityBot, Bingbot (Copilot),
+        Google-Extended (Gemini AI Overviews)
+      • Key pages crawlable from homepage links (no JS-only nav,
+        no noindex on service pages)
+      • No unnecessary blocking (a "User-agent: * / Disallow: /"
+        is fatal — flag it)
+    Bands:
+      • llms.txt present + all citation bots allowed + key pages
+        crawlable = 16–20.
+      • **CEILING: No llms.txt → cannot exceed 12 / 20** unless
+        robots.txt, sitemap, AND key-page crawlability are all
+        independently strong (in which case 13–14 is fine).
+      • Any citation bot blocked, OR robots.txt unclear = 0–6.
+      NOTE: Blocking *training-only* bots (GPTBot, anthropic-ai,
+      CCBot, Bytespider) is acceptable and does NOT lower the score
+      — those bots train models, they don't decide citations.
   - Local Trust Signals: 0–20
-    Visible reviews/ratings, awards, established date, NAP
-    consistency, AND specific numbers (years in business, jobs
-    completed, review count, service-area cities) = 14–20. Some
-    signals = 7–13. Few or none = 0–6.
+    Sub-checks:
+      • Visible review count + average rating
+      • Years in business / "established YYYY"
+      • Credentials, licenses, certifications, BBB rating
+      • Warranty / service guarantees
+      • Service-area cities or ZIP codes named
+      • NAP (name/address/phone) consistent across pages
+    Bands:
+      • Strong on FOUR or more of the above = 14–20.
+      • Two or three signals = 8–13.
+      • One or none = 0–7.
+      **POSITIVE OVERRIDE: A real-world business with strong
+      reviews, licenses, years, warranty, AND clear service area
+      MUST score 14+ here even if Schema/llms.txt are missing.**
+      Trust is measured from the visible page content, not from
+      machine-readable markup.
   - Content Depth + FAQ Quality: 0–15
-    Thorough service pages + FAQ section + concrete numbers
-    (turnaround times, warranty years, response time) = 11–15.
-    Thin service pages, no FAQ, vague marketing claims = 4–10.
-    Mostly homepage marketing copy = 0–3.
+    Sub-checks:
+      • Service pages with real depth (>250 words, sub-headings)
+      • FAQ section that answers customer questions
+      • Pricing or service-expectation clarity (ranges, terms)
+      • Before/after, project, or case-study proof
+      • Location-specific landing pages for each service area
+    Bands:
+      • Multiple deep service pages + FAQ + pricing + proof = 11–15.
+      • Some depth, no FAQ = 4–10.
+      • **HARD FLOOR: Thin service pages AND no FAQ → score MUST
+        be ≤ 5 / 15.** Marketing-only homepage copy = 0–3.
   - Brand / Entity Clarity: 0–10
-    Clear name, location, phone, service area, single-sentence
-    "what we do" = 7–10. Partial = 3–6. Ambiguous or missing = 0–2.
+    Sub-checks:
+      • Same business name across header, footer, pages
+      • Phone + address + service area visible above the fold
+      • One clear sentence on what the business does
+      • No conflicting claims (e.g. "20 years" + "since 2018")
+    Bands:
+      • All four = 7–10. Partial = 3–6. Ambiguous = 0–2.
   - Technical Accessibility: 0–10
-    Crawlable, valid metadata, working H1, no crawl blockers = 7–10.
-    Some metadata gaps = 3–6. Major gaps or broken pages = 0–2.
+    Sub-checks:
+      • Crawlable (no noindex, no soft-404s)
+      • No broken homepage links
+      • Title + meta description present and useful
+      • XML sitemap referenced from robots.txt
+      • Mobile-friendly + reasonable page weight
+    Bands:
+      • All five clean = 7–10. Two or three gaps = 3–6. Multiple
+        broken pages or major crawl blockers = 0–2.
+
+**Score-band differentiation rules — MANDATORY.** After summing
+the six category scores, classify the overall into ONE of these
+five bands and explain WHY in the report:
+
+  • 0–25  → "Invisible"     — site is essentially absent from AI
+                                 search results.
+  • 26–45 → "At Risk"       — many foundational signals missing,
+                                 customers picking competitors.
+  • 46–65 → "Needs Work"    — some visibility, real gaps, fixable.
+  • 66–80 → "Competitive"   — solid foundation, room for polish.
+  • 81–100 → "AI-Ready"     — fully optimized for AI citation.
+
+Calibration guardrails:
+  • Strong real-world business + weak technical GEO ⇒ overall 30–50.
+  • Very weak site (thin content, no schema, blocked crawlers) ⇒ 10–30.
+  • Strong site (schema + content + trust + AI guidance) ⇒ 55–75+.
+  • Sites scoring above 80 must demonstrably check ALL the boxes —
+    do not award 80+ to sites missing core schema or llms.txt.
 
 # GEO Visibility Report
 
 **Site:** ${websiteUrl}  ·  **Generated:** <today, plain English>
 
 ## 1. AI Visibility Score
-**Overall Score: <N>/100** (sum of the six category scores below)
+**Overall Score: <N>/100 — <Band>** (Band ∈ Invisible / At Risk /
+Needs Work / Competitive / AI-Ready, picked from the band rules above)
 
 Breakdown:
 - Structured Data / Schema: <n>/25
@@ -238,8 +313,11 @@ Breakdown:
 - Brand / Entity Clarity: <n>/10
 - Technical Accessibility: <n>/10
 
-One short sentence in plain language on what this score means for
-getting recommended by AI when local customers ask.
+**Why this band:** 2–3 plain-English sentences naming the specific
+findings that pushed the score into this band — what's working,
+what's missing, what the customer outcome is. NO jargon. Tie at
+least one sentence to lost calls / missed jobs / customers picking
+competitors.
 
 ## 2. Why Customers Don't See You
 Top 3 issues only. Numbered. For each:
@@ -341,40 +419,115 @@ findings on this site. Score conservatively when evidence is
 missing and explain why in the relevant report section.
 
   - Structured Data / Schema: 0–25
-    LocalBusiness/Service JSON-LD present and complete = 20–25.
-    Generic Organization only = 8–14. Missing schema entirely = 0–6.
+    Sub-checks (look for each in the page source / JSON-LD):
+      • LocalBusiness or Service schema with NAP + hours + areaServed
+      • Review / AggregateRating schema (rating + count)
+      • FAQPage schema (Q&A blocks)
+      • Organization / business identity schema
+      • sameAs links (BBB, Google Business Profile, Yelp, Facebook)
+    Bands:
+      • Complete LocalBusiness/Service + reviews + FAQ + sameAs = 20–25.
+      • LocalBusiness or Service present but incomplete = 10–19.
+      • Generic Organization only = 4–9.
+      • **HARD FLOOR: NO structured data of any kind on the page →
+        score MUST be 0–6 / 25.** This single check alone is enough
+        to push a site into the "At Risk" band.
   - AI Crawler Readiness: 0–20
-    llms.txt present + AI **citation** bots allowed (OAI-SearchBot
-    for ChatGPT Search, ClaudeBot for Claude, PerplexityBot,
-    Bingbot for Copilot, Google-Extended for Gemini AI Overviews)
-    = 16–20. AI citation bots allowed but no llms.txt = 9–14. Any
-    citation bot blocked, OR robots.txt unclear = 0–6.
-    NOTE: Blocking *training-only* bots (GPTBot, anthropic-ai,
-    CCBot) is acceptable and does NOT lower the score — those
-    bots train models, they don't decide who gets cited.
+    Sub-checks:
+      • robots.txt clarity (does it exist, is it parseable, no
+        obvious crawler-trapping patterns)
+      • llms.txt presence + structure
+      • AI **citation** bot access — OAI-SearchBot (ChatGPT Search),
+        ClaudeBot (Claude), PerplexityBot, Bingbot (Copilot),
+        Google-Extended (Gemini AI Overviews)
+      • Key pages crawlable from homepage links (no JS-only nav,
+        no noindex on service pages)
+      • No unnecessary blocking (a "User-agent: * / Disallow: /"
+        is fatal — flag it)
+    Bands:
+      • llms.txt present + all citation bots allowed + key pages
+        crawlable = 16–20.
+      • **CEILING: No llms.txt → cannot exceed 12 / 20** unless
+        robots.txt, sitemap, AND key-page crawlability are all
+        independently strong (in which case 13–14 is fine).
+      • Any citation bot blocked, OR robots.txt unclear = 0–6.
+      NOTE: Blocking *training-only* bots (GPTBot, anthropic-ai,
+      CCBot, Bytespider) is acceptable and does NOT lower the score
+      — those bots train models, they don't decide citations.
   - Local Trust Signals: 0–20
-    Visible reviews/ratings, awards, established date, NAP
-    consistency, AND specific numbers (years in business, jobs
-    completed, review count, service-area cities) = 14–20. Some
-    signals = 7–13. Few or none = 0–6.
+    Sub-checks:
+      • Visible review count + average rating
+      • Years in business / "established YYYY"
+      • Credentials, licenses, certifications, BBB rating
+      • Warranty / service guarantees
+      • Service-area cities or ZIP codes named
+      • NAP (name/address/phone) consistent across pages
+    Bands:
+      • Strong on FOUR or more of the above = 14–20.
+      • Two or three signals = 8–13.
+      • One or none = 0–7.
+      **POSITIVE OVERRIDE: A real-world business with strong
+      reviews, licenses, years, warranty, AND clear service area
+      MUST score 14+ here even if Schema/llms.txt are missing.**
+      Trust is measured from the visible page content, not from
+      machine-readable markup.
   - Content Depth + FAQ Quality: 0–15
-    Thorough service pages + FAQ section + concrete numbers
-    (turnaround times, warranty years, response time) = 11–15.
-    Thin service pages, no FAQ, vague marketing claims = 4–10.
-    Mostly homepage marketing copy = 0–3.
+    Sub-checks:
+      • Service pages with real depth (>250 words, sub-headings)
+      • FAQ section that answers customer questions
+      • Pricing or service-expectation clarity (ranges, terms)
+      • Before/after, project, or case-study proof
+      • Location-specific landing pages for each service area
+    Bands:
+      • Multiple deep service pages + FAQ + pricing + proof = 11–15.
+      • Some depth, no FAQ = 4–10.
+      • **HARD FLOOR: Thin service pages AND no FAQ → score MUST
+        be ≤ 5 / 15.** Marketing-only homepage copy = 0–3.
   - Brand / Entity Clarity: 0–10
-    Clear name, location, phone, service area, single-sentence
-    "what we do" = 7–10. Partial = 3–6. Ambiguous or missing = 0–2.
+    Sub-checks:
+      • Same business name across header, footer, pages
+      • Phone + address + service area visible above the fold
+      • One clear sentence on what the business does
+      • No conflicting claims (e.g. "20 years" + "since 2018")
+    Bands:
+      • All four = 7–10. Partial = 3–6. Ambiguous = 0–2.
   - Technical Accessibility: 0–10
-    Crawlable, valid metadata, working H1, no crawl blockers = 7–10.
-    Some metadata gaps = 3–6. Major gaps or broken pages = 0–2.
+    Sub-checks:
+      • Crawlable (no noindex, no soft-404s)
+      • No broken homepage links
+      • Title + meta description present and useful
+      • XML sitemap referenced from robots.txt
+      • Mobile-friendly + reasonable page weight
+    Bands:
+      • All five clean = 7–10. Two or three gaps = 3–6. Multiple
+        broken pages or major crawl blockers = 0–2.
+
+**Score-band differentiation rules — MANDATORY.** After summing
+the six category scores, classify the overall into ONE of these
+five bands and explain WHY in the report:
+
+  • 0–25  → "Invisible"     — site is essentially absent from AI
+                                 search results.
+  • 26–45 → "At Risk"       — many foundational signals missing,
+                                 customers picking competitors.
+  • 46–65 → "Needs Work"    — some visibility, real gaps, fixable.
+  • 66–80 → "Competitive"   — solid foundation, room for polish.
+  • 81–100 → "AI-Ready"     — fully optimized for AI citation.
+
+Calibration guardrails:
+  • Strong real-world business + weak technical GEO ⇒ overall 30–50.
+  • Very weak site (thin content, no schema, blocked crawlers) ⇒ 10–30.
+  • Strong site (schema + content + trust + AI guidance) ⇒ 55–75+.
+  • Sites scoring above 80 must demonstrably check ALL the boxes —
+    do not award 80+ to sites missing core schema or llms.txt.
 
 # GEO Visibility Report
 
 **Site:** ${websiteUrl}  ·  **Generated:** <today, plain English>
 
 ## 1. AI Visibility Score
-**Overall Score: <N>/100** (sum of the six category scores below)
+**Overall Score: <N>/100 — <Band>** (Band ∈ Invisible / At Risk /
+Needs Work / Competitive / AI-Ready, picked from the band rules above)
 
 Breakdown:
 - Structured Data / Schema: <n>/25
@@ -384,8 +537,11 @@ Breakdown:
 - Brand / Entity Clarity: <n>/10
 - Technical Accessibility: <n>/10
 
-One short sentence in plain language on what this score means for
-getting recommended by AI when local customers ask.
+**Why this band:** 2–3 plain-English sentences naming the specific
+findings that pushed the score into this band — what's working,
+what's missing, what the customer outcome is. NO jargon. Tie at
+least one sentence to lost calls / missed jobs / customers picking
+competitors.
 
 ## 2. Why Customers Don't See You
 Top 3 issues only. Numbered. For each:

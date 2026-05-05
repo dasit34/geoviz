@@ -9,6 +9,8 @@ export function parseReportScore(
 ): { score: number; status: string | null } | null {
   if (!md) return null;
   // Prefer "<n>/100 — <status>" or "<n> / 100 - <status>" or with em-dash.
+  // Status word matches the new 5-band rubric (Invisible / At Risk /
+  // Needs Work / Competitive / AI-Ready) and legacy bands.
   const m =
     /\b(\d{1,3})\s*\/\s*100[ \t]*[—\-–:][ \t]*([A-Za-z][A-Za-z _\-]+)/.exec(md);
   if (m) {
