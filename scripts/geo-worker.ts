@@ -365,9 +365,35 @@ Top 3 fixes only. Numbered. For each:
 - **What changes when fixed** — one sentence on the result
 
 ## 4. What Happens If You Fix This
-3–4 sentences in plain owner-friendly language. Frame: more chance
-of being recommended when customers ask AI for a local pro, more
-inbound calls, fewer customers handed to competitors.
+Write 3–4 sentences in natural, business-owner-friendly language —
+the way a trusted advisor would explain it across the kitchen
+table. Frame the outcome as: AI tools (ChatGPT, Claude, Perplexity,
+Google AI Overviews) finally have the right information to
+recommend the business, which means more inbound calls and fewer
+customers handed to competitors.
+
+Required wording rules:
+- NO arithmetic, NO score math, NO "= N/100".
+- NO dramatic phrasing like "your 70-year reputation is invisible"
+  or "homeowners can't find you in the AI age."
+- Keep it grounded and concrete. A sentence like the following is
+  the target tone: "When your website clearly explains who you are,
+  where you work, and why customers trust you, AI tools have more
+  reasons to recommend your business instead of skipping over it."
+
+**If — AND ONLY IF — the audit found strong real-world trust
+signals (decades in business, large review counts, licenses,
+warranty, named service area) but weak technical signals (no
+schema, no llms.txt, thin content), include this exact sentence
+near the top of the section, adjusted only so the years number
+matches the evidence:**
+
+  "Your real-world reputation is stronger than your website signals.
+  The fix is making that trust easier for Google and AI tools to
+  understand."
+
+Do NOT include that sentence when the evidence does not actually
+support it.
 
 ---
 
@@ -619,9 +645,35 @@ Top 3 fixes only. Numbered. For each:
 - **What changes when fixed** — one sentence on the result
 
 ## 4. What Happens If You Fix This
-3–4 sentences in plain owner-friendly language. Frame: more chance
-of being recommended when customers ask AI for a local pro, more
-inbound calls, fewer customers handed to competitors.
+Write 3–4 sentences in natural, business-owner-friendly language —
+the way a trusted advisor would explain it across the kitchen
+table. Frame the outcome as: AI tools (ChatGPT, Claude, Perplexity,
+Google AI Overviews) finally have the right information to
+recommend the business, which means more inbound calls and fewer
+customers handed to competitors.
+
+Required wording rules:
+- NO arithmetic, NO score math, NO "= N/100".
+- NO dramatic phrasing like "your 70-year reputation is invisible"
+  or "homeowners can't find you in the AI age."
+- Keep it grounded and concrete. A sentence like the following is
+  the target tone: "When your website clearly explains who you are,
+  where you work, and why customers trust you, AI tools have more
+  reasons to recommend your business instead of skipping over it."
+
+**If — AND ONLY IF — the audit found strong real-world trust
+signals (decades in business, large review counts, licenses,
+warranty, named service area) but weak technical signals (no
+schema, no llms.txt, thin content), include this exact sentence
+near the top of the section, adjusted only so the years number
+matches the evidence:**
+
+  "Your real-world reputation is stronger than your website signals.
+  The fix is making that trust easier for Google and AI tools to
+  understand."
+
+Do NOT include that sentence when the evidence does not actually
+support it.
 
 ---
 

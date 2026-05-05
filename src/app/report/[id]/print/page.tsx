@@ -7,6 +7,7 @@ import {
   parseReportScoreBreakdown,
   parseReportSections,
   scoreToneFromOverall,
+  stripScoreMath,
   type ReportSection,
 } from "@/lib/parse-report";
 import { ReportScoreCard } from "@/components/ReportScoreCard";
@@ -192,7 +193,7 @@ export default async function PrintPage({
               </span>
             </summary>
             <div className="report-prose mt-5">
-              <ReactMarkdown>{techSection.body}</ReactMarkdown>
+              <ReactMarkdown>{stripScoreMath(techSection.body)}</ReactMarkdown>
             </div>
           </details>
         ) : null}
@@ -234,7 +235,7 @@ function SectionCard({
       </div>
       <h2 className="h2 mt-3">{section.heading}</h2>
       <div className="report-prose mt-5">
-        <ReactMarkdown>{section.body}</ReactMarkdown>
+        <ReactMarkdown>{stripScoreMath(section.body)}</ReactMarkdown>
       </div>
     </section>
   );

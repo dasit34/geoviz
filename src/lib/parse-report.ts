@@ -286,11 +286,34 @@ export function cleanScoreSectionBody(body: string): string {
     /^[^\n]*Breakdown[^\n]*\n(?:[^\n]*\n?)+?(?=\n\s*\n|\*\*Why\s+this\s+band|$)/im,
     "",
   );
-  // Strip explicit arithmetic expressions like
-  // "(3 + 9 + 14 + 5 + 4 + 3 = 38)" or "= 38/100".
+  // Strip arithmetic expressions in any form the model emits:
+  //   • parenthetical: "(3 + 9 + 14 + 5 + 4 + 3 = 38)"
+  //   • naked:         "3 + 9 + 14 + 7 + 7 + 5 = 45"
+  //   • reverse:       "45 = 3 + 9 + 14 + 7 + 7 + 5"
+  //   • bare ratio:    "= 38/100"
   out = out.replace(/\(\s*\d+(?:\s*[+]\s*\d+)+\s*=\s*\d+[^)]*\)/g, "");
+  out = out.replace(/\b\d+(?:\s*[+]\s*\d+){2,}\s*=\s*\d+\b\s*\/?\s*\d{0,3}/g, "");
+  out = out.replace(/\b\d+\s*=\s*\d+(?:\s*[+]\s*\d+){2,}\b/g, "");
   out = out.replace(/=\s*\d+\s*\/\s*100/g, "");
+  // Drop any line whose content is now just an empty parenthetical or
+  // an orphan "Math: " label left behind after the arithmetic was cut.
+  out = out.replace(/^\s*\(\s*\)\s*$/gm, "");
+  out = out.replace(/^\s*(?:Math|Sum|Total|Calculation)\s*:?\s*$/gim, "");
   return out.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
+ * Strip arithmetic/score-math from any rendered section body. The
+ * ScoreCard already shows the breakdown visually; arithmetic
+ * anywhere else in the report just looks unprofessional.
+ */
+export function stripScoreMath(body: string): string {
+  let out = body;
+  out = out.replace(/\(\s*\d+(?:\s*[+]\s*\d+)+\s*=\s*\d+[^)]*\)/g, "");
+  out = out.replace(/\b\d+(?:\s*[+]\s*\d+){2,}\s*=\s*\d+\b\s*\/?\s*\d{0,3}/g, "");
+  out = out.replace(/\b\d+\s*=\s*\d+(?:\s*[+]\s*\d+){2,}\b/g, "");
+  out = out.replace(/=\s*\d+\s*\/\s*100/g, "");
+  return out.replace(/\n{3,}/g, "\n\n");
 }
 
 function clamp(n: number, lo: number, hi: number): number {
