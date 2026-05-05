@@ -198,15 +198,24 @@ missing and explain why in the relevant report section.
     LocalBusiness/Service JSON-LD present and complete = 20–25.
     Generic Organization only = 8–14. Missing schema entirely = 0–6.
   - AI Crawler Readiness: 0–20
-    llms.txt present + AI bots allowed = 16–20. AI bots allowed but
-    no llms.txt = 9–14. AI bots blocked or unclear in robots.txt =
-    0–6.
+    llms.txt present + AI **citation** bots allowed (OAI-SearchBot
+    for ChatGPT Search, ClaudeBot for Claude, PerplexityBot,
+    Bingbot for Copilot, Google-Extended for Gemini AI Overviews)
+    = 16–20. AI citation bots allowed but no llms.txt = 9–14. Any
+    citation bot blocked, OR robots.txt unclear = 0–6.
+    NOTE: Blocking *training-only* bots (GPTBot, anthropic-ai,
+    CCBot) is acceptable and does NOT lower the score — those
+    bots train models, they don't decide who gets cited.
   - Local Trust Signals: 0–20
     Visible reviews/ratings, awards, established date, NAP
-    consistency = 14–20. Some signals = 7–13. Few or none = 0–6.
+    consistency, AND specific numbers (years in business, jobs
+    completed, review count, service-area cities) = 14–20. Some
+    signals = 7–13. Few or none = 0–6.
   - Content Depth + FAQ Quality: 0–15
-    Thorough service pages + FAQ section = 11–15. Thin service
-    pages, no FAQ = 4–10. Mostly homepage marketing copy = 0–3.
+    Thorough service pages + FAQ section + concrete numbers
+    (turnaround times, warranty years, response time) = 11–15.
+    Thin service pages, no FAQ, vague marketing claims = 4–10.
+    Mostly homepage marketing copy = 0–3.
   - Brand / Entity Clarity: 0–10
     Clear name, location, phone, service area, single-sentence
     "what we do" = 7–10. Partial = 3–6. Ambiguous or missing = 0–2.
@@ -335,15 +344,24 @@ missing and explain why in the relevant report section.
     LocalBusiness/Service JSON-LD present and complete = 20–25.
     Generic Organization only = 8–14. Missing schema entirely = 0–6.
   - AI Crawler Readiness: 0–20
-    llms.txt present + AI bots allowed = 16–20. AI bots allowed but
-    no llms.txt = 9–14. AI bots blocked or unclear in robots.txt =
-    0–6.
+    llms.txt present + AI **citation** bots allowed (OAI-SearchBot
+    for ChatGPT Search, ClaudeBot for Claude, PerplexityBot,
+    Bingbot for Copilot, Google-Extended for Gemini AI Overviews)
+    = 16–20. AI citation bots allowed but no llms.txt = 9–14. Any
+    citation bot blocked, OR robots.txt unclear = 0–6.
+    NOTE: Blocking *training-only* bots (GPTBot, anthropic-ai,
+    CCBot) is acceptable and does NOT lower the score — those
+    bots train models, they don't decide who gets cited.
   - Local Trust Signals: 0–20
     Visible reviews/ratings, awards, established date, NAP
-    consistency = 14–20. Some signals = 7–13. Few or none = 0–6.
+    consistency, AND specific numbers (years in business, jobs
+    completed, review count, service-area cities) = 14–20. Some
+    signals = 7–13. Few or none = 0–6.
   - Content Depth + FAQ Quality: 0–15
-    Thorough service pages + FAQ section = 11–15. Thin service
-    pages, no FAQ = 4–10. Mostly homepage marketing copy = 0–3.
+    Thorough service pages + FAQ section + concrete numbers
+    (turnaround times, warranty years, response time) = 11–15.
+    Thin service pages, no FAQ, vague marketing claims = 4–10.
+    Mostly homepage marketing copy = 0–3.
   - Brand / Entity Clarity: 0–10
     Clear name, location, phone, service area, single-sentence
     "what we do" = 7–10. Partial = 3–6. Ambiguous or missing = 0–2.
@@ -421,9 +439,19 @@ impactful missing schema (LocalBusiness preferred). Skip anything you
 can't substantiate from the page. No commentary outside the code block.
 
 **robots.txt findings** — short bullet list. One line per AI crawler
-that's blocked or partially allowed. Cover: GPTBot, ChatGPT-User,
-ClaudeBot, anthropic-ai, PerplexityBot, Google-Extended, Googlebot.
-Skip the ones that are fully allowed.
+that's blocked or partially allowed. Group into TWO buckets so the
+developer can apply the right strategy:
+
+  Citation bots (must be allowed — these decide who gets cited):
+  OAI-SearchBot, ChatGPT-User, ClaudeBot, claude-web, PerplexityBot,
+  Perplexity-User, Bingbot, Google-Extended, Googlebot, Applebot.
+
+  Training-only bots (acceptable to block if the site doesn't want
+  to train AI models — does NOT affect citations): GPTBot,
+  anthropic-ai, CCBot, Bytespider.
+
+Skip the ones that are fully allowed. If a citation bot is blocked,
+flag it as a high-priority robots.txt fix.
 
 **llms.txt** — one sentence on whether it exists. If missing, ONE
 paste-ready block (≤25 lines) tailored to this business.
