@@ -183,6 +183,116 @@ export function bandLabelForOverall(overall: number | null): string {
   return "Invisible";
 }
 
+export type ReportSectionSlug =
+  | "score"
+  | "why"
+  | "fix-first"
+  | "happens"
+  | "cta"
+  | "tech-details"
+  | "other";
+
+export type ReportSection = {
+  slug: ReportSectionSlug;
+  heading: string;
+  body: string;
+};
+
+export type ReportSections = {
+  sections: ReportSection[];
+  hasCta: boolean;
+};
+
+const SECTION_SLUGS: Array<{ slug: ReportSectionSlug; pattern: RegExp }> = [
+  { slug: "score", pattern: /AI\s*Visibility\s*Score|^Score\b/i },
+  { slug: "why", pattern: /Why\s+(?:Customers\s+Don|Your\s+Business\s+Is|You['’]re)/i },
+  { slug: "fix-first", pattern: /What\s+to\s+Fix\s+First/i },
+  { slug: "happens", pattern: /What\s+Happens\s+If/i },
+  { slug: "cta", pattern: /Done[-\s]?For[-\s]?You\s+Fix/i },
+  { slug: "tech-details", pattern: /Technical\s+Details/i },
+];
+
+/**
+ * Splits the markdown into typed sections so the renderer can use a
+ * styled card per section instead of dumping raw markdown. Format-
+ * tolerant — unrecognized headings get the "other" slug and still
+ * render via fallback markdown.
+ */
+export function parseReportSections(
+  md: string | null | undefined,
+): ReportSections {
+  if (!md) return { sections: [], hasCta: false };
+
+  // Match every `## ` (or `# `) heading. Capture the heading text plus
+  // its body until the next heading-of-equal-or-higher level / EOF.
+  const headingRe = /^(##?)\s+(.+?)\s*$/gm;
+  const matches: Array<{ index: number; level: number; text: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = headingRe.exec(md)) !== null) {
+    matches.push({ index: m.index, level: m[1].length, text: m[2] });
+  }
+
+  const sections: ReportSection[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const cur = matches[i];
+    if (cur.level !== 2) continue; // Only ## sections become cards.
+    const next = matches.slice(i + 1).find((x) => x.level <= 2);
+    const bodyStart = cur.index + cur.text.length + cur.level + 1;
+    const bodyEnd = next ? next.index : md.length;
+    const rawBody = md.slice(bodyStart, bodyEnd);
+    const heading = cur.text
+      .replace(/^\d+\.\s*/, "")
+      .replace(/\s*\(Optional\)\s*$/i, "")
+      .trim();
+    const slug = slugForHeading(cur.text);
+    const body = stripWrappingSeparators(rawBody);
+    sections.push({ slug, heading, body });
+  }
+
+  const hasCta = sections.some((s) => s.slug === "cta");
+  return { sections, hasCta };
+}
+
+function slugForHeading(rawHeading: string): ReportSectionSlug {
+  for (const { slug, pattern } of SECTION_SLUGS) {
+    if (pattern.test(rawHeading)) return slug;
+  }
+  return "other";
+}
+
+function stripWrappingSeparators(s: string): string {
+  return s
+    .replace(/^\s*\n+\s*---\s*\n+/, "\n")
+    .replace(/\n\s*---\s*\n*\s*$/, "\n")
+    .trim();
+}
+
+/**
+ * Cleans up the score section body so the rendered card doesn't show
+ * the breakdown bullets (the ScoreCard component renders those
+ * visually) or any inline arithmetic the model occasionally emits.
+ * Returns just the prose ("Why this band:" paragraph and similar).
+ */
+export function cleanScoreSectionBody(body: string): string {
+  let out = body;
+  // Strip the raw "Overall Score: 38/100 — Band" line (rendered as
+  // huge number in the score card already).
+  out = out.replace(/^\*?\*?Overall\s*Score[^\n]*\n?/im, "");
+  // Strip any "(sum of the six category scores below)" parenthetical.
+  out = out.replace(/\(\s*sum\s+of\s+the[^\)]*\)/gi, "");
+  // Strip the "Breakdown:" block — from the line containing
+  // "Breakdown" through the last category bullet.
+  out = out.replace(
+    /^[^\n]*Breakdown[^\n]*\n(?:[^\n]*\n?)+?(?=\n\s*\n|\*\*Why\s+this\s+band|$)/im,
+    "",
+  );
+  // Strip explicit arithmetic expressions like
+  // "(3 + 9 + 14 + 5 + 4 + 3 = 38)" or "= 38/100".
+  out = out.replace(/\(\s*\d+(?:\s*[+]\s*\d+)+\s*=\s*\d+[^)]*\)/g, "");
+  out = out.replace(/=\s*\d+\s*\/\s*100/g, "");
+  return out.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }

@@ -1,309 +1,97 @@
-/* Force light theme on the print surface — globals.css sets a dark
-   background on body which would carry into the PDF otherwise. */
-html,
-body {
-  background: #ffffff !important;
-  color: #1a1a1a !important;
-  margin: 0;
-  padding: 0;
+/* Hosted report — landing-page design language.
+ *
+ * The page itself uses Tailwind utility classes for layout/spacing;
+ * this stylesheet covers:
+ *   1. Component selectors (.score-card-*, .cta-card-*) used by
+ *      ReportScoreCard and ReportCtaCard.
+ *   2. The section-card / hero / footer layout the page wraps each
+ *      ReactMarkdown chunk in.
+ *   3. Markdown-prose typography inside dark cards.
+ *   4. @media print overrides so the same surface still produces a
+ *      readable PDF (PDF is secondary, but should not be broken).
+ */
+
+.report-host {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
-/* Physical page setup. With preferCSSPageSize:true, puppeteer honors
-   this @page rule for PDF margins instead of its JS defaults. The
-   `margin: 0 auto` on .print-root centers the content column inside
-   that printable area. */
-@page {
-  size: A4;
-  margin: 14mm 14mm 18mm 14mm;
+/* ---- hero ---- */
+.report-hero {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 28px;
 }
-
-.print-root {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 56px 56px 64px;
-  background: #ffffff;
-  color: #1a1a1a;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
-    "Helvetica Neue", Arial, sans-serif;
-  font-size: 14.5px;
-  line-height: 1.7;
-  box-sizing: border-box;
-}
-
-/* ---- header ---- */
-.print-header {
-  border-bottom: 2px solid #ff7a18;
-  padding-bottom: 18px;
-  margin-bottom: 36px;
-}
-.print-brand-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.print-brand {
-  color: #ff7a18;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 11px;
-  font-weight: 700;
-}
-.print-score-badge {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  border: 2px solid;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
-    "Helvetica Neue", Arial, sans-serif;
-}
-.print-score-badge.tone-ok {
-  border-color: #2da94f;
-  background: #f0faf3;
-}
-.print-score-badge.tone-warn {
-  border-color: #c98604;
-  background: #fdf6e9;
-}
-.print-score-badge.tone-bad {
-  border-color: #ff7a18;
-  background: #fff4ea;
-}
-.print-score-badge.tone-muted {
-  border-color: #aaa;
-  background: #f5f5f5;
-}
-.print-score-num {
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.01em;
-}
-.print-score-badge.tone-ok .print-score-num {
-  color: #1f7e3a;
-}
-.print-score-badge.tone-warn .print-score-num {
-  color: #946203;
-}
-.print-score-badge.tone-bad .print-score-num {
-  color: #ff7a18;
-}
-.print-score-badge.tone-muted .print-score-num {
-  color: #555;
-}
-.print-score-label {
-  font-size: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: #777;
-  margin-top: 2px;
-}
-.print-meta {
-  margin-top: 14px;
+.report-meta {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  font-size: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 28px;
+  font-size: 13px;
 }
-.print-meta div {
+.report-meta div {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
-.print-meta dt {
-  font-size: 9.5px;
+.report-meta dt {
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: #888;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.45);
   font-weight: 600;
 }
-.print-meta dd {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #1a1a1a;
-  word-break: break-all;
-}
-
-/* ---- markdown body ---- */
-.print-prose h1 {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #111;
-  margin: 0 0 18px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e8e8e8;
-  page-break-after: avoid;
-}
-.print-prose h2 {
-  font-size: 17px;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin: 34px 0 12px;
-  padding-top: 4px;
-  page-break-after: avoid;
-}
-.print-prose h3 {
+.report-meta dd {
+  margin: 0;
   font-size: 13.5px;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin: 22px 0 6px;
-  page-break-after: avoid;
-}
-.print-prose h4 {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #333;
-  margin: 14px 0 4px;
-  page-break-after: avoid;
-}
-.print-prose p {
-  margin: 0 0 14px;
-  color: #2a2a2a;
-}
-.print-prose strong {
-  color: #111;
   font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  word-break: break-word;
 }
-.print-prose em {
-  color: #2a2a2a;
-}
-.print-prose a {
-  color: #ff7a18;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  word-break: break-all;
-}
-.print-prose ul,
-.print-prose ol {
-  margin: 0 0 16px;
-  padding-left: 22px;
-}
-.print-prose li {
-  margin: 4px 0;
-  color: #2a2a2a;
-}
-.print-prose ul li::marker {
-  color: #ff7a18;
-}
-.print-prose ol li::marker {
-  color: #ff7a18;
-  font-weight: 600;
-}
-.print-prose blockquote {
-  margin: 14px 0;
-  padding: 8px 14px;
-  border-left: 3px solid #ff7a18;
-  background: #fff8f1;
-  color: #1a1a1a;
-  font-style: italic;
-  page-break-inside: avoid;
-}
-.print-prose code {
-  background: #f4f4f4;
-  border: 1px solid #e6e6e6;
-  border-radius: 3px;
-  padding: 0 4px;
-  font-size: 0.85em;
-  color: #1a1a1a;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
-    "Liberation Mono", monospace;
-}
-.print-prose pre {
-  background: #f8f8f8;
-  border: 1px solid #e6e6e6;
-  border-radius: 6px;
-  padding: 12px 14px;
-  overflow-x: auto;
+.report-band-pill {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: 999px;
   font-size: 11.5px;
-  line-height: 1.5;
-  margin: 12px 0 16px;
-  page-break-inside: avoid;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
-    "Liberation Mono", monospace;
-}
-.print-prose pre code {
-  background: transparent;
-  border: none;
-  padding: 0;
-  color: #1a1a1a;
-}
-/* Horizontal rules wrap the Done-For-You Fix CTA block, so they
-   double as the visual separator that sets the offer apart from
-   the report body. Slightly heavier + warm tint to draw the eye. */
-.print-prose hr {
-  border: 0;
-  border-top: 2px solid #ffd9b8;
-  margin: 36px 0;
-}
-
-/* Done-For-You Fix CTA block sits between two <hr>s. Style the H3
-   immediately after a paragraph break inside that block so it reads
-   like an offer headline, not a body sub-heading. */
-.print-prose hr + h2 {
-  margin-top: 0;
-  color: #ff7a18;
-}
-.print-prose hr + h2 + h3 {
-  font-size: 16px;
-  font-weight: 800;
-  color: #1a1a1a;
-  margin-top: 6px;
-  letter-spacing: -0.01em;
-}
-.print-prose table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 12px 0 18px;
-  font-size: 12px;
-  page-break-inside: avoid;
-  border: 1px solid #e6e6e6;
-  border-radius: 6px;
-  overflow: hidden;
-}
-.print-prose th,
-.print-prose td {
-  padding: 8px 12px;
-  text-align: left;
-  border-bottom: 1px solid #ededed;
-}
-.print-prose th {
-  background: #fafafa;
-  color: #555;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border: 1px solid;
 }
-.print-prose tr:last-child td {
-  border-bottom: 0;
+.report-band-pill-ok {
+  color: #6ce39a;
+  background: rgba(45, 169, 79, 0.12);
+  border-color: rgba(108, 227, 154, 0.45);
 }
-.print-prose details {
-  border: 1px solid #e6e6e6;
-  border-radius: 6px;
-  padding: 10px 14px;
-  margin: 14px 0;
-  background: #fafafa;
+.report-band-pill-warn {
+  color: #ffc46b;
+  background: rgba(201, 134, 4, 0.14);
+  border-color: rgba(255, 196, 107, 0.45);
 }
-.print-prose details summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: #1a1a1a;
+.report-band-pill-bad {
+  color: #ff9a3c;
+  background: rgba(255, 122, 24, 0.14);
+  border-color: rgba(255, 154, 60, 0.55);
+}
+.report-band-pill-muted {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
-/* ---- score card ---- */
+/* ---- score card (overall + bars panel) ---- */
 .score-card {
-  margin: 28px 0 36px;
-  border: 1px solid #ececec;
-  border-radius: 12px;
-  background: #ffffff;
-  padding: 22px 24px 24px;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(10, 13, 22, 0.72);
+  padding: 26px 28px 28px;
   page-break-inside: avoid;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(6px);
 }
 .score-card-top {
   display: flex;
@@ -311,76 +99,76 @@ body {
   align-items: center;
   font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: #888;
-  margin-bottom: 10px;
+  letter-spacing: 0.22em;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 14px;
+  font-weight: 600;
 }
 .score-card-top-status {
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  border: 1px solid;
 }
 .score-card-tone-ok .score-card-top-status {
-  color: #1f7e3a;
-  background: #e9f7ee;
-  border: 1px solid #cdebd5;
+  color: #6ce39a;
+  background: rgba(45, 169, 79, 0.12);
+  border-color: rgba(108, 227, 154, 0.45);
 }
 .score-card-tone-warn .score-card-top-status {
-  color: #946203;
-  background: #fdf3e1;
-  border: 1px solid #f0dcb6;
+  color: #ffc46b;
+  background: rgba(201, 134, 4, 0.14);
+  border-color: rgba(255, 196, 107, 0.45);
 }
 .score-card-tone-bad .score-card-top-status {
-  color: #c14e0a;
-  background: #fff0e2;
-  border: 1px solid #ffd0a8;
+  color: #ff9a3c;
+  background: rgba(255, 122, 24, 0.14);
+  border-color: rgba(255, 154, 60, 0.55);
 }
 .score-card-tone-muted .score-card-top-status {
-  color: #555;
-  background: #f1f1f1;
-  border: 1px solid #e1e1e1;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 .score-card-overall-row {
   display: flex;
   align-items: flex-start;
-  gap: 18px;
-  margin-bottom: 18px;
+  gap: 24px;
+  margin-bottom: 22px;
 }
 .score-card-overall {
   display: flex;
   align-items: baseline;
-  gap: 4px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
-    "Helvetica Neue", Arial, sans-serif;
+  gap: 6px;
   letter-spacing: -0.02em;
   line-height: 1;
 }
 .score-card-overall-num {
-  font-size: 56px;
+  font-size: 64px;
   font-weight: 800;
-  color: #111;
+  color: #ffffff;
 }
 .score-card-tone-ok .score-card-overall-num {
-  color: #1f7e3a;
+  color: #6ce39a;
 }
 .score-card-tone-warn .score-card-overall-num {
-  color: #946203;
+  color: #ffc46b;
 }
 .score-card-tone-bad .score-card-overall-num {
-  color: #ff7a18;
+  color: #ff9a3c;
 }
 .score-card-overall-max {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
-  color: #777;
+  color: rgba(255, 255, 255, 0.45);
 }
 .score-card-blurb {
-  margin: 6px 0 0;
-  font-size: 13.5px;
-  line-height: 1.55;
-  color: #2a2a2a;
+  margin: 8px 0 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.7);
   flex: 1;
 }
 .score-card-bars {
@@ -389,7 +177,7 @@ body {
   padding: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px 24px;
+  gap: 14px 28px;
 }
 .score-card-bar {
   margin: 0;
@@ -399,25 +187,25 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 4px;
-  font-size: 12px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
 }
 .score-card-bar-label {
-  color: #1a1a1a;
+  color: rgba(255, 255, 255, 0.85);
   font-weight: 600;
 }
 .score-card-bar-value {
-  color: #111;
+  color: #ffffff;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .score-card-bar-max {
-  color: #999;
+  color: rgba(255, 255, 255, 0.45);
   font-weight: 500;
 }
 .score-card-bar-track {
   height: 6px;
-  background: #f1f1f1;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -429,66 +217,204 @@ body {
   background: #2da94f;
 }
 .score-card-bar-fill-warn {
-  background: #c98604;
+  background: #ffc46b;
 }
 .score-card-bar-fill-bad {
   background: #ff7a18;
 }
 
-/* ---- CTA card ----
-   High-contrast dark offer panel. Reads as an OFFER, not body copy.
-   Survives in PDF because puppeteer's `printBackground:true` keeps
-   the dark fill; -webkit-print-color-adjust forces color preservation
-   on browser print preview. */
+.report-band-explainer {
+  margin-top: 18px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.82);
+}
+.report-band-explainer p {
+  margin: 0 0 10px;
+}
+.report-band-explainer strong {
+  color: #ffffff;
+}
+
+/* ---- section cards ---- */
+.report-section-card {
+  margin-top: 32px;
+  padding: 28px 28px 30px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 13, 22, 0.65);
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  page-break-inside: avoid;
+}
+.report-section-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.report-section-diagnosis {
+  border-color: rgba(255, 122, 24, 0.18);
+}
+.report-section-action {
+  border-color: rgba(43, 139, 255, 0.18);
+}
+.report-section-impact {
+  border-color: rgba(108, 227, 154, 0.18);
+}
+
+/* ---- markdown prose inside dark cards ---- */
+.report-prose {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.85);
+}
+.report-prose h2,
+.report-prose h3,
+.report-prose h4 {
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  page-break-after: avoid;
+}
+.report-prose h3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 22px 0 8px;
+}
+.report-prose h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 16px 0 6px;
+  color: rgba(255, 255, 255, 0.92);
+}
+.report-prose p {
+  margin: 0 0 14px;
+}
+.report-prose strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+.report-prose em {
+  color: rgba(255, 255, 255, 0.85);
+}
+.report-prose a {
+  color: #ff9a3c;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+.report-prose ul,
+.report-prose ol {
+  margin: 0 0 16px;
+  padding-left: 22px;
+}
+.report-prose li {
+  margin: 6px 0;
+}
+.report-prose ul li::marker,
+.report-prose ol li::marker {
+  color: #ff7a18;
+  font-weight: 700;
+}
+.report-prose blockquote {
+  margin: 14px 0;
+  padding: 10px 16px;
+  border-left: 3px solid #ff7a18;
+  background: rgba(255, 122, 24, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 4px;
+}
+.report-prose code {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.85em;
+  color: #ffd9b8;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+.report-prose pre {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 14px 0;
+  color: #f4f5f7;
+  page-break-inside: avoid;
+}
+.report-prose pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+}
+.report-prose hr {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 28px 0;
+}
+
+/* ---- CTA card (dark by default — matches landing page) ---- */
 .cta-card {
   position: relative;
-  margin: 40px 0;
-  border-radius: 14px;
-  border: 1px solid #2a2f3a;
-  background: #0f1115;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 122, 24, 0.45);
+  background: linear-gradient(
+    180deg,
+    rgba(15, 17, 21, 1) 0%,
+    rgba(20, 13, 7, 1) 100%
+  );
   color: #f4f5f7;
   overflow: hidden;
   page-break-inside: avoid;
-  box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.18),
-    0 16px 36px -18px rgba(255, 122, 24, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.12),
+    0 30px 80px -25px rgba(255, 122, 24, 0.4);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 .cta-card-accent {
   height: 6px;
-  background: linear-gradient(90deg, #ff7a18 0%, #ff9b4a 100%);
+  background: linear-gradient(90deg, #ff7a18 0%, #ff9a3c 50%, #ff7a18 100%);
 }
 .cta-card-body {
-  padding: 28px 30px 30px;
+  padding: 30px 32px 32px;
 }
 .cta-card-eyebrow {
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: #ff7a18;
-  margin-bottom: 8px;
+  color: #ff9a3c;
+  margin-bottom: 10px;
 }
 .cta-card-headline {
-  margin: 0 0 10px;
-  font-size: 26px;
-  line-height: 1.2;
+  margin: 0 0 12px;
+  font-size: 30px;
+  line-height: 1.15;
   font-weight: 800;
   letter-spacing: -0.015em;
   color: #ffffff;
 }
 .cta-card-lede {
-  margin: 0 0 20px;
-  font-size: 14.5px;
+  margin: 0 0 22px;
+  font-size: 15px;
   line-height: 1.65;
-  color: #c8ccd3;
+  color: rgba(255, 255, 255, 0.78);
   max-width: 56ch;
 }
 .cta-card-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
   align-items: center;
 }
 .cta-card-badge {
@@ -501,23 +427,23 @@ body {
   print-color-adjust: exact;
 }
 .cta-card-badge-price {
-  padding: 8px 18px;
+  padding: 9px 20px;
   background: #ff7a18;
   color: #ffffff;
-  font-size: 18px;
+  font-size: 19px;
   border: 1px solid #ff7a18;
-  box-shadow: 0 0 0 3px rgba(255, 122, 24, 0.18);
+  box-shadow: 0 0 0 4px rgba(255, 122, 24, 0.18);
 }
 .cta-card-badge-meta {
-  padding: 8px 14px;
-  background: #1a1f29;
-  color: #f4f5f7;
-  font-size: 12.5px;
-  border: 1px solid #2a2f3a;
+  padding: 9px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 .cta-card-bullets {
   list-style: none;
-  margin: 0 0 22px;
+  margin: 0 0 24px;
   padding: 0;
 }
 .cta-card-bullets li {
@@ -525,9 +451,9 @@ body {
   align-items: flex-start;
   gap: 12px;
   margin: 10px 0;
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.55;
-  color: #f4f5f7;
+  color: rgba(255, 255, 255, 0.92);
 }
 .cta-card-check {
   flex: 0 0 18px;
@@ -535,100 +461,128 @@ body {
 }
 .cta-card-button {
   display: inline-block;
-  padding: 14px 26px;
+  padding: 14px 28px;
   border-radius: 10px;
   background: #ff7a18;
-  color: #ffffff !important;
+  color: #05070d !important;
   font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.01em;
   text-decoration: none !important;
   border: none;
-  box-shadow: 0 8px 20px -8px rgba(255, 122, 24, 0.55);
+  box-shadow: 0 0 60px -10px rgba(255, 122, 24, 0.45);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 .cta-card-button:hover {
-  background: #ff8a30;
+  background: #ff9a3c;
 }
 .cta-card-fineprint {
   margin: 14px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ---- technical details (collapsed appendix) ---- */
+.report-tech-details {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(10, 13, 22, 0.55);
+  padding: 18px 22px;
+}
+.report-tech-details summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.report-tech-details summary::-webkit-details-marker {
+  display: none;
+}
+.report-tech-summary-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+.report-tech-summary-hint {
   font-size: 12.5px;
-  color: #9aa0aa;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 /* ---- footer ---- */
-.print-footer {
-  margin-top: 48px;
-  padding-top: 16px;
-  border-top: 1px solid #e8e8e8;
+.report-footer {
+  margin-top: 56px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
-  font-size: 10.5px;
-  color: #888;
+  gap: 14px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.4);
   page-break-inside: avoid;
+  flex-wrap: wrap;
 }
-.print-footer-brand {
-  color: #ff7a18;
+.report-footer-brand {
+  color: #ff9a3c;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
-.print-footer-meta {
+.report-footer-meta {
   flex: 1;
   text-align: center;
 }
-.print-footer-id {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
-    "Liberation Mono", monospace;
-  font-size: 9.5px;
-  color: #999;
+.report-footer-id {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.35);
 }
 
-/* ---- print rules ---- */
+/* ---- print rules — preserve dark theme in PDF (PDF is secondary,
+       but it should still be readable). ---- */
+@page {
+  size: A4;
+  margin: 14mm 14mm 18mm 14mm;
+}
+
 @media print {
   html,
   body {
-    background: #ffffff !important;
-    color: #1a1a1a !important;
+    background: #05070d !important;
+    color: #f4f5f7 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
-  /* Keep the column centered inside the printable area defined by
-     @page. The previous version unset max-width which flushed
-     content to the left edge of A4 and looked unprofessional. */
-  .print-root {
-    margin-left: auto !important;
-    margin-right: auto !important;
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+  .report-host {
+    background: #05070d !important;
+  }
+  .container-page {
     max-width: 720px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
     width: 100% !important;
   }
-  /* Expand collapsed details so the whole report prints. */
-  .print-prose details {
-    page-break-inside: avoid;
-  }
-  .print-prose details > *:not(summary) {
-    display: block !important;
-  }
-  /* Collapse the score breakdown to a single column for the narrower
-     A4 printable area so each bar gets full width and stays legible. */
   .score-card-bars {
     grid-template-columns: 1fr !important;
-    gap: 10px !important;
+    gap: 12px !important;
   }
-  /* CTA card stays dark in the PDF — print-color-adjust:exact on the
-     card itself keeps the fill; we just trim the diffuse drop-shadow
-     since static PDFs don't render it cleanly. */
-  .cta-card {
-    box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.35) !important;
+  .report-section-card,
+  .score-card,
+  .cta-card,
+  .report-tech-details {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
-  .cta-card-button {
-    box-shadow: none !important;
+  /* Open the technical details in PDF so the developer doesn't lose
+     content to a non-clickable summary. */
+  .report-tech-details[open] summary,
+  .report-tech-details summary {
+    pointer-events: none;
+  }
+  .report-tech-details > *:not(summary) {
+    display: block !important;
   }
 }
