@@ -164,13 +164,28 @@ Do NOT crawl. Do NOT fabricate findings — every claim must come from
 one of those fetches.
 
 **Output budget: 600–1,000 words.** Markdown only. No preamble, no
-closing remarks. Voice: blunt consultant, short sentences. No SEO
-jargon — if you must use a term, explain it once in plain English.
+closing remarks.
 
-**Never omit the "Recommended Next Step: GEO Foundation Fix"
-section.** It is mandatory. Paste it verbatim from the template
-below as section 5 — do not paraphrase, do not change wording, do
-not change pricing, do not drop bullets.
+**Language rules — STRICT.** You are writing for a roofer, an HVAC
+owner, a contractor, a dentist. They have NEVER heard of "schema",
+"crawlers", "entity signals", or "structured data". Talk to them
+like their smart friend, not their developer.
+- Plain English only. Short sentences. No SEO jargon.
+- BAD: "AI crawler readiness is low because GPTBot is disallowed."
+  GOOD: "ChatGPT can't read your site, so it has nothing to recommend
+  when customers ask."
+- BAD: "Schema markup is missing."
+  GOOD: "AI tools can't tell what your business does or where you
+  serve, so you get skipped."
+- Every issue must answer three things, in plain words: WHAT'S
+  WRONG · WHY IT MATTERS (lost jobs / missed calls) · WHAT HAPPENS
+  IF FIXED.
+- No fabricated traffic numbers. No score promises.
+
+**Never omit the "Done-For-You Fix" section.** It is mandatory.
+Paste it verbatim from the template below as section 5 — do not
+paraphrase, do not change wording, do not change pricing, do not
+drop bullets.
 
 **Scoring rubric — REQUIRED.** Score each category from the evidence
 you actually fetched. The total MUST equal the sum of the six
@@ -217,50 +232,50 @@ Breakdown:
 One short sentence in plain language on what this score means for
 getting recommended by AI when local customers ask.
 
-## 2. Why Your Business Is Not Showing Up
+## 2. Why Customers Don't See You
 Top 3 issues only. Numbered. For each:
-- One-line headline (no jargon)
-- **What is wrong** — one sentence
-- **Why it hurts visibility** — one sentence
-- **How it can cost leads or trust** — one sentence
+- A plain-English headline (one short line, no jargon)
+- **What's wrong** — one sentence anyone can understand
+- **Why it matters** — one sentence in lost jobs / missed calls / a
+  competitor getting picked instead
+- **What happens if fixed** — one sentence on what changes for the
+  business
 
 ## 3. What To Fix First
 Top 3 fixes only. Numbered. For each:
-- **What to do** — one concrete action a developer can pick up
-- **Why it matters** — one sentence linking the fix to lost leads or
-  competitor advantage
-- **Expected outcome** — one sentence on what changes for the customer
+- **What to do** — one concrete action, plain words
+- **Why it matters** — tied to leads / calls / customers won
+- **What changes when fixed** — one sentence on the result
 
 ## 4. What Happens If You Fix This
-3–4 sentences in plain business-owner language. Frame: better AI
-visibility, stronger trust signals, higher chance of being recommended,
-more inbound lead opportunity. No score promises. No fabricated traffic
-numbers.
+3–4 sentences in plain owner-friendly language. Frame: more chance
+of being recommended when customers ask AI for a local pro, more
+inbound calls, fewer customers handed to competitors.
 
-## 5. Recommended Next Step: GEO Foundation Fix
+---
+
+## 5. Done-For-You Fix (Optional)
 
 Paste this section EXACTLY as written below. Do not paraphrase. Do
 not modify pricing. Do not drop bullets:
 
-If you want this handled for you, GeoViz offers a done-for-you GEO Foundation Fix.
+### Let Us Fix This For You
 
-**What we implement:**
-- LocalBusiness / Service schema setup
-- AI crawler guidance with llms.txt
-- robots.txt review and cleanup if needed
-- FAQ content structure for AI answers
-- service/location signal improvements
-- priority fixes from this report
+If you don't want to deal with technical changes, we can handle everything for you.
 
-**Why it matters:** These are the foundational signals AI systems use to understand, trust, and recommend a local business.
-
-**Timeline:** Typically completed in 3–5 business days.
+**What we do:**
+- Set up your business so AI tools understand and recommend you
+- Fix the exact issues found in this report
+- Improve your chances of showing up when customers search
 
 **Investment:** $497 one-time
+**Timeline:** 3–5 business days
 
-**Next step:** Reply to this email or click the fix request link to have GeoViz handle it.
+Reply to this email or click the link to request your fix.
 
-End immediately after the next-step CTA. No closing summary.`;
+---
+
+End immediately after the closing horizontal rule. No closing summary.`;
   }
 
   return `You are a senior digital visibility consultant — not an SEO technician.
@@ -283,16 +298,31 @@ one of those fetches.
 **Output budget: 1,200–2,000 words total.** Markdown only. No preamble,
 no closing remarks.
 
-**Voice rules:**
-- Blunt consultant. Short sentences.
-- No SEO jargon — if you must use a term ("schema", "robots.txt"),
-  explain it once in plain English.
+**Language rules — STRICT.** You are writing for a roofer, an HVAC
+owner, a contractor, a dentist. They have NEVER heard of "schema",
+"crawlers", "entity signals", or "structured data". Talk to them
+like their smart friend, not their developer.
+- Plain English only. Short sentences. No SEO jargon.
+- BAD: "AI crawler readiness is low because GPTBot is disallowed."
+  GOOD: "ChatGPT can't read your site, so it has nothing to recommend
+  when customers ask."
+- BAD: "Schema markup is missing."
+  GOOD: "AI tools can't tell what your business does or where you
+  serve, so you get skipped."
+- Every issue must answer three things, in plain words: WHAT'S
+  WRONG · WHY IT MATTERS (lost jobs / missed calls) · WHAT HAPPENS
+  IF FIXED.
 - No long paragraphs. Punchy and actionable.
 - No repeating the same issue across sections.
-- **Never omit the "Recommended Next Step: GEO Foundation Fix"
-  section.** It is mandatory. Paste it verbatim from the template
-  below as section 5 — do not paraphrase, do not change wording,
-  do not change pricing, do not drop bullets.
+- No fabricated traffic numbers. No score promises.
+- **Never omit the "Done-For-You Fix" section.** It is mandatory.
+  Paste it verbatim from the template below as section 5 — do not
+  paraphrase, do not change wording, do not change pricing, do not
+  drop bullets.
+
+Technical terms ("schema", "robots.txt", "llms.txt") may appear in
+the collapsed Section 6 (Technical Details), where the audience is
+the developer. Keep sections 1–5 jargon-free.
 
 **Scoring rubric — REQUIRED.** Score each category from the evidence
 you actually fetched. The overall score MUST equal the sum of the
@@ -339,48 +369,48 @@ Breakdown:
 One short sentence in plain language on what this score means for
 getting recommended by AI when local customers ask.
 
-## 2. Why Your Business Is Not Showing Up
+## 2. Why Customers Don't See You
 Top 3 issues only. Numbered. For each:
-- One-line headline (no jargon)
-- **What is wrong** — one sentence
-- **Why it hurts visibility** — one sentence
-- **How it can cost leads or trust** — one sentence
+- A plain-English headline (one short line, no jargon)
+- **What's wrong** — one sentence anyone can understand
+- **Why it matters** — one sentence in lost jobs / missed calls / a
+  competitor getting picked instead
+- **What happens if fixed** — one sentence on what changes for the
+  business
 
 ## 3. What To Fix First
 Top 3 fixes only. Numbered. For each:
-- **What to do** — one concrete action a developer can pick up
-- **Why it matters** — one sentence linking the fix to lost leads or
-  competitor advantage
-- **Expected outcome** — one sentence on what changes for the customer
+- **What to do** — one concrete action, plain words
+- **Why it matters** — tied to leads / calls / customers won
+- **What changes when fixed** — one sentence on the result
 
 ## 4. What Happens If You Fix This
-3–4 sentences in plain business-owner language. Frame: better AI
-visibility, stronger trust signals, higher chance of being recommended,
-more inbound lead opportunity. No score promises. No fabricated traffic
-numbers.
+3–4 sentences in plain owner-friendly language. Frame: more chance
+of being recommended when customers ask AI for a local pro, more
+inbound calls, fewer customers handed to competitors.
 
-## 5. Recommended Next Step: GEO Foundation Fix
+---
+
+## 5. Done-For-You Fix (Optional)
 
 Paste this section EXACTLY as written below. Do not paraphrase. Do
 not modify pricing. Do not drop bullets:
 
-If you want this handled for you, GeoViz offers a done-for-you GEO Foundation Fix.
+### Let Us Fix This For You
 
-**What we implement:**
-- LocalBusiness / Service schema setup
-- AI crawler guidance with llms.txt
-- robots.txt review and cleanup if needed
-- FAQ content structure for AI answers
-- service/location signal improvements
-- priority fixes from this report
+If you don't want to deal with technical changes, we can handle everything for you.
 
-**Why it matters:** These are the foundational signals AI systems use to understand, trust, and recommend a local business.
-
-**Timeline:** Typically completed in 3–5 business days.
+**What we do:**
+- Set up your business so AI tools understand and recommend you
+- Fix the exact issues found in this report
+- Improve your chances of showing up when customers search
 
 **Investment:** $497 one-time
+**Timeline:** 3–5 business days
 
-**Next step:** Reply to this email or click the fix request link to have GeoViz handle it.
+Reply to this email or click the link to request your fix.
+
+---
 
 ## 6. Technical Details
 <details>
