@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Sales-focused CTA card that REPLACES the markdown rendering of the
  * "Done-For-You Fix" section. The styled component lives in the same
@@ -7,9 +9,6 @@
  * Uses light-theme colors with a heavy orange accent so it prints
  * cleanly on a white A4 page without looking like raw markdown.
  */
-const FIX_REQUEST_EMAIL =
-  process.env.FIX_REQUEST_EMAIL ?? "fix@geoviz.app";
-
 export function ReportCtaCard({
   orderId,
   businessLabel,
@@ -17,8 +16,15 @@ export function ReportCtaCard({
   orderId: string;
   businessLabel: string;
 }) {
+  // Resolve at render-time, not module-load. Top-level `process.env`
+  // access in a module that gets bundled into the client chunk has
+  // been observed to break the webpack module factory after big
+  // server/client refactors (Next 14, App Router). Moving the lookup
+  // inside the function body keeps the module body side-effect-free.
+  const fixRequestEmail =
+    process.env.FIX_REQUEST_EMAIL ?? "fix@geoviz.app";
   const subject = `Fix request — ${businessLabel} (${orderId.slice(-6)})`;
-  const mailto = `mailto:${FIX_REQUEST_EMAIL}?subject=${encodeURIComponent(subject)}`;
+  const mailto = `mailto:${fixRequestEmail}?subject=${encodeURIComponent(subject)}`;
 
   return (
     <section className="cta-card" aria-label="Done-For-You Fix offer">
