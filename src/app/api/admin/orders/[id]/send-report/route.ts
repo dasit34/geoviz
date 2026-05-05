@@ -147,6 +147,10 @@ export async function POST(
       ]
     : undefined;
 
+  console.log(
+    `[admin-send] EMAIL_DISPATCH orderId=${order.id} to=${order.email} from=${FROM_EMAIL} cc=${cc?.join(",") ?? "(none)"} subject="${subject}" attachedPdf=${Boolean(pdfBuffer)}`,
+  );
+
   let resendId: string | undefined;
   try {
     const result = await getResend().emails.send({
@@ -160,7 +164,7 @@ export async function POST(
     });
     if (result.error) {
       console.error(
-        `[admin-send] report email failed orderId=${order.id}: ${result.error.name} — ${result.error.message}`,
+        `[admin-send] EMAIL_FAILED orderId=${order.id} to=${order.email} resendError="${result.error.name}: ${result.error.message}"`,
       );
       return NextResponse.json(
         { error: `${result.error.name}: ${result.error.message}` },
@@ -171,7 +175,7 @@ export async function POST(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(
-      `[admin-send] report email failed orderId=${order.id}: ${message}`,
+      `[admin-send] EMAIL_FAILED orderId=${order.id} to=${order.email} threwException="${message}"`,
     );
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -185,7 +189,7 @@ export async function POST(
   });
 
   console.log(
-    `[admin-send] report email sent orderId=${order.id} resendId=${resendId ?? "unknown"}`,
+    `[admin-send] EMAIL_SENT orderId=${order.id} to=${order.email} resendId=${resendId ?? "unknown"} attachedPdf=${Boolean(pdfBuffer)}`,
   );
 
   return NextResponse.json({

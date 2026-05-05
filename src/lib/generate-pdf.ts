@@ -55,7 +55,12 @@ export async function generateAuditPdf(args: GeneratePdfArgs): Promise<Buffer> {
   try {
     browser = await puppeteer.launch({
       args: chromium.args,
-      defaultViewport: { width: 1240, height: 1754 },
+      // Viewport sized to A4 at ~96dpi (210mm × 297mm ≈ 794 × 1123 px)
+      // with a 26px overscan so the layout viewport closely matches the
+      // physical page. Smaller viewport = less scale-down at print time
+      // = the centered max-width:720px column lands centered in the PDF
+      // instead of drifting after Chromium scales 1240px → A4.
+      defaultViewport: { width: 820, height: 1160 },
       executablePath,
       headless: true,
     });

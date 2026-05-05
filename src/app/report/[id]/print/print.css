@@ -435,85 +435,99 @@ body {
   background: #ff7a18;
 }
 
-/* ---- CTA card ---- */
+/* ---- CTA card ----
+   High-contrast dark offer panel. Reads as an OFFER, not body copy.
+   Survives in PDF because puppeteer's `printBackground:true` keeps
+   the dark fill; -webkit-print-color-adjust forces color preservation
+   on browser print preview. */
 .cta-card {
   position: relative;
-  margin: 36px 0;
-  border-radius: 12px;
-  border: 1px solid #ffd9b8;
-  background: #fffaf3;
+  margin: 40px 0;
+  border-radius: 14px;
+  border: 1px solid #2a2f3a;
+  background: #0f1115;
+  color: #f4f5f7;
   overflow: hidden;
   page-break-inside: avoid;
-  box-shadow: 0 2px 0 rgba(255, 122, 24, 0.06);
+  box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.18),
+    0 16px 36px -18px rgba(255, 122, 24, 0.45);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 .cta-card-accent {
   height: 6px;
-  background: #ff7a18;
+  background: linear-gradient(90deg, #ff7a18 0%, #ff9b4a 100%);
 }
 .cta-card-body {
-  padding: 24px 28px 26px;
+  padding: 28px 30px 30px;
 }
 .cta-card-eyebrow {
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-weight: 800;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: #ff7a18;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .cta-card-headline {
-  margin: 0 0 8px;
-  font-size: 24px;
+  margin: 0 0 10px;
+  font-size: 26px;
   line-height: 1.2;
   font-weight: 800;
-  letter-spacing: -0.01em;
-  color: #111;
+  letter-spacing: -0.015em;
+  color: #ffffff;
 }
 .cta-card-lede {
-  margin: 0 0 16px;
+  margin: 0 0 20px;
   font-size: 14.5px;
-  line-height: 1.6;
-  color: #2a2a2a;
+  line-height: 1.65;
+  color: #c8ccd3;
   max-width: 56ch;
 }
 .cta-card-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 20px;
+  align-items: center;
 }
 .cta-card-badge {
   display: inline-flex;
   align-items: center;
-  padding: 6px 12px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  border: 1px solid transparent;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 .cta-card-badge-price {
+  padding: 8px 18px;
   background: #ff7a18;
   color: #ffffff;
+  font-size: 18px;
+  border: 1px solid #ff7a18;
+  box-shadow: 0 0 0 3px rgba(255, 122, 24, 0.18);
 }
 .cta-card-badge-meta {
-  background: #ffffff;
-  color: #1a1a1a;
-  border-color: #ddd;
+  padding: 8px 14px;
+  background: #1a1f29;
+  color: #f4f5f7;
+  font-size: 12.5px;
+  border: 1px solid #2a2f3a;
 }
 .cta-card-bullets {
   list-style: none;
-  margin: 0 0 18px;
+  margin: 0 0 22px;
   padding: 0;
 }
 .cta-card-bullets li {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  margin: 8px 0;
-  font-size: 14px;
+  gap: 12px;
+  margin: 10px 0;
+  font-size: 14.5px;
   line-height: 1.55;
-  color: #1a1a1a;
+  color: #f4f5f7;
 }
 .cta-card-check {
   flex: 0 0 18px;
@@ -521,23 +535,26 @@ body {
 }
 .cta-card-button {
   display: inline-block;
-  padding: 12px 22px;
-  border-radius: 8px;
+  padding: 14px 26px;
+  border-radius: 10px;
   background: #ff7a18;
   color: #ffffff !important;
-  font-size: 14.5px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   letter-spacing: 0.01em;
   text-decoration: none !important;
   border: none;
+  box-shadow: 0 8px 20px -8px rgba(255, 122, 24, 0.55);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 .cta-card-button:hover {
-  background: #e96a0a;
+  background: #ff8a30;
 }
 .cta-card-fineprint {
-  margin: 10px 0 0;
-  font-size: 12px;
-  color: #666;
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  color: #9aa0aa;
 }
 
 /* ---- footer ---- */
@@ -581,10 +598,16 @@ body {
      @page. The previous version unset max-width which flushed
      content to the left edge of A4 and looked unprofessional. */
   .print-root {
-    margin: 0 auto !important;
-    padding: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
     max-width: 720px !important;
-    width: auto !important;
+    width: 100% !important;
   }
   /* Expand collapsed details so the whole report prints. */
   .print-prose details {
@@ -599,15 +622,13 @@ body {
     grid-template-columns: 1fr !important;
     gap: 10px !important;
   }
-  /* CTA card: drop hover bg + shadow that don't render meaningfully
-     in a static PDF, but keep the orange accent + bullet checks. */
+  /* CTA card stays dark in the PDF — print-color-adjust:exact on the
+     card itself keeps the fill; we just trim the diffuse drop-shadow
+     since static PDFs don't render it cleanly. */
   .cta-card {
-    box-shadow: none !important;
+    box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.35) !important;
   }
   .cta-card-button {
-    /* Underline so the link is obvious in print where there's no
-       hover/cursor affordance. */
-    text-decoration: underline !important;
-    text-underline-offset: 2px;
+    box-shadow: none !important;
   }
 }
