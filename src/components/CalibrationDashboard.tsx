@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type CategoryScore = {
   key: string;
@@ -13,6 +13,7 @@ type CategoryScore = {
 type CalibrationRun = {
   id: string;
   url: string;
+  businessName: string;
   label: string;
   reportStatus: string;
   reportError: string | null;
@@ -37,6 +38,9 @@ const BANDS: Array<{ label: string; min: number; max: number }> = [
   { label: "AI-Ready", min: 81, max: 100 },
 ];
 
+const POLL_ACTIVE_MS = 3000;
+const POLL_IDLE_MS = 15000;
+
 export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
   const [runs, setRuns] = useState<CalibrationRun[]>([]);
   const [loading, setLoading] = useState(false);
@@ -45,18 +49,30 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [tick, setTick] = useState(0);
+
+  // Tick once a second so the "X seconds ago" label updates without
+  // re-fetching. Cheap, decoupled from the polling loop.
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const fetchRuns = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      // Cache-bust on every poll so a CDN edge / browser cache can't
+      // serve a stale list while the worker is processing the queue.
       const res = await fetch(
-        `/api/admin/calibration?key=${encodeURIComponent(adminKey)}`,
+        `/api/admin/calibration?key=${encodeURIComponent(adminKey)}&t=${Date.now()}`,
         { cache: "no-store" },
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to load runs");
       setRuns(data.runs as CalibrationRun[]);
+      setLastFetched(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -64,20 +80,28 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
     }
   }, [adminKey]);
 
+  // Stable polling loop. We avoid putting `runs` in the deps so the
+  // interval doesn't tear down + recreate on every fetch (which would
+  // cause race conditions where the timer never fires).
+  const fetchRef = useRef(fetchRuns);
   useEffect(() => {
-    fetchRuns();
+    fetchRef.current = fetchRuns;
   }, [fetchRuns]);
 
-  // Auto-poll every 6 seconds while any run is queued or running so the
-  // table reconciles as the worker processes the queue.
+  const hasInflight = useMemo(
+    () =>
+      runs.some(
+        (r) => r.reportStatus === "queued" || r.reportStatus === "running",
+      ),
+    [runs],
+  );
+
   useEffect(() => {
-    const hasInflight = runs.some(
-      (r) => r.reportStatus === "queued" || r.reportStatus === "running",
-    );
-    if (!hasInflight) return;
-    const t = setInterval(fetchRuns, 6000);
+    fetchRef.current();
+    const interval = hasInflight ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+    const t = setInterval(() => fetchRef.current(), interval);
     return () => clearInterval(t);
-  }, [runs, fetchRuns]);
+  }, [hasInflight]);
 
   const onSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
@@ -123,31 +147,39 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
     [bulkText, adminKey, fetchRuns],
   );
 
-  const filteredRuns = useMemo(() => {
-    return runs.filter((r) => {
-      if (filter === "all") return true;
-      if (typeof r.overall !== "number") return false;
-      if (filter === "low") return r.overall < 30;
-      if (filter === "high") return r.overall > 70;
-      if (filter === "over-penalized") {
-        if (typeof r.expectedScore !== "number") return false;
-        return r.expectedScore - r.overall > 15;
-      }
-      return true;
-    });
-  }, [runs, filter]);
-
+  const counts = useMemo(() => bucketCounts(runs), [runs]);
+  const filteredRuns = useMemo(() => filterRuns(runs, filter), [runs, filter]);
   const insights = useMemo(() => computeInsights(runs), [runs]);
+
+  const lastFetchedAgo =
+    lastFetched === null ? null : Math.max(0, Math.round((Date.now() - lastFetched.getTime()) / 1000));
+  // tick is referenced so the ago-label re-renders every second.
+  void tick;
 
   return (
     <div className="space-y-10">
+      {/* Live status strip — always visible, updates every poll */}
+      <StatusStrip
+        counts={counts}
+        loading={loading}
+        lastFetchedAgo={lastFetchedAgo}
+        onRefresh={fetchRuns}
+      />
+
+      {/* Active batch progress */}
+      {counts.total > 0 && counts.queued + counts.running > 0 ? (
+        <ProgressBar counts={counts} />
+      ) : null}
+
       {/* URL input */}
       <form onSubmit={onSubmit} className="card">
         <p className="section-eyebrow">Step 1 · Queue audits</p>
         <h2 className="h3 mt-2">Paste URLs (one per line)</h2>
         <p className="muted mt-2 text-sm">
           Each non-empty line becomes a queued AuditOrder. Blank lines and
-          lines starting with <code>#</code> are skipped.
+          lines starting with <code>#</code> are skipped. The Railway
+          worker picks them up alongside any real customer queue — expect
+          ~60–120s per audit.
         </p>
         <textarea
           className="input-field mt-4 font-mono text-sm"
@@ -165,14 +197,6 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
             disabled={submitting || bulkText.trim().length === 0}
           >
             {submitting ? "Queueing…" : "Queue audits"}
-          </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => fetchRuns()}
-            disabled={loading}
-          >
-            {loading ? "Refreshing…" : "Refresh"}
           </button>
           {submitMsg ? (
             <span className="text-xs text-white/70">{submitMsg}</span>
@@ -200,11 +224,13 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
               : insights.stdDev.toFixed(2)
           }
           hint={
-            insights.stdDev > 0 && insights.stdDev < 6
-              ? "tight cluster — vary input quality more"
-              : insights.stdDev >= 12
-                ? "healthy spread"
-                : "moderate spread"
+            insights.scoredCount < 2
+              ? undefined
+              : insights.stdDev < 6
+                ? "tight cluster — vary input quality more"
+                : insights.stdDev >= 12
+                  ? "healthy spread"
+                  : "moderate spread"
           }
         />
       </div>
@@ -245,9 +271,7 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
             <strong className="text-white">Biggest bottleneck:</strong>{" "}
             {insights.bottleneck.label} — averaging{" "}
             {insights.bottleneck.average?.toFixed(1)} /{" "}
-            {insights.bottleneck.max} across scored runs. Consider whether
-            the rubric anchor here is too punitive or whether sampled sites
-            genuinely lack this signal.
+            {insights.bottleneck.max} across scored runs.
           </p>
         ) : null}
         {insights.commonZeroCategories.length > 0 ? (
@@ -266,7 +290,7 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
           <div>
             <p className="section-eyebrow">Step 2 · Inspect</p>
             <h3 className="h3 mt-2">
-              {filteredRuns.length} of {runs.length} runs
+              Showing {filteredRuns.length} of {runs.length} runs
             </h3>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -297,10 +321,10 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
         ) : null}
 
         <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
+          <table className="w-full min-w-[1200px] text-left text-sm">
             <thead>
               <tr className="text-xs uppercase tracking-[0.16em] text-white/45">
-                <th className="px-2 py-2 font-semibold">URL</th>
+                <th className="px-2 py-2 font-semibold">Business · URL</th>
                 <th className="px-2 py-2 font-semibold">Status</th>
                 <th className="px-2 py-2 font-semibold text-right">Overall</th>
                 <th className="px-2 py-2 font-semibold text-right">Schema /25</th>
@@ -311,6 +335,7 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
                 <th className="px-2 py-2 font-semibold text-right">Tech /10</th>
                 <th className="px-2 py-2 font-semibold text-right">Expected</th>
                 <th className="px-2 py-2 font-semibold text-right">Δ</th>
+                <th className="px-2 py-2 font-semibold">Report</th>
                 <th className="px-2 py-2 font-semibold"></th>
               </tr>
             </thead>
@@ -326,10 +351,27 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
               {filteredRuns.length === 0 ? (
                 <tr>
                   <td
-                    className="px-2 py-6 text-center text-white/50"
-                    colSpan={12}
+                    className="px-2 py-8 text-center text-white/55"
+                    colSpan={13}
                   >
-                    No calibration runs match the current filter.
+                    {runs.length === 0 ? (
+                      <>
+                        No calibration runs yet. Paste URLs above and click{" "}
+                        <strong className="text-white">Queue audits</strong>{" "}
+                        to start.
+                      </>
+                    ) : (
+                      <>
+                        No runs match the current filter.{" "}
+                        <button
+                          type="button"
+                          onClick={() => setFilter("all")}
+                          className="text-accent hover:underline"
+                        >
+                          Show all {runs.length}
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ) : null}
@@ -337,6 +379,102 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StatusStrip({
+  counts,
+  loading,
+  lastFetchedAgo,
+  onRefresh,
+}: {
+  counts: CountsByStatus;
+  loading: boolean;
+  lastFetchedAgo: number | null;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-ink-900/60 p-5 shadow-card backdrop-blur-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="section-eyebrow">Live queue</p>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-white/55" aria-live="polite">
+            {loading
+              ? "Refreshing…"
+              : lastFetchedAgo === null
+                ? "Not yet fetched"
+                : `Updated ${lastFetchedAgo}s ago`}
+          </span>
+          <button
+            type="button"
+            className="btn-ghost px-3 py-1.5 text-xs"
+            onClick={onRefresh}
+            disabled={loading}
+          >
+            Refresh now
+          </button>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <Counter label="Queued" value={counts.queued} tone="info" />
+        <Counter label="Running" value={counts.running} tone="info" />
+        <Counter label="Completed" value={counts.completed} tone="ok" />
+        <Counter label="Failed" value={counts.failed} tone="bad" />
+        <Counter label="Total" value={counts.total} tone="muted" />
+      </div>
+    </div>
+  );
+}
+
+function Counter({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "ok" | "info" | "bad" | "muted";
+}) {
+  const colorMap = {
+    ok: "text-emerald-300 border-emerald-400/30 bg-emerald-400/5",
+    info: "text-blue-300 border-blue-400/30 bg-blue-400/5",
+    bad: "text-red-300 border-red-400/30 bg-red-400/5",
+    muted: "text-white/85 border-white/10 bg-white/[0.03]",
+  } as const;
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${colorMap[tone]}`}>
+      <p className="text-[10px] uppercase tracking-[0.18em] text-white/55">
+        {label}
+      </p>
+      <p className="mt-1 font-mono text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function ProgressBar({ counts }: { counts: CountsByStatus }) {
+  const done = counts.completed + counts.failed;
+  const total = counts.total;
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+  return (
+    <div className="rounded-xl border border-accent/30 bg-accent/[0.04] p-4">
+      <div className="flex items-baseline justify-between">
+        <p className="text-sm font-semibold text-white">
+          Batch in progress · {done} of {total} done
+        </p>
+        <p className="font-mono text-xs text-white/70">{pct}%</p>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full bg-accent transition-[width] duration-700 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-2 text-xs text-white/55">
+        Auto-refreshing every {POLL_ACTIVE_MS / 1000}s while audits are
+        running. You can leave this page open — counters update on their
+        own.
+      </p>
     </div>
   );
 }
@@ -355,7 +493,6 @@ function RunRow({
   );
   const [saving, setSaving] = useState(false);
 
-  // Sync local draft when server-side value changes (poll refresh).
   useEffect(() => {
     setExpectedDraft(
       run.expectedScore === null ? "" : String(run.expectedScore),
@@ -401,21 +538,23 @@ function RunRow({
   return (
     <tr className="border-t border-white/5 align-top">
       <td className="px-2 py-3">
+        <div className="font-semibold text-white break-words">
+          {run.businessName}
+        </div>
         <a
           href={run.url}
           target="_blank"
           rel="noreferrer"
-          className="text-white hover:text-accent break-all"
+          className="mt-0.5 block text-xs text-white/45 break-all hover:text-accent"
         >
-          {run.label}
+          {run.url}
         </a>
-        <div className="mt-0.5 text-xs text-white/40 break-all">{run.url}</div>
       </td>
       <td className="px-2 py-3">
         <StatusBadge status={run.reportStatus} error={run.reportError} />
       </td>
       <td className="px-2 py-3 text-right font-mono">
-        {overall === null ? "—" : <span className="text-white font-bold">{overall}</span>}
+        {overall === null ? "—" : <span className="font-bold text-white">{overall}</span>}
       </td>
       {run.categories.map((c) => (
         <td key={c.key} className="px-2 py-3 text-right font-mono text-white/85">
@@ -453,6 +592,20 @@ function RunRow({
           >
             {delta > 0 ? `+${delta}` : delta}
           </span>
+        )}
+      </td>
+      <td className="px-2 py-3">
+        {run.reportStatus === "generated" ? (
+          <a
+            href={`/report/${encodeURIComponent(run.id)}/print`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-accent hover:underline"
+          >
+            Open ↗
+          </a>
+        ) : (
+          <span className="text-xs text-white/30">—</span>
         )}
       </td>
       <td className="px-2 py-3 text-right">
@@ -561,6 +714,50 @@ function Histogram({
   );
 }
 
+// ---------------- helpers ----------------
+
+type CountsByStatus = {
+  queued: number;
+  running: number;
+  completed: number;
+  failed: number;
+  pending: number;
+  total: number;
+};
+
+function bucketCounts(runs: CalibrationRun[]): CountsByStatus {
+  const out: CountsByStatus = {
+    queued: 0,
+    running: 0,
+    completed: 0,
+    failed: 0,
+    pending: 0,
+    total: runs.length,
+  };
+  for (const r of runs) {
+    if (r.reportStatus === "queued") out.queued++;
+    else if (r.reportStatus === "running") out.running++;
+    else if (r.reportStatus === "generated") out.completed++;
+    else if (r.reportStatus === "failed") out.failed++;
+    else out.pending++;
+  }
+  return out;
+}
+
+function filterRuns(runs: CalibrationRun[], filter: Filter): CalibrationRun[] {
+  return runs.filter((r) => {
+    if (filter === "all") return true;
+    if (typeof r.overall !== "number") return false;
+    if (filter === "low") return r.overall < 30;
+    if (filter === "high") return r.overall > 70;
+    if (filter === "over-penalized") {
+      if (typeof r.expectedScore !== "number") return false;
+      return r.expectedScore - r.overall > 15;
+    }
+    return true;
+  });
+}
+
 // ---------------- insights ----------------
 
 type Insights = {
@@ -589,9 +786,7 @@ function computeInsights(runs: CalibrationRun[]): Insights {
   const stdDev =
     scoredCount < 2
       ? 0
-      : Math.sqrt(
-          avg(scored.map((r) => (r.overall - mean) ** 2)),
-        );
+      : Math.sqrt(avg(scored.map((r) => (r.overall - mean) ** 2)));
 
   const bands = BANDS.map((b) => ({
     ...b,
@@ -599,9 +794,6 @@ function computeInsights(runs: CalibrationRun[]): Insights {
       .length,
   }));
 
-  // Category averages — pull from any run that has parsed scores
-  // (regardless of overall presence) so partial parses still inform
-  // per-category insights.
   const categoryKeys = scored[0]?.categories.map((c) => ({
     key: c.key,
     label: c.short,

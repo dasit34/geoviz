@@ -30,13 +30,28 @@ export async function GET(req: Request) {
     take: 500,
   });
 
+  // Diagnostic — surfaces the live row counts in Vercel logs so any
+  // "results table not updating" report can be checked against what
+  // the database actually shows.
+  const counts = rows.reduce<Record<string, number>>((acc, r) => {
+    acc[r.reportStatus] = (acc[r.reportStatus] ?? 0) + 1;
+    return acc;
+  }, {});
+  console.log(
+    `[calibration] GET total=${rows.length} ${Object.entries(counts)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(" ")}`,
+  );
+
   const runs = rows.map((row) => {
     const score = parseReportScoreBreakdown(row.reportMarkdown);
     const cal = parseCalibrationNotes(row.adminNotes);
+    const businessName = stripPrefix(row.businessName ?? row.websiteUrl);
     return {
       id: row.id,
       url: row.websiteUrl,
-      label: stripPrefix(row.businessName ?? row.websiteUrl),
+      businessName,
+      label: businessName,
       reportStatus: row.reportStatus,
       reportError: row.reportError,
       reportQueuedAt: row.reportQueuedAt?.toISOString() ?? null,
@@ -57,7 +72,12 @@ export async function GET(req: Request) {
     };
   });
 
-  return NextResponse.json({ runs });
+  return NextResponse.json({
+    runs,
+    fetchedAt: new Date().toISOString(),
+    total: rows.length,
+    counts,
+  });
 }
 
 export async function POST(req: Request) {
