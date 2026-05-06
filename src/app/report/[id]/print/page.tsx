@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import {
   bandLabelForOverall,
   cleanScoreSectionBody,
+  extractFixMeta,
   inferFixPriority,
   inferIssueSeverity,
   parseEnumeratedItems,
@@ -289,12 +290,17 @@ function ItemCard({
   index: number;
   kind: "issue" | "fix";
 }) {
-  const fields = parseLabeledFields(item.body);
-  const severity =
-    kind === "issue"
-      ? inferIssueSeverity(item.title, item.body)
-      : inferFixPriority(item.title, item.body).severity;
-  const fix = kind === "fix" ? inferFixPriority(item.title, item.body) : null;
+  const allFields = parseLabeledFields(item.body);
+  const meta = kind === "fix" ? extractFixMeta(allFields) : null;
+  const fields = meta ? meta.rest : allFields;
+
+  // Prefer the model-emitted Priority over the inferred severity
+  // when available; fall back to inference for old reports.
+  const inferredFix =
+    kind === "fix" ? inferFixPriority(item.title, item.body) : null;
+  const inferredIssueSeverity =
+    kind === "issue" ? inferIssueSeverity(item.title, item.body) : null;
+
   return (
     <li className={`report-item-card report-item-card-${kind}`}>
       <div className="report-item-card-head">
@@ -305,18 +311,36 @@ function ItemCard({
         <h3 className="report-item-card-title">{item.title}</h3>
       </div>
       <div className="report-item-card-badges">
-        <span className={`severity-badge severity-${severity.tone}`}>
-          {severity.label}
-        </span>
-        {fix ? (
-          <>
-            <span className="severity-badge severity-priority">
-              {fix.priority}
-            </span>
-            <span className="severity-badge severity-impact">
-              Estimated impact: {fix.impactLabel}
-            </span>
-          </>
+        {kind === "issue" && inferredIssueSeverity ? (
+          <span className={`severity-badge severity-${inferredIssueSeverity.tone}`}>
+            {inferredIssueSeverity.label}
+          </span>
+        ) : null}
+        {kind === "fix" && meta?.priority ? (
+          <span className={`severity-badge severity-${meta.priority.tone}`}>
+            {meta.priority.label}
+          </span>
+        ) : kind === "fix" && inferredFix ? (
+          <span className={`severity-badge severity-${inferredFix.severity.tone}`}>
+            {inferredFix.severity.label}
+          </span>
+        ) : null}
+        {kind === "fix" && meta?.difficulty ? (
+          <span className={`severity-badge difficulty-${meta.difficulty.tone}`}>
+            Difficulty: {meta.difficulty.label}
+          </span>
+        ) : null}
+        {kind === "fix" && meta?.foundationFix ? (
+          <span
+            className={`severity-badge foundation-${meta.foundationFix.yes ? "yes" : "no"}`}
+          >
+            GeoViz Foundation Fix: {meta.foundationFix.label}
+          </span>
+        ) : null}
+        {kind === "fix" && !meta?.priority && inferredFix ? (
+          <span className="severity-badge severity-impact">
+            Estimated impact: {inferredFix.impactLabel}
+          </span>
         ) : null}
       </div>
       {fields.length >= 2 ? (

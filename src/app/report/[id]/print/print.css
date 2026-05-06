@@ -384,6 +384,48 @@
   border-color: rgba(255, 255, 255, 0.12);
   letter-spacing: 0.08em;
 }
+
+/* Medium-priority — sits between High Impact (orange) and Quick Win
+   (green). Yellow-amber for the middle band. */
+.severity-medium {
+  color: #ffc46b;
+  background: rgba(201, 134, 4, 0.14);
+  border-color: rgba(255, 196, 107, 0.4);
+}
+
+/* Difficulty chips — neutral palette so they read as metadata, not
+   priority. Easy = green, Moderate = amber, Technical = blue (it's
+   hard but achievable). */
+.difficulty-easy {
+  color: #6ce39a;
+  background: rgba(45, 169, 79, 0.12);
+  border-color: rgba(108, 227, 154, 0.4);
+}
+.difficulty-moderate {
+  color: #ffc46b;
+  background: rgba(201, 134, 4, 0.14);
+  border-color: rgba(255, 196, 107, 0.4);
+}
+.difficulty-technical {
+  color: #6ea8ff;
+  background: rgba(43, 139, 255, 0.12);
+  border-color: rgba(110, 168, 255, 0.4);
+}
+
+/* GeoViz Foundation Fix capability — Yes is the strong sales signal,
+   render with the brand orange. No is muted so the customer knows
+   it's something they / their developer must own. */
+.foundation-yes {
+  color: #ff9a3c;
+  background: rgba(255, 122, 24, 0.14);
+  border-color: rgba(255, 154, 60, 0.5);
+  font-weight: 800;
+}
+.foundation-no {
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.14);
+}
 .report-item-card-icon {
   display: inline-flex;
   align-items: center;

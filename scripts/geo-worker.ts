@@ -489,10 +489,35 @@ Top 3 issues only. Numbered. For each:
   business
 
 ## 3. What To Fix First
-Top 3 fixes only. Numbered. For each:
-- **What to do** — one concrete action, plain words
-- **Why it matters** — tied to leads / calls / customers won
-- **What changes when fixed** — one sentence on the result
+Top 3 fixes only. Numbered. Render each as an implementation
+checklist — short, scannable, NO dense paragraphs. Use **EXACTLY**
+these seven labeled fields per fix, in this order, each on its own
+line. The renderer parses these labels into a clean grid; do not
+collapse multiple fields into one line and do not invent extra
+labels.
+
+### {N}. {Fix name — one short, plain-English imperative line}
+- **Priority** — one of: Critical / High / Medium / Quick Win
+- **What to do** — one concrete action, plain words, max 2 sentences
+- **Why it matters** — tied to leads / calls / customers won, max
+  2 sentences, no jargon
+- **Expected impact** — what visibly changes when this fix lands
+  (more inbound calls, recommendations from AI tools, etc.) — max
+  2 sentences
+- **Difficulty** — one of: Easy / Moderate / Technical
+- **Can GeoViz Foundation Fix handle this?** — Yes or No (one
+  word). Yes when the fix involves schema, llms.txt, robots.txt,
+  metadata, FAQ structure, or service-page setup. No when it
+  requires creative work the customer must own (writing reviews,
+  earning a license, photographing projects).
+
+Voice rules for this section:
+- No repeated phrasing. Each fix's "Why it matters" must point at
+  a DIFFERENT customer outcome (visibility / trust / specific
+  service category / location targeting).
+- Preserve factual audit findings. Do not invent claims about
+  traffic, rankings, or lead volume.
+- Every line must pass the kitchen-table test.
 
 ## 4. What Happens If You Fix This
 Write 3–4 sentences in natural, business-owner-friendly language —
@@ -899,10 +924,35 @@ Top 3 issues only. Numbered. For each:
   business
 
 ## 3. What To Fix First
-Top 3 fixes only. Numbered. For each:
-- **What to do** — one concrete action, plain words
-- **Why it matters** — tied to leads / calls / customers won
-- **What changes when fixed** — one sentence on the result
+Top 3 fixes only. Numbered. Render each as an implementation
+checklist — short, scannable, NO dense paragraphs. Use **EXACTLY**
+these seven labeled fields per fix, in this order, each on its own
+line. The renderer parses these labels into a clean grid; do not
+collapse multiple fields into one line and do not invent extra
+labels.
+
+### {N}. {Fix name — one short, plain-English imperative line}
+- **Priority** — one of: Critical / High / Medium / Quick Win
+- **What to do** — one concrete action, plain words, max 2 sentences
+- **Why it matters** — tied to leads / calls / customers won, max
+  2 sentences, no jargon
+- **Expected impact** — what visibly changes when this fix lands
+  (more inbound calls, recommendations from AI tools, etc.) — max
+  2 sentences
+- **Difficulty** — one of: Easy / Moderate / Technical
+- **Can GeoViz Foundation Fix handle this?** — Yes or No (one
+  word). Yes when the fix involves schema, llms.txt, robots.txt,
+  metadata, FAQ structure, or service-page setup. No when it
+  requires creative work the customer must own (writing reviews,
+  earning a license, photographing projects).
+
+Voice rules for this section:
+- No repeated phrasing. Each fix's "Why it matters" must point at
+  a DIFFERENT customer outcome (visibility / trust / specific
+  service category / location targeting).
+- Preserve factual audit findings. Do not invent claims about
+  traffic, rankings, or lead volume.
+- Every line must pass the kitchen-table test.
 
 ## 4. What Happens If You Fix This
 Write 3–4 sentences in natural, business-owner-friendly language —

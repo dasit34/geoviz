@@ -450,6 +450,68 @@ export function inferFixPriority(title: string, body: string): FixPriority {
 
 export type LabeledField = { label: string; content: string };
 
+export type FixMeta = {
+  priority: { label: string; tone: "critical" | "high" | "medium" | "quick" } | null;
+  difficulty: { label: string; tone: "easy" | "moderate" | "technical" } | null;
+  foundationFix: { yes: boolean; label: string } | null;
+  rest: LabeledField[];
+};
+
+/**
+ * Pulls out the three meta-fields the new section-3 prompt template
+ * emits per fix — Priority, Difficulty, and "Can GeoViz Foundation
+ * Fix handle this?" — so they can be rendered as visual chips. The
+ * remaining fields (What to do / Why it matters / Expected impact)
+ * stay in `rest` for the definition-list grid.
+ *
+ * Tolerant of model formatting drift: case-insensitive match on the
+ * label, value normalised before tone/yes detection, missing fields
+ * return null without breaking the rest.
+ */
+export function extractFixMeta(fields: LabeledField[]): FixMeta {
+  const norm = (s: string) => s.toLowerCase().trim();
+  let priority: FixMeta["priority"] = null;
+  let difficulty: FixMeta["difficulty"] = null;
+  let foundationFix: FixMeta["foundationFix"] = null;
+  const rest: LabeledField[] = [];
+
+  for (const f of fields) {
+    const label = norm(f.label);
+    const value = f.content.trim();
+    if (label === "priority") {
+      const v = norm(value);
+      let tone: NonNullable<FixMeta["priority"]>["tone"] = "high";
+      if (/critical/.test(v)) tone = "critical";
+      else if (/quick\s*win/.test(v)) tone = "quick";
+      else if (/high/.test(v)) tone = "high";
+      else if (/medium/.test(v)) tone = "medium";
+      priority = { label: value, tone };
+      continue;
+    }
+    if (label === "difficulty") {
+      const v = norm(value);
+      let tone: NonNullable<FixMeta["difficulty"]>["tone"] = "moderate";
+      if (/easy/.test(v)) tone = "easy";
+      else if (/moderate/.test(v)) tone = "moderate";
+      else if (/technical|hard|complex/.test(v)) tone = "technical";
+      difficulty = { label: value, tone };
+      continue;
+    }
+    if (
+      /^can\s+geoviz\s+foundation\s+fix\s+handle\s+this/i.test(label) ||
+      label === "foundation fix" ||
+      label === "geoviz handles this"
+    ) {
+      const yes = /^\s*y(es)?\b/i.test(value);
+      foundationFix = { yes, label: yes ? "Yes" : "No" };
+      continue;
+    }
+    rest.push(f);
+  }
+
+  return { priority, difficulty, foundationFix, rest };
+}
+
 /**
  * Detects the model's "**Label** — content" / "**Label**: content"
  * pattern that appears under each issue / fix sub-card and returns
