@@ -48,8 +48,17 @@ export default async function AdminReportsPage({
     );
   }
 
+  // Exclude calibration entries (businessName starts with "[CAL]") so the
+  // internal calibration harness doesn't pollute customer-order triage.
+  // Calibration runs are listed at /admin/calibration instead.
   const orders = await prisma.auditOrder.findMany({
-    where: { paymentStatus: "paid" },
+    where: {
+      paymentStatus: "paid",
+      OR: [
+        { businessName: null },
+        { businessName: { not: { startsWith: "[CAL]" } } },
+      ],
+    },
     orderBy: { createdAt: "desc" },
     take: 200,
   });
@@ -98,6 +107,15 @@ export default async function AdminReportsPage({
           Every paid order in one place. Run the GEO audit, expand the report
           to review it inline, mark it approved, then send it to the customer
           via email — all without leaving this page.
+        </p>
+        <p className="mt-3 text-xs text-white/55">
+          Calibrating the rubric across many businesses?{" "}
+          <a
+            href={`/admin/calibration?key=${encodeURIComponent(key!)}`}
+            className="text-accent hover:underline"
+          >
+            Open the calibration harness →
+          </a>
         </p>
 
         <details className="mt-6 rounded-lg border border-white/10 bg-white/[0.02] p-4 text-xs">
