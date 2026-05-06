@@ -1,43 +1,19 @@
 /**
- * Calibration recalibration projector — Iteration #1.
+ * Calibration recalibration projector — Iteration #2.
  *
- * Reads every existing calibration run from the database (tagged
- * AuditOrder rows where `businessName` starts with "[CAL]"),
- * projects what each one *would* score under the rebalanced
- * additive rubric, and prints a side-by-side summary:
+ * Projects existing calibration runs onto the v2 ladder rubric so we
+ * can see what the spread *would* look like under the new scoring
+ * before committing the dataset to a real re-run.
  *
- *   - old mean / median / stdDev
- *   - projected mean / median / stdDev
- *   - band distribution before vs after
- *   - top 5 sites that move the most (with reasons)
- *
- * NOTE: This is a *projection*, not a true rerun. The new rubric
- * has different sub-checks; we don't have the original evidence.
- * Instead we apply a calibrated transformation per category that
- * mirrors the additive scheme's expected behavior on the OLD
- * (band-based) score:
- *
- *   - schema  : add ~+2–4 if old score 1–6 (the old hard floor that
- *               local businesses without JSON-LD systematically hit
- *               but had clear HTML identity).
- *   - crawler : add ~+3–5 if old score 9–12 (the old llms.txt
- *               ceiling — sites with citation bots reachable but
- *               no llms.txt no longer get capped).
- *   - trust   : add ~+2–4 if old score 8–13 (mid-band sites that
- *               had 2–3 pillars now earn more per pillar).
- *   - content : add ~+1–3 if old score 4–7 (thin-pages-no-FAQ
- *               soft floor relaxed slightly).
- *   - brand / : essentially unchanged — additive vs band-based
- *     tech     yields similar values for the small categories.
- *
- * After computing the projection, this script ALSO offers a
- * `--rerun` mode that flips reportStatus back to "queued" for
- * every calibration row, so the worker re-audits them under the
- * new rubric and the dashboard reflects real recomputed scores.
- *
- * Usage:
- *   npx tsx scripts/calibration-recalc.ts            # projection only
- *   npx tsx scripts/calibration-recalc.ts --rerun    # also re-queue
+ * Three modes:
+ *   1. Default (no flags) — load every [CAL] AuditOrder row from the
+ *      DB, project each old → new, print aggregate + bands + top
+ *      movers + DISTRIBUTION HEALTH verdict.
+ *   2. `--archetypes` — skip the DB and project the 7 user-supplied
+ *      archetypes (2 weak, 2 average, 2 strong, 1 elite) inline.
+ *      Useful to verify rubric math before any real-world run.
+ *   3. `--rerun` — flip every [CAL] row back to reportStatus="queued"
+ *      so the worker re-audits them under the new rubric.
  *
  * Untouched: Stripe, queue worker code, report rendering, PDF,
  * calibration dashboard UI.
@@ -75,39 +51,53 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-function projectCategory(key: CategoryKey, old: number | null): number | null {
+/**
+ * v2 ladder projection — maps an old (band-based) score to its
+ * approximate v2 (ladder-based) equivalent.
+ *
+ * Schema is the biggest correction: under v1 a typical local biz
+ * with no JSON-LD landed at 4–5 (soft floor); under v2 the same
+ * site with clean HTML identity earns the "10 = basic readable
+ * structure" rung.
+ */
+function projectCategoryV2(key: CategoryKey, old: number | null): number | null {
   if (old === null) return null;
-  // Calibrated bumps based on where the old score landed in each
-  // category's compression zone. See header comment for rationale.
   let next = old;
   switch (key) {
     case "schema":
-      // Old hard floor was 0–6. Sites with NO JSON-LD but clear
-      // HTML identity now earn the +5 soft-floor bump.
-      if (old >= 1 && old <= 6) next = old + 4;
-      else if (old >= 7 && old <= 9) next = old + 2;
+      // Biggest corrective. Lift the 31–44 cluster off the floor.
+      if (old <= 4) next = 8;
+      else if (old <= 6) next = 10;
+      else if (old <= 10) next = 12;
+      else if (old <= 15) next = 15;
+      // 16+ already on the right rung — leave alone.
       break;
     case "crawler":
-      // Old ceiling at 12 (no llms.txt). Removed — citation bots +
-      // sitemap + crawlable can now reach 15.
-      if (old >= 9 && old <= 12) next = old + 4;
-      else if (old >= 13 && old <= 15) next = old + 1;
+      // v1 ceiling at 12 (no llms.txt) is exactly the v2 "12 rung".
+      // Sites at the v1 ceiling of 12 land at 15 under v2 because
+      // the ceiling is gone (sitemap + crawlable now reach 15).
+      if (old >= 9 && old <= 12) next = 15;
+      else if (old >= 13 && old <= 15) next = 16;
+      // Lower scores (blocked / unclear) stay at the bottom rung.
       break;
     case "trust":
-      // Mid-band sites (2–3 pillars) under-earned. Bump them.
-      if (old >= 6 && old <= 13) next = old + 3;
-      else if (old >= 14) next = old + 1;
+      // STRICTER under v2 — v1 was inflating "claimed 4+ pillars"
+      // when only 2–3 had real evidence. Pull those down.
+      if (old >= 14 && old <= 17) next = old - 2;
+      // Mid and low band stay where they were — the v2 ladder
+      // rungs at 4 / 8 / 12 line up with the v1 numeric values.
       break;
     case "content":
-      // Old soft floor at ≤5 for thin-pages-no-FAQ. Slight relief
-      // when at least some service content exists.
-      if (old >= 3 && old <= 7) next = old + 2;
-      else if (old >= 8 && old <= 11) next = old + 1;
+      // Modest lift through the mid-band.
+      if (old >= 4 && old <= 7) next = old + 2;
+      else if (old >= 8 && old <= 10) next = old + 2;
+      // Marketing-only homepages stay capped.
       break;
     case "brand":
     case "tech":
-      // Small categories — additive scoring lands near the same value.
-      next = old;
+      // Small categories — ladder values close to additive. Slight
+      // upward correction in the mid-band where v1 was conservative.
+      if (old >= 3 && old <= 6) next = old + 1;
       break;
   }
   return clamp(Math.round(next), 0, MAX_BY_CAT[key]);
@@ -122,8 +112,116 @@ function bandFor(overall: number | null): string {
   return "Invisible";
 }
 
+const ARCHETYPES: Array<{
+  name: string;
+  scores: Record<CategoryKey, number>;
+}> = [
+  // 2 weak
+  {
+    name: "Weak A — broken-ish, near-empty content",
+    scores: { schema: 1, crawler: 4, trust: 3, content: 3, brand: 2, tech: 4 },
+  },
+  {
+    name: "Weak B — basic site, no trust, blocked bots",
+    scores: { schema: 4, crawler: 6, trust: 5, content: 4, brand: 4, tech: 5 },
+  },
+  // 2 average
+  {
+    name: "Average A — typical local biz, no schema",
+    scores: { schema: 4, crawler: 11, trust: 10, content: 5, brand: 5, tech: 5 },
+  },
+  {
+    name: "Average B — small biz with reviews + service area",
+    scores: { schema: 5, crawler: 12, trust: 13, content: 6, brand: 6, tech: 6 },
+  },
+  // 2 strong
+  {
+    name: "Strong A — partial LocalBusiness + FAQ + good content",
+    scores: { schema: 13, crawler: 12, trust: 14, content: 9, brand: 7, tech: 7 },
+  },
+  {
+    name: "Strong B — full LocalBusiness + reviews + multi-page",
+    scores: { schema: 18, crawler: 14, trust: 16, content: 11, brand: 8, tech: 8 },
+  },
+  // 1 elite
+  {
+    name: "Elite — full schema + llms.txt + deep content",
+    scores: { schema: 23, crawler: 19, trust: 18, content: 14, brand: 9, tech: 9 },
+  },
+];
+
+function projectArchetype(scores: Record<CategoryKey, number>) {
+  const next: Record<CategoryKey, number> = {
+    schema: projectCategoryV2("schema", scores.schema)!,
+    crawler: projectCategoryV2("crawler", scores.crawler)!,
+    trust: projectCategoryV2("trust", scores.trust)!,
+    content: projectCategoryV2("content", scores.content)!,
+    brand: projectCategoryV2("brand", scores.brand)!,
+    tech: projectCategoryV2("tech", scores.tech)!,
+  };
+  const oldTotal =
+    scores.schema + scores.crawler + scores.trust + scores.content + scores.brand + scores.tech;
+  const newTotal =
+    next.schema + next.crawler + next.trust + next.content + next.brand + next.tech;
+  return { next, oldTotal, newTotal };
+}
+
+function printArchetypeReport() {
+  console.log("\n========== ARCHETYPE PROJECTION (v1 → v2) ==========\n");
+  console.log(
+    "name".padEnd(54) +
+      "v1 → v2".padEnd(15) +
+      "band move".padEnd(28) +
+      "Δ",
+  );
+  console.log("-".repeat(100));
+  for (const a of ARCHETYPES) {
+    const { oldTotal, newTotal } = projectArchetype(a.scores);
+    const oldBand = bandFor(oldTotal);
+    const newBand = bandFor(newTotal);
+    const delta = newTotal - oldTotal;
+    console.log(
+      a.name.padEnd(54) +
+        `${oldTotal} → ${newTotal}`.padEnd(15) +
+        `${oldBand} → ${newBand}`.padEnd(28) +
+        `${delta >= 0 ? "+" : ""}${delta}`,
+    );
+  }
+
+  // Summary stats on the archetype set
+  const oldTotals = ARCHETYPES.map((a) => projectArchetype(a.scores).oldTotal);
+  const newTotals = ARCHETYPES.map((a) => projectArchetype(a.scores).newTotal);
+  console.log("\n========== ARCHETYPE SET SPREAD ==========");
+  console.log(
+    `mean      old=${mean(oldTotals).toFixed(1).padEnd(6)}  new=${mean(newTotals).toFixed(1)}`,
+  );
+  console.log(
+    `stdDev    old=${stddev(oldTotals).toFixed(2).padEnd(6)}  new=${stddev(newTotals).toFixed(2)}`,
+  );
+  console.log(
+    `range     old=${Math.min(...oldTotals)}–${Math.max(...oldTotals).toString().padEnd(4)}  new=${Math.min(...newTotals)}–${Math.max(...newTotals)}`,
+  );
+
+  // Pairwise gaps between consecutive tiers (sorted)
+  const sorted = [...newTotals].sort((a, b) => a - b);
+  const gaps: number[] = [];
+  for (let i = 1; i < sorted.length; i++) gaps.push(sorted[i] - sorted[i - 1]);
+  console.log(`tier gaps (v2): ${sorted.join(" → ")}  (gaps: ${gaps.join(", ")})`);
+
+  console.log(
+    "\n✅ Healthy v2 sample = each tier separated by ≥ 5 points, weak ≠ average ≠ strong ≠ elite.\n",
+  );
+}
+
 async function main() {
+  const archetypesOnly = process.argv.includes("--archetypes");
   const rerun = process.argv.includes("--rerun");
+
+  if (archetypesOnly) {
+    printArchetypeReport();
+    return;
+  }
+
   const prisma = new PrismaClient();
   try {
     const rows = await prisma.auditOrder.findMany({
@@ -131,7 +229,9 @@ async function main() {
       orderBy: { createdAt: "desc" },
     });
     if (rows.length === 0) {
-      console.log("No calibration rows found. Queue some at /admin/calibration first.");
+      console.log(
+        "No calibration rows found. Queue some at /admin/calibration first, or run with --archetypes for an offline projection.",
+      );
       return;
     }
     console.log(`Loaded ${rows.length} calibration rows.\n`);
@@ -147,20 +247,16 @@ async function main() {
         tech: score.categories.find((c) => c.key === "tech")?.score ?? null,
       } as Record<CategoryKey, number | null>;
       const newByCat = {
-        schema: projectCategory("schema", oldByCat.schema),
-        crawler: projectCategory("crawler", oldByCat.crawler),
-        trust: projectCategory("trust", oldByCat.trust),
-        content: projectCategory("content", oldByCat.content),
-        brand: projectCategory("brand", oldByCat.brand),
-        tech: projectCategory("tech", oldByCat.tech),
+        schema: projectCategoryV2("schema", oldByCat.schema),
+        crawler: projectCategoryV2("crawler", oldByCat.crawler),
+        trust: projectCategoryV2("trust", oldByCat.trust),
+        content: projectCategoryV2("content", oldByCat.content),
+        brand: projectCategoryV2("brand", oldByCat.brand),
+        tech: projectCategoryV2("tech", oldByCat.tech),
       } as Record<CategoryKey, number | null>;
-      const newOverall =
-        Object.values(newByCat).every((v) => v === null)
-          ? null
-          : Object.values(newByCat).reduce<number>(
-              (a, b) => a + (b ?? 0),
-              0,
-            );
+      const newOverall = Object.values(newByCat).every((v) => v === null)
+        ? null
+        : Object.values(newByCat).reduce<number>((a, b) => a + (b ?? 0), 0);
       return {
         id: row.id,
         url: row.websiteUrl,
@@ -186,33 +282,25 @@ async function main() {
     }
 
     const oldOverall = scored.map((s) => s.oldOverall as number);
-    const newOverall = scored.map((s) => (s.newOverall ?? 0));
+    const newOverall = scored.map((s) => s.newOverall ?? 0);
 
     console.log(`Scored runs: ${scored.length} (of ${snapshots.length} total).\n`);
     console.log("================ AGGREGATE ================");
-    console.log(
-      `              old        projected    delta`,
-    );
+    console.log("              old        projected    delta");
     const oldMean = mean(oldOverall);
     const newMean = mean(newOverall);
     console.log(
-      `mean          ${oldMean.toFixed(2).padEnd(10)} ${newMean
-        .toFixed(2)
-        .padEnd(12)} ${(newMean - oldMean >= 0 ? "+" : "")}${(newMean - oldMean).toFixed(2)}`,
+      `mean          ${oldMean.toFixed(2).padEnd(10)} ${newMean.toFixed(2).padEnd(12)} ${(newMean - oldMean >= 0 ? "+" : "")}${(newMean - oldMean).toFixed(2)}`,
     );
     const oldMed = median(oldOverall);
     const newMed = median(newOverall);
     console.log(
-      `median        ${oldMed.toFixed(2).padEnd(10)} ${newMed
-        .toFixed(2)
-        .padEnd(12)} ${(newMed - oldMed >= 0 ? "+" : "")}${(newMed - oldMed).toFixed(2)}`,
+      `median        ${oldMed.toFixed(2).padEnd(10)} ${newMed.toFixed(2).padEnd(12)} ${(newMed - oldMed >= 0 ? "+" : "")}${(newMed - oldMed).toFixed(2)}`,
     );
     const oldSd = stddev(oldOverall);
     const newSd = stddev(newOverall);
     console.log(
-      `stdDev (σ)    ${oldSd.toFixed(2).padEnd(10)} ${newSd
-        .toFixed(2)
-        .padEnd(12)} ${(newSd - oldSd >= 0 ? "+" : "")}${(newSd - oldSd).toFixed(2)}`,
+      `stdDev (σ)    ${oldSd.toFixed(2).padEnd(10)} ${newSd.toFixed(2).padEnd(12)} ${(newSd - oldSd >= 0 ? "+" : "")}${(newSd - oldSd).toFixed(2)}`,
     );
     console.log(
       `range         ${`${Math.min(...oldOverall)}–${Math.max(...oldOverall)}`.padEnd(10)} ${`${Math.min(...newOverall)}–${Math.max(...newOverall)}`.padEnd(12)}`,
@@ -239,6 +327,61 @@ async function main() {
       const newPct = ((newN / total) * 100).toFixed(1).padStart(5);
       console.log(
         `${b.padEnd(15)} ${`${oldN}`.padStart(3)} (${oldPct}%)    ${`${newN}`.padStart(3)} (${newPct}%)`,
+      );
+    }
+
+    // ============ DISTRIBUTION HEALTH ============
+    console.log("\n========== DISTRIBUTION HEALTH ==========");
+    const newCategoryAverages: Record<CategoryKey, number | null> = {
+      schema: catAverage(scored, "schema"),
+      crawler: catAverage(scored, "crawler"),
+      trust: catAverage(scored, "trust"),
+      content: catAverage(scored, "content"),
+      brand: catAverage(scored, "brand"),
+      tech: catAverage(scored, "tech"),
+    };
+    const lowCats = (Object.entries(newCategoryAverages) as Array<[CategoryKey, number | null]>)
+      .filter(([k, v]) => v !== null && v < MAX_BY_CAT[k] * 0.3)
+      .map(([k]) => k);
+    const populatedBands = bands.filter((b) => newBandCounts[b] > 0).length;
+    const spreadLabel =
+      newSd < 8 ? "tight" : newSd >= 14 ? "healthy" : "moderate";
+    const ceilingEvidence = lowCats.length > 0;
+    let verdict: "compressed" | "improving" | "healthy_v2";
+    if (newSd < 8 || populatedBands < 3 || ceilingEvidence) {
+      verdict = "compressed";
+    } else if (newSd >= 14 && populatedBands >= 4 && !ceilingEvidence) {
+      verdict = "healthy_v2";
+    } else {
+      verdict = "improving";
+    }
+    console.log(`spread_quality:   ${spreadLabel}   (σ ${newSd.toFixed(2)})`);
+    console.log(
+      `band_coverage:    ${populatedBands} / 5   (${bands.filter((b) => newBandCounts[b] > 0).join(", ")})`,
+    );
+    console.log(
+      `ceiling_evidence: ${ceilingEvidence ? "yes" : "no"}${
+        ceilingEvidence ? `   (${lowCats.join(", ")} averaging < 30% of max)` : ""
+      }`,
+    );
+    console.log(`verdict:          ${verdict.toUpperCase()}`);
+    if (verdict === "compressed") {
+      console.log(
+        `\n⚠  v2 projection is still compressed. Likely cause: ${
+          lowCats.length > 0
+            ? `category averages still below the floor → ${lowCats.join(", ")}`
+            : populatedBands < 3
+              ? "fewer than 3 bands populated"
+              : "stdDev under 8 — sample lacks variety"
+        }.`,
+      );
+    } else if (verdict === "healthy_v2") {
+      console.log(
+        "\n✅ v2 projection is healthy — variance, band coverage, and category averages all look right.",
+      );
+    } else {
+      console.log(
+        "\n→ Improving from v1, but not yet healthy. Re-run on real audits to confirm.",
       );
     }
 
@@ -291,6 +434,16 @@ function explainMove(s: RunSnapshot): string | null {
     if (d !== 0) parts.push(`${k} ${oldV}→${newV}`);
   }
   return parts.length === 0 ? null : `[${parts.join(", ")}]`;
+}
+
+function catAverage(
+  scored: RunSnapshot[],
+  key: CategoryKey,
+): number | null {
+  const vals = scored
+    .map((s) => s.newByCat[key])
+    .filter((v): v is number => typeof v === "number");
+  return vals.length === 0 ? null : mean(vals);
 }
 
 function mean(xs: number[]): number {

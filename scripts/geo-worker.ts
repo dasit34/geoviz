@@ -204,116 +204,125 @@ you actually saw on the homepage / robots.txt / llms.txt fetches.
 If you can't point to evidence, the sub-check fails — score it
 conservatively and say "no evidence found" in the report.
 
-**Calibration v1 — additive partial credit.** Each sub-check below
-awards a specific point value when supported by evidence. Add the
-points across sub-checks per category to get the category score.
-This replaces the old band-based thresholds, which compressed real
-local businesses into a 31–38 cluster regardless of underlying
-quality. Floors / ceilings remain ONLY where they reflect a fatal
-gap (noindex, blocked citation bots).
+**Calibration v2 — explicit ladder anchors with partial credit.**
+Each category uses a 0-to-max ladder of named rungs. Find the rung
+the site genuinely sits on and award the rung's points. Partial
+credit BETWEEN rungs is allowed (e.g. 11/25 if the site is between
+"basic readable HTML" and "decent JSON-LD"). The intent is to use
+the FULL range — do NOT cluster at the bottom because no schema
+markup exists. A small business with clear HTML identity, working
+site, and visible reviews is mid-tier, not "At Risk."
 
-  - Structured Data / Schema: 0–25 (additive)
-    Award the points when the evidence is on the page; otherwise 0.
-      1.1  LocalBusiness or Service JSON-LD (subtype like Plumber,
-           Roofing, Dentist, HVACBusiness) WITH name + telephone +
-           address + hours: **+10 pts**. Partial (name + phone only,
-           no address/hours): +5.
-      1.2  AggregateRating or Review schema (ratingValue +
-           reviewCount): **+5 pts**.
-      1.3  FAQPage schema with Question / acceptedAnswer blocks:
-           **+4 pts**.
-      1.4  Organization or WebSite schema (only counts when
-           LocalBusiness/Service is absent): **+3 pts**.
-      1.5  sameAs links to GBP, BBB, Yelp, Facebook, LinkedIn: **+3 pts**.
-      Soft floor (NO JSON-LD anywhere) — the business identity is
-      readable in HTML (clear name, phone, address visible without
-      schema markup): **+5 pts** as partial credit. Without even
-      that signal: 0–2.
-      Maximum: 25.
+Floors / ceilings remain only for fatal gaps: noindex on a
+customer-facing page, citation bots blocked, marketing-only
+homepage with no real content.
 
-  - AI Crawler Readiness: 0–20 (additive)
-      2.1  All five citation bots reachable (OAI-SearchBot,
-           ClaudeBot, PerplexityBot, Bingbot, Google-Extended) —
-           the foundational signal: **+10 pts**.
-           Partial (3–4 of the five reachable): +6.
-           One or two of the five reachable: +3.
-           ANY one fully blocked OR fatal "User-agent: */Disallow: /":
-           +0 (this category cannot exceed 6 in that case).
-      2.2  Training-only bots (GPTBot, anthropic-ai, CCBot,
-           Bytespider) blocked — fine, **does NOT lower the score**.
-      2.3  /llms.txt exists at site root with H1 + blockquote +
-           H2 sections: **+5 pts** bonus. Bare-bones llms.txt: +3.
-      2.4  Sitemap.xml referenced from robots.txt: **+3 pts**.
-      2.5  Key pages reachable from homepage links (no JS-only nav,
-           no noindex on service pages): **+2 pts**.
-      Note: missing llms.txt is no longer a ceiling. A site with
-      open citation bots, a sitemap, and crawlable pages can still
-      reach 15/20 even without llms.txt — that's the right ceiling
-      for "well-prepared without bleeding-edge AI optimization."
-      Maximum: 20.
+  - Structured Data / Schema: 0–25
+    Ladder:
+      0  : page doesn't render OR no business info on the page at all
+      5  : minimal — bare business name visible, nothing else readable
+      10 : basic — name + phone + address clearly visible in HTML
+           (no JSON-LD required to earn this — clean HTML counts)
+      15 : decent — Organization or partial LocalBusiness JSON-LD
+           (some fields populated, but missing reviews / FAQ)
+      20 : strong — LocalBusiness or Service JSON-LD complete (name,
+           telephone, address, hours, areaServed) with EITHER
+           AggregateRating OR FAQPage schema
+      25 : elite — full LocalBusiness + AggregateRating + FAQPage +
+           sameAs links to GBP/BBB/Yelp/Facebook
+    Bonus: industry-specific subtype on LocalBusiness (Plumber,
+    Dentist, Roofer, HVACBusiness, AutoRepair, etc.) → +1.
+    Most local businesses without dev resources land 8–14 (clean
+    HTML, no markup). That's where they belong — not at 4.
 
-  - Local Trust Signals: 0–20 (additive)
-      3.1  Visible review count + average rating ("4.9 stars · 240
-           reviews", testimonial slider with quoted reviews):
-           **+5 pts**. Just star rating, no review count: +3.
-      3.2  Years in business / "established YYYY" / "since YYYY":
-           **+3 pts**.
-      3.3  Credentials, licenses, certifications, BBB rating: **+4 pts**.
-      3.4  Warranty / guarantees / "satisfaction guaranteed": **+3 pts**.
-      3.5  Service-area cities or ZIPs named explicitly: **+3 pts**.
-      3.6  NAP consistency across header, footer, contact page:
-           **+2 pts**. Mismatch (different phone numbers / spellings)
-           demotes by –2.
-      Maximum: 20.
-      Real-world fundamentals matter — a business with strong reviews +
-      license + warranty + named service area earns a real Trust score
-      regardless of whether they have schema markup.
+  - AI Crawler Readiness: 0–20
+    Ladder:
+      0  : everything blocked OR fatal "User-agent: * / Disallow: /"
+      4  : most citation bots blocked / unclear robots.txt
+      8  : 2–3 citation bots reachable, no sitemap, no llms.txt
+      12 : all 5 citation bots reachable (OAI-SearchBot, ClaudeBot,
+           PerplexityBot, Bingbot, Google-Extended)
+      15 : above + sitemap.xml referenced from robots.txt + key
+           pages reachable from homepage (no JS-only nav)
+      18 : above + structured /llms.txt (H1 + blockquote + H2 sections)
+      20 : elite — full llms.txt suite + AI Discovery hints
+    Note: training-only bots (GPTBot, anthropic-ai, CCBot,
+    Bytespider) may be blocked — does NOT lower this score.
+    Note: missing llms.txt is NOT a ceiling. A site with citation
+    bots reachable + sitemap + crawlable can reach 15/20 — that's
+    "well-prepared without bleeding-edge."
 
-  - Content Depth + FAQ Quality: 0–15 (additive)
-      4.1  Two or more service pages with >250 words and sub-headings:
-           **+4 pts**. One service page with depth: +2.
-      4.2  FAQ section with real customer questions: **+3 pts**.
-      4.3  Pricing or service-expectation clarity ("starts at $X",
-           "free same-day estimate", "typical install 1–3 days"):
-           **+3 pts**.
-      4.4  Concrete numbers on service pages (turnaround time,
-           warranty years, response time, projects completed):
-           **+2 pts**.
-      4.5  Before/after photos, project galleries, or case studies:
-           **+2 pts**.
-      4.6  Location-specific landing pages per service area:
-           **+1 pt**.
-      Soft floor: marketing-only homepage with no separate service
-      content → cap at 4/15.
-      Maximum: 15.
+  - Local Trust Signals: 0–20  (stricter — no inflation)
+    Ladder. Each "signal" must be visible on the homepage or a
+    one-click-away page; mention without supporting evidence does
+    NOT count. Be evidence-based, not generous.
+      0  : zero visible trust signals
+      4  : ONE clear signal (e.g. "4.8 stars" alone, OR years in
+           business stated, OR a license number)
+      8  : TWO signals (reviews + years, or license + warranty)
+      12 : THREE signals (reviews + years + license, etc.)
+      16 : FOUR or more signals AND NAP consistency across pages
+      20 : elite — five+ signals INCLUDING verifiable third-party
+           proof (BBB rating page, Google reviews count visible)
+    Demote 2 pts for NAP mismatches (different phone numbers,
+    inconsistent business name). A bare "5 stars" claim with no
+    count or third-party source is worth +2, not +5.
 
-  - Brand / Entity Clarity: 0–10 (additive)
-      5.1  Same business name across <title>, header, footer, and
-           schema (when present): **+2 pts**.
-      5.2  Phone, address, and primary service area visible above
-           the fold on the homepage: **+3 pts**. (Phone alone: +2.
-           Phone + service area: +2.)
-      5.3  One clear sentence on what the business does within the
-           first viewport: **+2 pts**.
-      5.4  No conflicting claims ("20 years experience" alongside
-           "Established 2018" demotes by –2): **+2 pts**.
-      5.5  /about and /contact discoverable from the homepage:
-           **+1 pt**.
-      Maximum: 10.
+  - Content Depth + FAQ Quality: 0–15
+    Ladder:
+      0  : no real content — error / parked / spam
+      3  : marketing-only homepage, no separate service content
+      6  : 1–2 thin service pages, no FAQ
+      9  : 2+ service pages with real depth (>250 words each,
+           sub-headings) — OR — clear FAQ with answers (one or
+           the other)
+      12 : 2+ deep service pages AND FAQ section AND pricing /
+           service-expectation clarity ("starts at $X", "free
+           estimate", "typical 1–3 days")
+      15 : elite — all of the above + concrete numbers (turnaround,
+           warranty years, projects completed) + before/after proof
+           or case studies + location-specific landing pages
+    Bonus: real FAQPage schema markup that machines can extract
+    cleanly → +2 (already partially captured in Schema, but
+    double-rewarded here for content depth).
 
-  - Technical Accessibility: 0–10 (additive)
-      6.1  <title> + <meta description> present and useful (names
-           the service + location): **+2 pts**.
-      6.2  Single <h1> per page: **+2 pts**.
-      6.3  No noindex / soft-404 on homepage or service pages:
-           **+2 pts**. **HARD FLOOR: noindex anywhere customer-
-           facing → cap this category at 2/10.**
-      6.4  No broken homepage links: **+1 pt**.
-      6.5  Sitemap referenced from robots.txt (already counted in
-           2.4 — don't double-count): **+1 pt**.
-      6.6  Mobile viewport meta tag + reasonable page weight:
-           **+2 pts**.
-      Maximum: 10.
+  - Brand / Entity Clarity: 0–10
+    Ladder:
+      0  : confusing — multiple businesses, no clear identity
+      2  : bare business name visible, nothing else
+      4  : name + phone visible
+      6  : name + phone + service area + one-sentence what-we-do
+      8  : above + consistent across header/footer/title/schema
+      10 : elite — all above + clear /about + no conflicting claims
+           (no "30 years" alongside "Established 2018")
+    Demote 2 pts for any conflicting claim (years, founder, location).
+
+  - Technical Accessibility: 0–10
+    Ladder:
+      0  : home page broken (5xx) OR noindex on customer-facing pages
+      2  : loads but missing title/meta description, no h1
+      4  : basic — title + meta description + single h1 + reachable
+      6  : above + sitemap referenced from robots.txt
+      8  : above + mobile viewport tag + no broken homepage links +
+           reasonable page weight
+      10 : elite — all hygiene + structured headings + accessible
+           markup + fast (<2s LCP)
+
+  **Bonus multipliers — push strong implementations into the
+  upper bands.** Award after summing the six categories. Cap at 100.
+    +2  : entire site has consistent semantic heading hierarchy
+          (single h1 per page, ordered h2/h3, no skipped levels)
+    +2  : visible internal linking between service / location /
+          about / contact pages — a clear site graph
+    +2  : evidence the site renders without JavaScript (server-
+          rendered HTML, content visible in initial response)
+    +2  : multi-language signals (lang attribute, hreflang) — only
+          when relevant for the business's audience
+    +2  : real visible expertise (named professionals with bios,
+          dated case studies, recent project photos with locations)
+  These bonuses can lift a strong site from 70 → 78 — exactly the
+  spread the rubric should produce when implementation is genuinely
+  excellent.
 
 **Score bands — MANDATORY.** After summing the six category
 scores, classify the overall and explain WHY in the report:
@@ -523,116 +532,125 @@ you actually saw on the homepage / robots.txt / llms.txt fetches.
 If you can't point to evidence, the sub-check fails — score it
 conservatively and say "no evidence found" in the report.
 
-**Calibration v1 — additive partial credit.** Each sub-check below
-awards a specific point value when supported by evidence. Add the
-points across sub-checks per category to get the category score.
-This replaces the old band-based thresholds, which compressed real
-local businesses into a 31–38 cluster regardless of underlying
-quality. Floors / ceilings remain ONLY where they reflect a fatal
-gap (noindex, blocked citation bots).
+**Calibration v2 — explicit ladder anchors with partial credit.**
+Each category uses a 0-to-max ladder of named rungs. Find the rung
+the site genuinely sits on and award the rung's points. Partial
+credit BETWEEN rungs is allowed (e.g. 11/25 if the site is between
+"basic readable HTML" and "decent JSON-LD"). The intent is to use
+the FULL range — do NOT cluster at the bottom because no schema
+markup exists. A small business with clear HTML identity, working
+site, and visible reviews is mid-tier, not "At Risk."
 
-  - Structured Data / Schema: 0–25 (additive)
-    Award the points when the evidence is on the page; otherwise 0.
-      1.1  LocalBusiness or Service JSON-LD (subtype like Plumber,
-           Roofing, Dentist, HVACBusiness) WITH name + telephone +
-           address + hours: **+10 pts**. Partial (name + phone only,
-           no address/hours): +5.
-      1.2  AggregateRating or Review schema (ratingValue +
-           reviewCount): **+5 pts**.
-      1.3  FAQPage schema with Question / acceptedAnswer blocks:
-           **+4 pts**.
-      1.4  Organization or WebSite schema (only counts when
-           LocalBusiness/Service is absent): **+3 pts**.
-      1.5  sameAs links to GBP, BBB, Yelp, Facebook, LinkedIn: **+3 pts**.
-      Soft floor (NO JSON-LD anywhere) — the business identity is
-      readable in HTML (clear name, phone, address visible without
-      schema markup): **+5 pts** as partial credit. Without even
-      that signal: 0–2.
-      Maximum: 25.
+Floors / ceilings remain only for fatal gaps: noindex on a
+customer-facing page, citation bots blocked, marketing-only
+homepage with no real content.
 
-  - AI Crawler Readiness: 0–20 (additive)
-      2.1  All five citation bots reachable (OAI-SearchBot,
-           ClaudeBot, PerplexityBot, Bingbot, Google-Extended) —
-           the foundational signal: **+10 pts**.
-           Partial (3–4 of the five reachable): +6.
-           One or two of the five reachable: +3.
-           ANY one fully blocked OR fatal "User-agent: */Disallow: /":
-           +0 (this category cannot exceed 6 in that case).
-      2.2  Training-only bots (GPTBot, anthropic-ai, CCBot,
-           Bytespider) blocked — fine, **does NOT lower the score**.
-      2.3  /llms.txt exists at site root with H1 + blockquote +
-           H2 sections: **+5 pts** bonus. Bare-bones llms.txt: +3.
-      2.4  Sitemap.xml referenced from robots.txt: **+3 pts**.
-      2.5  Key pages reachable from homepage links (no JS-only nav,
-           no noindex on service pages): **+2 pts**.
-      Note: missing llms.txt is no longer a ceiling. A site with
-      open citation bots, a sitemap, and crawlable pages can still
-      reach 15/20 even without llms.txt — that's the right ceiling
-      for "well-prepared without bleeding-edge AI optimization."
-      Maximum: 20.
+  - Structured Data / Schema: 0–25
+    Ladder:
+      0  : page doesn't render OR no business info on the page at all
+      5  : minimal — bare business name visible, nothing else readable
+      10 : basic — name + phone + address clearly visible in HTML
+           (no JSON-LD required to earn this — clean HTML counts)
+      15 : decent — Organization or partial LocalBusiness JSON-LD
+           (some fields populated, but missing reviews / FAQ)
+      20 : strong — LocalBusiness or Service JSON-LD complete (name,
+           telephone, address, hours, areaServed) with EITHER
+           AggregateRating OR FAQPage schema
+      25 : elite — full LocalBusiness + AggregateRating + FAQPage +
+           sameAs links to GBP/BBB/Yelp/Facebook
+    Bonus: industry-specific subtype on LocalBusiness (Plumber,
+    Dentist, Roofer, HVACBusiness, AutoRepair, etc.) → +1.
+    Most local businesses without dev resources land 8–14 (clean
+    HTML, no markup). That's where they belong — not at 4.
 
-  - Local Trust Signals: 0–20 (additive)
-      3.1  Visible review count + average rating ("4.9 stars · 240
-           reviews", testimonial slider with quoted reviews):
-           **+5 pts**. Just star rating, no review count: +3.
-      3.2  Years in business / "established YYYY" / "since YYYY":
-           **+3 pts**.
-      3.3  Credentials, licenses, certifications, BBB rating: **+4 pts**.
-      3.4  Warranty / guarantees / "satisfaction guaranteed": **+3 pts**.
-      3.5  Service-area cities or ZIPs named explicitly: **+3 pts**.
-      3.6  NAP consistency across header, footer, contact page:
-           **+2 pts**. Mismatch (different phone numbers / spellings)
-           demotes by –2.
-      Maximum: 20.
-      Real-world fundamentals matter — a business with strong reviews +
-      license + warranty + named service area earns a real Trust score
-      regardless of whether they have schema markup.
+  - AI Crawler Readiness: 0–20
+    Ladder:
+      0  : everything blocked OR fatal "User-agent: * / Disallow: /"
+      4  : most citation bots blocked / unclear robots.txt
+      8  : 2–3 citation bots reachable, no sitemap, no llms.txt
+      12 : all 5 citation bots reachable (OAI-SearchBot, ClaudeBot,
+           PerplexityBot, Bingbot, Google-Extended)
+      15 : above + sitemap.xml referenced from robots.txt + key
+           pages reachable from homepage (no JS-only nav)
+      18 : above + structured /llms.txt (H1 + blockquote + H2 sections)
+      20 : elite — full llms.txt suite + AI Discovery hints
+    Note: training-only bots (GPTBot, anthropic-ai, CCBot,
+    Bytespider) may be blocked — does NOT lower this score.
+    Note: missing llms.txt is NOT a ceiling. A site with citation
+    bots reachable + sitemap + crawlable can reach 15/20 — that's
+    "well-prepared without bleeding-edge."
 
-  - Content Depth + FAQ Quality: 0–15 (additive)
-      4.1  Two or more service pages with >250 words and sub-headings:
-           **+4 pts**. One service page with depth: +2.
-      4.2  FAQ section with real customer questions: **+3 pts**.
-      4.3  Pricing or service-expectation clarity ("starts at $X",
-           "free same-day estimate", "typical install 1–3 days"):
-           **+3 pts**.
-      4.4  Concrete numbers on service pages (turnaround time,
-           warranty years, response time, projects completed):
-           **+2 pts**.
-      4.5  Before/after photos, project galleries, or case studies:
-           **+2 pts**.
-      4.6  Location-specific landing pages per service area:
-           **+1 pt**.
-      Soft floor: marketing-only homepage with no separate service
-      content → cap at 4/15.
-      Maximum: 15.
+  - Local Trust Signals: 0–20  (stricter — no inflation)
+    Ladder. Each "signal" must be visible on the homepage or a
+    one-click-away page; mention without supporting evidence does
+    NOT count. Be evidence-based, not generous.
+      0  : zero visible trust signals
+      4  : ONE clear signal (e.g. "4.8 stars" alone, OR years in
+           business stated, OR a license number)
+      8  : TWO signals (reviews + years, or license + warranty)
+      12 : THREE signals (reviews + years + license, etc.)
+      16 : FOUR or more signals AND NAP consistency across pages
+      20 : elite — five+ signals INCLUDING verifiable third-party
+           proof (BBB rating page, Google reviews count visible)
+    Demote 2 pts for NAP mismatches (different phone numbers,
+    inconsistent business name). A bare "5 stars" claim with no
+    count or third-party source is worth +2, not +5.
 
-  - Brand / Entity Clarity: 0–10 (additive)
-      5.1  Same business name across <title>, header, footer, and
-           schema (when present): **+2 pts**.
-      5.2  Phone, address, and primary service area visible above
-           the fold on the homepage: **+3 pts**. (Phone alone: +2.
-           Phone + service area: +2.)
-      5.3  One clear sentence on what the business does within the
-           first viewport: **+2 pts**.
-      5.4  No conflicting claims ("20 years experience" alongside
-           "Established 2018" demotes by –2): **+2 pts**.
-      5.5  /about and /contact discoverable from the homepage:
-           **+1 pt**.
-      Maximum: 10.
+  - Content Depth + FAQ Quality: 0–15
+    Ladder:
+      0  : no real content — error / parked / spam
+      3  : marketing-only homepage, no separate service content
+      6  : 1–2 thin service pages, no FAQ
+      9  : 2+ service pages with real depth (>250 words each,
+           sub-headings) — OR — clear FAQ with answers (one or
+           the other)
+      12 : 2+ deep service pages AND FAQ section AND pricing /
+           service-expectation clarity ("starts at $X", "free
+           estimate", "typical 1–3 days")
+      15 : elite — all of the above + concrete numbers (turnaround,
+           warranty years, projects completed) + before/after proof
+           or case studies + location-specific landing pages
+    Bonus: real FAQPage schema markup that machines can extract
+    cleanly → +2 (already partially captured in Schema, but
+    double-rewarded here for content depth).
 
-  - Technical Accessibility: 0–10 (additive)
-      6.1  <title> + <meta description> present and useful (names
-           the service + location): **+2 pts**.
-      6.2  Single <h1> per page: **+2 pts**.
-      6.3  No noindex / soft-404 on homepage or service pages:
-           **+2 pts**. **HARD FLOOR: noindex anywhere customer-
-           facing → cap this category at 2/10.**
-      6.4  No broken homepage links: **+1 pt**.
-      6.5  Sitemap referenced from robots.txt (already counted in
-           2.4 — don't double-count): **+1 pt**.
-      6.6  Mobile viewport meta tag + reasonable page weight:
-           **+2 pts**.
-      Maximum: 10.
+  - Brand / Entity Clarity: 0–10
+    Ladder:
+      0  : confusing — multiple businesses, no clear identity
+      2  : bare business name visible, nothing else
+      4  : name + phone visible
+      6  : name + phone + service area + one-sentence what-we-do
+      8  : above + consistent across header/footer/title/schema
+      10 : elite — all above + clear /about + no conflicting claims
+           (no "30 years" alongside "Established 2018")
+    Demote 2 pts for any conflicting claim (years, founder, location).
+
+  - Technical Accessibility: 0–10
+    Ladder:
+      0  : home page broken (5xx) OR noindex on customer-facing pages
+      2  : loads but missing title/meta description, no h1
+      4  : basic — title + meta description + single h1 + reachable
+      6  : above + sitemap referenced from robots.txt
+      8  : above + mobile viewport tag + no broken homepage links +
+           reasonable page weight
+      10 : elite — all hygiene + structured headings + accessible
+           markup + fast (<2s LCP)
+
+  **Bonus multipliers — push strong implementations into the
+  upper bands.** Award after summing the six categories. Cap at 100.
+    +2  : entire site has consistent semantic heading hierarchy
+          (single h1 per page, ordered h2/h3, no skipped levels)
+    +2  : visible internal linking between service / location /
+          about / contact pages — a clear site graph
+    +2  : evidence the site renders without JavaScript (server-
+          rendered HTML, content visible in initial response)
+    +2  : multi-language signals (lang attribute, hreflang) — only
+          when relevant for the business's audience
+    +2  : real visible expertise (named professionals with bios,
+          dated case studies, recent project photos with locations)
+  These bonuses can lift a strong site from 70 → 78 — exactly the
+  spread the rubric should produce when implementation is genuinely
+  excellent.
 
 **Score bands — MANDATORY.** After summing the six category
 scores, classify the overall and explain WHY in the report:
