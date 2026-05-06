@@ -65,16 +65,17 @@ function projectCategoryV2(key: CategoryKey, old: number | null): number | null 
   let next = old;
   switch (key) {
     case "schema":
-      // v2.1 — explicit partial-credit rungs for small-biz sites.
-      // The "8–12 default rung for any working small-business site"
-      // means a typical no-schema-but-clean-HTML site lands at 10
-      // (not 5, not 8). The 13–17 band rewards multi-page structure
-      // even without JSON-LD. Schema only unlocks 18+.
-      if (old <= 3) next = 5;          // truly minimal — name only
-      else if (old <= 5) next = 10;    // basic — clean HTML identity
+      // v2.2 — upper-rung lift for genuinely structured sites.
+      // Lower rungs unchanged from v2.1 (don't lift weak sites).
+      // 13–17 band gets a small ladder shift so multi-page sites
+      // climb to 16. 18+ unchanged at this stage; the structural
+      // synergy bonus is applied separately in projectArchetype()
+      // after all six categories are computed.
+      if (old <= 3) next = 5;          // truly minimal — unchanged
+      else if (old <= 5) next = 10;    // basic — unchanged
       else if (old <= 8) next = 12;    // upper edge of mid-tier
-      else if (old <= 12) next = 15;   // strong human-readable structure
-      else if (old <= 17) next = 18;   // partial schema → machine-readable
+      else if (old <= 12) next = 16;   // strong human-readable (lifted +1)
+      else if (old <= 17) next = 19;   // semantic HTML5 / partial schema
       // 18+ already on the right rung — leave alone.
       break;
     case "crawler":
@@ -155,8 +156,40 @@ const ARCHETYPES: Array<{
   },
 ];
 
+/**
+ * Structural Synergy Bonus — v2.2.
+ * Adds up to +3 to the Schema score when Content + Brand + Tech +
+ * Crawler are all in their strong tiers AND at least one
+ * machine-readable signal is plausibly present (proxied here by
+ * Schema already being in the upper rung). Gated heavily so weak
+ * sites can never trigger it.
+ */
+function structuralSynergyBonus(next: Record<CategoryKey, number>): number {
+  if (
+    next.content >= 12 &&
+    next.brand >= 8 &&
+    next.tech >= 7 &&
+    next.crawler >= 15 &&
+    next.schema >= 16 // proxy for "machine-readable signal plausibly present"
+  ) {
+    return 3;
+  }
+  // Partial synergy when most-but-not-all top-tier — still a real
+  // strong site, just not all-the-way-there.
+  if (
+    next.content >= 10 &&
+    next.brand >= 7 &&
+    next.tech >= 6 &&
+    next.crawler >= 14 &&
+    next.schema >= 14
+  ) {
+    return 1;
+  }
+  return 0;
+}
+
 function projectArchetype(scores: Record<CategoryKey, number>) {
-  const next: Record<CategoryKey, number> = {
+  const baseNext: Record<CategoryKey, number> = {
     schema: projectCategoryV2("schema", scores.schema)!,
     crawler: projectCategoryV2("crawler", scores.crawler)!,
     trust: projectCategoryV2("trust", scores.trust)!,
@@ -164,11 +197,16 @@ function projectArchetype(scores: Record<CategoryKey, number>) {
     brand: projectCategoryV2("brand", scores.brand)!,
     tech: projectCategoryV2("tech", scores.tech)!,
   };
+  const synergy = structuralSynergyBonus(baseNext);
+  const next: Record<CategoryKey, number> = {
+    ...baseNext,
+    schema: clamp(baseNext.schema + synergy, 0, 25),
+  };
   const oldTotal =
     scores.schema + scores.crawler + scores.trust + scores.content + scores.brand + scores.tech;
   const newTotal =
     next.schema + next.crawler + next.trust + next.content + next.brand + next.tech;
-  return { next, oldTotal, newTotal };
+  return { next, oldTotal, newTotal, synergy };
 }
 
 function printArchetypeReport() {
@@ -176,18 +214,20 @@ function printArchetypeReport() {
   console.log(
     "name".padEnd(54) +
       "v1 → v2".padEnd(15) +
+      "syn".padEnd(6) +
       "band move".padEnd(28) +
       "Δ",
   );
-  console.log("-".repeat(100));
+  console.log("-".repeat(105));
   for (const a of ARCHETYPES) {
-    const { oldTotal, newTotal } = projectArchetype(a.scores);
+    const { oldTotal, newTotal, synergy } = projectArchetype(a.scores);
     const oldBand = bandFor(oldTotal);
     const newBand = bandFor(newTotal);
     const delta = newTotal - oldTotal;
     console.log(
       a.name.padEnd(54) +
         `${oldTotal} → ${newTotal}`.padEnd(15) +
+        (synergy > 0 ? `+${synergy}` : "—").padEnd(6) +
         `${oldBand} → ${newBand}`.padEnd(28) +
         `${delta >= 0 ? "+" : ""}${delta}`,
     );

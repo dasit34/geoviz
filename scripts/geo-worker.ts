@@ -240,22 +240,39 @@ homepage with no real content.
              required to earn this band. Most local operators
              without dev resources should land HERE, not at 4.
       13–17: Strong human-readable structure. The page has a clear
-             service/location hierarchy: multiple service pages OR
-             named service-area pages, crawlable nav between them,
-             consistent brand name across pages, an /about or
+             service/location hierarchy: multiple service pages
+             AND/OR named service-area pages, crawlable nav between
+             them, consistent brand name across pages, an /about or
              /contact page reachable from the homepage. Still no
-             JSON-LD required.
-      18–22: Machine-readable structure. Either JSON-LD schema is
-             present (Organization, LocalBusiness, Service, even if
-             partial), OR the HTML uses strong semantic layout
-             (HTML5 <address>, <article>, ContactPoint markup,
-             rich Open Graph, well-structured headings naming the
-             entity). One side or the other clears 18.
+             JSON-LD required. **A site with 3+ distinct service
+             pages, an about page, AND a clear contact section
+             belongs at 15–17, not at 12.** When the entity comes
+             through clearly across multiple pages — even without
+             markup — that IS strong structure.
+      18–22: Machine-readable structure. Earned by EITHER path:
+             (a) JSON-LD schema is present — Organization,
+                 LocalBusiness, or Service, even partial. Treat
+                 LocalBusiness with at least name + telephone +
+                 address as 19; full LocalBusiness + areaServed +
+                 hours as 21.
+             (b) Strong semantic HTML5 layout WITHOUT JSON-LD —
+                 the page uses <address> for NAP, ContactPoint
+                 markup, rich Open Graph (og:title / og:type /
+                 og:locale + og:image), well-structured headings
+                 naming the entity, AND the site shows entity
+                 coherence (LocalBusiness + about-page + service
+                 hierarchy + FAQ section all reinforcing the same
+                 business). This path matters — many genuinely
+                 strong local operators have polished semantic HTML
+                 but no schema. They belong at 18–20, not capped at
+                 17.
       23–25: Elite — full LocalBusiness or Service JSON-LD
              (industry subtype like Plumber/Dentist/Roofer/
              HVACBusiness preferred) WITH AggregateRating + FAQPage
-             schema AND sameAs links to GBP/BBB/Yelp/Facebook. This
-             is genuinely rare and stays hard to earn.
+             schema AND sameAs links to GBP/BBB/Yelp/Facebook AND
+             the human-readable structure already at 17. Genuinely
+             rare and stays hard to earn — but when all five
+             signals line up, do not under-award.
 
     Reward partial credit for each of: clear business name, visible
     services, visible phone/contact, clear city or service area,
@@ -263,6 +280,23 @@ homepage with no real content.
     brand/entity naming. Each adds confidence — accumulating five or
     six of those signals on a clean HTML site is exactly what 8–12
     is for.
+
+    **Structural Synergy Bonus (NEW — only fires when the site is
+    genuinely structured).** When ALL of the following are true,
+    add up to +3 to the Schema score (capped at 25 still):
+      • Content score ≥ 12 (multiple deep service pages + FAQ)
+      • Brand score ≥ 8 (consistent entity naming, clear identity)
+      • Tech score ≥ 7 (clean meta + sitemap + reachable)
+      • Crawler score ≥ 15 (citation bots reachable + sitemap)
+      • At least ONE of: LocalBusiness JSON-LD (any), strong
+        semantic HTML5 layout (<address>, ContactPoint), sameAs
+        links to authoritative profiles
+    This bonus rewards entity coherence — the site, the schema,
+    the about page, the service hierarchy, and the FAQ all point to
+    the same business. It will NEVER fire for a weak site because
+    Content + Brand + Tech + Crawler must already be strong before
+    the bonus engages. Genuinely elite sites can clear 80+; weak
+    sites cannot.
 
   - AI Crawler Readiness: 0–20
     Ladder:
@@ -597,22 +631,39 @@ homepage with no real content.
              required to earn this band. Most local operators
              without dev resources should land HERE, not at 4.
       13–17: Strong human-readable structure. The page has a clear
-             service/location hierarchy: multiple service pages OR
-             named service-area pages, crawlable nav between them,
-             consistent brand name across pages, an /about or
+             service/location hierarchy: multiple service pages
+             AND/OR named service-area pages, crawlable nav between
+             them, consistent brand name across pages, an /about or
              /contact page reachable from the homepage. Still no
-             JSON-LD required.
-      18–22: Machine-readable structure. Either JSON-LD schema is
-             present (Organization, LocalBusiness, Service, even if
-             partial), OR the HTML uses strong semantic layout
-             (HTML5 <address>, <article>, ContactPoint markup,
-             rich Open Graph, well-structured headings naming the
-             entity). One side or the other clears 18.
+             JSON-LD required. **A site with 3+ distinct service
+             pages, an about page, AND a clear contact section
+             belongs at 15–17, not at 12.** When the entity comes
+             through clearly across multiple pages — even without
+             markup — that IS strong structure.
+      18–22: Machine-readable structure. Earned by EITHER path:
+             (a) JSON-LD schema is present — Organization,
+                 LocalBusiness, or Service, even partial. Treat
+                 LocalBusiness with at least name + telephone +
+                 address as 19; full LocalBusiness + areaServed +
+                 hours as 21.
+             (b) Strong semantic HTML5 layout WITHOUT JSON-LD —
+                 the page uses <address> for NAP, ContactPoint
+                 markup, rich Open Graph (og:title / og:type /
+                 og:locale + og:image), well-structured headings
+                 naming the entity, AND the site shows entity
+                 coherence (LocalBusiness + about-page + service
+                 hierarchy + FAQ section all reinforcing the same
+                 business). This path matters — many genuinely
+                 strong local operators have polished semantic HTML
+                 but no schema. They belong at 18–20, not capped at
+                 17.
       23–25: Elite — full LocalBusiness or Service JSON-LD
              (industry subtype like Plumber/Dentist/Roofer/
              HVACBusiness preferred) WITH AggregateRating + FAQPage
-             schema AND sameAs links to GBP/BBB/Yelp/Facebook. This
-             is genuinely rare and stays hard to earn.
+             schema AND sameAs links to GBP/BBB/Yelp/Facebook AND
+             the human-readable structure already at 17. Genuinely
+             rare and stays hard to earn — but when all five
+             signals line up, do not under-award.
 
     Reward partial credit for each of: clear business name, visible
     services, visible phone/contact, clear city or service area,
@@ -620,6 +671,23 @@ homepage with no real content.
     brand/entity naming. Each adds confidence — accumulating five or
     six of those signals on a clean HTML site is exactly what 8–12
     is for.
+
+    **Structural Synergy Bonus (NEW — only fires when the site is
+    genuinely structured).** When ALL of the following are true,
+    add up to +3 to the Schema score (capped at 25 still):
+      • Content score ≥ 12 (multiple deep service pages + FAQ)
+      • Brand score ≥ 8 (consistent entity naming, clear identity)
+      • Tech score ≥ 7 (clean meta + sitemap + reachable)
+      • Crawler score ≥ 15 (citation bots reachable + sitemap)
+      • At least ONE of: LocalBusiness JSON-LD (any), strong
+        semantic HTML5 layout (<address>, ContactPoint), sameAs
+        links to authoritative profiles
+    This bonus rewards entity coherence — the site, the schema,
+    the about page, the service hierarchy, and the FAQ all point to
+    the same business. It will NEVER fire for a weak site because
+    Content + Brand + Tech + Crawler must already be strong before
+    the bonus engages. Genuinely elite sites can clear 80+; weak
+    sites cannot.
 
   - AI Crawler Readiness: 0–20
     Ladder:
