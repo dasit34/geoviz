@@ -27,18 +27,16 @@ export function ReportCtaCard({
   const mailto = `mailto:${fixRequestEmail}?subject=${encodeURIComponent(subject)}`;
 
   return (
-    <section className="cta-card" aria-label="Done-For-You Fix offer">
+    <section className="cta-card" aria-label="GEO Foundation Fix offer">
       <div className="cta-card-accent" />
       <div className="cta-card-body">
-        <div className="cta-card-eyebrow">Done-for-you GEO Foundation Fix</div>
+        <div className="cta-card-eyebrow">GEO Foundation Fix</div>
         <h2 className="cta-card-headline">
           Want GeoViz to fix this for you?
         </h2>
         <p className="cta-card-lede">
-          Skip the technical work. We&rsquo;ll handle every fix in this
-          report so AI tools like ChatGPT, Claude, and Perplexity can
-          find, understand, and recommend your business when local
-          customers ask.
+          We&rsquo;ll handle the technical updates found in this report
+          so AI tools can better understand and recommend your business.
         </p>
 
         <div className="cta-card-badges">
@@ -49,21 +47,6 @@ export function ReportCtaCard({
             3–5 business days
           </span>
         </div>
-
-        <ul className="cta-card-bullets">
-          <li>
-            <Check />
-            Set up your business so AI tools understand and recommend you
-          </li>
-          <li>
-            <Check />
-            Fix the exact issues found in this report
-          </li>
-          <li>
-            <Check />
-            Improve your chances of showing up when customers search
-          </li>
-        </ul>
 
         <a className="cta-card-button" href={mailto}>
           Request My Fix →
@@ -77,7 +60,10 @@ export function ReportCtaCard({
   );
 }
 
-function Check() {
+// `Check` icon was used by the bullet list that previously
+// duplicated the report's section-2/3 content. The new sharper
+// CTA copy drops the bullet list — Check is unreferenced.
+function _UnusedCheck() {
   return (
     <svg
       className="cta-card-check"

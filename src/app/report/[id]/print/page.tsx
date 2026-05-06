@@ -140,6 +140,15 @@ export default async function PrintPage({
           </dl>
         </header>
 
+        {/* Executive At-a-Glance — first-screen preview of issues + fixes
+            so the customer sees the punchline before scrolling. */}
+        {issueItems.length >= 2 || fixItems.length >= 2 ? (
+          <ExecutiveAtAGlance
+            issues={issueItems}
+            fixes={fixItems}
+          />
+        ) : null}
+
         {/* Score card */}
         <section className="mt-10">
           <ReportScoreCard score={score} />
@@ -148,6 +157,10 @@ export default async function PrintPage({
               <ReactMarkdown>{scoreProse}</ReactMarkdown>
             </div>
           ) : null}
+          <p className="report-score-consistency-note">
+            Scores may vary slightly as pages, crawlability, and
+            available signals change.
+          </p>
         </section>
 
         {/* Why customers don't see you — issue cards */}
@@ -239,6 +252,67 @@ export default async function PrintPage({
 }
 
 type EnumeratedItem = { title: string; body: string };
+
+function ExecutiveAtAGlance({
+  issues,
+  fixes,
+}: {
+  issues: EnumeratedItem[];
+  fixes: EnumeratedItem[];
+}) {
+  const topIssues = issues.slice(0, 3);
+  const topFixes = fixes.slice(0, 3);
+  return (
+    <section className="report-glance mt-10">
+      <p className="section-eyebrow">At a glance</p>
+      <h2 className="h3 mt-2">The headlines from this audit.</h2>
+      <div className="report-glance-grid mt-5">
+        {topIssues.length > 0 ? (
+          <div>
+            <p className="report-glance-col-label">Top 3 issues</p>
+            <ol className="report-glance-list">
+              {topIssues.map((it, i) => {
+                const sev = inferIssueSeverity(it.title, it.body);
+                return (
+                  <li key={`issue-${i}`} className="report-glance-row">
+                    <span className="report-glance-index">#{i + 1}</span>
+                    <span className="report-glance-title">{it.title}</span>
+                    <span
+                      className={`severity-badge severity-${sev.tone} report-glance-badge`}
+                    >
+                      {sev.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ) : null}
+        {topFixes.length > 0 ? (
+          <div>
+            <p className="report-glance-col-label">Top 3 fixes</p>
+            <ol className="report-glance-list">
+              {topFixes.map((it, i) => {
+                const fix = inferFixPriority(it.title, it.body);
+                return (
+                  <li key={`fix-${i}`} className="report-glance-row">
+                    <span className="report-glance-index">#{i + 1}</span>
+                    <span className="report-glance-title">{it.title}</span>
+                    <span
+                      className={`severity-badge severity-${fix.severity.tone} report-glance-badge`}
+                    >
+                      {fix.severity.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
 
 function ItemListSection({
   heading,

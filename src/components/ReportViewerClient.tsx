@@ -71,12 +71,21 @@ export function ReportViewerClient({
         </pre>
       ) : (
         <div className="report-host bg-ink-950 text-white -mx-6 -my-6 md:-mx-8 md:-my-8 px-6 py-6 md:px-8 md:py-8 rounded-lg">
-          <ReportScoreCard score={score} />
+          {issueItems.length >= 2 || fixItems.length >= 2 ? (
+            <ExecutiveAtAGlance issues={issueItems} fixes={fixItems} />
+          ) : null}
+          <div className="mt-6">
+            <ReportScoreCard score={score} />
+          </div>
           {scoreProse ? (
             <div className="report-band-explainer">
               <ReactMarkdown>{scoreProse}</ReactMarkdown>
             </div>
           ) : null}
+          <p className="report-score-consistency-note">
+            Scores may vary slightly as pages, crawlability, and
+            available signals change.
+          </p>
 
           {whySection ? (
             <ItemListSection
@@ -155,6 +164,67 @@ export function ReportViewerClient({
 }
 
 type EnumItem = { title: string; body: string };
+
+function ExecutiveAtAGlance({
+  issues,
+  fixes,
+}: {
+  issues: EnumItem[];
+  fixes: EnumItem[];
+}) {
+  const topIssues = issues.slice(0, 3);
+  const topFixes = fixes.slice(0, 3);
+  return (
+    <section className="report-glance">
+      <p className="section-eyebrow">At a glance</p>
+      <h2 className="h3 mt-2">The headlines from this audit.</h2>
+      <div className="report-glance-grid mt-5">
+        {topIssues.length > 0 ? (
+          <div>
+            <p className="report-glance-col-label">Top 3 issues</p>
+            <ol className="report-glance-list">
+              {topIssues.map((it, i) => {
+                const sev = inferIssueSeverity(it.title, it.body);
+                return (
+                  <li key={`issue-${i}`} className="report-glance-row">
+                    <span className="report-glance-index">#{i + 1}</span>
+                    <span className="report-glance-title">{it.title}</span>
+                    <span
+                      className={`severity-badge severity-${sev.tone} report-glance-badge`}
+                    >
+                      {sev.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ) : null}
+        {topFixes.length > 0 ? (
+          <div>
+            <p className="report-glance-col-label">Top 3 fixes</p>
+            <ol className="report-glance-list">
+              {topFixes.map((it, i) => {
+                const fix = inferFixPriority(it.title, it.body);
+                return (
+                  <li key={`fix-${i}`} className="report-glance-row">
+                    <span className="report-glance-index">#{i + 1}</span>
+                    <span className="report-glance-title">{it.title}</span>
+                    <span
+                      className={`severity-badge severity-${fix.severity.tone} report-glance-badge`}
+                    >
+                      {fix.severity.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
 
 function ItemListSection({
   heading,

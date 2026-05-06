@@ -169,8 +169,9 @@ appear in section 6 (Technical Details) only.
 Do NOT crawl. Do NOT fabricate findings — every claim must come from
 one of those fetches.
 
-**Output budget: 600–1,000 words.** Markdown only. No preamble, no
-closing remarks.
+**Output budget: 350–550 words.** Markdown only. No preamble, no
+closing remarks. The customer-facing report is an executive
+audit — terse, scannable, no novel-length explanations.
 
 **Language rules — STRICT.** You are writing for a roofer, an HVAC
 owner, a contractor, a dentist. They have NEVER heard of "schema",
@@ -206,7 +207,7 @@ like their smart friend, not their developer.
   plain English on the same line.
 - No fabricated traffic numbers. No score promises.
 
-**Never omit the "Done-For-You Fix" section.** It is mandatory.
+**Never omit the "GEO Foundation Fix" section.** It is mandatory.
 Paste it verbatim from the template below as section 5 — do not
 paraphrase, do not change wording, do not change pricing, do not
 drop bullets.
@@ -479,97 +480,92 @@ This reasoning block is intentionally short and concrete — it's how
 the audit explains the scoring math to the customer (and to us
 during calibration) without listing every single sub-check.
 
-## 2. Why Customers Don't See You
-Top 3 issues only. Numbered. For each:
-- A plain-English headline (one short line, no jargon)
-- **What's wrong** — one sentence anyone can understand
-- **Why it matters** — one sentence in lost jobs / missed calls / a
-  competitor getting picked instead
-- **What happens if fixed** — one sentence on what changes for the
-  business
+## 2. Top 3 Issues
+Top 3 issues only. Numbered. For each, render the **EXACT** three
+labeled fields below — Problem / Impact / Fix — each on its own
+line. NO long paragraphs. NO additional fields. The renderer
+parses these labels into a clean grid.
 
-## 3. What To Fix First
-Top 3 fixes only. Numbered. Render each as an implementation
+### {N}. {Plain-English headline — one short line, no jargon}
+- **Problem** — one sentence on what's wrong, anyone can understand.
+- **Impact** — one sentence in lost jobs / missed calls / customers
+  picking a competitor instead.
+- **Fix** — one sentence preview of the corrective action (the
+  detailed fix lives in section 3).
+
+## 3. Top 3 Fixes
+Top 3 fixes only. Numbered. Render each as a tight implementation
 checklist — short, scannable, NO dense paragraphs. Use **EXACTLY**
-these seven labeled fields per fix, in this order, each on its own
-line. The renderer parses these labels into a clean grid; do not
-collapse multiple fields into one line and do not invent extra
-labels.
+these six labeled fields per fix, in this order, each on its own
+line. The renderer parses these labels into a clean grid + chips;
+do not collapse fields, do not invent extra labels.
 
 ### {N}. {Fix name — one short, plain-English imperative line}
 - **Priority** — one of: Critical / High / Medium / Quick Win
-- **What to do** — one concrete action, plain words, max 2 sentences
-- **Why it matters** — tied to leads / calls / customers won, max
-  2 sentences, no jargon
-- **Expected impact** — what visibly changes when this fix lands
-  (more inbound calls, recommendations from AI tools, etc.) — max
-  2 sentences
 - **Difficulty** — one of: Easy / Moderate / Technical
 - **Can GeoViz Foundation Fix handle this?** — Yes or No (one
   word). Yes when the fix involves schema, llms.txt, robots.txt,
   metadata, FAQ structure, or service-page setup. No when it
   requires creative work the customer must own (writing reviews,
   earning a license, photographing projects).
+- **Problem** — one sentence on what's broken right now.
+- **Impact** — one sentence on what it costs the business in leads /
+  calls / customers won.
+- **Fix** — one or two sentences, max, on the concrete action — what
+  to install, what to write, what to update. Plain words.
 
-Voice rules for this section:
-- No repeated phrasing. Each fix's "Why it matters" must point at
-  a DIFFERENT customer outcome (visibility / trust / specific
-  service category / location targeting).
+Voice rules for sections 2 and 3:
+- No repeated phrasing across items. Each Problem/Impact/Fix line
+  must point at a DIFFERENT specific finding.
 - Preserve factual audit findings. Do not invent claims about
   traffic, rankings, or lead volume.
-- Every line must pass the kitchen-table test.
+- Every line passes the kitchen-table test.
 
-## 4. What Happens If You Fix This
-Write 3–4 sentences in natural, business-owner-friendly language —
-the way a trusted advisor would explain it across the kitchen
-table. Frame the outcome as: AI tools (ChatGPT, Claude, Perplexity,
-Google AI Overviews) finally have the right information to
-recommend the business, which means more inbound calls and fewer
-customers handed to competitors.
+## 4. Business Impact
+Write 2–3 short sentences. NO long paragraphs. Frame the outcome:
+when AI search systems can read the site clearly, the business
+wins more inbound calls and fewer customers go to competitors.
 
 Required wording rules:
 - NO arithmetic, NO score math, NO "= N/100".
-- NO dramatic phrasing like "your 70-year reputation is invisible"
-  or "homeowners can't find you in the AI age."
-- Keep it grounded and concrete. A sentence like the following is
-  the target tone: "When your website clearly explains who you are,
-  where you work, and why customers trust you, AI tools have more
-  reasons to recommend your business instead of skipping over it."
+- NO dramatic phrasing like "your 70-year reputation is invisible".
+- Keep it grounded. Target tone: "When your website clearly
+  explains who you are, where you work, and why customers trust
+  you, AI tools have more reasons to recommend your business
+  instead of skipping over it."
 
 **If — AND ONLY IF — the audit found strong real-world trust
 signals (decades in business, large review counts, licenses,
 warranty, named service area) but weak technical signals (no
-schema, no llms.txt, thin content), include this exact sentence
-near the top of the section, adjusted only so the years number
-matches the evidence:**
+schema, no llms.txt, thin content), include this exact sentence:**
 
   "Your real-world reputation is stronger than your website signals.
   The fix is making that trust easier for Google and AI tools to
   understand."
 
-Do NOT include that sentence when the evidence does not actually
-support it.
+Do NOT include that sentence when the evidence does not support it.
+
+End the section with this verbatim note on its own line:
+
+> Scores may vary slightly as pages, crawlability, and available
+> signals change.
 
 ---
 
-## 5. Done-For-You Fix (Optional)
+## 5. GEO Foundation Fix
 
 Paste this section EXACTLY as written below. Do not paraphrase. Do
 not modify pricing. Do not drop bullets:
 
-### Let Us Fix This For You
+### Want GeoViz to fix this for you?
 
-If you don't want to deal with technical changes, we can handle everything for you.
-
-**What we do:**
-- Set up your business so AI tools understand and recommend you
-- Fix the exact issues found in this report
-- Improve your chances of showing up when customers search
+We&rsquo;ll handle the technical updates found in this report so AI
+tools can better understand and recommend your business.
 
 **Investment:** $497 one-time
 **Timeline:** 3–5 business days
 
-Reply to this email or click the link to request your fix.
+Reply to this email or click the link below to request your fix.
 
 ---
 
@@ -599,8 +595,11 @@ appear in section 6 (Technical Details) only.
 Do NOT crawl. Do NOT fabricate findings — every claim must trace to
 one of those fetches.
 
-**Output budget: 1,200–2,000 words total.** Markdown only. No preamble,
-no closing remarks.
+**Output budget: 600–900 words total** (sections 1–5 budgeted ~500
+words; section 6 Technical Appendix budgeted ~300 words). Markdown
+only. No preamble, no closing remarks. The customer-facing report
+is an executive audit — terse, scannable, no novel-length
+explanations.
 
 **Language rules — STRICT.** You are writing for a roofer, an HVAC
 owner, a contractor, a dentist. They have NEVER heard of "schema",
@@ -637,7 +636,7 @@ like their smart friend, not their developer.
 - No long paragraphs. Punchy and actionable.
 - No repeating the same issue across sections.
 - No fabricated traffic numbers. No score promises.
-- **Never omit the "Done-For-You Fix" section.** It is mandatory.
+- **Never omit the "GEO Foundation Fix" section.** It is mandatory.
   Paste it verbatim from the template below as section 5 — do not
   paraphrase, do not change wording, do not change pricing, do not
   drop bullets.
@@ -914,103 +913,98 @@ This reasoning block is intentionally short and concrete — it's how
 the audit explains the scoring math to the customer (and to us
 during calibration) without listing every single sub-check.
 
-## 2. Why Customers Don't See You
-Top 3 issues only. Numbered. For each:
-- A plain-English headline (one short line, no jargon)
-- **What's wrong** — one sentence anyone can understand
-- **Why it matters** — one sentence in lost jobs / missed calls / a
-  competitor getting picked instead
-- **What happens if fixed** — one sentence on what changes for the
-  business
+## 2. Top 3 Issues
+Top 3 issues only. Numbered. For each, render the **EXACT** three
+labeled fields below — Problem / Impact / Fix — each on its own
+line. NO long paragraphs. NO additional fields. The renderer
+parses these labels into a clean grid.
 
-## 3. What To Fix First
-Top 3 fixes only. Numbered. Render each as an implementation
+### {N}. {Plain-English headline — one short line, no jargon}
+- **Problem** — one sentence on what's wrong, anyone can understand.
+- **Impact** — one sentence in lost jobs / missed calls / customers
+  picking a competitor instead.
+- **Fix** — one sentence preview of the corrective action (the
+  detailed fix lives in section 3).
+
+## 3. Top 3 Fixes
+Top 3 fixes only. Numbered. Render each as a tight implementation
 checklist — short, scannable, NO dense paragraphs. Use **EXACTLY**
-these seven labeled fields per fix, in this order, each on its own
-line. The renderer parses these labels into a clean grid; do not
-collapse multiple fields into one line and do not invent extra
-labels.
+these six labeled fields per fix, in this order, each on its own
+line. The renderer parses these labels into a clean grid + chips;
+do not collapse fields, do not invent extra labels.
 
 ### {N}. {Fix name — one short, plain-English imperative line}
 - **Priority** — one of: Critical / High / Medium / Quick Win
-- **What to do** — one concrete action, plain words, max 2 sentences
-- **Why it matters** — tied to leads / calls / customers won, max
-  2 sentences, no jargon
-- **Expected impact** — what visibly changes when this fix lands
-  (more inbound calls, recommendations from AI tools, etc.) — max
-  2 sentences
 - **Difficulty** — one of: Easy / Moderate / Technical
 - **Can GeoViz Foundation Fix handle this?** — Yes or No (one
   word). Yes when the fix involves schema, llms.txt, robots.txt,
   metadata, FAQ structure, or service-page setup. No when it
   requires creative work the customer must own (writing reviews,
   earning a license, photographing projects).
+- **Problem** — one sentence on what's broken right now.
+- **Impact** — one sentence on what it costs the business in leads /
+  calls / customers won.
+- **Fix** — one or two sentences, max, on the concrete action — what
+  to install, what to write, what to update. Plain words.
 
-Voice rules for this section:
-- No repeated phrasing. Each fix's "Why it matters" must point at
-  a DIFFERENT customer outcome (visibility / trust / specific
-  service category / location targeting).
+Voice rules for sections 2 and 3:
+- No repeated phrasing across items. Each Problem/Impact/Fix line
+  must point at a DIFFERENT specific finding.
 - Preserve factual audit findings. Do not invent claims about
   traffic, rankings, or lead volume.
-- Every line must pass the kitchen-table test.
+- Every line passes the kitchen-table test.
 
-## 4. What Happens If You Fix This
-Write 3–4 sentences in natural, business-owner-friendly language —
-the way a trusted advisor would explain it across the kitchen
-table. Frame the outcome as: AI tools (ChatGPT, Claude, Perplexity,
-Google AI Overviews) finally have the right information to
-recommend the business, which means more inbound calls and fewer
-customers handed to competitors.
+## 4. Business Impact
+Write 2–3 short sentences. NO long paragraphs. Frame the outcome:
+when AI search systems can read the site clearly, the business
+wins more inbound calls and fewer customers go to competitors.
 
 Required wording rules:
 - NO arithmetic, NO score math, NO "= N/100".
-- NO dramatic phrasing like "your 70-year reputation is invisible"
-  or "homeowners can't find you in the AI age."
-- Keep it grounded and concrete. A sentence like the following is
-  the target tone: "When your website clearly explains who you are,
-  where you work, and why customers trust you, AI tools have more
-  reasons to recommend your business instead of skipping over it."
+- NO dramatic phrasing like "your 70-year reputation is invisible".
+- Keep it grounded. Target tone: "When your website clearly
+  explains who you are, where you work, and why customers trust
+  you, AI tools have more reasons to recommend your business
+  instead of skipping over it."
 
 **If — AND ONLY IF — the audit found strong real-world trust
 signals (decades in business, large review counts, licenses,
 warranty, named service area) but weak technical signals (no
-schema, no llms.txt, thin content), include this exact sentence
-near the top of the section, adjusted only so the years number
-matches the evidence:**
+schema, no llms.txt, thin content), include this exact sentence:**
 
   "Your real-world reputation is stronger than your website signals.
   The fix is making that trust easier for Google and AI tools to
   understand."
 
-Do NOT include that sentence when the evidence does not actually
-support it.
+Do NOT include that sentence when the evidence does not support it.
+
+End the section with this verbatim note on its own line:
+
+> Scores may vary slightly as pages, crawlability, and available
+> signals change.
 
 ---
 
-## 5. Done-For-You Fix (Optional)
+## 5. GEO Foundation Fix
 
 Paste this section EXACTLY as written below. Do not paraphrase. Do
 not modify pricing. Do not drop bullets:
 
-### Let Us Fix This For You
+### Want GeoViz to fix this for you?
 
-If you don't want to deal with technical changes, we can handle everything for you.
-
-**What we do:**
-- Set up your business so AI tools understand and recommend you
-- Fix the exact issues found in this report
-- Improve your chances of showing up when customers search
+We&rsquo;ll handle the technical updates found in this report so AI
+tools can better understand and recommend your business.
 
 **Investment:** $497 one-time
 **Timeline:** 3–5 business days
 
-Reply to this email or click the link to request your fix.
+Reply to this email or click the link below to request your fix.
 
 ---
 
-## 6. Technical Details
+## 6. Technical Appendix
 <details>
-<summary>Schema, robots.txt, llms.txt — implementation notes for your developer</summary>
+<summary>Crawler details, robots.txt findings, sitemap, raw schema analysis — implementation notes for your developer</summary>
 
 **Schema (JSON-LD)** — one paste-ready code block for the single most
 impactful missing schema (LocalBusiness preferred). Skip anything you

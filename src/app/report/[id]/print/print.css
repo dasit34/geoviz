@@ -265,6 +265,78 @@
   line-height: 1.65;
   color: rgba(255, 255, 255, 0.82);
 }
+
+/* Score consistency note — small grey line under the score card so
+   customers understand small variances aren't bugs. */
+.report-score-consistency-note {
+  margin: 14px 4px 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+/* Executive At-a-Glance preview — sits between the hero and the
+   detailed score card. Shows the 3-issue + 3-fix headlines side-by-
+   side so the customer sees the punchline before scrolling. */
+.report-glance {
+  padding: 22px 24px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.report-glance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+.report-glance-col-label {
+  margin: 0 0 8px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 700;
+}
+.report-glance-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.report-glance-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+.report-glance-row:first-child {
+  border-top: none;
+}
+.report-glance-index {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.4);
+}
+.report-glance-title {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.report-glance-badge {
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .report-glance-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
 .report-band-explainer p {
   margin: 0 0 10px;
 }

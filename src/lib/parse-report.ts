@@ -205,11 +205,31 @@ export type ReportSections = {
 
 const SECTION_SLUGS: Array<{ slug: ReportSectionSlug; pattern: RegExp }> = [
   { slug: "score", pattern: /AI\s*Visibility\s*Score|^Score\b/i },
-  { slug: "why", pattern: /Why\s+(?:Customers\s+Don|Your\s+Business\s+Is|You['’]re)/i },
-  { slug: "fix-first", pattern: /What\s+to\s+Fix\s+First/i },
-  { slug: "happens", pattern: /What\s+Happens\s+If/i },
-  { slug: "cta", pattern: /Done[-\s]?For[-\s]?You\s+Fix/i },
-  { slug: "tech-details", pattern: /Technical\s+Details/i },
+  // Top 3 Issues (new) + Why Customers Don't See You (legacy)
+  {
+    slug: "why",
+    pattern: /Top\s+3\s+Issues|Why\s+(?:Customers\s+Don|Your\s+Business\s+Is|You['’]re)/i,
+  },
+  // Top 3 Fixes (new) + What To Fix First (legacy)
+  {
+    slug: "fix-first",
+    pattern: /Top\s+3\s+Fixes|What\s+to\s+Fix\s+First/i,
+  },
+  // Business Impact (new) + What Happens If You Fix This (legacy)
+  {
+    slug: "happens",
+    pattern: /Business\s+Impact|What\s+Happens\s+If/i,
+  },
+  // GEO Foundation Fix (new) + Done-For-You Fix (legacy)
+  {
+    slug: "cta",
+    pattern: /GEO\s+Foundation\s+Fix|Done[-\s]?For[-\s]?You\s+Fix/i,
+  },
+  // Technical Appendix (new) + Technical Details (legacy)
+  {
+    slug: "tech-details",
+    pattern: /Technical\s+(?:Appendix|Details)/i,
+  },
 ];
 
 /**
