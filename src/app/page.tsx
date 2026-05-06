@@ -143,10 +143,11 @@ export default function Page() {
               who to hire — does your business get named?
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/70">
-              AI search is the new front door for local hiring. If
-              ChatGPT, Claude, Perplexity, and Gemini can&rsquo;t read your
-              site clearly, they recommend the competitor who is easier
-              to read. We show you why — and exactly what to fix.
+              AI answer engines are the new front door for local
+              hiring. When ChatGPT, Claude, Perplexity, and Gemini
+              can&rsquo;t parse your site clearly, they cite the
+              competitor whose business identity is easier to confirm.
+              We show you why — and exactly what to fix.
             </p>
 
             <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -154,11 +155,12 @@ export default function Page() {
                 Get My Audit — $97
               </Link>
               <Link href="/sample-report" className="btn-ghost text-base">
-                View a Real Audit (2 min)
+                View a sample audit
               </Link>
             </div>
-            <p className="mt-3 text-xs italic text-white/50">
-              We run a limited number of audits per day to keep results accurate.
+            <p className="mt-3 text-xs text-white/55">
+              Instant AI-visibility scan in minutes. Full scored audit
+              delivered within 24 hours.
             </p>
 
             <div className="mt-8">
@@ -255,16 +257,16 @@ export default function Page() {
         <div className="container-page py-20">
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
             <div>
-              <p className="section-eyebrow">How AI actually reads your site</p>
+              <p className="section-eyebrow">How AI search systems read your site</p>
               <h2 className="h2 mt-3 max-w-2xl">
                 Seven dimensions decide whether AI cites you or skips you.
               </h2>
             </div>
             <p className="muted max-w-md">
-              Generative search engines don&rsquo;t read marketing copy
-              the way a human does. They parse structure first, then
-              extract claims they can confirm, then cite sources they
-              can trust.
+              Each dimension is structured, measurable, and tested in
+              every audit. AI answer engines parse machine-readable
+              structure first, then extract claims they can confirm,
+              then cite sources they can trust.
             </p>
           </div>
           <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -305,14 +307,15 @@ export default function Page() {
         <div className="container-page py-20">
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
             <div>
-              <p className="section-eyebrow">Reference engagement</p>
+              <p className="section-eyebrow">Rubric-based reference</p>
               <h2 className="h2 mt-3 max-w-2xl">
                 What a Foundation Fix typically delivers.
               </h2>
             </div>
             <p className="muted max-w-md text-sm">
-              Illustrative — based on the scoring rubric. We don&rsquo;t
-              publish named customer cases without explicit consent.
+              Illustrative — modeled on the same six-category rubric
+              the audit runs on. We don&rsquo;t publish named customer
+              cases without explicit consent.
             </p>
           </div>
 
@@ -427,14 +430,15 @@ export default function Page() {
               >
                 Get My Audit — $97
               </Link>
-              <p className="mt-3 text-center text-xs italic text-white/50">
-                We run a limited number of audits per day to keep results accurate.
+              <p className="mt-3 text-center text-xs text-white/55">
+                Instant AI-visibility scan in minutes. Full scored
+                audit delivered within 24 hours.
               </p>
-              <p className="mt-2 text-center text-xs text-white/40">
-                Delivered by email within 24 hours. Each report is
-                generated using AI-assisted analysis across ChatGPT,
-                Claude, Perplexity, and Gemini, then reviewed for
-                clarity before delivery.
+              <p className="mt-2 text-center text-xs text-white/45">
+                Each audit includes automated AI-search analysis
+                plus manual review for scoring consistency and
+                clarity. Generated against ChatGPT, Claude,
+                Perplexity, and Gemini.
               </p>
             </div>
           </div>
@@ -447,15 +451,17 @@ export default function Page() {
           <div className="rounded-2xl border border-accent/30 bg-ink-900/70 p-8 md:p-12 shadow-card">
             <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
               <div>
-                <p className="section-eyebrow">Done-for-you service</p>
+                <p className="section-eyebrow">Done-for-you · rubric-based</p>
                 <h2 className="h2 mt-3">
-                  GEO Foundation Fix — the AI visibility infrastructure repair.
+                  GEO Foundation Fix — measurable AI-visibility lift.
                 </h2>
                 <p className="muted mt-5 max-w-xl text-base leading-relaxed">
-                  After your audit, the fixes are concrete:
-                  schema, crawl directives, FAQ structure, page-level
-                  signals. We do the implementation. You stay focused
-                  on the business.
+                  Every category that pulled your audit score down
+                  comes back as a concrete repair: structured business
+                  data, AI-crawler access, content hierarchy, and
+                  entity clarity. We implement against the same rubric
+                  the audit ran on, then re-score the site so the
+                  visibility lift is measurable — not a guess.
                 </p>
 
                 <p className="mt-8 text-xs uppercase tracking-[0.2em] text-accent">
@@ -524,20 +530,20 @@ export default function Page() {
             Find out exactly what ChatGPT, Claude, Perplexity, and Gemini see.
           </h2>
           <p className="muted mx-auto mt-4 max-w-xl">
-            Delivered by email within 24 hours. Each audit is generated
-            using AI-assisted analysis across the four major
-            platforms, then reviewed for clarity before delivery.
+            Instant AI-visibility scan in minutes. Full scored audit
+            delivered within 24 hours.
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Link href="/order" className="btn-primary">
               Get My Audit — $97
             </Link>
             <Link href="/sample-report" className="btn-ghost">
-              View a Real Audit (2 min)
+              View a sample audit
             </Link>
           </div>
-          <p className="mt-3 text-xs italic text-white/50">
-            We run a limited number of audits per day to keep results accurate.
+          <p className="mt-3 mx-auto max-w-xl text-xs text-white/45">
+            Each audit includes automated AI-search analysis plus
+            manual review for scoring consistency and clarity.
           </p>
         </div>
       </section>
