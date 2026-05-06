@@ -4,6 +4,8 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import {
   cleanScoreSectionBody,
+  inferFixPriority,
+  inferIssueSeverity,
   parseEnumeratedItems,
   parseLabeledFields,
   parseReportScoreBreakdown,
@@ -202,6 +204,11 @@ function ItemCard({
   kind: "issue" | "fix";
 }) {
   const fields = parseLabeledFields(item.body);
+  const severity =
+    kind === "issue"
+      ? inferIssueSeverity(item.title, item.body)
+      : inferFixPriority(item.title, item.body).severity;
+  const fix = kind === "fix" ? inferFixPriority(item.title, item.body) : null;
   return (
     <li className={`report-item-card report-item-card-${kind}`}>
       <div className="report-item-card-head">
@@ -210,6 +217,21 @@ function ItemCard({
         </span>
         <span className="report-item-card-index">#{index}</span>
         <h3 className="report-item-card-title">{item.title}</h3>
+      </div>
+      <div className="report-item-card-badges">
+        <span className={`severity-badge severity-${severity.tone}`}>
+          {severity.label}
+        </span>
+        {fix ? (
+          <>
+            <span className="severity-badge severity-priority">
+              {fix.priority}
+            </span>
+            <span className="severity-badge severity-impact">
+              Estimated impact: {fix.impactLabel}
+            </span>
+          </>
+        ) : null}
       </div>
       {fields.length >= 2 ? (
         <dl className="report-item-card-fields">

@@ -328,6 +328,62 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* Severity / priority / impact badges that sit just below the
+   issue or fix card headline. Plain text labels (no emoji), color-
+   coded by tone so the report reads like a consultant dashboard
+   instead of a wall of paragraphs. */
+.report-item-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.severity-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.severity-critical {
+  color: #ff8d8d;
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.4);
+}
+.severity-high {
+  color: #ff9a3c;
+  background: rgba(255, 122, 24, 0.12);
+  border-color: rgba(255, 122, 24, 0.4);
+}
+.severity-quick {
+  color: #6ce39a;
+  background: rgba(45, 169, 79, 0.12);
+  border-color: rgba(108, 227, 154, 0.4);
+}
+.severity-trust {
+  color: #6ea8ff;
+  background: rgba(43, 139, 255, 0.12);
+  border-color: rgba(110, 168, 255, 0.4);
+}
+.severity-priority {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  letter-spacing: 0.08em;
+}
+.severity-impact {
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  letter-spacing: 0.08em;
+}
 .report-item-card-icon {
   display: inline-flex;
   align-items: center;

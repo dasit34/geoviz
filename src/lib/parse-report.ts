@@ -363,6 +363,91 @@ export function parseEnumeratedItems(body: string): EnumeratedItem[] {
   return [];
 }
 
+export type IssueSeverity = {
+  label: "Critical" | "High Impact" | "Quick Win" | "Trust Signal";
+  tone: "critical" | "high" | "quick" | "trust";
+};
+
+export type FixPriority = {
+  severity: IssueSeverity;
+  priority: "P0 — Do First" | "P1 — High Value" | "P2 — Polish";
+  impactLabel: string;
+};
+
+/**
+ * Render-time severity inference for issue cards. Reads only the
+ * existing report title + body (no prompt changes) and assigns one
+ * of four severity tones using keyword heuristics. Imperfect by
+ * design — the goal is a useful default badge on every card so
+ * sections feel like a consultant-grade dashboard, not a wall of
+ * paragraphs.
+ */
+export function inferIssueSeverity(title: string, body: string): IssueSeverity {
+  const text = `${title} ${body}`.toLowerCase();
+  // Order matters — narrow critical first, then trust (so "no reviews"
+  // doesn't fall through to high-impact), then quick wins, then schema.
+  if (
+    /\b(noindex|inaccessible|404|fatal|crawl[er]*\s+block|user-agent\s*[:*].*disallow|broken\s+(site|home|page)|disallow\s*:\s*\/|citation\s+bot.*block|all\s+bots\s+block)\b/.test(
+      text,
+    )
+  ) {
+    return { label: "Critical", tone: "critical" };
+  }
+  if (
+    /(reviews?|ratings?|license[ds]?|certif|warrant(y|ies)|guarantee[ds]?|trust\s|nap\s|service\s*area|contact\s*info|years\s+in\s+business|established\s+\d{4})/.test(
+      text,
+    )
+  ) {
+    return { label: "Trust Signal", tone: "trust" };
+  }
+  if (
+    /(title\s+tag|meta\s+description|sitemap|alt\s+text|missing\s+h1|heading\s+structure|broken\s+link|page\s+speed|mobile\s+viewport)/.test(
+      text,
+    )
+  ) {
+    return { label: "Quick Win", tone: "quick" };
+  }
+  if (
+    /(schema|json[-\s]?ld|llms\.txt|markup|aggregaterating|faq.?page|localbusiness|crawler|robots\.txt)/.test(
+      text,
+    )
+  ) {
+    return { label: "High Impact", tone: "high" };
+  }
+  return { label: "High Impact", tone: "high" };
+}
+
+/**
+ * Render-time priority + estimated-impact inference for fix cards.
+ * Layered on top of the issue-severity helper so a fix inherits its
+ * tone, then maps that tone to a P0 / P1 / P2 priority and a short
+ * impact phrase.
+ */
+export function inferFixPriority(title: string, body: string): FixPriority {
+  const severity = inferIssueSeverity(title, body);
+  let priority: FixPriority["priority"];
+  let impactLabel: string;
+  switch (severity.tone) {
+    case "critical":
+      priority = "P0 — Do First";
+      impactLabel = "Highest priority";
+      break;
+    case "quick":
+      priority = "P0 — Do First";
+      impactLabel = "Quick win";
+      break;
+    case "high":
+      priority = "P1 — High Value";
+      impactLabel = "Strong gain";
+      break;
+    case "trust":
+      priority = "P1 — High Value";
+      impactLabel = "Trust boost";
+      break;
+  }
+  return { severity, priority, impactLabel };
+}
+
 export type LabeledField = { label: string; content: string };
 
 /**
