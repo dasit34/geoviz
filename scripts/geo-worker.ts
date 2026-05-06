@@ -462,63 +462,64 @@ explanation across two lines):
 - Brand / Entity Clarity: <n>/10 — <why>
 - Technical Accessibility: <n>/10 — <why>
 
-**Why this band:** 2–3 plain-English sentences naming the specific
-findings that pushed the score into this band — what's working,
-what's missing, what the customer outcome is. NO jargon. Tie at
-least one sentence to lost calls / missed jobs / customers picking
-competitors.
+**Score drivers:**
+3–5 single-line bullets naming the specific findings that drove
+the overall score. Mix POSITIVE drivers (what's earning points)
+and NEGATIVE drivers (what's holding the score back). Each
+bullet is one short line tied to actual evidence — no paragraphs,
+no jargon. Examples:
 
-**Score reasoning (internal — keep brief):**
-- *Biggest positive contributors:* 2–3 short bullets naming the
-  sub-checks that earned the most points (e.g. "Strong reviews
-  visible (+5 trust)", "Citation bots reachable (+10 crawler)").
-- *Biggest negative contributors:* 2–3 short bullets naming the
-  sub-checks that cost the most points (e.g. "No LocalBusiness
-  JSON-LD (–10 schema)", "Thin service pages (–4 content)").
+- Strong trust signals: 1,800+ reviews, BBB A+, licensed/insured
+- Missing machine-readable identity: no LocalBusiness JSON-LD
+- Weak AI navigation: no confirmed sitemap or llms.txt
+- Conflicting business age claims reduce trust
 
-This reasoning block is intentionally short and concrete — it's how
-the audit explains the scoring math to the customer (and to us
-during calibration) without listing every single sub-check.
+Detailed scoring math (per-rubric sub-checks, point breakdowns,
+synergy-bonus details) lives in section 6 (Technical Appendix),
+NOT here. The Score drivers bullets are a glance for the customer.
 
-## 2. Top 3 Issues
-Top 3 issues only. Numbered. For each, render the **EXACT** three
-labeled fields below — Problem / Impact / Fix — each on its own
-line. NO long paragraphs. NO additional fields. The renderer
-parses these labels into a clean grid.
+## 2. What's Holding You Back
+Top 3 issues only. Numbered. This section explains ONLY what's
+wrong and why it matters. Do NOT include detailed fix steps here
+— those live in section 3.
+
+For each issue, use **EXACTLY** the two labeled fields below, each
+on its own line. NO long paragraphs. NO additional fields.
 
 ### {N}. {Plain-English headline — one short line, no jargon}
 - **Problem** — one sentence on what's wrong, anyone can understand.
-- **Impact** — one sentence in lost jobs / missed calls / customers
-  picking a competitor instead.
-- **Fix** — one sentence preview of the corrective action (the
-  detailed fix lives in section 3).
+- **Why it hurts visibility** — one sentence on the visibility,
+  trust, or revenue cost (lost calls, customers picking a
+  competitor, weak AI citations).
 
-## 3. Top 3 Fixes
-Top 3 fixes only. Numbered. Render each as a tight implementation
-checklist — short, scannable, NO dense paragraphs. Use **EXACTLY**
-these six labeled fields per fix, in this order, each on its own
-line. The renderer parses these labels into a clean grid + chips;
-do not collapse fields, do not invent extra labels.
+## 3. What To Fix First
+Top 3 fixes only. Numbered. This section explains ONLY what to do.
+Do NOT repeat the problem narrative from section 2.
+
+For each fix, use **EXACTLY** the four labeled fields below, in
+this order, each on its own line. The renderer parses Difficulty
+and Foundation-Fix into chips; the body shows Fix + Expected
+impact as a clean two-row grid.
 
 ### {N}. {Fix name — one short, plain-English imperative line}
-- **Priority** — one of: Critical / High / Medium / Quick Win
 - **Difficulty** — one of: Easy / Moderate / Technical
 - **Can GeoViz Foundation Fix handle this?** — Yes or No (one
   word). Yes when the fix involves schema, llms.txt, robots.txt,
   metadata, FAQ structure, or service-page setup. No when it
   requires creative work the customer must own (writing reviews,
   earning a license, photographing projects).
-- **Problem** — one sentence on what's broken right now.
-- **Impact** — one sentence on what it costs the business in leads /
-  calls / customers won.
-- **Fix** — one or two sentences, max, on the concrete action — what
-  to install, what to write, what to update. Plain words.
+- **Fix** — one or two sentences, max, on the concrete action —
+  what to install, what to write, what to update. Plain words.
+- **Expected impact** — one short sentence on what visibly changes
+  when this fix lands.
 
 Voice rules for sections 2 and 3:
-- No repeated phrasing across items. Each Problem/Impact/Fix line
-  must point at a DIFFERENT specific finding.
-- Preserve factual audit findings. Do not invent claims about
-  traffic, rankings, or lead volume.
+- No repeated phrasing across items.
+- Each fix in section 3 must MAP to a different issue from
+  section 2 (1-to-1, in the same order). Don't invent new
+  problems in section 3 — focus on the action.
+- Preserve factual audit findings. No fabricated traffic,
+  rankings, or lead volume.
 - Every line passes the kitchen-table test.
 
 ## 4. Business Impact
@@ -895,63 +896,64 @@ explanation across two lines):
 - Brand / Entity Clarity: <n>/10 — <why>
 - Technical Accessibility: <n>/10 — <why>
 
-**Why this band:** 2–3 plain-English sentences naming the specific
-findings that pushed the score into this band — what's working,
-what's missing, what the customer outcome is. NO jargon. Tie at
-least one sentence to lost calls / missed jobs / customers picking
-competitors.
+**Score drivers:**
+3–5 single-line bullets naming the specific findings that drove
+the overall score. Mix POSITIVE drivers (what's earning points)
+and NEGATIVE drivers (what's holding the score back). Each
+bullet is one short line tied to actual evidence — no paragraphs,
+no jargon. Examples:
 
-**Score reasoning (internal — keep brief):**
-- *Biggest positive contributors:* 2–3 short bullets naming the
-  sub-checks that earned the most points (e.g. "Strong reviews
-  visible (+5 trust)", "Citation bots reachable (+10 crawler)").
-- *Biggest negative contributors:* 2–3 short bullets naming the
-  sub-checks that cost the most points (e.g. "No LocalBusiness
-  JSON-LD (–10 schema)", "Thin service pages (–4 content)").
+- Strong trust signals: 1,800+ reviews, BBB A+, licensed/insured
+- Missing machine-readable identity: no LocalBusiness JSON-LD
+- Weak AI navigation: no confirmed sitemap or llms.txt
+- Conflicting business age claims reduce trust
 
-This reasoning block is intentionally short and concrete — it's how
-the audit explains the scoring math to the customer (and to us
-during calibration) without listing every single sub-check.
+Detailed scoring math (per-rubric sub-checks, point breakdowns,
+synergy-bonus details) lives in section 6 (Technical Appendix),
+NOT here. The Score drivers bullets are a glance for the customer.
 
-## 2. Top 3 Issues
-Top 3 issues only. Numbered. For each, render the **EXACT** three
-labeled fields below — Problem / Impact / Fix — each on its own
-line. NO long paragraphs. NO additional fields. The renderer
-parses these labels into a clean grid.
+## 2. What's Holding You Back
+Top 3 issues only. Numbered. This section explains ONLY what's
+wrong and why it matters. Do NOT include detailed fix steps here
+— those live in section 3.
+
+For each issue, use **EXACTLY** the two labeled fields below, each
+on its own line. NO long paragraphs. NO additional fields.
 
 ### {N}. {Plain-English headline — one short line, no jargon}
 - **Problem** — one sentence on what's wrong, anyone can understand.
-- **Impact** — one sentence in lost jobs / missed calls / customers
-  picking a competitor instead.
-- **Fix** — one sentence preview of the corrective action (the
-  detailed fix lives in section 3).
+- **Why it hurts visibility** — one sentence on the visibility,
+  trust, or revenue cost (lost calls, customers picking a
+  competitor, weak AI citations).
 
-## 3. Top 3 Fixes
-Top 3 fixes only. Numbered. Render each as a tight implementation
-checklist — short, scannable, NO dense paragraphs. Use **EXACTLY**
-these six labeled fields per fix, in this order, each on its own
-line. The renderer parses these labels into a clean grid + chips;
-do not collapse fields, do not invent extra labels.
+## 3. What To Fix First
+Top 3 fixes only. Numbered. This section explains ONLY what to do.
+Do NOT repeat the problem narrative from section 2.
+
+For each fix, use **EXACTLY** the four labeled fields below, in
+this order, each on its own line. The renderer parses Difficulty
+and Foundation-Fix into chips; the body shows Fix + Expected
+impact as a clean two-row grid.
 
 ### {N}. {Fix name — one short, plain-English imperative line}
-- **Priority** — one of: Critical / High / Medium / Quick Win
 - **Difficulty** — one of: Easy / Moderate / Technical
 - **Can GeoViz Foundation Fix handle this?** — Yes or No (one
   word). Yes when the fix involves schema, llms.txt, robots.txt,
   metadata, FAQ structure, or service-page setup. No when it
   requires creative work the customer must own (writing reviews,
   earning a license, photographing projects).
-- **Problem** — one sentence on what's broken right now.
-- **Impact** — one sentence on what it costs the business in leads /
-  calls / customers won.
-- **Fix** — one or two sentences, max, on the concrete action — what
-  to install, what to write, what to update. Plain words.
+- **Fix** — one or two sentences, max, on the concrete action —
+  what to install, what to write, what to update. Plain words.
+- **Expected impact** — one short sentence on what visibly changes
+  when this fix lands.
 
 Voice rules for sections 2 and 3:
-- No repeated phrasing across items. Each Problem/Impact/Fix line
-  must point at a DIFFERENT specific finding.
-- Preserve factual audit findings. Do not invent claims about
-  traffic, rankings, or lead volume.
+- No repeated phrasing across items.
+- Each fix in section 3 must MAP to a different issue from
+  section 2 (1-to-1, in the same order). Don't invent new
+  problems in section 3 — focus on the action.
+- Preserve factual audit findings. No fabricated traffic,
+  rankings, or lead volume.
 - Every line passes the kitchen-table test.
 
 ## 4. Business Impact

@@ -205,15 +205,17 @@ export type ReportSections = {
 
 const SECTION_SLUGS: Array<{ slug: ReportSectionSlug; pattern: RegExp }> = [
   { slug: "score", pattern: /AI\s*Visibility\s*Score|^Score\b/i },
-  // Top 3 Issues (new) + Why Customers Don't See You (legacy)
+  // What's Holding You Back (current) + Top 3 Issues + Why Customers
+  // Don't See You (legacy patterns kept for old reports).
   {
     slug: "why",
-    pattern: /Top\s+3\s+Issues|Why\s+(?:Customers\s+Don|Your\s+Business\s+Is|You['’]re)/i,
+    pattern:
+      /What['’]s\s+Holding\s+You\s+Back|Top\s+3\s+Issues|Why\s+(?:Customers\s+Don|Your\s+Business\s+Is|You['’]re)/i,
   },
-  // Top 3 Fixes (new) + What To Fix First (legacy)
+  // What To Fix First (current) + Top 3 Fixes (legacy).
   {
     slug: "fix-first",
-    pattern: /Top\s+3\s+Fixes|What\s+to\s+Fix\s+First/i,
+    pattern: /What\s+to\s+Fix\s+First|Top\s+3\s+Fixes/i,
   },
   // Business Impact (new) + What Happens If You Fix This (legacy)
   {

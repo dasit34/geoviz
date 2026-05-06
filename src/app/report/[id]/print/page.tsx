@@ -176,6 +176,14 @@ export default async function PrintPage({
           />
         ) : null}
 
+        {/* Bridge note linking issues → fixes (1-to-1 mapping) */}
+        {whySection && fixSection && issueItems.length >= 2 && fixItems.length >= 2 ? (
+          <p className="report-bridge-note">
+            These fixes directly map to the issues above, but this
+            section focuses only on action.
+          </p>
+        ) : null}
+
         {/* What to fix first — checklist cards */}
         {fixSection ? (
           <ItemListSection

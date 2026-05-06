@@ -99,6 +99,13 @@ export function ReportViewerClient({
             />
           ) : null}
 
+          {whySection && fixSection && issueItems.length >= 2 && fixItems.length >= 2 ? (
+            <p className="report-bridge-note">
+              These fixes directly map to the issues above, but this
+              section focuses only on action.
+            </p>
+          ) : null}
+
           {fixSection ? (
             <ItemListSection
               heading={fixSection.heading}

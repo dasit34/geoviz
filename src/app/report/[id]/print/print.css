@@ -276,6 +276,17 @@
   font-style: italic;
 }
 
+/* Bridge note that sits between the Issues card and the Fixes card,
+   reminding the reader the fixes map 1-to-1 to the issues above. */
+.report-bridge-note {
+  margin: 22px 8px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  text-align: center;
+}
+
 /* Executive At-a-Glance preview — sits between the hero and the
    detailed score card. Shows the 3-issue + 3-fix headlines side-by-
    side so the customer sees the punchline before scrolling. */
