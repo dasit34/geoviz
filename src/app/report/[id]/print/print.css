@@ -376,6 +376,44 @@
   margin-bottom: 0;
 }
 
+/* Definition-list layout for labeled fields ("What's wrong" / "Why
+   it matters" / "What happens if fixed") inside an issue or fix
+   card. Reads as a clean grid instead of three stacked paragraphs. */
+.report-item-card-fields {
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.report-item-card-field {
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  gap: 14px;
+  align-items: baseline;
+}
+.report-item-card-field dt {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.55);
+}
+.report-item-card-field dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 60ch;
+}
+@media (max-width: 640px) {
+  .report-item-card-field {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 /* ---- markdown prose inside dark cards ---- */
 .report-prose {
   font-size: 14.5px;
@@ -476,16 +514,14 @@
   position: relative;
   border-radius: 16px;
   border: 1px solid rgba(255, 122, 24, 0.45);
-  background: linear-gradient(
-    180deg,
-    rgba(15, 17, 21, 1) 0%,
-    rgba(20, 13, 7, 1) 100%
-  );
+  background: #0d1018;
   color: #f4f5f7;
   overflow: hidden;
   page-break-inside: avoid;
-  box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.12),
-    0 30px 80px -25px rgba(255, 122, 24, 0.4);
+  /* Crisp 1px orange ring only — the heavy 80px orange box-shadow
+     read as a "blob" behind the bullets / CTA. Border + accent bar +
+     button are enough to mark this as a premium offer. */
+  box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.18);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -541,7 +577,6 @@
   color: #ffffff;
   font-size: 19px;
   border: 1px solid #ff7a18;
-  box-shadow: 0 0 0 4px rgba(255, 122, 24, 0.18);
 }
 .cta-card-badge-meta {
   padding: 9px 16px;
@@ -579,7 +614,6 @@
   letter-spacing: 0.01em;
   text-decoration: none !important;
   border: none;
-  box-shadow: 0 0 60px -10px rgba(255, 122, 24, 0.45);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }

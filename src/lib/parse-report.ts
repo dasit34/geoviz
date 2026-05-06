@@ -363,6 +363,30 @@ export function parseEnumeratedItems(body: string): EnumeratedItem[] {
   return [];
 }
 
+export type LabeledField = { label: string; content: string };
+
+/**
+ * Detects the model's "**Label** — content" / "**Label**: content"
+ * pattern that appears under each issue / fix sub-card and returns
+ * structured fields so the renderer can present a clean labeled
+ * grid instead of three stacked paragraphs.
+ *
+ * Only fires when at least 2 such lines are detected; otherwise
+ * returns [] and the caller falls back to plain markdown.
+ */
+export function parseLabeledFields(body: string): LabeledField[] {
+  const fieldRe =
+    /^\s*(?:[-*]\s+)?\*\*([^*\n]+?)\*\*\s*[—\-:]\s*(.+?)\s*$/gm;
+  const out: LabeledField[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = fieldRe.exec(body)) !== null) {
+    const label = m[1].trim();
+    const content = m[2].trim();
+    if (label && content) out.push({ label, content });
+  }
+  return out.length >= 2 ? out : [];
+}
+
 /**
  * Strip arithmetic/score-math from any rendered section body. The
  * ScoreCard already shows the breakdown visually; arithmetic

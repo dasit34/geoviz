@@ -5,6 +5,7 @@ import {
   bandLabelForOverall,
   cleanScoreSectionBody,
   parseEnumeratedItems,
+  parseLabeledFields,
   parseReportScoreBreakdown,
   parseReportSections,
   scoreToneFromOverall,
@@ -286,6 +287,7 @@ function ItemCard({
   index: number;
   kind: "issue" | "fix";
 }) {
+  const fields = parseLabeledFields(item.body);
   return (
     <li className={`report-item-card report-item-card-${kind}`}>
       <div className="report-item-card-head">
@@ -295,9 +297,20 @@ function ItemCard({
         <span className="report-item-card-index">#{index}</span>
         <h3 className="report-item-card-title">{item.title}</h3>
       </div>
-      <div className="report-prose report-item-card-body">
-        <ReactMarkdown>{stripScoreMath(item.body)}</ReactMarkdown>
-      </div>
+      {fields.length >= 2 ? (
+        <dl className="report-item-card-fields">
+          {fields.map((f, i) => (
+            <div className="report-item-card-field" key={`${f.label}-${i}`}>
+              <dt>{f.label}</dt>
+              <dd>{f.content}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <div className="report-prose report-item-card-body">
+          <ReactMarkdown>{stripScoreMath(item.body)}</ReactMarkdown>
+        </div>
+      )}
     </li>
   );
 }
