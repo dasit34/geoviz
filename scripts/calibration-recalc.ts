@@ -65,12 +65,17 @@ function projectCategoryV2(key: CategoryKey, old: number | null): number | null 
   let next = old;
   switch (key) {
     case "schema":
-      // Biggest corrective. Lift the 31–44 cluster off the floor.
-      if (old <= 4) next = 8;
-      else if (old <= 6) next = 10;
-      else if (old <= 10) next = 12;
-      else if (old <= 15) next = 15;
-      // 16+ already on the right rung — leave alone.
+      // v2.1 — explicit partial-credit rungs for small-biz sites.
+      // The "8–12 default rung for any working small-business site"
+      // means a typical no-schema-but-clean-HTML site lands at 10
+      // (not 5, not 8). The 13–17 band rewards multi-page structure
+      // even without JSON-LD. Schema only unlocks 18+.
+      if (old <= 3) next = 5;          // truly minimal — name only
+      else if (old <= 5) next = 10;    // basic — clean HTML identity
+      else if (old <= 8) next = 12;    // upper edge of mid-tier
+      else if (old <= 12) next = 15;   // strong human-readable structure
+      else if (old <= 17) next = 18;   // partial schema → machine-readable
+      // 18+ already on the right rung — leave alone.
       break;
     case "crawler":
       // v1 ceiling at 12 (no llms.txt) is exactly the v2 "12 rung".

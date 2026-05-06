@@ -217,23 +217,52 @@ Floors / ceilings remain only for fatal gaps: noindex on a
 customer-facing page, citation bots blocked, marketing-only
 homepage with no real content.
 
-  - Structured Data / Schema: 0–25
-    Ladder:
-      0  : page doesn't render OR no business info on the page at all
-      5  : minimal — bare business name visible, nothing else readable
-      10 : basic — name + phone + address clearly visible in HTML
-           (no JSON-LD required to earn this — clean HTML counts)
-      15 : decent — Organization or partial LocalBusiness JSON-LD
-           (some fields populated, but missing reviews / FAQ)
-      20 : strong — LocalBusiness or Service JSON-LD complete (name,
-           telephone, address, hours, areaServed) with EITHER
-           AggregateRating OR FAQPage schema
-      25 : elite — full LocalBusiness + AggregateRating + FAQPage +
-           sameAs links to GBP/BBB/Yelp/Facebook
-    Bonus: industry-specific subtype on LocalBusiness (Plumber,
-    Dentist, Roofer, HVACBusiness, AutoRepair, etc.) → +1.
-    Most local businesses without dev resources land 8–14 (clean
-    HTML, no markup). That's where they belong — not at 4.
+  - Structured Data / Schema (a.k.a. "Business Info AI Can Read"): 0–25
+    This category was over-suppressing every small-business site by
+    requiring schema markup to clear mid-tier. v2.1 rebalance: a
+    site that's clearly understandable to a human reader IS
+    understandable to AI — schema unlocks the upper bands but is NOT
+    required for mid-tier credit.
+
+    Ladder (use partial credit between rungs; do NOT clamp to 0):
+
+      0–3  : Broken, inaccessible, OR no clear business identity at
+             all (page won't render, completely empty, parked domain,
+             obvious spam).
+      4–7  : Minimal — only a business name is visible, no clear
+             services / no contact / no location info anywhere on
+             the page.
+      8–12 : **Default rung for any working small-business site.**
+             The page makes the business reasonably clear to a
+             reader: business name AND at least one of {what they
+             do (clear service name) / phone / city or service
+             area / address}. Clean HTML is enough — JSON-LD NOT
+             required to earn this band. Most local operators
+             without dev resources should land HERE, not at 4.
+      13–17: Strong human-readable structure. The page has a clear
+             service/location hierarchy: multiple service pages OR
+             named service-area pages, crawlable nav between them,
+             consistent brand name across pages, an /about or
+             /contact page reachable from the homepage. Still no
+             JSON-LD required.
+      18–22: Machine-readable structure. Either JSON-LD schema is
+             present (Organization, LocalBusiness, Service, even if
+             partial), OR the HTML uses strong semantic layout
+             (HTML5 <address>, <article>, ContactPoint markup,
+             rich Open Graph, well-structured headings naming the
+             entity). One side or the other clears 18.
+      23–25: Elite — full LocalBusiness or Service JSON-LD
+             (industry subtype like Plumber/Dentist/Roofer/
+             HVACBusiness preferred) WITH AggregateRating + FAQPage
+             schema AND sameAs links to GBP/BBB/Yelp/Facebook. This
+             is genuinely rare and stays hard to earn.
+
+    Reward partial credit for each of: clear business name, visible
+    services, visible phone/contact, clear city or service area,
+    crawlable navigation, service/location page structure, consistent
+    brand/entity naming. Each adds confidence — accumulating five or
+    six of those signals on a clean HTML site is exactly what 8–12
+    is for.
 
   - AI Crawler Readiness: 0–20
     Ladder:
@@ -545,23 +574,52 @@ Floors / ceilings remain only for fatal gaps: noindex on a
 customer-facing page, citation bots blocked, marketing-only
 homepage with no real content.
 
-  - Structured Data / Schema: 0–25
-    Ladder:
-      0  : page doesn't render OR no business info on the page at all
-      5  : minimal — bare business name visible, nothing else readable
-      10 : basic — name + phone + address clearly visible in HTML
-           (no JSON-LD required to earn this — clean HTML counts)
-      15 : decent — Organization or partial LocalBusiness JSON-LD
-           (some fields populated, but missing reviews / FAQ)
-      20 : strong — LocalBusiness or Service JSON-LD complete (name,
-           telephone, address, hours, areaServed) with EITHER
-           AggregateRating OR FAQPage schema
-      25 : elite — full LocalBusiness + AggregateRating + FAQPage +
-           sameAs links to GBP/BBB/Yelp/Facebook
-    Bonus: industry-specific subtype on LocalBusiness (Plumber,
-    Dentist, Roofer, HVACBusiness, AutoRepair, etc.) → +1.
-    Most local businesses without dev resources land 8–14 (clean
-    HTML, no markup). That's where they belong — not at 4.
+  - Structured Data / Schema (a.k.a. "Business Info AI Can Read"): 0–25
+    This category was over-suppressing every small-business site by
+    requiring schema markup to clear mid-tier. v2.1 rebalance: a
+    site that's clearly understandable to a human reader IS
+    understandable to AI — schema unlocks the upper bands but is NOT
+    required for mid-tier credit.
+
+    Ladder (use partial credit between rungs; do NOT clamp to 0):
+
+      0–3  : Broken, inaccessible, OR no clear business identity at
+             all (page won't render, completely empty, parked domain,
+             obvious spam).
+      4–7  : Minimal — only a business name is visible, no clear
+             services / no contact / no location info anywhere on
+             the page.
+      8–12 : **Default rung for any working small-business site.**
+             The page makes the business reasonably clear to a
+             reader: business name AND at least one of {what they
+             do (clear service name) / phone / city or service
+             area / address}. Clean HTML is enough — JSON-LD NOT
+             required to earn this band. Most local operators
+             without dev resources should land HERE, not at 4.
+      13–17: Strong human-readable structure. The page has a clear
+             service/location hierarchy: multiple service pages OR
+             named service-area pages, crawlable nav between them,
+             consistent brand name across pages, an /about or
+             /contact page reachable from the homepage. Still no
+             JSON-LD required.
+      18–22: Machine-readable structure. Either JSON-LD schema is
+             present (Organization, LocalBusiness, Service, even if
+             partial), OR the HTML uses strong semantic layout
+             (HTML5 <address>, <article>, ContactPoint markup,
+             rich Open Graph, well-structured headings naming the
+             entity). One side or the other clears 18.
+      23–25: Elite — full LocalBusiness or Service JSON-LD
+             (industry subtype like Plumber/Dentist/Roofer/
+             HVACBusiness preferred) WITH AggregateRating + FAQPage
+             schema AND sameAs links to GBP/BBB/Yelp/Facebook. This
+             is genuinely rare and stays hard to earn.
+
+    Reward partial credit for each of: clear business name, visible
+    services, visible phone/contact, clear city or service area,
+    crawlable navigation, service/location page structure, consistent
+    brand/entity naming. Each adds confidence — accumulating five or
+    six of those signals on a clean HTML site is exactly what 8–12
+    is for.
 
   - AI Crawler Readiness: 0–20
     Ladder:
