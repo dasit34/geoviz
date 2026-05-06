@@ -118,8 +118,9 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   background: rgba(10, 13, 22, 0.72);
-  padding: 26px 28px 28px;
+  padding: 30px 32px 32px;
   page-break-inside: avoid;
+  break-inside: avoid;
   box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(6px);
@@ -273,14 +274,15 @@
 
 /* ---- section cards ---- */
 .report-section-card {
-  margin-top: 32px;
-  padding: 28px 28px 30px;
+  margin-top: 44px;
+  padding: 30px 30px 32px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(10, 13, 22, 0.65);
   box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   page-break-inside: avoid;
+  break-inside: avoid;
 }
 .report-section-card-header {
   display: flex;
@@ -310,11 +312,12 @@
 }
 .report-item-card {
   position: relative;
-  padding: 18px 20px 20px;
+  padding: 20px 22px 22px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(255, 255, 255, 0.025);
   page-break-inside: avoid;
+  break-inside: avoid;
 }
 .report-item-card-issue {
   border-left: 3px solid rgba(255, 122, 24, 0.7);
@@ -610,12 +613,14 @@
 /* ---- CTA card (dark by default — matches landing page) ---- */
 .cta-card {
   position: relative;
+  margin: 56px 0 8px;
   border-radius: 16px;
   border: 1px solid rgba(255, 122, 24, 0.45);
   background: #0d1018;
   color: #f4f5f7;
   overflow: hidden;
   page-break-inside: avoid;
+  break-inside: avoid;
   /* Crisp 1px orange ring only — the heavy 80px orange box-shadow
      read as a "blob" behind the bullets / CTA. Border + accent bar +
      button are enough to mark this as a premium offer. */
@@ -726,10 +731,13 @@
 
 /* ---- technical details (collapsed appendix) ---- */
 .report-tech-details {
+  margin-top: 32px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   background: rgba(10, 13, 22, 0.55);
-  padding: 18px 22px;
+  padding: 20px 24px;
+  page-break-inside: avoid;
+  break-inside: avoid;
 }
 .report-tech-details summary {
   cursor: pointer;
@@ -800,7 +808,7 @@
     font-size: 56px;
   }
   .report-section-card {
-    padding: 22px 20px 24px;
+    padding: 24px 20px 26px;
   }
   .score-card,
   .cta-card-body {
@@ -826,8 +834,22 @@
   .report-footer-meta {
     text-align: left;
   }
+  .report-item-card {
+    padding: 18px 18px 20px;
+  }
   .report-item-card-head {
     gap: 8px;
+  }
+  /* Severity / priority / difficulty / foundation-fix badges
+     wrap and shrink slightly so the row doesn't overflow on
+     narrow viewports. */
+  .report-item-card-badges {
+    gap: 5px;
+  }
+  .severity-badge {
+    font-size: 9.5px;
+    padding: 2px 8px;
+    letter-spacing: 0.1em;
   }
 }
 
@@ -874,5 +896,32 @@
   }
   .report-tech-details > *:not(summary) {
     display: block !important;
+  }
+  /* Tech Details starts on a fresh page in PDF so it doesn't crowd
+     against the CTA, and the appendix label is never orphaned at
+     the bottom of the previous page. */
+  .report-tech-details {
+    page-break-before: always;
+    break-before: page;
+  }
+  /* CTA always travels with at least its accent bar + headline —
+     never split between pages. */
+  .cta-card,
+  .cta-card-body {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  /* Issue + fix sub-cards: harden again with !important so a
+     long body never splits the card across pages. */
+  .report-item-card,
+  .report-section-card,
+  .score-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  /* Don't let the section heading orphan from its first card. */
+  .report-section-card-header {
+    page-break-after: avoid;
+    break-after: avoid;
   }
 }
