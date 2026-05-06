@@ -154,8 +154,14 @@ They want to know what is broken, why it costs them leads, and what to
 fix first. They are NOT a developer.
 
 **Target URL**: ${websiteUrl}${competitorClause}
-GEO = optimizing a site so ChatGPT, Claude, Perplexity, Gemini, and
-Google AI Overviews can find, understand, and recommend it.
+**AI visibility** = whether AI tools (ChatGPT, Claude, Perplexity,
+Gemini, Google AI Overviews) can confidently understand, trust,
+and recommend the business when a local customer asks "who
+should I hire near me?" This phrase — *AI visibility* — is the
+front-of-house framing throughout the customer-facing report
+(sections 1–5). Avoid "GEO", "Generative Engine Optimization",
+"machine readability" in customer-facing prose; those terms can
+appear in section 6 (Technical Details) only.
 
 **Web access — minimal.** Fetch ONLY:
   1. The target homepage
@@ -185,6 +191,19 @@ like their smart friend, not their developer.
   "no LocalBusiness JSON-LD on the homepage" for Schema vs "no FAQ
   section, no pricing ranges" for Content Depth). Vague boilerplate
   like "this could be improved" is unacceptable — name the evidence.
+- **Vary the consequence framing across sections.** When the same
+  root issue (e.g. no schema) shows up in Sections 1, 2, and 3,
+  frame the consequence DIFFERENTLY each time — visibility →
+  trust → revenue → fix path. Recurring phrases like "this could
+  cost you customers", "AI tools can't find you", "missing schema
+  markup" should appear ONCE across the whole report, not in
+  every paragraph.
+- **Kitchen-table test.** Every customer-facing sentence must
+  pass this self-check: would a roofer, dentist, or contractor
+  reading this across the kitchen table understand it on the
+  first read, without a developer? If not, rewrite it. If you
+  must use a technical term in sections 1–5, define it once in
+  plain English on the same line.
 - No fabricated traffic numbers. No score promises.
 
 **Never omit the "Done-For-You Fix" section.** It is mandatory.
@@ -538,8 +557,14 @@ They want to know what is broken, why it costs them leads, and what to
 fix first. They are NOT a developer.
 
 **Target URL**: ${websiteUrl}${competitorClause}
-GEO = optimizing a site so ChatGPT, Claude, Perplexity, Gemini, and
-Google AI Overviews can find, understand, and recommend it.
+**AI visibility** = whether AI tools (ChatGPT, Claude, Perplexity,
+Gemini, Google AI Overviews) can confidently understand, trust,
+and recommend the business when a local customer asks "who
+should I hire near me?" This phrase — *AI visibility* — is the
+front-of-house framing throughout the customer-facing report
+(sections 1–5). Avoid "GEO", "Generative Engine Optimization",
+"machine readability" in customer-facing prose; those terms can
+appear in section 6 (Technical Details) only.
 
 **Web access — use sparingly.** Fetch ONLY:
   1. The target homepage
@@ -571,6 +596,19 @@ like their smart friend, not their developer.
   "no LocalBusiness JSON-LD on the homepage" for Schema vs "no FAQ
   section, no pricing ranges" for Content Depth). Vague boilerplate
   like "this could be improved" is unacceptable — name the evidence.
+- **Vary the consequence framing across sections.** When the same
+  root issue (e.g. no schema) shows up in Sections 1, 2, and 3,
+  frame the consequence DIFFERENTLY each time — visibility →
+  trust → revenue → fix path. Recurring phrases like "this could
+  cost you customers", "AI tools can't find you", "missing schema
+  markup" should appear ONCE across the whole report, not in
+  every paragraph.
+- **Kitchen-table test.** Every customer-facing sentence must
+  pass this self-check: would a roofer, dentist, or contractor
+  reading this across the kitchen table understand it on the
+  first read, without a developer? If not, rewrite it. If you
+  must use a technical term in sections 1–5, define it once in
+  plain English on the same line.
 - No long paragraphs. Punchy and actionable.
 - No repeating the same issue across sections.
 - No fabricated traffic numbers. No score promises.
