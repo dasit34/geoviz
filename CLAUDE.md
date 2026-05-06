@@ -156,6 +156,69 @@ This MVP exists for one goal:
 
 Everything else is secondary.
 
+## Scoring Freeze (v1 — DO NOT silently change)
+
+**The GEO scoring rubric is frozen for v1.** As of `2c0d762`
+(Calibration v2.2), the rubric has been calibrated through three
+iterations against real audit data and the score distribution is
+believable: weak sites land below 40, average sites 40–60, strong
+sites 65–80, elite sites occasionally 80+. Don't quietly tune any
+of it.
+
+**Frozen surfaces — never modify without an explicit instruction:**
+- The six category weights (Schema 25, Crawler 20, Trust 20,
+  Content 15, Brand 10, Tech 10).
+- The five score bands (Invisible / At Risk / Needs Work /
+  Competitive / AI-Ready) and their thresholds (0–25 / 26–45 /
+  46–65 / 66–80 / 81–100).
+- The ladder anchors per category in `scripts/geo-worker.ts`
+  (the `Calibration v2 — explicit ladder anchors` block in both
+  fast and full prompts).
+- The Structural Synergy Bonus rule in the Schema category
+  (gated on Content ≥ 12, Brand ≥ 8, Tech ≥ 7, Crawler ≥ 15
+  AND at least one machine-readable signal).
+- The score-bands mandate, calibration targets, and per-category
+  "why this score" reasoning requirement in section 1 of the
+  audit output.
+- The worker queue / atomic claim / poll loop in
+  `scripts/geo-worker.ts`.
+- The score parsers in `src/lib/parse-report.ts`
+  (`parseReportScoreBreakdown`, `bandLabelForOverall`,
+  `scoreToneFromOverall`).
+- The calibration projector math in
+  `scripts/calibration-recalc.ts`.
+
+**Where to put energy instead.** Future improvements should focus on:
+- Report clarity (severity badges, fix-priority labels, scannable
+  cards, CTA polish).
+- Remediation quality (the prose under "What To Fix First" — make
+  it more concrete and actionable, but don't change what triggers
+  a fix).
+- PDF polish (typography, layout, page breaks — the visual
+  surface, not the underlying scoring).
+- Customer delivery (email subject / body, attachment handling,
+  redirect flow).
+- Sales flow (landing page, order form, checkout success, the
+  $497 Foundation Fix CTA).
+
+**If a scoring change is genuinely needed:**
+1. **Isolate it.** One category, one rule, or one bonus — never a
+   simultaneous multi-category rebalance.
+2. **Name it.** Use a versioned label: `Calibration v2.3`,
+   `v3.0`, etc. Document what changed in the commit message.
+3. **Validate it.** Run `npx tsx scripts/calibration-recalc.ts
+   --archetypes` first to project the change against the
+   7-archetype set, then queue a small probe batch
+   (1 weak + 1 average + 1 strong site) at `/admin/calibration`
+   to confirm the projected shift is real before re-running the
+   full dataset.
+4. **Preserve credibility.** Weak sites must stay below 40, and
+   AI-Ready must remain rare. Never apply flat boosts to all
+   categories; never widen the band by inflating the floor.
+
+The shortest version: **scoring is done for v1**. Don't touch
+unless explicitly asked, and even then, isolate / name / validate.
+
 ## GEO Audit Engine (geo-seo-claude)
 
 Audit fulfillment uses the `geo-seo-claude` Claude Code skill installed at `~/.claude/skills/geo/`. There is **no standalone Python CLI** — the audit is orchestrated by the `geo-audit` skill via WebFetch + sub-agents. We always invoke it through the wrapper script, never inline.
