@@ -21,7 +21,7 @@ const CHECKS = [
   },
   {
     title: "Schema markup",
-    body: "Structured data that lets AI tools confidently identify what you do.",
+    body: "Structured data that lets AI confidently identify what you do.",
   },
   {
     title: "LocalBusiness data",
@@ -45,8 +45,79 @@ const CHECKS = [
   },
   {
     title: "AI citability",
-    body: "How likely AI tools are to recommend you when a customer asks for help.",
+    body: "How likely AI is to name you when a customer asks for help.",
   },
+];
+
+const AUDIENCES = [
+  {
+    title: "Home services",
+    examples: "Roofing · HVAC · Plumbing · Electricians · Contractors",
+    body: "Customers ask AI for a contractor before they call anyone. If your site doesn't surface a clear service area, license, and warranty, the closest competitor with cleaner signals gets the call.",
+  },
+  {
+    title: "Health & wellness",
+    examples: "Dentists · Med spas · Clinics · Chiropractors",
+    body: "AI is conservative with health recommendations — it leans on whichever local practice publishes the most consistent identity and service information. Practices with weak entity signals get filtered out before review counts even matter.",
+  },
+  {
+    title: "Professional services",
+    examples: "Law firms · Accountants · Consultants · Real-estate agents",
+    body: "AI prefers to cite sources where the practitioner, the firm, and the practice areas line up cleanly. Inconsistent naming or thin practice-area pages cause AI to hand the inquiry to a more legible competitor.",
+  },
+  {
+    title: "Multi-location operators",
+    examples: "Regional chains · Franchise locations · Agencies running local accounts",
+    body: "Each location must read as its own credible entity to AI — not a copy-pasted footer. Without per-city pages and structured location data, AI collapses your locations into one and your service-area coverage disappears.",
+  },
+];
+
+const AI_DIMENSIONS = [
+  {
+    eyebrow: "01",
+    title: "Crawlability",
+    body: "Citation bots — OAI-SearchBot, ClaudeBot, PerplexityBot, Bingbot, Google-Extended — must be able to reach your pages. Many sites accidentally block them in robots.txt.",
+  },
+  {
+    eyebrow: "02",
+    title: "Structured data",
+    body: "JSON-LD schema (LocalBusiness, Service, Review, FAQPage) is how AI confirms what you do, where, and for whom — without having to guess from marketing copy.",
+  },
+  {
+    eyebrow: "03",
+    title: "Entity consistency",
+    body: "Your business name, phone, and address must match exactly across the homepage, footer, schema, and Open Graph tags. Mismatches make AI uncertain you're the same business.",
+  },
+  {
+    eyebrow: "04",
+    title: "Service ↔ location relationships",
+    body: "AI extracts what services you offer and where you offer them. Sites that bundle every service onto one page lose to operators with separate, location-specific service pages.",
+  },
+  {
+    eyebrow: "05",
+    title: "Citation trust",
+    body: "Visible reviews, license numbers, warranty terms, and named third-party sources (BBB, Google Business Profile, Yelp) are what AI references when deciding whom to cite.",
+  },
+  {
+    eyebrow: "06",
+    title: "FAQ extraction format",
+    body: "Question-and-answer blocks marked up with FAQPage schema are pulled directly into AI answers. Plain marketing copy is summarised; FAQ blocks get quoted.",
+  },
+  {
+    eyebrow: "07",
+    title: "Machine-readable hierarchy",
+    body: "Clear `<h1>` per page, ordered headings, semantic HTML5 elements (`<address>`, `<article>`, ContactPoint), and an XML sitemap together tell AI how your content fits together.",
+  },
+];
+
+const FOUNDATION_FIX_DELIVERABLES = [
+  "LocalBusiness or Service JSON-LD installed with full NAP, hours, areaServed, and industry subtype",
+  "AggregateRating + FAQPage schema added so AI can extract reviews and answers directly",
+  "robots.txt rewritten to allow OAI-SearchBot, ClaudeBot, PerplexityBot, Bingbot, and Google-Extended",
+  "Site-root /llms.txt published with clear site description and links to your key pages",
+  "XML sitemap referenced from robots.txt, every service and location page included",
+  "Title tags + meta descriptions rewritten to name service and location explicitly",
+  "Re-audit and final visibility score delivered after implementation",
 ];
 
 export default function Page() {
@@ -61,19 +132,21 @@ export default function Page() {
         <div className="container-page grid gap-10 py-20 md:grid-cols-[1.15fr_1fr] md:py-28 md:gap-16">
           <div>
             <span className="pill animate-pulseSoft">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> AI
-              Visibility Audit
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> AI search
+              audit for local businesses
             </span>
             <h1 className="h1 mt-5">
-              Can{" "}
+              When customers ask{" "}
               <span className="bg-gradient-to-r from-accent to-accent-glow bg-clip-text text-transparent">
                 ChatGPT
               </span>{" "}
-              find your business — or is it recommending your competitors?
+              who to hire — does your business get named?
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/70">
-              We audit how ChatGPT, Claude, Perplexity, and Gemini see your
-              business — and show exactly how to fix it.
+              AI search is the new front door for local hiring. If
+              ChatGPT, Claude, Perplexity, and Gemini can&rsquo;t read your
+              site clearly, they recommend the competitor who is easier
+              to read. We show you why — and exactly what to fix.
             </p>
 
             <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -118,61 +191,86 @@ export default function Page() {
         </div>
       </section>
 
-      {/* WHAT YOU'LL SEE — directly under hero */}
-      <section className="border-t border-white/5 bg-ink-950">
-        <div className="container-page py-16">
-          <div className="grid gap-10 md:grid-cols-[1fr_auto] md:items-center">
-            <div>
-              <p className="section-eyebrow">What you’ll see in your audit</p>
-              <h2 className="h2 mt-3">Your real numbers, your real fixes.</h2>
-              <ul className="mt-6 space-y-3 text-base text-white/85">
-                <li className="flex items-start gap-3">
-                  <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-accent" />
-                  <span>Visibility Score: 38/100</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span aria-hidden className="text-base">❌</span>
-                  <span>Not recommended by ChatGPT for key local searches</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span aria-hidden className="text-base">⚠️</span>
-                  <span>Weak presence in sources AI platforms rely on</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span aria-hidden className="text-base">✅</span>
-                  <span>Clear fix plan to improve AI visibility</span>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <Link href="/sample-report" className="btn-ghost">
-                See Full Sample Report →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PROBLEM */}
+      {/* PROBLEM — real business pain */}
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-20">
           <p className="section-eyebrow">The shift</p>
           <h2 className="h2 mt-3 max-w-3xl">
-            Customers are starting their search inside AI — not Google.
+            Customers are choosing who to call before they ever open Google.
           </h2>
+          <p className="muted mt-5 max-w-2xl text-base leading-relaxed">
+            If AI recommends your competitor, you lose the customer
+            before your phone rings, your form fills, or your booking page
+            loads. Most local businesses are invisible inside AI answers
+            — even ones ranking on Google.
+          </p>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             <ProblemCard
               title="AI is the new front door"
-              body="Buyers are asking ChatGPT, Claude, and Gemini for recommendations before they ever open a search engine."
+              body="Buyers are asking ChatGPT, Claude, and Gemini who to hire — long before any traditional search happens."
             />
             <ProblemCard
               title="Most sites are invisible"
-              body="If AI tools can’t crawl, parse, or trust your site, they will not surface you when a customer asks who to hire."
+              body="If AI can&rsquo;t crawl, parse, or trust your site, it will not name you when a local customer asks for a recommendation."
             />
             <ProblemCard
-              title="Lost opportunities"
-              body="Every AI conversation that recommends a competitor instead of you is a job, case, or appointment that never reaches you."
+              title="Lost calls compound"
+              body="Every conversation that ends with the wrong recommendation is a job, a case, or an appointment you never knew you had a chance at."
             />
+          </div>
+        </div>
+      </section>
+
+      {/* WHO THIS IS FOR */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-20">
+          <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <p className="section-eyebrow">Built for</p>
+              <h2 className="h2 mt-3 max-w-2xl">
+                Local operators where one missed lead pays for the audit ten times over.
+              </h2>
+            </div>
+            <p className="muted max-w-md">
+              Businesses where every inbound call is qualified, the
+              services are specific, and the win-rate per lead is high.
+              These businesses have the most to gain — and the most to
+              lose — when AI picks who gets named.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            {AUDIENCES.map((a) => (
+              <AudienceCard key={a.title} {...a} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* WHAT AI ACTUALLY LOOKS AT — authority section */}
+      <section
+        id="how-ai-reads"
+        className="relative border-t border-white/5 bg-ink-950"
+      >
+        <div className="absolute inset-0 -z-10 bg-radial-orange opacity-30" />
+        <div className="container-page py-20">
+          <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <p className="section-eyebrow">How AI actually reads your site</p>
+              <h2 className="h2 mt-3 max-w-2xl">
+                Seven dimensions decide whether AI cites you or skips you.
+              </h2>
+            </div>
+            <p className="muted max-w-md">
+              Generative search engines don&rsquo;t read marketing copy
+              the way a human does. They parse structure first, then
+              extract claims they can confirm, then cite sources they
+              can trust.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {AI_DIMENSIONS.map((d) => (
+              <DimensionCard key={d.title} {...d} />
+            ))}
           </div>
         </div>
       </section>
@@ -180,24 +278,65 @@ export default function Page() {
       {/* WHAT WE CHECK */}
       <section
         id="what-we-check"
-        className="relative border-t border-white/5 bg-ink-950"
+        className="border-t border-white/5 bg-ink-950"
       >
-        <div className="absolute inset-0 -z-10 bg-radial-orange opacity-40" />
         <div className="container-page py-20">
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
             <div>
               <p className="section-eyebrow">What we check</p>
-              <h2 className="h2 mt-3">10 signals that decide AI visibility.</h2>
+              <h2 className="h2 mt-3">10 signals that decide AI citations.</h2>
             </div>
             <p className="muted max-w-md">
-              Each audit is a deep technical and content review focused on the
-              exact signals AI tools use to recommend a business.
+              Each audit is a deep technical and content review focused
+              on the exact signals generative engines use to decide who
+              gets recommended.
             </p>
           </div>
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {CHECKS.map((c, i) => (
               <CheckCard key={c.title} index={i + 1} {...c} />
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CASE STUDY — before/after framework */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-20">
+          <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <p className="section-eyebrow">Reference engagement</p>
+              <h2 className="h2 mt-3 max-w-2xl">
+                What a Foundation Fix typically delivers.
+              </h2>
+            </div>
+            <p className="muted max-w-md text-sm">
+              Illustrative — based on the scoring rubric. We don&rsquo;t
+              publish named customer cases without explicit consent.
+            </p>
+          </div>
+
+          <div className="mt-12 rounded-2xl border border-white/10 bg-ink-900/60 p-6 md:p-10 shadow-card">
+            <div className="grid gap-10 lg:grid-cols-[auto_1fr] lg:items-start">
+              <BeforeAfterScores />
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-accent">
+                  What changed
+                </p>
+                <ul className="mt-4 space-y-3 text-sm text-white/80">
+                  <CaseChange before="No JSON-LD on any page" after="Full LocalBusiness + Service schema with industry subtype" />
+                  <CaseChange before="No FAQ section" after="FAQPage schema published with 8 customer questions" />
+                  <CaseChange before="OAI-SearchBot blocked in robots.txt" after="All five citation bots reachable, sitemap referenced" />
+                  <CaseChange before="No /llms.txt" after="Structured llms.txt published linking to every service page" />
+                  <CaseChange before="Service-area buried at the bottom of the homepage" after="Named service-area cities + per-city landing pages" />
+                </ul>
+                <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                  <BeforeAfterStat label="Schema /25" before={3} after={20} />
+                  <BeforeAfterStat label="Crawler /20" before={9} after={18} />
+                  <BeforeAfterStat label="Content /15" before={5} after={13} />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -209,15 +348,15 @@ export default function Page() {
             <div>
               <p className="section-eyebrow">Sample report</p>
               <h2 className="h2 mt-3">
-                A clear score, a clear plan, plain English.
+                A real score, a real plan, plain English.
               </h2>
               <p className="muted mt-4 max-w-md">
-                You get an AI Visibility Score from 0 to 100, the issues that
-                are pulling you down, and the highest-impact fixes — written so
-                a non-technical owner can act on them.
+                You get a Visibility Score from 0 to 100, the issues
+                pulling it down, and the highest-impact fixes — written
+                so a non-technical owner can act on them today.
               </p>
               <ul className="mt-6 space-y-3 text-sm text-white/75">
-                <SampleBullet>AI Visibility Score · 0–100</SampleBullet>
+                <SampleBullet>Visibility Score · 0–100</SampleBullet>
                 <SampleBullet>
                   Plain-English breakdown of every issue
                 </SampleBullet>
@@ -237,7 +376,7 @@ export default function Page() {
           </div>
 
           <div className="mt-12 grid gap-4 sm:grid-cols-4">
-            <SampleStat label="AI Visibility Score" value="42 / 100" tone="warn" />
+            <SampleStat label="Visibility Score" value="42 / 100" tone="warn" />
             <SampleStat label="Status" value="At Risk" tone="warn" />
             <SampleStat label="Issues found" value="11" />
             <SampleStat label="Top priority fixes" value="4" tone="ok" />
@@ -256,8 +395,8 @@ export default function Page() {
             <p className="section-eyebrow">Pricing</p>
             <h2 className="h2 mt-3">One audit. One price. No subscription.</h2>
             <p className="muted mt-4">
-              You get the full picture of how AI tools see your business — and
-              exactly what to fix first.
+              The full picture of how generative search engines see your
+              business — and exactly what to fix first.
             </p>
           </div>
 
@@ -276,10 +415,10 @@ export default function Page() {
                 Normally $147 — currently $97 for early customers
               </p>
               <ul className="mt-6 space-y-3 text-sm text-white/80">
-                <PricingBullet>Full AI visibility audit</PricingBullet>
-                <PricingBullet>AI Visibility Score (0–100)</PricingBullet>
-                <PricingBullet>Breakdown of every issue</PricingBullet>
-                <PricingBullet>Recommended fixes, ranked</PricingBullet>
+                <PricingBullet>Full audit across 6 scoring categories</PricingBullet>
+                <PricingBullet>Visibility Score (0–100) with band</PricingBullet>
+                <PricingBullet>Top 3 issues with severity + impact</PricingBullet>
+                <PricingBullet>Top 3 fixes with priority + difficulty</PricingBullet>
                 <PricingBullet>Professional PDF report</PricingBullet>
               </ul>
               <Link
@@ -292,86 +431,88 @@ export default function Page() {
                 We run a limited number of audits per day to keep results accurate.
               </p>
               <p className="mt-2 text-center text-xs text-white/40">
-                Delivered by email within 24 hours. Each report is generated
-                using AI-assisted analysis across ChatGPT, Claude, Perplexity,
-                and Gemini, then reviewed for clarity before delivery.
+                Delivered by email within 24 hours. Each report is
+                generated using AI-assisted analysis across ChatGPT,
+                Claude, Perplexity, and Gemini, then reviewed for
+                clarity before delivery.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* TRUST */}
-      <section className="border-t border-white/5 bg-ink-950">
-        <div className="container-page py-16">
-          <p className="section-eyebrow">Trust</p>
-          <h2 className="h2 mt-3">Built for businesses adapting to AI search.</h2>
-          <ul className="mt-8 grid gap-4 sm:grid-cols-2">
-            <li className="rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/80">
-              Platforms checked: ChatGPT, Claude, Perplexity, Gemini
-            </li>
-            <li className="rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/80">
-              Designed for local businesses and service providers
-            </li>
-            <li className="rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/80">
-              Each audit is reviewed for clarity before delivery
-            </li>
-            <li className="rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/80">
-              Early customers and case studies will be added here
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      {/* UPSELL TEASER */}
+      {/* FOUNDATION FIX — premium service block */}
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-20">
-          <div className="card relative overflow-hidden md:p-10">
-            <div className="absolute -left-20 -top-20 h-56 w-56 rounded-full bg-accent-blue/20 blur-3xl" />
-            <div className="grid gap-8 md:grid-cols-[1.4fr_1fr] md:items-center">
+          <div className="rounded-2xl border border-accent/30 bg-ink-900/70 p-8 md:p-12 shadow-card">
+            <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
               <div>
-                <p className="section-eyebrow text-accent-blue">After the audit</p>
-                <h2 className="h2 mt-3">GEO Foundation Fix — $497</h2>
-                <ul className="mt-6 space-y-3 text-sm text-white/80">
-                  <PricingBullet>Fix the issues found in your audit</PricingBullet>
-                  <PricingBullet>
-                    Improve AI visibility across ChatGPT and other platforms
-                  </PricingBullet>
-                  <PricingBullet>
-                    Optimize structured data and business signals
-                  </PricingBullet>
-                  <PricingBullet>Re-check your visibility after fixes</PricingBullet>
-                </ul>
-                <p className="muted mt-5 text-sm">
-                  More complex cases are quoted upfront.
+                <p className="section-eyebrow">Done-for-you service</p>
+                <h2 className="h2 mt-3">
+                  GEO Foundation Fix — the AI visibility infrastructure repair.
+                </h2>
+                <p className="muted mt-5 max-w-xl text-base leading-relaxed">
+                  After your audit, the fixes are concrete:
+                  schema, crawl directives, FAQ structure, page-level
+                  signals. We do the implementation. You stay focused
+                  on the business.
                 </p>
+
+                <p className="mt-8 text-xs uppercase tracking-[0.2em] text-accent">
+                  Deliverables
+                </p>
+                <ul className="mt-4 space-y-3 text-sm text-white/85">
+                  {FOUNDATION_FIX_DELIVERABLES.map((d) => (
+                    <PricingBullet key={d}>{d}</PricingBullet>
+                  ))}
+                </ul>
+
+                <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                  <FixMetaCard
+                    label="Timeline"
+                    value="3–5 business days"
+                    hint="From audit handoff to verified live"
+                  />
+                  <FixMetaCard
+                    label="Re-check"
+                    value="Included"
+                    hint="Final score delivered after implementation"
+                  />
+                  <FixMetaCard
+                    label="Investment"
+                    value="$497 one-time"
+                    hint="Most cases. Complex sites quoted upfront."
+                  />
+                </div>
               </div>
-              <div className="rounded-xl border border-white/10 bg-ink-800/60 p-6 text-center">
-                <p className="text-xs uppercase tracking-[0.2em] text-white/50">
+
+              <div className="rounded-xl border border-accent/40 bg-ink-900/80 p-7 flex flex-col">
+                <p className="text-xs uppercase tracking-[0.2em] text-white/55">
                   GEO Foundation Fix
                 </p>
-                <p className="mt-3 text-4xl font-bold text-white">$497</p>
+                <p className="mt-3 text-5xl font-bold text-white">$497</p>
                 <p className="mt-2 text-sm text-white/60">
-                  Available after your audit.
+                  Done-for-you. Re-check included.
+                </p>
+                <ul className="mt-6 space-y-2 text-sm text-white/75 flex-1">
+                  <li className="flex gap-2">
+                    <span className="text-accent">→</span> Schema, llms.txt, robots.txt
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-accent">→</span> FAQ + service-page structure
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-accent">→</span> Per-location signals
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-accent">→</span> Final score delivered
+                  </li>
+                </ul>
+                <p className="mt-6 text-xs text-white/45">
+                  Available after your audit completes.
                 </p>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* WHY GEOVIZ EXISTS */}
-      <section className="border-t border-white/5 bg-ink-950">
-        <div className="container-page py-16">
-          <div className="mx-auto max-w-3xl">
-            <p className="section-eyebrow">Why GeoViz exists</p>
-            <h2 className="h2 mt-3">A new front door for customers.</h2>
-            <p className="mt-5 text-base leading-relaxed text-white/80">
-              More customers are using ChatGPT and other AI platforms to find
-              businesses. But many companies that rank on Google are invisible
-              in AI answers. GeoViz shows you exactly how these systems see
-              your business — and what needs to change.
-            </p>
           </div>
         </div>
       </section>
@@ -380,12 +521,12 @@ export default function Page() {
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-20 text-center">
           <h2 className="h2 mx-auto max-w-3xl">
-            Find out if ChatGPT, Claude, Perplexity, and Gemini recommend your business.
+            Find out exactly what ChatGPT, Claude, Perplexity, and Gemini see.
           </h2>
           <p className="muted mx-auto mt-4 max-w-xl">
-            Delivered by email within 24 hours. Each report is generated using
-            AI-assisted analysis across ChatGPT, Claude, Perplexity, and
-            Gemini, then reviewed for clarity before delivery.
+            Delivered by email within 24 hours. Each audit is generated
+            using AI-assisted analysis across the four major
+            platforms, then reviewed for clarity before delivery.
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Link href="/order" className="btn-primary">
@@ -415,6 +556,46 @@ function ProblemCard({ title, body }: { title: string; body: string }) {
   );
 }
 
+function AudienceCard({
+  title,
+  examples,
+  body,
+}: {
+  title: string;
+  examples: string;
+  body: string;
+}) {
+  return (
+    <div className="card">
+      <h3 className="h3">{title}</h3>
+      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-accent">
+        {examples}
+      </p>
+      <p className="muted mt-4 text-sm leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function DimensionCard({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="card">
+      <p className="text-xs font-semibold tracking-[0.2em] text-accent">
+        {eyebrow}
+      </p>
+      <h3 className="mt-2 text-base font-semibold text-white">{title}</h3>
+      <p className="muted mt-3 text-sm leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
 function CheckCard({
   index,
   title,
@@ -433,6 +614,111 @@ function CheckCard({
         <h3 className="text-base font-semibold text-white">{title}</h3>
       </div>
       <p className="muted mt-2 text-sm leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function BeforeAfterScores() {
+  return (
+    <div className="rounded-xl border border-white/10 bg-ink-800/60 p-6 text-center min-w-[260px]">
+      <p className="text-xs uppercase tracking-[0.18em] text-white/50">
+        Visibility score
+      </p>
+      <div className="mt-5 flex items-center justify-center gap-5">
+        <div>
+          <p className="text-xs uppercase tracking-[0.16em] text-white/40">
+            Before
+          </p>
+          <p className="mt-1 text-5xl font-bold text-accent">38</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-accent/80">
+            At Risk
+          </p>
+        </div>
+        <span aria-hidden className="text-2xl text-white/40">
+          →
+        </span>
+        <div>
+          <p className="text-xs uppercase tracking-[0.16em] text-white/40">
+            After
+          </p>
+          <p className="mt-1 text-5xl font-bold text-emerald-300">71</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-emerald-300/80">
+            Competitive
+          </p>
+        </div>
+      </div>
+      <p className="mt-5 text-xs text-white/45">
+        Illustrative · based on the rubric
+      </p>
+    </div>
+  );
+}
+
+function CaseChange({ before, after }: { before: string; after: string }) {
+  return (
+    <li className="flex gap-3">
+      <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
+        <svg
+          aria-hidden
+          viewBox="0 0 16 16"
+          className="h-3 w-3"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m3 8 3.5 3.5L13 5" />
+        </svg>
+      </span>
+      <span className="leading-relaxed">
+        <span className="text-white/55 line-through">{before}</span>
+        <span className="text-white/40"> → </span>
+        <span className="text-white">{after}</span>
+      </span>
+    </li>
+  );
+}
+
+function BeforeAfterStat({
+  label,
+  before,
+  after,
+}: {
+  label: string;
+  before: number;
+  after: number;
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-ink-800/40 p-3 text-center">
+      <p className="text-[10px] uppercase tracking-[0.16em] text-white/45">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-mono text-white/85">
+        <span className="text-accent">{before}</span>
+        <span className="text-white/40"> → </span>
+        <span className="text-emerald-300 font-semibold">{after}</span>
+      </p>
+    </div>
+  );
+}
+
+function FixMetaCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-ink-800/40 p-4">
+      <p className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+        {label}
+      </p>
+      <p className="mt-2 text-base font-semibold text-white">{value}</p>
+      <p className="mt-1 text-xs text-white/55">{hint}</p>
     </div>
   );
 }
