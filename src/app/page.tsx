@@ -159,8 +159,8 @@ export default function Page() {
               </Link>
             </div>
             <p className="mt-3 text-xs text-white/55">
-              Instant AI-visibility scan in minutes. Full scored audit
-              delivered within 24 hours.
+              Get an instant AI visibility scan in minutes. Receive
+              your full scored GeoViz audit within 24 hours.
             </p>
 
             <div className="mt-8">
@@ -431,8 +431,8 @@ export default function Page() {
                 Get My Audit — $97
               </Link>
               <p className="mt-3 text-center text-xs text-white/55">
-                Instant AI-visibility scan in minutes. Full scored
-                audit delivered within 24 hours.
+                Get an instant AI visibility scan in minutes. Receive
+                your full scored GeoViz audit within 24 hours.
               </p>
               <p className="mt-2 text-center text-xs text-white/45">
                 Each audit includes automated AI-search analysis
@@ -530,8 +530,8 @@ export default function Page() {
             Find out exactly what ChatGPT, Claude, Perplexity, and Gemini see.
           </h2>
           <p className="muted mx-auto mt-4 max-w-xl">
-            Instant AI-visibility scan in minutes. Full scored audit
-            delivered within 24 hours.
+            Get an instant AI visibility scan in minutes. Receive
+            your full scored GeoViz audit within 24 hours.
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Link href="/order" className="btn-primary">
