@@ -20,9 +20,16 @@ export async function POST(
   }
 
   let force = false;
+  let recipientOverride: string | undefined;
   try {
-    const body = (await req.json().catch(() => ({}))) as { force?: boolean };
+    const body = (await req.json().catch(() => ({}))) as {
+      force?: boolean;
+      recipientEmail?: unknown;
+    };
     force = body.force === true;
+    if (typeof body.recipientEmail === "string") {
+      recipientOverride = body.recipientEmail.trim().toLowerCase();
+    }
   } catch {
     // ignore
   }
@@ -44,6 +51,36 @@ export async function POST(
         reportStatus: order.reportStatus,
       },
       { status: 409 },
+    );
+  }
+
+  // Pilot-launch gate: never send a report that hasn't been explicitly
+  // approved in the admin review panel. The `force` flag is for resends —
+  // it bypasses the "already-sent" check, NOT the review gate.
+  if (order.reviewStatus !== "approved") {
+    console.warn(
+      `[admin-send] orderId=${order.id} blocked — reviewStatus=${order.reviewStatus} (approval required)`,
+    );
+    return NextResponse.json(
+      {
+        error:
+          "Report has not been approved. Mark the review approved before sending.",
+        reviewStatus: order.reviewStatus,
+      },
+      { status: 409 },
+    );
+  }
+
+  // Resolve the actual recipient: admin-provided override wins, else the
+  // order's original email. Validate cheaply — Resend will reject malformed
+  // addresses anyway, but we catch obvious typos before generating a PDF.
+  const toAddress = recipientOverride && recipientOverride.length > 0
+    ? recipientOverride
+    : order.email;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(toAddress)) {
+    return NextResponse.json(
+      { error: `Invalid recipient email: "${toAddress}"` },
+      { status: 400 },
     );
   }
 
@@ -105,14 +142,14 @@ export async function POST(
   });
 
   console.log(
-    `[admin-send] sending report orderId=${order.id} to=${order.email} subject="${subject}"`,
+    `[admin-send] sending report orderId=${order.id} to=${toAddress}${recipientOverride && recipientOverride !== order.email.toLowerCase() ? ` (override; original=${order.email})` : ""} subject="${subject}"`,
   );
 
   // CC the admin notification address (if configured) so we have a copy of
   // every customer deliverable in the same inbox we monitor for new orders.
   const ccAddress = process.env.AUDIT_NOTIFICATION_EMAIL;
   const cc =
-    ccAddress && ccAddress.toLowerCase() !== order.email.toLowerCase()
+    ccAddress && ccAddress.toLowerCase() !== toAddress.toLowerCase()
       ? [ccAddress]
       : undefined;
 
@@ -148,14 +185,14 @@ export async function POST(
     : undefined;
 
   console.log(
-    `[admin-send] EMAIL_DISPATCH orderId=${order.id} to=${order.email} from=${FROM_EMAIL} cc=${cc?.join(",") ?? "(none)"} subject="${subject}" attachedPdf=${Boolean(pdfBuffer)}`,
+    `[admin-send] EMAIL_DISPATCH orderId=${order.id} to=${toAddress} from=${FROM_EMAIL} cc=${cc?.join(",") ?? "(none)"} subject="${subject}" attachedPdf=${Boolean(pdfBuffer)}`,
   );
 
   let resendId: string | undefined;
   try {
     const result = await getResend().emails.send({
       from: FROM_EMAIL,
-      to: order.email,
+      to: toAddress,
       cc,
       subject,
       text: textBody,
@@ -164,7 +201,7 @@ export async function POST(
     });
     if (result.error) {
       console.error(
-        `[admin-send] EMAIL_FAILED orderId=${order.id} to=${order.email} resendError="${result.error.name}: ${result.error.message}"`,
+        `[admin-send] EMAIL_FAILED orderId=${order.id} to=${toAddress} resendError="${result.error.name}: ${result.error.message}"`,
       );
       return NextResponse.json(
         { error: `${result.error.name}: ${result.error.message}` },
@@ -175,26 +212,32 @@ export async function POST(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(
-      `[admin-send] EMAIL_FAILED orderId=${order.id} to=${order.email} threwException="${message}"`,
+      `[admin-send] EMAIL_FAILED orderId=${order.id} to=${toAddress} threwException="${message}"`,
     );
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
+  const sentAt = new Date();
+  const sentCcValue = cc?.[0] ?? null;
   await prisma.auditOrder.update({
     where: { id: order.id },
     data: {
-      reportSentToCustomerAt: new Date(),
+      reportSentToCustomerAt: sentAt,
+      sentTo: toAddress,
+      sentCc: sentCcValue,
       auditStatus: "completed",
     },
   });
 
   console.log(
-    `[admin-send] EMAIL_SENT orderId=${order.id} to=${order.email} resendId=${resendId ?? "unknown"} attachedPdf=${Boolean(pdfBuffer)}`,
+    `[admin-send] EMAIL_SENT orderId=${order.id} sentTo=${toAddress} sentCc=${sentCcValue ?? "(none)"} sentAt=${sentAt.toISOString()} resendId=${resendId ?? "unknown"} attachedPdf=${Boolean(pdfBuffer)}`,
   );
 
   return NextResponse.json({
     status: "sent",
-    to: order.email,
+    to: toAddress,
+    cc: sentCcValue,
+    sentAt: sentAt.toISOString(),
     resendId: resendId ?? null,
     attached: Boolean(pdfBuffer),
   });

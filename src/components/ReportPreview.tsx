@@ -1,8 +1,8 @@
 type ScoreState = "at-risk" | "healthy" | "strong";
 
 const STATE_LABEL: Record<ScoreState, string> = {
-  "at-risk": "At Risk",
-  healthy: "Healthy",
+  "at-risk": "Limited Visibility",
+  healthy: "Good",
   strong: "Strong",
 };
 

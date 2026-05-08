@@ -38,6 +38,8 @@ export async function GET(
       reviewStatus: true,
       adminNotes: true,
       qualityScore: true,
+      sentTo: true,
+      sentCc: true,
     },
   });
 

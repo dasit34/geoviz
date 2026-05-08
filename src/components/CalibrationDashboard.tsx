@@ -804,7 +804,7 @@ function computeInsights(runs: CalibrationRun[]): Insights {
     { key: "trust", label: "Local trust signals", max: 20 },
     { key: "content", label: "Service pages + FAQs", max: 15 },
     { key: "brand", label: "Business clarity", max: 10 },
-    { key: "tech", label: "Site reachability", max: 10 },
+    { key: "tech", label: "AI Readability", max: 10 },
   ];
 
   const categoryAverages = categoryKeys.map((ck) => {

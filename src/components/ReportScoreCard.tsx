@@ -1,7 +1,8 @@
 "use client";
 
 import {
-  bandLabelForOverall,
+  detectJsHeavySite,
+  plainEnglishBandLabel,
   scoreToneFromOverall,
   type ReportScore,
 } from "@/lib/parse-report";
@@ -12,18 +13,28 @@ import {
  * shows the overall, the risk label, and a horizontal bar for each of
  * the six rubric categories. Pure server component — same JSX is used
  * for the on-screen view and the puppeteer-driven PDF.
+ *
+ * `markdown` is optional and used only to surface the subtle JS-heavy
+ * advisory line — no scoring logic depends on it.
  */
-export function ReportScoreCard({ score }: { score: ReportScore }) {
+export function ReportScoreCard({
+  score,
+  markdown,
+}: {
+  score: ReportScore;
+  markdown?: string | null;
+}) {
   const tone = scoreToneFromOverall(score.overall);
   const overallLabel = typeof score.overall === "number" ? score.overall : "—";
-  // Band label always derives from the numeric overall — that's the
-  // single source of truth from the rubric, not whatever status word
-  // the model happened to type. Falls back to a parsed status only
-  // when the overall couldn't be extracted.
+  // Customer-facing status: plain-English label collapsed from the
+  // 5-band rubric. Falls back to a parsed status word only when the
+  // overall couldn't be extracted from the markdown.
   const status =
     typeof score.overall === "number"
-      ? bandLabelForOverall(score.overall)
+      ? plainEnglishBandLabel(score.overall)
       : score.status ?? riskLabelForTone(tone);
+
+  const isJsHeavy = detectJsHeavySite(markdown ?? null);
 
   return (
     <section className={`score-card score-card-tone-${tone}`}>
@@ -31,6 +42,10 @@ export function ReportScoreCard({ score }: { score: ReportScore }) {
         <div className="score-card-top-label">AI Visibility Score</div>
         <div className="score-card-top-status">{status}</div>
       </div>
+      <p className="score-card-explainer">
+        GeoViz measures how clearly AI systems can read, understand, and
+        confidently recommend your business online.
+      </p>
       <div className="score-card-overall-row">
         <div className="score-card-overall">
           <span className="score-card-overall-num">{overallLabel}</span>
@@ -45,7 +60,12 @@ export function ReportScoreCard({ score }: { score: ReportScore }) {
           return (
             <li key={cat.key} className="score-card-bar">
               <div className="score-card-bar-row">
-                <span className="score-card-bar-label">{cat.short}</span>
+                <span
+                  className="score-card-bar-label"
+                  title={cat.tooltip}
+                >
+                  {cat.short}
+                </span>
                 <span className="score-card-bar-value">
                   {cat.score === null ? "—" : cat.score}
                   <span className="score-card-bar-max"> / {cat.max}</span>
@@ -61,6 +81,12 @@ export function ReportScoreCard({ score }: { score: ReportScore }) {
           );
         })}
       </ul>
+      {isJsHeavy ? (
+        <p className="score-card-advisory">
+          Modern app-style websites can sometimes make AI readability more
+          difficult, even for large brands.
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -68,11 +94,11 @@ export function ReportScoreCard({ score }: { score: ReportScore }) {
 function riskLabelForTone(tone: "ok" | "warn" | "bad" | "muted"): string {
   switch (tone) {
     case "ok":
-      return "Competitive";
+      return "Good";
     case "warn":
       return "Needs Work";
     case "bad":
-      return "At Risk";
+      return "Limited Visibility";
     default:
       return "Pending";
   }

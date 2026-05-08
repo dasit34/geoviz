@@ -34,6 +34,12 @@ function resolveSiteUrl(): string | null {
   return null;
 }
 
+// TODO(rate-limit): /api/checkout is a public POST. A bad actor can
+// hammer it to mint Stripe sessions (no charge until they actually
+// pay, but it pollutes Stripe metrics and adds API spend). Before live
+// launch, add per-IP throttling (e.g., 10 requests / 5 minutes / IP)
+// or a Vercel WAF rule. Keep it simple — an in-memory Map keyed on
+// `req.headers.get("x-forwarded-for")` is enough for the pilot.
 export async function POST(req: Request) {
   const PRICE_ID = process.env.STRIPE_PRICE_ID;
 

@@ -75,7 +75,7 @@ export function ReportViewerClient({
             <ExecutiveAtAGlance issues={issueItems} fixes={fixItems} />
           ) : null}
           <div className="mt-6">
-            <ReportScoreCard score={score} />
+            <ReportScoreCard score={score} markdown={markdown} />
           </div>
           {scoreProse ? (
             <div className="report-band-explainer">

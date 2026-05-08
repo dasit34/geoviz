@@ -8,44 +8,24 @@ const PLATFORMS = ["ChatGPT", "Claude", "Perplexity", "Gemini", "AI Overviews"];
 
 const CHECKS = [
   {
-    title: "AI crawler access",
-    body: "Whether GPTBot, ClaudeBot, PerplexityBot, and Googlebot can actually reach your pages.",
+    title: "AI Readability",
+    body: "How easily AI systems can retrieve and interpret your site structure and content.",
   },
   {
-    title: "robots.txt",
-    body: "How your robots policy impacts AI training and citation crawlers.",
+    title: "Machine-Readable Business Identity",
+    body: "Whether structured business data tells AI clearly who you are, what you do, and where you serve.",
   },
   {
-    title: "Sitemap",
-    body: "Discoverability of every key service and location page.",
+    title: "Crawl Accessibility",
+    body: "Whether the AI crawlers behind ChatGPT, Claude, Perplexity, and Gemini can actually reach your pages.",
   },
   {
-    title: "Schema markup",
-    body: "Structured data that lets AI confidently identify what you do.",
+    title: "Trust Signals",
+    body: "Reviews, citations, and consistent business info that make AI confident enough to recommend you.",
   },
   {
-    title: "LocalBusiness data",
-    body: "NAP, hours, service area, and category signals AI uses for local recommendations.",
-  },
-  {
-    title: "FAQ structure",
-    body: "Question/answer formatting AI can extract and cite directly.",
-  },
-  {
-    title: "Service clarity",
-    body: "Whether your homepage and service pages clearly state what you offer.",
-  },
-  {
-    title: "Location clarity",
-    body: "Whether AI can confidently match you to the cities and regions you serve.",
-  },
-  {
-    title: "Authority signals",
-    body: "Reviews, mentions, and citations that build AI trust in your business.",
-  },
-  {
-    title: "AI citability",
-    body: "How likely AI is to name you when a customer asks for help.",
+    title: "Recommendation Readiness",
+    body: "Whether your site has the depth and clarity AI needs to name you when a customer asks for help.",
   },
 ];
 
@@ -165,6 +145,12 @@ export default function Page() {
 
             <div className="mt-8">
               <HeroForm />
+              <p className="mt-3 text-xs text-white/65">
+                Automated AI analysis + human-reviewed delivery within 24 hours.{" "}
+                <span className="text-white/85">
+                  Most reports are delivered the same day.
+                </span>
+              </p>
             </div>
 
             <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -193,10 +179,34 @@ export default function Page() {
         </div>
       </section>
 
-      {/* PROBLEM — real business pain */}
+      {/* WHAT IS GEOVIZ — short, scannable framing for first-time visitors */}
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-20">
-          <p className="section-eyebrow">The shift</p>
+          <p className="section-eyebrow">What is GeoViz</p>
+          <h2 className="h2 mt-3 max-w-3xl">
+            How AI systems read, trust, and recommend your business.
+          </h2>
+          <div className="mt-6 grid gap-6 max-w-4xl md:grid-cols-2">
+            <p className="text-base leading-relaxed text-white/80">
+              GeoViz helps businesses understand how modern AI systems
+              like ChatGPT, Claude, Gemini, and Perplexity interpret,
+              trust, and recommend their websites.
+            </p>
+            <p className="text-base leading-relaxed text-white/80">
+              Businesses are increasingly discovered through
+              AI-generated recommendations — not just traditional
+              search rankings.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* WHY THIS MATTERS — was "PROBLEM — The shift". Same three cards
+          (AI is the front door · weak AI visibility · compounding loss);
+          the eyebrow / headline reframe in business language. */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-20">
+          <p className="section-eyebrow">Why this matters</p>
           <h2 className="h2 mt-3 max-w-3xl">
             Customers are choosing who to call before they ever open Google.
           </h2>
@@ -218,6 +228,34 @@ export default function Page() {
             <ProblemCard
               title="Lost calls compound"
               body="Every conversation that ends with the wrong recommendation is a job, a case, or an appointment you never knew you had a chance at."
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS — three clean steps so a non-technical buyer
+          knows exactly what they get and when. */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-20">
+          <p className="section-eyebrow">How it works</p>
+          <h2 className="h2 mt-3 max-w-2xl">
+            Three steps. One reviewed report.
+          </h2>
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            <HowItWorksStep
+              index={1}
+              title="Submit your website"
+              body="Drop your URL into the form above. Optional: business name and a competitor URL for comparison context."
+            />
+            <HowItWorksStep
+              index={2}
+              title="GeoViz analyzes AI visibility signals"
+              body="Automated AI-search analysis across structured data, crawler accessibility, trust signals, content depth, and entity clarity."
+            />
+            <HowItWorksStep
+              index={3}
+              title="Receive a reviewed audit report"
+              body="Manually reviewed for clarity and consistency, then delivered as a hosted link and PDF — typically within 24 hours."
             />
           </div>
         </div>
@@ -285,13 +323,13 @@ export default function Page() {
         <div className="container-page py-20">
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
             <div>
-              <p className="section-eyebrow">What we check</p>
-              <h2 className="h2 mt-3">10 signals that decide AI citations.</h2>
+              <p className="section-eyebrow">What GeoViz checks</p>
+              <h2 className="h2 mt-3">Five dimensions of AI visibility.</h2>
             </div>
             <p className="muted max-w-md">
-              Each audit is a deep technical and content review focused
-              on the exact signals generative engines use to decide who
-              gets recommended.
+              Plain-English categories, scored on the same rubric the
+              full audit runs on. Each one captures a different way AI
+              systems decide whether to cite you or skip you.
             </p>
           </div>
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -366,12 +404,12 @@ export default function Page() {
                 <SampleBullet>Top priority fixes, ranked</SampleBullet>
                 <SampleBullet>Professional PDF report</SampleBullet>
               </ul>
-              <div className="mt-8 flex gap-3">
+              <div className="mt-8 flex flex-wrap gap-3">
                 <Link href="/sample-report" className="btn-ghost">
-                  See full sample report
+                  View a Real GeoViz AI Visibility Report
                 </Link>
                 <Link href="/order" className="btn-primary">
-                  Run my audit
+                  Request my audit
                 </Link>
               </div>
             </div>
@@ -383,6 +421,91 @@ export default function Page() {
             <SampleStat label="Status" value="At Risk" tone="warn" />
             <SampleStat label="Issues found" value="11" />
             <SampleStat label="Top priority fixes" value="4" tone="ok" />
+          </div>
+        </div>
+      </section>
+
+      {/* PROOF — concrete examples of what an audit surfaces.
+          Distinct from the SAMPLE REPORT section above (which sells the
+          report's *features*); this section shows specific findings the
+          customer is most likely to see in their own audit. */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-20">
+          <div className="grid gap-12 md:grid-cols-2 md:items-start">
+            <div>
+              <p className="section-eyebrow">Proof</p>
+              <h2 className="h2 mt-3 max-w-2xl">
+                See what an AI visibility audit looks like.
+              </h2>
+              <p className="muted mt-4 max-w-md">
+                A real score, the categories pulling it down, and the
+                three findings most local sites surface — the exact
+                language your audit will use, written so the owner can
+                act on it.
+              </p>
+
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                <SampleStat label="Visibility Score" value="42 / 100" tone="warn" />
+                <SampleStat label="Status" value="At Risk" tone="warn" />
+              </div>
+
+              <p className="mt-10 text-xs font-semibold uppercase tracking-[0.2em] text-white/45">
+                Three findings most weak audits surface
+              </p>
+              <div className="mt-4 grid gap-4">
+                <ProblemCard
+                  title="Missing structured business identity"
+                  body="No JSON-LD LocalBusiness schema means AI can&rsquo;t confirm what you do, where you operate, or how to contact you. Marketing copy alone is not extractable as fact."
+                />
+                <ProblemCard
+                  title="Weak AI-readable service / location signals"
+                  body="Services and service-areas live only in body copy. Without per-service and per-location pages — and ideally Service schema — generative engines can&rsquo;t match you to a city + service the way a customer asks."
+                />
+                <ProblemCard
+                  title="Inconsistent trust / citation data"
+                  body="Business name, phone, and address vary across the homepage, footer, schema, and Google Business Profile. Mismatch erodes the confidence AI needs to cite you instead of a more legible competitor."
+                />
+              </div>
+
+              <div className="mt-10 flex flex-wrap gap-3">
+                <Link href="/sample-report" className="btn-ghost">
+                  View Sample Report
+                </Link>
+                <Link href="/order" className="btn-primary">
+                  Get My Audit — $97
+                </Link>
+              </div>
+            </div>
+
+            <div className="relative md:sticky md:top-24">
+              <div className="absolute -inset-6 -z-10 bg-radial-orange opacity-30" />
+              <ReportPreview />
+              <p className="mt-4 text-center text-xs text-white/45">
+                Illustrative · same layout your audit will be delivered in.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* RECENT AUDIT INSIGHTS — observation-style notes from real
+          audits. Subtle, premium, never testimonial. Not customer-
+          attributed and never invents metrics. */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-20">
+          <p className="section-eyebrow">Recent audit insights</p>
+          <h2 className="h2 mt-3 max-w-3xl">
+            Patterns we keep seeing across real audits.
+          </h2>
+          <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
+            Observations from running GeoViz against real local
+            businesses. Subtle, but they almost always cost the
+            business AI citations.
+          </p>
+          <div className="mt-12 grid gap-4 md:grid-cols-3">
+            <InsightCard body="Major brands can still struggle with AI readability." />
+            <InsightCard body="JavaScript-heavy websites often reduce AI retrieval visibility." />
+            <InsightCard body="Many businesses lack machine-readable trust signals." />
           </div>
         </div>
       </section>
@@ -759,6 +882,42 @@ function SampleStat({
         {label}
       </p>
       <p className={`mt-2 text-2xl font-semibold ${valueColor}`}>{value}</p>
+    </div>
+  );
+}
+
+function HowItWorksStep({
+  index,
+  title,
+  body,
+}: {
+  index: number;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="card relative">
+      <div className="flex items-center gap-3">
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-accent/10 text-sm font-bold text-accent">
+          {index}
+        </span>
+        <h3 className="text-base font-semibold text-white">{title}</h3>
+      </div>
+      <p className="muted mt-4 text-sm leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function InsightCard({ body }: { body: string }) {
+  return (
+    <div className="card">
+      <div className="flex gap-3">
+        <span
+          aria-hidden
+          className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
+        />
+        <p className="text-sm leading-relaxed text-white/85">{body}</p>
+      </div>
     </div>
   );
 }

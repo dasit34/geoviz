@@ -25,6 +25,10 @@ import { getDbFingerprint } from "@/lib/db-fingerprint";
  * The dbHost fingerprint is included so an operator can compare what
  * Vercel writes against what the local worker sees — same fingerprint
  * means same database.
+ *
+ * Rate limiting: this route is admin-gated (`ADMIN_SECRET`) so abuse
+ * surface is small. A worker-side guard already prevents duplicate
+ * concurrent runs on the same order. No per-IP throttle needed here.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

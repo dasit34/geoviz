@@ -3,11 +3,24 @@ import { prisma } from "@/lib/db";
 import { buildPdfBaseUrl, generateAuditPdf } from "@/lib/generate-pdf";
 
 /**
- * GET /api/report/[id]/pdf?key=<ADMIN_SECRET>
+ * GET /api/report/[id]/pdf
  *
  * Server-side renders the print page at /report/[id]/print into a PDF
  * and streams it back as application/pdf. The admin "Download PDF"
- * button hits this URL.
+ * button and the customer report email both link here.
+ *
+ * Access model: the order ID is a 25-char CUID (~120 bits of entropy)
+ * and acts as the access token. There is no admin-secret check on this
+ * route — it is intentionally public-by-CUID so the link inside the
+ * customer email works without an admin key. Same access model as the
+ * `/report/[id]/print` page. Don't add an admin-key gate here unless
+ * you also rework the email link.
+ *
+ * TODO(rate-limit): This is the most expensive public route in the
+ * app — every hit launches a headless Chromium and streams an A4 PDF.
+ * Add per-IP throttling (e.g., 6 / minute per IP via a small in-memory
+ * Map or an upstream WAF rule) before opening live traffic. Keyed on
+ * IP rather than order ID so an attacker can't fan out across IDs.
  *
  * The customer-facing email send (POST /api/admin/orders/[id]/send-report)
  * also calls into the shared `generateAuditPdf` helper to attach the same

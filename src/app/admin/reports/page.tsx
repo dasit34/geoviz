@@ -240,6 +240,8 @@ export default async function AdminReportsPage({
                   reviewStatus: o.reviewStatus,
                   adminNotes: o.adminNotes,
                   qualityScore: o.qualityScore,
+                  sentTo: o.sentTo,
+                  sentCc: o.sentCc,
                   amount: o.amount,
                   currency: o.currency,
                   createdAt: o.createdAt.toISOString(),

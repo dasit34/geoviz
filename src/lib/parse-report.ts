@@ -26,6 +26,12 @@ export type ScoreCategory = {
   key: ScoreCategoryKey;
   label: string;
   short: string;
+  /**
+   * Plain-English description shown as a tooltip / hover help on the
+   * customer-facing score card. Display-only — not consumed by the
+   * audit prompt or any scoring logic.
+   */
+  tooltip?: string;
   max: number;
   score: number | null;
 };
@@ -49,6 +55,8 @@ const CATEGORIES: Array<
     key: "schema",
     label: "Structured Data / Schema",
     short: "Business info AI can read",
+    tooltip:
+      "How clearly AI systems can identify who you are and what you do.",
     max: 25,
     pattern: /Structured\s*Data(?:\s*\/\s*Schema)?/i,
   },
@@ -56,6 +64,8 @@ const CATEGORIES: Array<
     key: "crawler",
     label: "AI Crawler Readiness",
     short: "AI tools can read your site",
+    tooltip:
+      "Whether AI systems can access and understand your website content.",
     max: 20,
     pattern: /AI\s*Crawler\s*Readiness/i,
   },
@@ -63,6 +73,8 @@ const CATEGORIES: Array<
     key: "trust",
     label: "Local Trust Signals",
     short: "Local trust signals",
+    tooltip:
+      "Whether reviews, citations, and consistent business info make AI confident enough to recommend you.",
     max: 20,
     pattern: /Local\s*Trust\s*Signals/i,
   },
@@ -70,6 +82,8 @@ const CATEGORIES: Array<
     key: "content",
     label: "Content Depth + FAQ Quality",
     short: "Service pages + FAQs",
+    tooltip:
+      "Whether your site has the depth of service and FAQ content AI can quote when answering customers.",
     max: 15,
     pattern: /Content\s*Depth(?:\s*\+\s*FAQ\s*Quality)?/i,
   },
@@ -77,13 +91,17 @@ const CATEGORIES: Array<
     key: "brand",
     label: "Brand / Entity Clarity",
     short: "Business clarity",
+    tooltip:
+      "Whether AI can confidently identify your business as one consistent entity across the web.",
     max: 10,
     pattern: /Brand(?:\s*\/\s*Entity)?\s*Clarity/i,
   },
   {
     key: "tech",
     label: "Technical Accessibility",
-    short: "Site reachability",
+    short: "AI Readability",
+    tooltip:
+      "How easily AI systems can retrieve and interpret your site structure and content.",
     max: 10,
     pattern: /Technical\s*Accessibility/i,
   },
@@ -142,6 +160,7 @@ export function parseReportScoreBreakdown(
       key: cat.key,
       label: cat.label,
       short: cat.short,
+      tooltip: cat.tooltip,
       max: cat.max,
       score: m ? clamp(Number(m[1]), 0, cat.max) : null,
     };
@@ -181,6 +200,44 @@ export function bandLabelForOverall(overall: number | null): string {
   if (overall >= 46) return "Needs Work";
   if (overall >= 26) return "At Risk";
   return "Invisible";
+}
+
+/**
+ * Plain-English label rendered to customers on the score card and the
+ * report hero — easier to act on than the rubric's 5-band names. The
+ * underlying thresholds are unchanged; this just collapses the two
+ * lowest bands (Invisible + At Risk) into one customer-facing phrase
+ * so the report doesn't open with a blunt "Invisible" verdict.
+ *
+ * Mapping:
+ *   ≥ 81        → "Strong"
+ *   66–80       → "Good"
+ *   46–65       → "Needs Work"
+ *   0–45        → "Limited Visibility"
+ *   non-numeric → "Pending"
+ *
+ * The 5-band rubric names are still emitted by `bandLabelForOverall`
+ * for any internal/admin/calibration surface that needs them.
+ */
+export function plainEnglishBandLabel(overall: number | null): string {
+  if (typeof overall !== "number") return "Pending";
+  if (overall >= 81) return "Strong";
+  if (overall >= 66) return "Good";
+  if (overall >= 46) return "Needs Work";
+  return "Limited Visibility";
+}
+
+/**
+ * Returns true when the report markdown describes a heavily JS-rendered,
+ * SPA, or marketplace-style site — the cases where AI readability is
+ * structurally harder regardless of effort. Pure heuristic over the
+ * existing audit prose; does NOT touch the audit logic itself.
+ */
+export function detectJsHeavySite(md: string | null | undefined): boolean {
+  if (!md) return false;
+  return /javascript[-\s]?rendered|client[-\s]?side\s+render|single[-\s]?page\s+app|\bSPA\b|js[-\s]?heavy|app\s+shell|app[-\s]style|client[-\s]?side\s+only/i.test(
+    md,
+  );
 }
 
 export type ReportSectionSlug =

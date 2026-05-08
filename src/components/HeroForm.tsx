@@ -54,7 +54,7 @@ export function HeroForm() {
         />
       </div>
       <button type="submit" className="btn-primary whitespace-nowrap">
-        Run My AI Visibility Audit
+        Request My AI Visibility Audit
         <svg
           aria-hidden
           viewBox="0 0 20 20"

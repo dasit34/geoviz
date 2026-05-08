@@ -203,6 +203,29 @@
   color: rgba(255, 255, 255, 0.7);
   flex: 1;
 }
+/* One-line plain-English explainer that sits directly under the
+   "AI Visibility Score" header — frames what the score actually
+   measures without burying the number. */
+.score-card-explainer {
+  margin: 4px 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 70ch;
+}
+/* Subtle advisory rendered only when the audit indicates a heavily
+   JS-rendered / app-style site. Sits under the category bars. */
+.score-card-advisory {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.55);
+  font-style: italic;
+}
 .score-card-bars {
   list-style: none;
   margin: 0;
@@ -962,7 +985,7 @@
   }
   .score-card-bars {
     grid-template-columns: 1fr !important;
-    gap: 12px !important;
+    gap: 10px !important;
   }
   .report-section-card,
   .score-card,
@@ -986,25 +1009,181 @@
   .report-tech-details {
     page-break-before: always;
     break-before: page;
+    margin-top: 20px !important;
+    padding: 16px 22px !important;
   }
-  /* CTA always travels with at least its accent bar + headline —
-     never split between pages. */
+
+  /* ---- pagination strategy ----
+   *
+   * The PDF was leaving large dead zones because every section card
+   * AND every item-card inside had `page-break-inside: avoid`. When
+   * a long section couldn't fit on the remaining space the browser
+   * pushed the entire section to the next page, stranding ~1/3 of a
+   * page above. The fix:
+   *
+   *   - Atomic units (must NEVER split): hero, score card, individual
+   *     issue/fix cards, the CTA card. These are visually self-
+   *     contained — splitting them looks broken.
+   *
+   *   - Containers that MAY split across pages: the outer
+   *     .report-section-card. Its header still glues to its first
+   *     child via page-break-after: avoid, but if the body has many
+   *     item-cards we allow the page to break BETWEEN cards.
+   *
+   *   - Free-flowing prose, the band explainer, and small notes are
+   *     allowed to split naturally so they fill empty space rather
+   *     than create new whitespace.
+   */
+  .report-hero,
+  .score-card,
+  .report-item-card,
+  .report-glance,
   .cta-card,
   .cta-card-body {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
-  /* Issue + fix sub-cards: harden again with !important so a
-     long body never splits the card across pages. */
-  .report-item-card,
-  .report-section-card,
-  .score-card {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
+  /* Outer section card MAY split between its inner item-cards —
+     overrides the screen rule that kept the whole section atomic. */
+  .report-section-card {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
   }
   /* Don't let the section heading orphan from its first card. */
   .report-section-card-header {
     page-break-after: avoid;
     break-after: avoid;
+  }
+  /* Small notes (consistency note, bridge note, band explainer) stay
+     glued to the card above them — orphaning a one-liner at the top
+     of a fresh page reads as a layout bug. They themselves are also
+     allowed to split if the body grows. */
+  .report-score-consistency-note,
+  .report-bridge-note {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+  .report-band-explainer {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+  /* Free prose, lists, and disclaimer-style paragraphs are allowed to
+     split across pages so they pack into available space. Code blocks
+     stay atomic. */
+  .report-prose p,
+  .report-prose ul,
+  .report-prose ol,
+  .report-prose blockquote {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+  .report-prose pre {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  /* Avoid orphaning a heading at the bottom of a page — keep it with
+     the first paragraph of its section. */
+  .report-prose h2,
+  .report-prose h3,
+  .report-prose h4 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  /* ---- print-only spacing tightening ----
+   *
+   * On screen the rhythm is generous (44px / 56px between blocks).
+   * On A4 that compounds into half-page dead zones. These overrides
+   * apply only inside @media print and shave the verticals back to
+   * a tighter — but still premium — print rhythm.
+   */
+  .report-hero {
+    padding-bottom: 22px !important;
+  }
+  .report-meta {
+    margin-top: 18px !important;
+    gap: 14px !important;
+  }
+  .report-section-card {
+    margin-top: 24px !important;
+    padding: 22px 26px 24px !important;
+  }
+  .score-card {
+    padding: 24px 28px 26px !important;
+  }
+  .report-item-list {
+    margin-top: 16px !important;
+    gap: 10px !important;
+  }
+  .report-item-card {
+    padding: 16px 20px 18px !important;
+  }
+  .report-item-card-body {
+    margin-top: 10px !important;
+  }
+  .report-item-card-fields {
+    margin-top: 12px !important;
+    gap: 6px !important;
+  }
+  .report-glance {
+    padding: 18px 22px !important;
+  }
+  .report-band-explainer {
+    margin-top: 14px !important;
+    padding: 14px 18px !important;
+  }
+  .report-prose hr {
+    margin: 16px 0 !important;
+  }
+  .report-prose h3 {
+    margin: 16px 0 6px !important;
+  }
+  .report-prose h4 {
+    margin: 12px 0 4px !important;
+  }
+  .report-prose p {
+    margin-bottom: 10px !important;
+  }
+  .report-prose ul,
+  .report-prose ol {
+    margin-bottom: 12px !important;
+  }
+  /* CTA: the biggest pagination offender. Reducing the top margin
+     (was 56px on screen) lets it hug the previous section when there
+     is room, instead of getting punted to a fresh page on its own.
+     The card itself is still atomic via the rule above. */
+  .cta-card {
+    margin: 22px 0 6px !important;
+  }
+  .cta-card-body {
+    padding: 22px 26px 26px !important;
+  }
+  .cta-card-headline {
+    font-size: 26px !important;
+    margin-bottom: 10px !important;
+  }
+  .cta-card-lede {
+    margin-bottom: 16px !important;
+  }
+  .cta-card-badges {
+    margin-bottom: 16px !important;
+  }
+  .cta-card-bullets {
+    margin-bottom: 18px !important;
+  }
+  .cta-card-bullets li {
+    margin: 7px 0 !important;
+  }
+  .report-footer {
+    margin-top: 28px !important;
+    padding-top: 16px !important;
+  }
+  /* When a section card is the last block before the CTA, drop its
+     bottom padding slightly so the CTA's reduced top margin sits in
+     a tight rhythm rather than a double gap. */
+  .report-section-card + .cta-card {
+    margin-top: 18px !important;
   }
 }

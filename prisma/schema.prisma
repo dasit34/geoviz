@@ -41,6 +41,8 @@ model AuditOrder {
   reviewStatus     String        @default("pending")
   adminNotes       String?
   qualityScore     Int?
+  sentTo           String?
+  sentCc           String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 

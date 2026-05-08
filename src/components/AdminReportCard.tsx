@@ -19,6 +19,8 @@ type Order = {
   reviewStatus: string;
   adminNotes: string | null;
   qualityScore: number | null;
+  sentTo: string | null;
+  sentCc: string | null;
   amount: number;
   currency: string;
   createdAt: string;
@@ -29,6 +31,20 @@ const REVIEW_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "approved", label: "Approved" },
   { value: "needs_changes", label: "Needs changes" },
 ];
+
+// Pilot-launch sanity checklist. Each item is a manual visual confirmation
+// the operator does on every order before sending. The "recipient" item is
+// also wired to the Send-button gate; the others are nudges.
+const LAUNCH_QA_ITEMS: Array<{ key: string; label: string }> = [
+  { key: "biz", label: "Business name correct" },
+  { key: "url", label: "Website URL correct" },
+  { key: "clean", label: "Report looks clean" },
+  { key: "halluc", label: "No obvious hallucinations" },
+  { key: "pdf", label: "PDF / download works" },
+  { key: "recipient", label: "Email recipient confirmed" },
+];
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export function AdminReportCard({
   adminKey,
@@ -53,6 +69,20 @@ export function AdminReportCard({
   const [qualityScore, setQualityScore] = useState<string>(
     typeof order.qualityScore === "number" ? String(order.qualityScore) : "",
   );
+  const [sentTo, setSentTo] = useState<string | null>(order.sentTo);
+  const [sentCc, setSentCc] = useState<string | null>(order.sentCc);
+
+  // Recipient override + confirmation gate. The input starts pre-filled with
+  // the order's original email; the operator can edit, but Send stays
+  // disabled until they click "Confirm recipient". Editing the input again
+  // resets the confirmation so they can't drift from a confirmed value.
+  const [recipientEmail, setRecipientEmail] = useState(order.email);
+  const [recipientConfirmed, setRecipientConfirmed] = useState(false);
+  const [confirmedAddress, setConfirmedAddress] = useState<string | null>(null);
+
+  // Six pilot-QA checkboxes. Local state, not persisted — they reset on
+  // page refresh by design (pre-flight checks every send, not once-per-order).
+  const [qaChecks, setQaChecks] = useState<Record<string, boolean>>({});
 
   const [expanded, setExpanded] = useState(false);
   const [reviewExpanded, setReviewExpanded] = useState(false);
@@ -79,6 +109,8 @@ export function AdminReportCard({
       reviewStatus?: string;
       adminNotes?: string | null;
       qualityScore?: number | null;
+      sentTo?: string | null;
+      sentCc?: string | null;
     }) => {
       if (server.reportStatus !== undefined) {
         setReportStatus(server.reportStatus);
@@ -100,6 +132,8 @@ export function AdminReportCard({
             ? String(server.qualityScore)
             : "",
         );
+      if (server.sentTo !== undefined) setSentTo(server.sentTo);
+      if (server.sentCc !== undefined) setSentCc(server.sentCc);
       console.log(
         `[admin-card] orderId=${order.id} reportStatus=${server.reportStatus ?? reportStatus}`,
       );
@@ -275,10 +309,11 @@ export function AdminReportCard({
   };
 
   const onSend = async (force = false) => {
+    const recipient = (confirmedAddress ?? recipientEmail).trim().toLowerCase();
     if (
       !force &&
       !confirm(
-        `Send the generated report to ${order.email}?\nA copy will be CC'd to the admin notification address (set via AUDIT_NOTIFICATION_EMAIL).`,
+        `Send the generated report to ${recipient}?\nA copy will be CC'd to the admin notification address (set via AUDIT_NOTIFICATION_EMAIL).`,
       )
     ) {
       return;
@@ -287,13 +322,15 @@ export function AdminReportCard({
     setMessage("Sending email…");
     setTone("warn");
     try {
-      const res = await post(
-        `/api/admin/orders/${order.id}/send-report`,
-        force ? { force: true } : {},
-      );
+      const res = await post(`/api/admin/orders/${order.id}/send-report`, {
+        ...(force ? { force: true } : {}),
+        recipientEmail: recipient,
+      });
       const data = (await res.json().catch(() => ({}))) as {
         status?: string;
         to?: string;
+        cc?: string | null;
+        sentAt?: string;
         resendId?: string | null;
         error?: string;
         message?: string;
@@ -301,9 +338,11 @@ export function AdminReportCard({
       if (res.ok) {
         setTone("ok");
         const id = data.resendId ? ` · id ${data.resendId}` : "";
-        setMessage(`Sent to ${data.to ?? order.email}${id}`);
+        setMessage(`Sent to ${data.to ?? recipient}${id}`);
         applyOrderUpdate({
-          reportSentToCustomerAt: new Date().toISOString(),
+          reportSentToCustomerAt: data.sentAt ?? new Date().toISOString(),
+          sentTo: data.to ?? recipient,
+          sentCc: data.cc ?? null,
         });
       } else if (res.status === 409) {
         setTone("warn");
@@ -318,6 +357,33 @@ export function AdminReportCard({
     } finally {
       setSending(false);
     }
+  };
+
+  const onConfirmRecipient = () => {
+    const trimmed = recipientEmail.trim().toLowerCase();
+    if (!EMAIL_RE.test(trimmed)) {
+      setTone("err");
+      setMessage(`Invalid recipient email: "${trimmed}"`);
+      return;
+    }
+    setConfirmedAddress(trimmed);
+    setRecipientConfirmed(true);
+    setQaChecks((prev) => ({ ...prev, recipient: true }));
+    setTone("ok");
+    setMessage(`Recipient confirmed: ${trimmed}`);
+  };
+
+  const onChangeRecipient = (value: string) => {
+    setRecipientEmail(value);
+    if (recipientConfirmed) {
+      setRecipientConfirmed(false);
+      setConfirmedAddress(null);
+      setQaChecks((prev) => ({ ...prev, recipient: false }));
+    }
+  };
+
+  const toggleQaCheck = (key: string) => {
+    setQaChecks((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const saveReview = async (overrideStatus?: string) => {
@@ -360,10 +426,59 @@ export function AdminReportCard({
 
   const businessLabel = order.businessName ?? order.websiteUrl;
   const anyBusy = running || sending || marking || savingReview;
-  const sendDisabled = anyBusy || reportStatus !== "generated";
+  // The "recipient" checklist item is auto-controlled by the confirm button —
+  // every other item is a manual checkbox. All six must be ticked + the
+  // review must be approved before Send is allowed to fire.
+  const checklistComplete = LAUNCH_QA_ITEMS.every((it) =>
+    it.key === "recipient" ? recipientConfirmed : Boolean(qaChecks[it.key]),
+  );
+  // Pilot-launch send gate: every condition must hold. The `title` attribute
+  // on the Send button explains exactly which one is blocking.
+  const sendBlockReason: string | null = anyBusy
+    ? null // button is in busy state, the spinner explains itself
+    : reportStatus !== "generated"
+      ? "No generated report. Run the audit first."
+      : reviewStatus !== "approved"
+        ? "Review not approved. Mark the report approved before sending."
+        : !recipientConfirmed
+          ? "Recipient email not confirmed. Confirm the address below."
+          : !checklistComplete
+            ? "Launch QA checklist incomplete. Tick every item before sending."
+            : null;
+  const sendDisabled = anyBusy || sendBlockReason !== null;
   const markDisabled =
     anyBusy || reportStatus !== "generated" || reviewStatus === "approved";
   const scoreInfo = parseReportScore(markdown);
+
+  // Single per-order status banner — the headline an operator should be able
+  // to read from across the room. Distinct from the granular pills (paid /
+  // audit / review / sent) which are still useful for at-a-glance scanning.
+  const banner: { text: string; tone: "err" | "ok" | "ready" | "warn" | "info" | "muted" } =
+    reportStatus === "failed"
+      ? { text: "Audit failed — needs attention", tone: "err" }
+      : reportSentAt
+        ? { text: "Sent to customer", tone: "ok" }
+        : reviewStatus === "approved" && reportStatus === "generated"
+          ? { text: "Approved — ready to send", tone: "ready" }
+          : reportStatus === "generated"
+            ? { text: "Report ready — needs review", tone: "warn" }
+            : reportStatus === "running"
+              ? { text: "Generating report", tone: "info" }
+              : reportStatus === "queued"
+                ? { text: "Queued — waiting on worker", tone: "warn" }
+                : { text: "Paid — report not generated", tone: "muted" };
+  const bannerClass =
+    banner.tone === "err"
+      ? "border-red-400/40 bg-red-500/[0.08] text-red-200"
+      : banner.tone === "ok"
+        ? "border-emerald-300/40 bg-emerald-300/[0.08] text-emerald-200"
+        : banner.tone === "ready"
+          ? "border-emerald-300/50 bg-emerald-300/[0.12] text-emerald-100"
+          : banner.tone === "warn"
+            ? "border-amber-300/40 bg-amber-300/[0.08] text-amber-100"
+            : banner.tone === "info"
+              ? "border-sky-300/40 bg-sky-300/[0.08] text-sky-100"
+              : "border-white/15 bg-white/[0.03] text-white/70";
 
   return (
     <article className="rounded-xl border border-white/10 bg-ink-900/60 shadow-card">
@@ -408,24 +523,35 @@ export function AdminReportCard({
         />
       </header>
 
+      {/* Single status banner — one short headline per order. The granular
+          pills in the header still show paid / audit / review / sent for
+          at-a-glance scanning; this is the loud, one-liner version. */}
+      <div className={`border-b ${bannerClass} px-5 py-3`}>
+        <p className="text-sm font-semibold">{banner.text}</p>
+      </div>
+
       {/* Action row — strict logical order:
           Run GEO Audit → View Report → Mark Reviewed → Send Report. */}
       <div className="flex flex-wrap items-center gap-3 border-b border-white/10 px-5 py-4">
         <button
           type="button"
           disabled={anyBusy}
-          onClick={() => onRun(reportStatus === "generated")}
+          onClick={() =>
+            onRun(reportStatus === "generated" || reportStatus === "failed")
+          }
           className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-60"
         >
           {running
             ? "Queueing…"
             : reportStatus === "generated"
               ? "Re-run GEO Audit"
-              : reportStatus === "queued"
-                ? "Queued (worker pending)"
-                : reportStatus === "running"
-                  ? "Worker running…"
-                  : "Run GEO Audit"}
+              : reportStatus === "failed"
+                ? "Re-run GEO Audit"
+                : reportStatus === "queued"
+                  ? "Queued (worker pending)"
+                  : reportStatus === "running"
+                    ? "Worker running…"
+                    : "Run GEO Audit"}
         </button>
         <button
           type="button"
@@ -477,6 +603,7 @@ export function AdminReportCard({
           type="button"
           disabled={sendDisabled}
           onClick={() => onSend(false)}
+          title={sendBlockReason ?? undefined}
           className="btn-ghost text-sm border-emerald-300/30 text-emerald-200 hover:border-emerald-300/60 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {sending
@@ -511,6 +638,124 @@ export function AdminReportCard({
         ) : null}
       </div>
 
+      {/* Pre-flight panel — only meaningful once a report exists. Recipient
+          confirmation gates the Send button (alongside review approval);
+          the six checklist items are visual nudges for the operator. */}
+      {reportStatus === "generated" ? (
+        <div className="border-b border-white/10 bg-white/[0.015] px-5 py-4">
+          <div className="grid gap-5 md:grid-cols-[1.4fr_1fr]">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55">
+                Send-time recipient
+              </p>
+              <p className="mt-1 text-xs text-white/55">
+                Pre-filled from the order ({order.email}). Edit if the customer
+                asked you to use a different address. Confirm before Send.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  type="email"
+                  value={recipientEmail}
+                  onChange={(e) => onChangeRecipient(e.target.value)}
+                  disabled={anyBusy}
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="input-field flex-1 min-w-[220px] text-sm font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={onConfirmRecipient}
+                  disabled={anyBusy || recipientConfirmed}
+                  className={
+                    recipientConfirmed
+                      ? "btn-ghost text-xs border-emerald-300/30 text-emerald-200 disabled:cursor-not-allowed disabled:opacity-70"
+                      : "btn-ghost text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                  }
+                  title={
+                    recipientConfirmed
+                      ? `Confirmed as ${confirmedAddress ?? recipientEmail}. Edit the field to re-confirm.`
+                      : "Confirm this is the correct address before sending."
+                  }
+                >
+                  {recipientConfirmed ? "Confirmed ✓" : "Confirm recipient"}
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] text-white/45">
+                A copy is always CC&apos;d to{" "}
+                <code className="text-white/65">AUDIT_NOTIFICATION_EMAIL</code>{" "}
+                if set.
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55">
+                Launch QA Checklist
+              </p>
+              <p className="mt-1 text-xs text-white/55">
+                Pre-flight sanity check. Resets per page load — every send.
+              </p>
+              <ul className="mt-3 space-y-1.5">
+                {LAUNCH_QA_ITEMS.map((it) => {
+                  const checked = Boolean(qaChecks[it.key]);
+                  // The "recipient" checkbox is wired to the confirm button —
+                  // mirrors recipientConfirmed and is read-only here.
+                  const isRecipient = it.key === "recipient";
+                  return (
+                    <li key={it.key}>
+                      <label className="flex items-start gap-2 text-xs text-white/80">
+                        <input
+                          type="checkbox"
+                          checked={isRecipient ? recipientConfirmed : checked}
+                          onChange={() => {
+                            if (isRecipient) return; // controlled by confirm button
+                            toggleQaCheck(it.key);
+                          }}
+                          disabled={isRecipient || anyBusy}
+                          className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-emerald-400 disabled:cursor-not-allowed"
+                        />
+                        <span
+                          className={
+                            isRecipient
+                              ? "text-white/55"
+                              : checked
+                                ? "text-emerald-200"
+                                : "text-white/80"
+                          }
+                        >
+                          {it.label}
+                          {isRecipient ? (
+                            <span className="ml-1 text-[10px] uppercase tracking-[0.18em] text-white/40">
+                              (auto)
+                            </span>
+                          ) : null}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+              {!checklistComplete ? (
+                <p className="mt-3 text-[11px] text-amber-200/80">
+                  Tick every item before sending — these aren&apos;t enforced
+                  server-side, but the customer sees this report.
+                </p>
+              ) : (
+                <p className="mt-3 text-[11px] text-emerald-300/80">
+                  All checks complete. Send when ready.
+                </p>
+              )}
+            </div>
+          </div>
+          {sendBlockReason ? (
+            <p className="mt-4 rounded-md border border-amber-300/20 bg-amber-300/[0.05] px-3 py-2 text-[11px] text-amber-200">
+              <span className="font-semibold uppercase tracking-[0.16em] text-amber-100">
+                Send blocked:
+              </span>{" "}
+              {sendBlockReason}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Empty / queued / running / failed / sent — explicit state hints */}
       {reportStatus === "pending" && !markdown ? (
         <div className="border-b border-white/10 px-5 py-4 text-xs text-white/55">
@@ -535,18 +780,26 @@ export function AdminReportCard({
         </div>
       ) : null}
       {reportStatus === "failed" && reportError ? (
-        <details className="border-b border-white/10 bg-red-500/[0.04] px-5 py-3">
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-red-300">
-            Last audit error · expand for stderr
-          </summary>
-          <pre className="mt-3 max-h-[220px] overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-red-200">
+        <div className="border-b border-white/10 bg-red-500/[0.04] px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-300">
+            Audit failed
+          </p>
+          <p className="mt-1 text-[11px] text-red-200/80">
+            The worker reported an error. Read the stderr below before
+            re-running. Re-run with the <span className="text-white">Re-run GEO Audit</span> button once the underlying issue is resolved.
+          </p>
+          <pre className="mt-3 max-h-[260px] overflow-auto whitespace-pre-wrap rounded-md border border-red-400/20 bg-black/30 p-3 text-xs leading-relaxed text-red-200">
 {reportError}
           </pre>
-        </details>
+        </div>
       ) : null}
       {reportSentAt ? (
         <div className="border-b border-white/10 bg-emerald-300/[0.04] px-5 py-3 text-xs text-emerald-200">
-          Report sent to {order.email}
+          Report sent to <span className="text-white">{sentTo ?? order.email}</span>
+          {sentTo && sentTo.toLowerCase() !== order.email.toLowerCase() ? (
+            <span className="text-white/55"> (overrode original {order.email})</span>
+          ) : null}
+          {sentCc ? <span className="text-white/55"> · cc {sentCc}</span> : null}
           {" · "}
           {new Date(reportSentAt).toLocaleString()}. To send again, click{" "}
           <span className="text-white">force resend</span>.
@@ -692,21 +945,35 @@ function StatusBadges({
             ? "warn"
             : "muted";
 
-  const showReview =
-    reviewStatus === "approved" || reviewStatus === "needs_changes";
+  // Always show all four status dimensions so an operator scanning the queue
+  // can read paid · audit · review · sent at a glance — including the
+  // negative cases ("Not Reviewed" / "Not Sent"), which were previously
+  // implicit-by-absence and easy to miss.
   const reviewLabel =
-    reviewStatus === "approved" ? "Reviewed" : "Needs Changes";
-  const reviewToneClass: "ok" | "warn" =
-    reviewStatus === "approved" ? "ok" : "warn";
+    reviewStatus === "approved"
+      ? "Reviewed"
+      : reviewStatus === "needs_changes"
+        ? "Needs Changes"
+        : "Not Reviewed";
+  const reviewToneClass: "ok" | "warn" | "muted" =
+    reviewStatus === "approved"
+      ? "ok"
+      : reviewStatus === "needs_changes"
+        ? "warn"
+        : "muted";
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.18em]">
       <Pill tone={paymentStatus === "paid" ? "ok" : "warn"}>
-        Paid · ${(amount / 100).toFixed(0)}
+        {paymentStatus === "paid" ? `Paid · $${(amount / 100).toFixed(0)}` : "Unpaid"}
       </Pill>
       <Pill tone={reportToneClass}>{reportLabel}</Pill>
-      {showReview ? <Pill tone={reviewToneClass}>{reviewLabel}</Pill> : null}
-      {sentAt ? <Pill tone="ok">Sent {formatShort(sentAt)}</Pill> : null}
+      <Pill tone={reviewToneClass}>{reviewLabel}</Pill>
+      {sentAt ? (
+        <Pill tone="ok">Sent {formatShort(sentAt)}</Pill>
+      ) : (
+        <Pill tone="muted">Not Sent</Pill>
+      )}
       <span className="text-white/35">{formatShort(createdAt)}</span>
     </div>
   );

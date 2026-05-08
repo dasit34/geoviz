@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { prisma } from "@/lib/db";
 import {
-  bandLabelForOverall,
+  plainEnglishBandLabel,
   cleanScoreSectionBody,
   extractFixMeta,
   inferFixPriority,
@@ -71,9 +71,12 @@ export default async function PrintPage({
   const layout = parseReportSections(order.reportMarkdown);
   const businessLabel = order.businessName ?? order.email;
   const tone = scoreToneFromOverall(score.overall);
+  // Customer-facing band: plain-English (Strong / Good / Needs Work /
+  // Limited Visibility). The 5-band rubric labels stay available via
+  // bandLabelForOverall for any internal/admin surface.
   const band =
     typeof score.overall === "number"
-      ? bandLabelForOverall(score.overall)
+      ? plainEnglishBandLabel(score.overall)
       : score.status ?? "Pending";
 
   const scoreSection = layout.sections.find((s) => s.slug === "score");
@@ -151,7 +154,7 @@ export default async function PrintPage({
 
         {/* Score card */}
         <section className="mt-10">
-          <ReportScoreCard score={score} />
+          <ReportScoreCard score={score} markdown={order.reportMarkdown} />
           {scoreProse ? (
             <div className="report-band-explainer">
               <ReactMarkdown>{scoreProse}</ReactMarkdown>
