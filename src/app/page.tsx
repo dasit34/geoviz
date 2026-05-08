@@ -98,7 +98,10 @@ export default function Page() {
 
       {/* WHAT IS GEOVIZ — premium card grid. Four compact concepts a
           non-technical buyer can scan in five seconds. */}
-      <section className="border-t border-white/5 bg-ink-950">
+      <section
+        id="what-is-geoviz"
+        className="border-t border-white/5 bg-ink-950 scroll-mt-20"
+      >
         <div className="container-page py-14">
           <p className="section-eyebrow">What is GeoViz</p>
           <h2 className="h2 mt-3 max-w-3xl">What Is GeoViz?</h2>
@@ -106,7 +109,7 @@ export default function Page() {
             GeoViz shows whether AI systems can clearly read,
             understand, and recommend your business.
           </p>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <WhatCard
               icon={<IconEye />}
               title="AI Readability"
@@ -158,7 +161,10 @@ export default function Page() {
 
       {/* HOW IT WORKS — four clean steps. Horizontal on desktop (4-col),
           stacks on mobile so each step reads cleanly. */}
-      <section className="border-t border-white/5 bg-ink-950">
+      <section
+        id="how-it-works"
+        className="border-t border-white/5 bg-ink-950 scroll-mt-20"
+      >
         <div className="container-page py-14">
           <p className="section-eyebrow">How it works</p>
           <h2 className="h2 mt-3 max-w-2xl">
@@ -173,7 +179,7 @@ export default function Page() {
             <HowItWorksStep
               index={2}
               title="GeoViz analyzes AI visibility signals"
-              body="Automated AI-search analysis across schema, crawler access, trust, content, brand clarity, and tech."
+              body="Automated analysis across AI readability, crawl access, trust signals, content clarity, and technical signals."
             />
             <HowItWorksStep
               index={3}
@@ -190,7 +196,10 @@ export default function Page() {
       </section>
 
       {/* SAMPLE REPORT */}
-      <section className="border-t border-white/5 bg-ink-950">
+      <section
+        id="sample-report"
+        className="border-t border-white/5 bg-ink-950 scroll-mt-20"
+      >
         <div className="container-page py-16">
           <div className="grid gap-12 md:grid-cols-2 md:items-center">
             <div>
@@ -252,7 +261,7 @@ export default function Page() {
       {/* PRICING */}
       <section
         id="pricing"
-        className="relative border-t border-white/5 bg-ink-950"
+        className="relative border-t border-white/5 bg-ink-950 scroll-mt-20"
       >
         <div className="absolute inset-0 -z-10 bg-radial-orange opacity-50" />
         <div className="container-page py-20">
@@ -266,7 +275,7 @@ export default function Page() {
           </div>
 
           <div className="mx-auto mt-12 max-w-xl">
-            <div className="card relative overflow-hidden">
+            <div className="card card-hover relative overflow-hidden">
               <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-accent/20 blur-3xl" />
               <p className="pill">AI Visibility Audit</p>
               <div className="mt-5 flex items-end gap-3">
@@ -314,7 +323,7 @@ export default function Page() {
           were competing visually with the $97 anchor above. */}
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-16">
-          <div className="rounded-2xl border border-accent/30 bg-ink-900/70 p-8 md:p-10 shadow-card">
+          <div className="rounded-2xl border border-accent/30 bg-ink-900/70 p-8 md:p-10 shadow-card transition duration-200 ease-out hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-glow">
             <p className="section-eyebrow">Optional next step</p>
             <h2 className="h2 mt-3 max-w-2xl">
               Want us to fix what the audit found?
@@ -428,8 +437,8 @@ function WhatCard({
   body: string;
 }) {
   return (
-    <div className="card group relative transition hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-glow">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent/30 bg-accent/10 text-accent">
+    <div className="card card-hover group relative">
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent/30 bg-accent/10 text-accent transition group-hover:border-accent/60 group-hover:bg-accent/15">
         {icon}
       </div>
       <h3 className="mt-5 text-base font-semibold text-white">{title}</h3>
@@ -523,9 +532,9 @@ function HowItWorksStep({
   body: string;
 }) {
   return (
-    <div className="card relative">
+    <div className="card card-hover group relative">
       <div className="flex items-center gap-3">
-        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-accent/10 text-sm font-bold text-accent">
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-accent/10 text-sm font-bold text-accent transition group-hover:border-accent/70 group-hover:bg-accent/15">
           {index}
         </span>
         <h3 className="text-base font-semibold text-white">{title}</h3>
@@ -537,7 +546,7 @@ function HowItWorksStep({
 
 function InsightCard({ body }: { body: string }) {
   return (
-    <div className="card">
+    <div className="card card-hover">
       <div className="flex gap-3">
         <span
           aria-hidden

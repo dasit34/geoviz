@@ -39,6 +39,14 @@ body {
     @apply rounded-xl border border-white/10 bg-ink-900/60 p-6 shadow-card backdrop-blur-sm;
   }
 
+  /* Subtle premium hover for homepage cards. Adds a 1px lift, an
+     orange-tinted border, and the existing accent glow — opt-in via
+     the `card-hover` className so info-dense admin cards (which
+     contain interactive action buttons) don't pick up the lift. */
+  .card-hover {
+    @apply transition duration-200 ease-out hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-glow;
+  }
+
   .pill {
     @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs uppercase tracking-[0.18em] text-white/60;
   }

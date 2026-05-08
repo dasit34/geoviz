@@ -24,7 +24,7 @@ export function ReportPreview({
   const dash = (score / 100) * circumference;
 
   return (
-    <div className="card relative overflow-hidden">
+    <div className="card card-hover relative overflow-hidden">
       <div className="absolute inset-0 -z-10 bg-grid-fade opacity-70" />
       <div className="flex items-start justify-between">
         <div>
