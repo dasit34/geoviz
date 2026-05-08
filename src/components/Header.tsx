@@ -7,9 +7,6 @@ export function Header() {
       <div className="container-page flex h-16 items-center justify-between">
         <Logo />
         <nav className="hidden items-center gap-7 text-sm text-white/70 md:flex">
-          <Link href="/#what-we-check" className="transition hover:text-white">
-            What we check
-          </Link>
           <Link href="/sample-report" className="transition hover:text-white">
             Sample report
           </Link>
@@ -18,7 +15,7 @@ export function Header() {
           </Link>
         </nav>
         <Link href="/order" className="btn-primary text-sm">
-          Run my audit
+          Request my audit
         </Link>
       </div>
     </header>

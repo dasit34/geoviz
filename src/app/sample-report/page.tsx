@@ -32,7 +32,7 @@ export default function SampleReportPage() {
               </p>
             </div>
             <Link href="/order" className="btn-primary">
-              Get My Audit — $97
+              Request My AI Visibility Audit
             </Link>
           </div>
         </div>
@@ -55,7 +55,7 @@ export default function SampleReportPage() {
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Link href="/order" className="btn-primary">
-              Get My Audit — $97
+              Request My AI Visibility Audit
             </Link>
             <Link href="/" className="btn-ghost">
               Back to homepage
