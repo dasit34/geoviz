@@ -41,7 +41,7 @@ export default function Page() {
           <div>
             <span className="pill animate-pulseSoft">
               <span className="h-1.5 w-1.5 rounded-full bg-accent" /> AI search
-              audit for local businesses
+              visibility audits for businesses
             </span>
             <h1 className="h1 mt-5">
               When customers ask{" "}

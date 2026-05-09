@@ -20,7 +20,7 @@ export function Header() {
             How it works
           </Link>
           <Link
-            href="/#sample-report"
+            href="/sample-report"
             className="transition hover:text-white"
           >
             Sample report
