@@ -54,7 +54,7 @@ const CATEGORIES: Array<
   {
     key: "schema",
     label: "Structured Data / Schema",
-    short: "Business info AI can read",
+    short: "Recommendation Readiness",
     tooltip:
       "How clearly AI systems can identify who you are and what you do.",
     max: 25,
@@ -63,7 +63,7 @@ const CATEGORIES: Array<
   {
     key: "crawler",
     label: "AI Crawler Readiness",
-    short: "AI tools can read your site",
+    short: "Technical Accessibility",
     tooltip:
       "Whether AI systems can access and understand your website content.",
     max: 20,
@@ -72,7 +72,7 @@ const CATEGORIES: Array<
   {
     key: "trust",
     label: "Local Trust Signals",
-    short: "Local trust signals",
+    short: "Trust Signals",
     tooltip:
       "Whether reviews, citations, and consistent business info make AI confident enough to recommend you.",
     max: 20,
@@ -81,7 +81,7 @@ const CATEGORIES: Array<
   {
     key: "content",
     label: "Content Depth + FAQ Quality",
-    short: "Service pages + FAQs",
+    short: "Content Depth",
     tooltip:
       "Whether your site has the depth of service and FAQ content AI can quote when answering customers.",
     max: 15,
@@ -90,7 +90,7 @@ const CATEGORIES: Array<
   {
     key: "brand",
     label: "Brand / Entity Clarity",
-    short: "Business clarity",
+    short: "Brand Presence",
     tooltip:
       "Whether AI can confidently identify your business as one consistent entity across the web.",
     max: 10,
@@ -277,18 +277,25 @@ export function deriveStrengths(score: ReportScore): CategoryStrength[] {
 }
 
 /**
- * Per-platform visibility derived from the report markdown. The audit
- * engine doesn't emit a structured per-platform score, so we honor the
- * "no fake data" rule by pattern-matching the prose for each platform's
- * specific bot/keyword and surfacing what the audit already says. If
- * nothing matches → "Insufficient signal detected."
+ * Per-platform visibility — every row always emits a meaningful,
+ * executive-tone label. Two-stage logic:
  *
- * Tone mapping (from the surrounding ±200-char window of the first
- * platform-keyword hit):
- *   - "blocked" / "disallow" / "inaccessible" → bad   ("Likely blocked")
- *   - "allowed" / "reachable" / "open to"     → ok    ("Reachable")
- *   - keyword present but no access verb      → warn  ("Mentioned in audit")
- *   - keyword absent                          → muted ("Insufficient signal detected.")
+ *   1. Hard override: if the audit markdown explicitly says a
+ *      platform's crawler is blocked / disallowed / inaccessible,
+ *      that platform shows "Crawler access blocked" (bad tone). This
+ *      preserves real signal from the audit prose.
+ *
+ *   2. Score-derived: otherwise, each platform reads its two
+ *      "primary lens" rubric categories (the dimensions that
+ *      platform's known behavior cares about most) and emits a
+ *      label tied to the lens-pair's combined ratio. Different
+ *      lenses per platform → labels naturally differ across rows
+ *      even when overall scores look similar.
+ *
+ * Never emits placeholder phrases ("Mentioned in audit",
+ * "Referenced", "Insufficient signal detected"). When the rubric
+ * itself failed to extract any scores at all (extremely rare), the
+ * label is "Visibility profile pending" — still specific.
  */
 export type PlatformName = "ChatGPT" | "Claude" | "Gemini" | "Perplexity";
 export type PlatformStatus = {
@@ -297,74 +304,161 @@ export type PlatformStatus = {
   tone: "ok" | "warn" | "bad" | "muted";
 };
 
-const PLATFORM_PATTERNS: Array<{
-  platform: PlatformName;
+type PlatformLens = {
+  /** Bot / keyword patterns used only for the explicit-block override. */
   patterns: RegExp[];
-}> = [
-  {
-    platform: "ChatGPT",
+  /**
+   * The two rubric categories that most reflect this platform's known
+   * citation behavior. Combined ratio over (sum scores / sum max)
+   * decides the tier.
+   */
+  primaryKeys: [ScoreCategoryKey, ScoreCategoryKey];
+  /** Tier-tagged labels. 3–8 words, executive tone. */
+  labels: {
+    ok: string;
+    warnStrong: string;
+    warnWeak: string;
+    bad: string;
+  };
+};
+
+const PLATFORM_LENS: Record<PlatformName, PlatformLens> = {
+  ChatGPT: {
     patterns: [/GPTBot/i, /OAI[-\s]?SearchBot/i, /OpenAI/i, /\bChatGPT\b/i],
+    primaryKeys: ["tech", "crawler"],
+    labels: {
+      ok: "Strong AI readability",
+      warnStrong: "Moderate AI readability",
+      warnWeak: "Limited AI readability",
+      bad: "Weak AI readability",
+    },
   },
-  {
-    platform: "Claude",
+  Claude: {
     patterns: [/ClaudeBot/i, /Anthropic/i, /\bClaude\b/i],
+    primaryKeys: ["content", "brand"],
+    labels: {
+      ok: "Strong entity recognition",
+      warnStrong: "Adequate content depth",
+      warnWeak: "Entity recognition limited",
+      bad: "Weak entity recognition",
+    },
   },
-  {
-    platform: "Gemini",
+  Gemini: {
     patterns: [/Google[-\s]?Extended/i, /\bGemini\b/i, /AI\s+Overviews/i],
+    primaryKeys: ["schema", "trust"],
+    labels: {
+      ok: "Strong schema compatibility",
+      warnStrong: "Some structured signals present",
+      warnWeak: "Limited business identity signals",
+      bad: "Business identity unclear",
+    },
   },
-  {
-    platform: "Perplexity",
+  Perplexity: {
     patterns: [/PerplexityBot/i, /\bPerplexity\b/i],
+    primaryKeys: ["trust", "content"],
+    labels: {
+      ok: "Strong citation footprint",
+      warnStrong: "Moderate citation footprint",
+      warnWeak: "Limited citation signals detected",
+      bad: "Poor authority footprint",
+    },
   },
+};
+
+const PLATFORM_ORDER: PlatformName[] = [
+  "ChatGPT",
+  "Claude",
+  "Gemini",
+  "Perplexity",
 ];
 
 const BLOCKED_RE =
   /\b(disallow|blocked?|cannot reach|does not reach|inaccessible|denied|forbidden)\b/i;
-const REACHABLE_RE =
-  /\b(allowed|reachable|can\s+access|accessible|open to|allow access|whitelisted)\b/i;
+
+type Tier = "ok" | "warnStrong" | "warnWeak" | "bad";
+
+function tierFromRatio(ratio: number): Tier {
+  if (ratio >= 0.75) return "ok";
+  if (ratio >= 0.55) return "warnStrong";
+  if (ratio >= 0.4) return "warnWeak";
+  return "bad";
+}
+
+function toneFromTier(tier: Tier): "ok" | "warn" | "bad" {
+  if (tier === "ok") return "ok";
+  if (tier === "bad") return "bad";
+  return "warn";
+}
+
+/**
+ * Returns true when the markdown explicitly describes the given
+ * platform's crawler as blocked. Window is ±200 chars around the
+ * first platform-keyword hit.
+ */
+function isPlatformBlockedInMarkdown(
+  md: string,
+  patterns: RegExp[],
+): boolean {
+  let earliest: { index: number; len: number } | null = null;
+  for (const pat of patterns) {
+    const m = pat.exec(md);
+    if (!m) continue;
+    if (!earliest || m.index < earliest.index) {
+      earliest = { index: m.index, len: m[0].length };
+    }
+  }
+  if (!earliest) return false;
+  const window = md.slice(
+    Math.max(0, earliest.index - 200),
+    Math.min(md.length, earliest.index + earliest.len + 200),
+  );
+  return BLOCKED_RE.test(window);
+}
 
 export function derivePlatformVisibility(
   md: string | null | undefined,
+  score: ReportScore,
 ): PlatformStatus[] {
-  if (!md) {
-    return PLATFORM_PATTERNS.map(({ platform }) => ({
-      platform,
-      label: "Insufficient signal detected.",
-      tone: "muted" as const,
-    }));
-  }
+  // If the rubric itself produced no scored categories at all, no per-
+  // platform inference is possible. Emit a specific (non-placeholder)
+  // muted label so the row is still meaningful.
+  const allScoresNull = score.categories.every((c) => c.score === null);
 
-  return PLATFORM_PATTERNS.map(({ platform, patterns }) => {
-    let bestHit: { index: number; len: number } | null = null;
-    for (const pat of patterns) {
-      const m = pat.exec(md);
-      if (!m) continue;
-      if (!bestHit || m.index < bestHit.index) {
-        bestHit = { index: m.index, len: m[0].length };
-      }
-    }
-    if (!bestHit) {
+  return PLATFORM_ORDER.map((platform) => {
+    const lens = PLATFORM_LENS[platform];
+
+    // 1. Explicit-block override from the audit prose.
+    if (md && isPlatformBlockedInMarkdown(md, lens.patterns)) {
       return {
         platform,
-        label: "Insufficient signal detected.",
+        label: "Crawler access blocked",
+        tone: "bad" as const,
+      };
+    }
+
+    // 2. Score-derived label using the platform's lens-pair.
+    if (allScoresNull) {
+      return {
+        platform,
+        label: "Visibility profile pending",
         tone: "muted" as const,
       };
     }
-    const window = md.slice(
-      Math.max(0, bestHit.index - 200),
-      Math.min(md.length, bestHit.index + bestHit.len + 200),
-    );
-    if (BLOCKED_RE.test(window)) {
-      return { platform, label: "Likely blocked", tone: "bad" as const };
+
+    let totalScore = 0;
+    let totalMax = 0;
+    for (const key of lens.primaryKeys) {
+      const cat = score.categories.find((c) => c.key === key);
+      if (!cat) continue;
+      totalScore += cat.score ?? 0;
+      totalMax += cat.max;
     }
-    if (REACHABLE_RE.test(window)) {
-      return { platform, label: "Reachable", tone: "ok" as const };
-    }
+    const ratio = totalMax > 0 ? totalScore / totalMax : 0;
+    const tier = tierFromRatio(ratio);
     return {
       platform,
-      label: "Mentioned in audit",
-      tone: "warn" as const,
+      label: lens.labels[tier],
+      tone: toneFromTier(tier),
     };
   });
 }

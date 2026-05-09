@@ -55,7 +55,7 @@ export function ReportViewerClient({
   const issueItems = whySection ? parseEnumeratedItems(whySection.body) : [];
   const fixItems = fixSection ? parseEnumeratedItems(fixSection.body) : [];
   const strengths = deriveStrengths(score);
-  const platforms = derivePlatformVisibility(markdown);
+  const platforms = derivePlatformVisibility(markdown, score);
 
   return (
     <div>
@@ -80,16 +80,7 @@ export function ReportViewerClient({
       ) : (
         <div className="report-host bg-ink-950 text-white -mx-6 -my-6 md:-mx-8 md:-my-8 px-6 py-6 md:px-8 md:py-8 rounded-lg">
           {issueItems.length >= 2 || fixItems.length >= 2 ? (
-            <section className="report-snapshot mt-6">
-              <div className="report-snapshot-chart">
-                <p className="section-eyebrow">Score distribution</p>
-                <h2 className="h3 mt-2">All six dimensions at a glance.</h2>
-                <RadarChart categories={score.categories} />
-              </div>
-              <div className="report-snapshot-headlines">
-                <ExecutiveAtAGlance issues={issueItems} fixes={fixItems} />
-              </div>
-            </section>
+            <ExecutiveAtAGlance issues={issueItems} fixes={fixItems} />
           ) : null}
 
           <div className="mt-12">
@@ -105,7 +96,7 @@ export function ReportViewerClient({
             available signals change.
           </p>
 
-          {/* Category breakdown — six fixed cards */}
+          {/* Category breakdown — primary, with radar as secondary support. */}
           <section className="report-section-card report-section-impact mt-10">
             <div className="report-section-card-header">
               <p className="section-eyebrow">
@@ -118,6 +109,12 @@ export function ReportViewerClient({
               {score.categories.map((cat) => (
                 <CategoryScoreCard key={cat.key} category={cat} />
               ))}
+            </div>
+            <div className="category-score-radar-wrap mt-8">
+              <p className="category-score-radar-label">
+                Score distribution at a glance
+              </p>
+              <RadarChart categories={score.categories} />
             </div>
           </section>
 
@@ -157,9 +154,9 @@ export function ReportViewerClient({
             </div>
             <h2 className="h2 mt-3">How each AI search system sees you.</h2>
             <p className="muted mt-3 max-w-2xl text-sm">
-              Derived from your audit&rsquo;s findings. Where the audit
-              doesn&rsquo;t surface a platform-specific signal, we say
-              so instead of guessing.
+              A short interpretive read of how each platform is
+              positioned to find, parse, and confidently recommend your
+              business.
             </p>
             <div className="platform-list mt-6">
               {platforms.map((p) => (

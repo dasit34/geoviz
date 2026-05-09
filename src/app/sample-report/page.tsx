@@ -29,15 +29,14 @@ const GEOVIZ_BUSINESS_LABEL = "GeoViz";
 
 async function findGeoVizSampleAudit() {
   if (!isDatabaseConfigured()) return null;
+  // Must satisfy ALL of: geoviz.ai URL, "GeoViz" in the business name,
+  // generated status, non-null markdown. Most recent wins.
   return prisma.auditOrder.findFirst({
     where: {
       websiteUrl: { contains: "geoviz.ai", mode: "insensitive" },
+      businessName: { contains: "GeoViz", mode: "insensitive" },
       reportStatus: "generated",
       reportMarkdown: { not: null },
-      OR: [
-        { businessName: null },
-        { businessName: { not: { startsWith: "[CAL]" } } },
-      ],
     },
     orderBy: { reportGeneratedAt: "desc" },
   });
