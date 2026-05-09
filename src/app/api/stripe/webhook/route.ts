@@ -68,9 +68,21 @@ export async function POST(req: Request) {
 
     if (!order) {
       console.warn(
-        "[stripe-webhook] skipping admin email — order not persisted (no duplicate-tracking row available)",
+        "[stripe-webhook] skipping emails — order not persisted (no duplicate-tracking row available)",
       );
     } else {
+      // Send the customer confirmation FIRST so the customer's "we got
+      // your request" email lands before the admin gets a "new order"
+      // ping in the same inbox. Both are dedup'd at the DB level so
+      // webhook replays are safe.
+      try {
+        await notifyCustomer(req, session, order);
+      } catch (err) {
+        console.error(
+          "[stripe-webhook] notifyCustomer error (non-fatal):",
+          err,
+        );
+      }
       try {
         await notifyAdmin(session, order);
       } catch (err) {
@@ -258,4 +270,254 @@ async function notifyAdmin(
   console.log(
     `[stripe-webhook] email sent successfully — id=${result.data?.id ?? "unknown"}`,
   );
+}
+
+/**
+ * Sends the "GeoViz Audit Request Received" confirmation to the customer
+ * immediately after the webhook persists the paid order. Race-safe via
+ * an atomic DB claim on the `customerConfirmationSentAt` column —
+ * concurrent webhook replays can't double-send. If the email send
+ * fails after the claim, the column is rolled back so the next
+ * delivery (manual resend / future retry) can try again.
+ */
+async function notifyCustomer(
+  req: Request,
+  session: Stripe.Checkout.Session,
+  order: AuditOrder,
+): Promise<void> {
+  if (order.paymentStatus !== "paid") {
+    console.log(
+      "[stripe-webhook] notifyCustomer skipped — order not in paid state",
+    );
+    return;
+  }
+
+  const customerEmail = (
+    session.customer_details?.email ??
+    session.customer_email ??
+    order.email ??
+    ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!customerEmail) {
+    console.warn(
+      `[stripe-webhook] notifyCustomer skipped — no customer email on session=${session.id}`,
+    );
+    return;
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customerEmail)) {
+    console.warn(
+      `[stripe-webhook] notifyCustomer skipped — invalid customer email "${customerEmail}" on session=${session.id}`,
+    );
+    return;
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn(
+      "[stripe-webhook] notifyCustomer skipped — RESEND_API_KEY not set",
+    );
+    return;
+  }
+
+  // ---- Atomic claim — only proceed if customerConfirmationSentAt is
+  // still null. Concurrent webhook replays will see the timestamp
+  // already set on the second attempt and bail out cleanly.
+  const claim = await prisma.auditOrder.updateMany({
+    where: { id: order.id, customerConfirmationSentAt: null },
+    data: { customerConfirmationSentAt: new Date() },
+  });
+  if (claim.count !== 1) {
+    console.log(
+      `[stripe-webhook] notifyCustomer skipped — already sent for orderId=${order.id}`,
+    );
+    return;
+  }
+
+  const businessLabel = order.businessName || order.websiteUrl;
+  const baseUrl = resolveCustomerLinkBase(req);
+  const orderUrl = `${baseUrl}/checkout/success?session_id=${encodeURIComponent(session.id)}`;
+
+  const subject = "GeoViz Audit Request Received";
+  const textBody = [
+    "Hi —",
+    "",
+    `We've received your audit request${businessLabel ? ` for ${businessLabel}` : ""} and started reviewing your AI visibility signals.`,
+    "",
+    "Your reviewed GeoViz audit will be delivered within 24 hours.",
+    "",
+    `Order confirmation: ${orderUrl}`,
+    "",
+    "Reply to this email if anything is wrong with the order details.",
+    "",
+    "— GeoViz",
+    "",
+  ].join("\n");
+
+  const htmlBody = buildCustomerConfirmationHtml({
+    businessLabel,
+    orderUrl,
+  });
+
+  console.log(
+    `[stripe-webhook] CUSTOMER_DISPATCH orderId=${order.id} to=${customerEmail} from=${FROM_EMAIL} subject="${subject}"`,
+  );
+
+  let resendId: string | undefined;
+  try {
+    const result = await getResend().emails.send({
+      from: FROM_EMAIL,
+      to: customerEmail,
+      subject,
+      text: textBody,
+      html: htmlBody,
+    });
+    if (result.error) {
+      console.error(
+        `[stripe-webhook] CUSTOMER_FAILED orderId=${order.id} to=${customerEmail} resendError="${result.error.name}: ${result.error.message}"`,
+      );
+      // Roll back the claim so a future attempt can retry.
+      await prisma.auditOrder
+        .update({
+          where: { id: order.id },
+          data: { customerConfirmationSentAt: null },
+        })
+        .catch(() => {
+          /* ignore — best-effort rollback */
+        });
+      return;
+    }
+    resendId = result.data?.id;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[stripe-webhook] CUSTOMER_FAILED orderId=${order.id} to=${customerEmail} threwException="${message}"`,
+    );
+    await prisma.auditOrder
+      .update({
+        where: { id: order.id },
+        data: { customerConfirmationSentAt: null },
+      })
+      .catch(() => {
+        /* ignore */
+      });
+    return;
+  }
+
+  console.log(
+    `[stripe-webhook] CUSTOMER_SENT orderId=${order.id} to=${customerEmail} resendId=${resendId ?? "unknown"}`,
+  );
+}
+
+/**
+ * Resolve the public site URL for links in the customer email. Same
+ * resolution chain as the checkout route, with a louder fallback log
+ * if everything resolves to localhost (which would mean a misconfigured
+ * production env). Never returns trailing slash.
+ */
+function resolveCustomerLinkBase(req: Request): string {
+  const candidates = [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.SITE_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
+  ];
+  for (const c of candidates) {
+    if (c && c.trim().length > 0) {
+      return c.trim().replace(/\/+$/, "");
+    }
+  }
+  // Last-ditch: parse from the incoming request origin.
+  try {
+    const origin = new URL(req.url).origin;
+    if (!/localhost/.test(origin)) return origin;
+    if (process.env.NODE_ENV !== "production") return origin;
+  } catch {
+    // fall through
+  }
+  console.warn(
+    "[stripe-webhook] resolveCustomerLinkBase falling back to localhost — set NEXT_PUBLIC_SITE_URL on Vercel.",
+  );
+  return "http://localhost:3000";
+}
+
+/**
+ * HTML body for the audit-received confirmation. Same dark-on-light
+ * template as the report-delivery email so customers recognize the
+ * brand on both touchpoints.
+ */
+function buildCustomerConfirmationHtml(args: {
+  businessLabel: string | null;
+  orderUrl: string;
+}): string {
+  const { businessLabel, orderUrl } = args;
+  const safeBiz = escapeHtml(businessLabel ?? "your business");
+  const safeUrl = escapeHtml(orderUrl);
+  return `<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter','Helvetica Neue',Arial,sans-serif;color:#1a1a1a;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f5f5f5;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #ececec;">
+            <tr>
+              <td style="padding:28px 32px 8px;">
+                <div style="color:#ff7a18;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">GeoViz</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 8px;">
+                <h1 style="margin:8px 0 18px;font-size:22px;line-height:1.3;color:#111;font-weight:700;letter-spacing:-0.01em;">
+                  Audit request received
+                </h1>
+                <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#2a2a2a;">
+                  We've received your audit request for <strong style="color:#111;">${safeBiz}</strong> and started reviewing your AI visibility signals.
+                </p>
+                <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#2a2a2a;">
+                  Your reviewed GeoViz audit will be delivered within <strong style="color:#111;">24 hours</strong>. Most reports land the same business day.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td align="left" style="padding:4px 32px 8px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="background:#ff7a18;border-radius:6px;">
+                      <a href="${safeUrl}" style="display:inline-block;padding:13px 22px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;">View Order Confirmation →</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px 8px;">
+                <p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#2a2a2a;">
+                  Reply to this email if anything is wrong with your order details.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px 26px;border-top:1px solid #eee;">
+                <p style="margin:14px 0 0;font-size:11.5px;line-height:1.5;color:#888;">
+                  GeoViz · AI Visibility Audits · geoviz.app
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

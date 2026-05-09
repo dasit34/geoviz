@@ -110,6 +110,15 @@ export async function POST(
 
   const businessLabel = order.businessName || order.websiteUrl;
   const baseUrl = buildPdfBaseUrl(req);
+  // Loud warning if production accidentally resolves to localhost — the
+  // customer email shouldn't ever go out with localhost links. The send
+  // continues so admin can see what happened, but the issue is
+  // surfaced in the function logs immediately.
+  if (process.env.NODE_ENV === "production" && /localhost|127\.0\.0\.1/.test(baseUrl)) {
+    console.error(
+      `[admin-send] WARNING orderId=${order.id} baseUrl=${baseUrl} resolved to localhost in production — set NEXT_PUBLIC_APP_URL or NEXT_PUBLIC_SITE_URL on Vercel.`,
+    );
+  }
   const viewUrl = `${baseUrl.replace(/\/$/, "")}/report/${encodeURIComponent(order.id)}/print`;
   const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/report/${encodeURIComponent(order.id)}/pdf`;
 

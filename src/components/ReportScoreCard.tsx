@@ -53,34 +53,6 @@ export function ReportScoreCard({
         </div>
         <p className="score-card-blurb">{blurbForTone(tone)}</p>
       </div>
-      <ul className="score-card-bars">
-        {score.categories.map((cat) => {
-          const filled = cat.score === null ? 0 : cat.score / cat.max;
-          const barTone = toneForRatio(filled);
-          return (
-            <li key={cat.key} className="score-card-bar">
-              <div className="score-card-bar-row">
-                <span
-                  className="score-card-bar-label"
-                  title={cat.tooltip}
-                >
-                  {cat.short}
-                </span>
-                <span className="score-card-bar-value">
-                  {cat.score === null ? "—" : cat.score}
-                  <span className="score-card-bar-max"> / {cat.max}</span>
-                </span>
-              </div>
-              <div className="score-card-bar-track">
-                <div
-                  className={`score-card-bar-fill score-card-bar-fill-${barTone}`}
-                  style={{ width: `${Math.round(filled * 100)}%` }}
-                />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
       {isJsHeavy ? (
         <p className="score-card-advisory">
           Modern app-style websites can sometimes make AI readability more
@@ -117,8 +89,3 @@ function blurbForTone(tone: "ok" | "warn" | "bad" | "muted"): string {
   }
 }
 
-function toneForRatio(ratio: number): "ok" | "warn" | "bad" {
-  if (ratio >= 0.7) return "ok";
-  if (ratio >= 0.4) return "warn";
-  return "bad";
-}

@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
-import ReactMarkdown from "react-markdown";
 import { prisma } from "@/lib/db";
 import {
   plainEnglishBandLabel,
   cleanScoreSectionBody,
+  derivePlatformVisibility,
+  deriveStrengths,
   extractFixMeta,
   inferFixPriority,
   inferIssueSeverity,
@@ -12,11 +13,17 @@ import {
   parseReportScoreBreakdown,
   parseReportSections,
   scoreToneFromOverall,
+  stripInlineMarkdown,
   stripScoreMath,
   type ReportSection,
 } from "@/lib/parse-report";
+import { Prose, InlineProse } from "@/components/Prose";
 import { ReportScoreCard } from "@/components/ReportScoreCard";
 import { ReportCtaCard } from "@/components/ReportCtaCard";
+import { CategoryScoreCard } from "@/components/CategoryScoreCard";
+import { StrengthCard } from "@/components/StrengthCard";
+import { PlatformVisibilityRow } from "@/components/PlatformVisibilityRow";
+import { RadarChart } from "@/components/RadarChart";
 import "./print.css";
 
 /**
@@ -88,13 +95,21 @@ export default async function PrintPage({
   const scoreProse = scoreSection
     ? cleanScoreSectionBody(scoreSection.body)
     : "";
-  // First sentence of the score prose becomes the hero one-liner.
-  const heroAssessment = scoreProse.split(/(?<=[.!?])\s/).find((s) =>
-    s.trim().length > 12,
+  // First sentence of the score prose becomes the hero one-liner. We
+  // strip inline markdown markers so a model-emitted "**Your site is
+  // ...**" doesn't show literal asterisks in the hero.
+  const heroAssessment = stripInlineMarkdown(
+    scoreProse.split(/(?<=[.!?])\s/).find((s) => s.trim().length > 12),
   );
 
   const issueItems = whySection ? parseEnumeratedItems(whySection.body) : [];
   const fixItems = fixSection ? parseEnumeratedItems(fixSection.body) : [];
+
+  // Derived rendering data — pure functions over the existing rubric
+  // output and existing markdown. The audit engine is unchanged; we
+  // just project its output into the new template's component slots.
+  const strengths = deriveStrengths(score);
+  const platforms = derivePlatformVisibility(order.reportMarkdown);
 
   return (
     <div className="report-host bg-ink-950 text-white">
@@ -143,27 +158,100 @@ export default async function PrintPage({
           </dl>
         </header>
 
-        {/* Executive At-a-Glance — first-screen preview of issues + fixes
-            so the customer sees the punchline before scrolling. */}
+        {/* Executive Snapshot — radar chart on the left, top issues +
+            fixes headlines on the right. Replaces the older
+            ExecutiveAtAGlance with a more visual side-by-side. */}
         {issueItems.length >= 2 || fixItems.length >= 2 ? (
-          <ExecutiveAtAGlance
-            issues={issueItems}
-            fixes={fixItems}
-          />
+          <section className="report-snapshot mt-12">
+            <div className="report-snapshot-chart">
+              <p className="section-eyebrow">Score distribution</p>
+              <h2 className="h3 mt-2">All six dimensions at a glance.</h2>
+              <RadarChart categories={score.categories} />
+            </div>
+            <div className="report-snapshot-headlines">
+              <ExecutiveAtAGlance issues={issueItems} fixes={fixItems} />
+            </div>
+          </section>
         ) : null}
 
-        {/* Score card */}
-        <section className="mt-10">
+        {/* Score card — overall number + tone label, no bars (the
+            Category Score Cards section below renders the breakdown). */}
+        <section className="mt-12">
           <ReportScoreCard score={score} markdown={order.reportMarkdown} />
           {scoreProse ? (
             <div className="report-band-explainer">
-              <ReactMarkdown>{scoreProse}</ReactMarkdown>
+              <Prose>{scoreProse}</Prose>
             </div>
           ) : null}
           <p className="report-score-consistency-note">
             Scores may vary slightly as pages, crawlability, and
             available signals change.
           </p>
+        </section>
+
+        {/* CATEGORY SCORE CARDS — six fixed cards, one per rubric
+            category. Same template every report; only the numbers,
+            tone, and explainer text change with the audit data. */}
+        <section className="report-section-card report-section-impact mt-10">
+          <div className="report-section-card-header">
+            <p className="section-eyebrow">Section 02 · Category breakdown</p>
+            <span className="pill">6 dimensions scored</span>
+          </div>
+          <h2 className="h2 mt-3">Where the score comes from.</h2>
+          <div className="category-score-grid mt-6">
+            {score.categories.map((cat) => (
+              <CategoryScoreCard key={cat.key} category={cat} />
+            ))}
+          </div>
+        </section>
+
+        {/* TOP STRENGTHS — derived from category scores ≥ 70%. Section
+            renders unconditionally so the report template stays
+            identical across audits; the empty state explains when no
+            category cleared the threshold. */}
+        <section className="report-section-card report-section-strengths mt-10">
+          <div className="report-section-card-header">
+            <p className="section-eyebrow">Section 03 · Top strengths</p>
+            {strengths.length > 0 ? (
+              <span className="pill">{strengths.length} surfaced</span>
+            ) : null}
+          </div>
+          <h2 className="h2 mt-3">What&rsquo;s working in your favor.</h2>
+          {strengths.length > 0 ? (
+            <div className="strength-grid mt-6">
+              {strengths.map((s) => (
+                <StrengthCard key={s.key} label={s.label} />
+              ))}
+            </div>
+          ) : (
+            <p className="muted mt-5 text-sm">
+              No category scored at least 70% of its maximum. Every
+              dimension has room to grow — see Top Issues and Quick
+              Fixes below.
+            </p>
+          )}
+        </section>
+
+        {/* PLATFORM VISIBILITY — four fixed rows. Status is derived from
+            platform-specific keywords in the audit markdown; rows
+            without a hit show "Insufficient signal detected." (no
+            invented data). */}
+        <section className="report-section-card report-section-impact mt-10">
+          <div className="report-section-card-header">
+            <p className="section-eyebrow">Section 04 · Platform visibility</p>
+            <span className="pill">ChatGPT · Claude · Gemini · Perplexity</span>
+          </div>
+          <h2 className="h2 mt-3">How each AI search system sees you.</h2>
+          <p className="muted mt-3 max-w-2xl text-sm">
+            Derived from your audit&rsquo;s findings. Where the audit
+            doesn&rsquo;t surface a platform-specific signal, we say so
+            instead of guessing.
+          </p>
+          <div className="platform-list mt-6">
+            {platforms.map((p) => (
+              <PlatformVisibilityRow key={p.platform} status={p} />
+            ))}
+          </div>
         </section>
 
         {/* Why customers don't see you — issue cards */}
@@ -243,9 +331,7 @@ export default async function PrintPage({
                 Click to expand — for your developer
               </span>
             </summary>
-            <div className="report-prose mt-5">
-              <ReactMarkdown>{stripScoreMath(techSection.body)}</ReactMarkdown>
-            </div>
+            <Prose className="mt-5">{stripScoreMath(techSection.body)}</Prose>
           </details>
         ) : null}
 
@@ -287,7 +373,9 @@ function ExecutiveAtAGlance({
                 return (
                   <li key={`issue-${i}`} className="report-glance-row">
                     <span className="report-glance-index">#{i + 1}</span>
-                    <span className="report-glance-title">{it.title}</span>
+                    <span className="report-glance-title">
+                      <InlineProse>{it.title}</InlineProse>
+                    </span>
                     <span
                       className={`severity-badge severity-${sev.tone} report-glance-badge`}
                     >
@@ -308,7 +396,9 @@ function ExecutiveAtAGlance({
                 return (
                   <li key={`fix-${i}`} className="report-glance-row">
                     <span className="report-glance-index">#{i + 1}</span>
-                    <span className="report-glance-title">{it.title}</span>
+                    <span className="report-glance-title">
+                      <InlineProse>{it.title}</InlineProse>
+                    </span>
                     <span
                       className={`severity-badge severity-${fix.severity.tone} report-glance-badge`}
                     >
@@ -358,9 +448,7 @@ function ItemListSection({
           ))}
         </ol>
       ) : (
-        <div className="report-prose mt-5">
-          <ReactMarkdown>{stripScoreMath(fallbackBody)}</ReactMarkdown>
-        </div>
+        <Prose className="mt-5">{stripScoreMath(fallbackBody)}</Prose>
       )}
     </section>
   );
@@ -393,7 +481,9 @@ function ItemCard({
           {kind === "issue" ? <WarningIcon /> : <WrenchIcon />}
         </span>
         <span className="report-item-card-index">#{index}</span>
-        <h3 className="report-item-card-title">{item.title}</h3>
+        <h3 className="report-item-card-title">
+          <InlineProse>{item.title}</InlineProse>
+        </h3>
       </div>
       <div className="report-item-card-badges">
         {kind === "issue" && inferredIssueSeverity ? (
@@ -433,14 +523,16 @@ function ItemCard({
           {fields.map((f, i) => (
             <div className="report-item-card-field" key={`${f.label}-${i}`}>
               <dt>{f.label}</dt>
-              <dd>{f.content}</dd>
+              <dd>
+                <InlineProse>{f.content}</InlineProse>
+              </dd>
             </div>
           ))}
         </dl>
       ) : (
-        <div className="report-prose report-item-card-body">
-          <ReactMarkdown>{stripScoreMath(item.body)}</ReactMarkdown>
-        </div>
+        <Prose className="report-item-card-body">
+          {stripScoreMath(item.body)}
+        </Prose>
       )}
     </li>
   );
@@ -504,9 +596,7 @@ function SectionCard({
         {badge ? <span className="pill">{badge}</span> : null}
       </div>
       <h2 className="h2 mt-3">{section.heading}</h2>
-      <div className="report-prose mt-5">
-        <ReactMarkdown>{stripScoreMath(section.body)}</ReactMarkdown>
-      </div>
+      <Prose className="mt-5">{stripScoreMath(section.body)}</Prose>
     </section>
   );
 }

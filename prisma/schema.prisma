@@ -43,6 +43,7 @@ model AuditOrder {
   qualityScore     Int?
   sentTo           String?
   sentCc           String?
+  customerConfirmationSentAt DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 

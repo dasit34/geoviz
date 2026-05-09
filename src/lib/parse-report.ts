@@ -228,6 +228,148 @@ export function plainEnglishBandLabel(overall: number | null): string {
 }
 
 /**
+ * Tone bucket for a category score given its score-to-max ratio.
+ * Mirrors the score card's bar-fill colors so all category-level
+ * surfaces (cards, radar, strengths) read the same way.
+ */
+export function categoryToneFromRatio(ratio: number): "ok" | "warn" | "bad" {
+  if (ratio >= 0.7) return "ok";
+  if (ratio >= 0.4) return "warn";
+  return "bad";
+}
+
+/**
+ * Strengths derived from the rubric output — categories that score
+ * ≥ 70% of their max are surfaced as named strengths. The labels are
+ * fixed per category key so different reports show the same wording
+ * for the same category. NEVER invents data: if no category clears the
+ * threshold the array is empty and the renderer shows an empty state.
+ */
+const STRENGTH_LABELS: Record<ScoreCategoryKey, string> = {
+  schema: "Strong structured business identity",
+  crawler: "Open to AI crawlers across major platforms",
+  trust: "Solid trust signals — reviews, citations, consistent NAP",
+  content: "Deep service and FAQ content for AI to quote",
+  brand: "Clear, consistent brand identity across the web",
+  tech: "Highly AI-readable site structure",
+};
+const STRENGTH_THRESHOLD = 0.7;
+
+export type CategoryStrength = {
+  key: ScoreCategoryKey;
+  label: string;
+  score: number;
+  max: number;
+};
+
+export function deriveStrengths(score: ReportScore): CategoryStrength[] {
+  return score.categories
+    .filter(
+      (c): c is ScoreCategory & { score: number } =>
+        typeof c.score === "number" && c.score / c.max >= STRENGTH_THRESHOLD,
+    )
+    .map((c) => ({
+      key: c.key,
+      label: STRENGTH_LABELS[c.key] ?? c.label,
+      score: c.score,
+      max: c.max,
+    }));
+}
+
+/**
+ * Per-platform visibility derived from the report markdown. The audit
+ * engine doesn't emit a structured per-platform score, so we honor the
+ * "no fake data" rule by pattern-matching the prose for each platform's
+ * specific bot/keyword and surfacing what the audit already says. If
+ * nothing matches → "Insufficient signal detected."
+ *
+ * Tone mapping (from the surrounding ±200-char window of the first
+ * platform-keyword hit):
+ *   - "blocked" / "disallow" / "inaccessible" → bad   ("Likely blocked")
+ *   - "allowed" / "reachable" / "open to"     → ok    ("Reachable")
+ *   - keyword present but no access verb      → warn  ("Mentioned in audit")
+ *   - keyword absent                          → muted ("Insufficient signal detected.")
+ */
+export type PlatformName = "ChatGPT" | "Claude" | "Gemini" | "Perplexity";
+export type PlatformStatus = {
+  platform: PlatformName;
+  label: string;
+  tone: "ok" | "warn" | "bad" | "muted";
+};
+
+const PLATFORM_PATTERNS: Array<{
+  platform: PlatformName;
+  patterns: RegExp[];
+}> = [
+  {
+    platform: "ChatGPT",
+    patterns: [/GPTBot/i, /OAI[-\s]?SearchBot/i, /OpenAI/i, /\bChatGPT\b/i],
+  },
+  {
+    platform: "Claude",
+    patterns: [/ClaudeBot/i, /Anthropic/i, /\bClaude\b/i],
+  },
+  {
+    platform: "Gemini",
+    patterns: [/Google[-\s]?Extended/i, /\bGemini\b/i, /AI\s+Overviews/i],
+  },
+  {
+    platform: "Perplexity",
+    patterns: [/PerplexityBot/i, /\bPerplexity\b/i],
+  },
+];
+
+const BLOCKED_RE =
+  /\b(disallow|blocked?|cannot reach|does not reach|inaccessible|denied|forbidden)\b/i;
+const REACHABLE_RE =
+  /\b(allowed|reachable|can\s+access|accessible|open to|allow access|whitelisted)\b/i;
+
+export function derivePlatformVisibility(
+  md: string | null | undefined,
+): PlatformStatus[] {
+  if (!md) {
+    return PLATFORM_PATTERNS.map(({ platform }) => ({
+      platform,
+      label: "Insufficient signal detected.",
+      tone: "muted" as const,
+    }));
+  }
+
+  return PLATFORM_PATTERNS.map(({ platform, patterns }) => {
+    let bestHit: { index: number; len: number } | null = null;
+    for (const pat of patterns) {
+      const m = pat.exec(md);
+      if (!m) continue;
+      if (!bestHit || m.index < bestHit.index) {
+        bestHit = { index: m.index, len: m[0].length };
+      }
+    }
+    if (!bestHit) {
+      return {
+        platform,
+        label: "Insufficient signal detected.",
+        tone: "muted" as const,
+      };
+    }
+    const window = md.slice(
+      Math.max(0, bestHit.index - 200),
+      Math.min(md.length, bestHit.index + bestHit.len + 200),
+    );
+    if (BLOCKED_RE.test(window)) {
+      return { platform, label: "Likely blocked", tone: "bad" as const };
+    }
+    if (REACHABLE_RE.test(window)) {
+      return { platform, label: "Reachable", tone: "ok" as const };
+    }
+    return {
+      platform,
+      label: "Mentioned in audit",
+      tone: "warn" as const,
+    };
+  });
+}
+
+/**
  * Returns true when the report markdown describes a heavily JS-rendered,
  * SPA, or marketplace-style site — the cases where AI readability is
  * structurally harder regardless of effort. Pure heuristic over the
@@ -611,6 +753,34 @@ export function parseLabeledFields(body: string): LabeledField[] {
     if (label && content) out.push({ label, content });
   }
   return out.length >= 2 ? out : [];
+}
+
+/**
+ * Strip the most common inline markdown markers from a one-line
+ * string so it can render cleanly inside contexts that don't tolerate
+ * block elements — the hero one-liner, executive-glance card titles,
+ * labeled-field labels, etc. NOT a markdown sanitizer; just a
+ * pragmatic "render this as plain text" helper.
+ *
+ * Removes: **bold**, __bold__, *italic*, _italic_, `code`, [text](url)
+ * (keeping the visible text), heading marks at line start, and
+ * collapses any double-asterisk leftovers.
+ */
+export function stripInlineMarkdown(s: string | null | undefined): string {
+  if (!s) return "";
+  let out = s;
+  // Markdown links → visible text only.
+  out = out.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  // Bold / italic / inline code emphasis markers.
+  out = out.replace(/\*\*([^*]+)\*\*/g, "$1");
+  out = out.replace(/__([^_]+)__/g, "$1");
+  out = out.replace(/(?<!\w)\*([^*\n]+)\*(?!\w)/g, "$1");
+  out = out.replace(/(?<!\w)_([^_\n]+)_(?!\w)/g, "$1");
+  out = out.replace(/`([^`]+)`/g, "$1");
+  // Heading markers at line start.
+  out = out.replace(/^#{1,6}\s+/gm, "");
+  // Collapse residual whitespace.
+  return out.replace(/\s+/g, " ").trim();
 }
 
 /**

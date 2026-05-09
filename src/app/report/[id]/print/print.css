@@ -374,8 +374,345 @@
 .report-band-explainer p {
   margin: 0 0 10px;
 }
+.report-band-explainer p:last-child {
+  margin-bottom: 0;
+}
 .report-band-explainer strong {
   color: #ffffff;
+}
+/* Bullets / numbered lists inside the band explainer pick up the
+   same prose typography as the rest of the report so a model-emitted
+   list never collapses to one flat line. */
+.report-band-explainer ul,
+.report-band-explainer ol {
+  margin: 8px 0 10px;
+  padding-left: 20px;
+}
+.report-band-explainer ul li::marker,
+.report-band-explainer ol li::marker {
+  color: #ff7a18;
+  font-weight: 700;
+}
+.report-band-explainer li {
+  margin: 4px 0;
+}
+.report-band-explainer h3,
+.report-band-explainer h4 {
+  color: #ffffff;
+  margin: 12px 0 6px;
+  font-weight: 700;
+}
+
+/* ============================================================
+   New report template (May 2026 redesign) — visual audit dashboard
+   ============================================================ */
+
+/* ---- Executive snapshot: radar chart + headlines side-by-side ---- */
+.report-snapshot {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 32px;
+  align-items: stretch;
+  padding: 28px 30px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 13, 22, 0.55);
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.report-snapshot-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.report-snapshot-chart .radar-chart {
+  margin-top: auto;
+  width: 100%;
+  height: auto;
+  max-width: 320px;
+  align-self: center;
+}
+.report-snapshot-headlines {
+  display: flex;
+  align-items: flex-start;
+}
+.report-snapshot-headlines .report-glance {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  width: 100%;
+}
+@media (max-width: 720px) {
+  .report-snapshot {
+    grid-template-columns: 1fr;
+    padding: 22px 22px;
+    gap: 20px;
+  }
+  .report-snapshot-chart .radar-chart {
+    max-width: 280px;
+  }
+}
+
+/* ---- Radar chart (pure SVG) ---- */
+.radar-chart {
+  display: block;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.radar-chart-ring {
+  fill: rgba(255, 255, 255, 0.02);
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+}
+.radar-chart-ring-3 {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+.radar-chart-axis {
+  stroke: rgba(255, 255, 255, 0.06);
+  stroke-width: 1;
+}
+.radar-chart-data {
+  fill: rgba(255, 122, 24, 0.2);
+  stroke: #ff7a18;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.radar-chart-data-point {
+  fill: #ff9a3c;
+  stroke: #05070d;
+  stroke-width: 1.5;
+}
+.radar-chart-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.02em;
+}
+
+/* ---- Category score cards (6-card grid) ---- */
+.category-score-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (min-width: 900px) {
+  .category-score-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.category-score-card {
+  padding: 18px 20px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  page-break-inside: avoid;
+  break-inside: avoid;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.category-score-tone-ok {
+  border-color: rgba(108, 227, 154, 0.3);
+}
+.category-score-tone-warn {
+  border-color: rgba(255, 196, 107, 0.3);
+}
+.category-score-tone-bad {
+  border-color: rgba(255, 154, 60, 0.3);
+}
+.category-score-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+.category-score-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: -0.005em;
+}
+.category-score-num {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.category-score-tone-ok .category-score-num {
+  color: #6ce39a;
+}
+.category-score-tone-warn .category-score-num {
+  color: #ffc46b;
+}
+.category-score-tone-bad .category-score-num {
+  color: #ff9a3c;
+}
+.category-score-max {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  font-weight: 600;
+}
+.category-score-bar-track {
+  height: 6px;
+  margin-top: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.category-score-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease-out;
+}
+.category-score-bar-fill-ok {
+  background: #2da94f;
+}
+.category-score-bar-fill-warn {
+  background: #ffc46b;
+}
+.category-score-bar-fill-bad {
+  background: #ff7a18;
+}
+.category-score-bar-fill-muted {
+  background: rgba(255, 255, 255, 0.18);
+}
+.category-score-explainer {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ---- Top Strengths (green-check card grid) ---- */
+.strength-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 720px) {
+  .strength-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.strength-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(108, 227, 154, 0.25);
+  background: rgba(45, 169, 79, 0.07);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.strength-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  background: rgba(45, 169, 79, 0.2);
+  color: #6ce39a;
+}
+.strength-card-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.45;
+}
+.report-section-strengths {
+  border-color: rgba(108, 227, 154, 0.18);
+}
+
+/* ---- Platform Visibility (4-row list) ---- */
+.platform-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.platform-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.platform-tone-ok {
+  border-color: rgba(108, 227, 154, 0.25);
+}
+.platform-tone-warn {
+  border-color: rgba(255, 196, 107, 0.25);
+}
+.platform-tone-bad {
+  border-color: rgba(255, 154, 60, 0.3);
+}
+.platform-row-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+.platform-row-marker {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+.platform-tone-ok .platform-row-marker {
+  background: #6ce39a;
+}
+.platform-tone-warn .platform-row-marker {
+  background: #ffc46b;
+}
+.platform-tone-bad .platform-row-marker {
+  background: #ff9a3c;
+}
+.platform-row-badge {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid;
+}
+.platform-row-badge-ok {
+  color: #6ce39a;
+  background: rgba(45, 169, 79, 0.12);
+  border-color: rgba(108, 227, 154, 0.4);
+}
+.platform-row-badge-warn {
+  color: #ffc46b;
+  background: rgba(201, 134, 4, 0.14);
+  border-color: rgba(255, 196, 107, 0.4);
+}
+.platform-row-badge-bad {
+  color: #ff9a3c;
+  background: rgba(255, 122, 24, 0.12);
+  border-color: rgba(255, 122, 24, 0.4);
+}
+.platform-row-badge-muted {
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.14);
+  letter-spacing: 0.08em;
 }
 
 /* ---- section cards ---- */
@@ -626,6 +963,27 @@
   font-size: 14.5px;
   line-height: 1.7;
   color: rgba(255, 255, 255, 0.85);
+  /* Defensive: long URLs / unbroken tokens never overflow the card. */
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+/* Defensive image rendering — model rarely emits images, but if it
+   does we cap them so they never overflow the card width. */
+.report-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+/* Inline list fallback used by InlineProse when a model emits a
+   bullet list inside an inline context (e.g. inside a <dd>). The
+   real <ul>/<li> are mapped to <span>s with a leading dot separator
+   so the surrounding layout doesn't break. */
+.report-inline-list {
+  display: inline;
+  color: inherit;
+}
+.report-inline-list-item {
+  display: inline;
 }
 .report-prose h2,
 .report-prose h3,
@@ -1185,5 +1543,39 @@
      a tight rhythm rather than a double gap. */
   .report-section-card + .cta-card {
     margin-top: 18px !important;
+  }
+
+  /* New-template print tightening (May 2026 redesign). The snapshot,
+     category cards, strength cards, and platform rows all need
+     atomic-unit protection so they don't split mid-component, plus
+     tighter print-only margins. */
+  .report-snapshot {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    padding: 22px 24px !important;
+    grid-template-columns: minmax(240px, 1fr) 1fr !important;
+    gap: 24px !important;
+    margin-top: 22px !important;
+  }
+  .report-snapshot-chart .radar-chart {
+    max-width: 240px !important;
+  }
+  .category-score-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .category-score-card {
+    padding: 14px 16px 16px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .strength-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .strength-card,
+  .platform-row {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }

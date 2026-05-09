@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
 import {
   cleanScoreSectionBody,
+  derivePlatformVisibility,
+  deriveStrengths,
   extractFixMeta,
   inferFixPriority,
   inferIssueSeverity,
@@ -13,8 +14,13 @@ import {
   parseReportSections,
   stripScoreMath,
 } from "@/lib/parse-report";
+import { Prose, InlineProse } from "./Prose";
 import { ReportScoreCard } from "./ReportScoreCard";
 import { ReportCtaCard } from "./ReportCtaCard";
+import { CategoryScoreCard } from "./CategoryScoreCard";
+import { StrengthCard } from "./StrengthCard";
+import { PlatformVisibilityRow } from "./PlatformVisibilityRow";
+import { RadarChart } from "./RadarChart";
 import "@/app/report/[id]/print/print.css";
 
 /**
@@ -48,6 +54,8 @@ export function ReportViewerClient({
     : "";
   const issueItems = whySection ? parseEnumeratedItems(whySection.body) : [];
   const fixItems = fixSection ? parseEnumeratedItems(fixSection.body) : [];
+  const strengths = deriveStrengths(score);
+  const platforms = derivePlatformVisibility(markdown);
 
   return (
     <div>
@@ -72,20 +80,93 @@ export function ReportViewerClient({
       ) : (
         <div className="report-host bg-ink-950 text-white -mx-6 -my-6 md:-mx-8 md:-my-8 px-6 py-6 md:px-8 md:py-8 rounded-lg">
           {issueItems.length >= 2 || fixItems.length >= 2 ? (
-            <ExecutiveAtAGlance issues={issueItems} fixes={fixItems} />
+            <section className="report-snapshot mt-6">
+              <div className="report-snapshot-chart">
+                <p className="section-eyebrow">Score distribution</p>
+                <h2 className="h3 mt-2">All six dimensions at a glance.</h2>
+                <RadarChart categories={score.categories} />
+              </div>
+              <div className="report-snapshot-headlines">
+                <ExecutiveAtAGlance issues={issueItems} fixes={fixItems} />
+              </div>
+            </section>
           ) : null}
-          <div className="mt-6">
+
+          <div className="mt-12">
             <ReportScoreCard score={score} markdown={markdown} />
           </div>
           {scoreProse ? (
             <div className="report-band-explainer">
-              <ReactMarkdown>{scoreProse}</ReactMarkdown>
+              <Prose>{scoreProse}</Prose>
             </div>
           ) : null}
           <p className="report-score-consistency-note">
             Scores may vary slightly as pages, crawlability, and
             available signals change.
           </p>
+
+          {/* Category breakdown — six fixed cards */}
+          <section className="report-section-card report-section-impact mt-10">
+            <div className="report-section-card-header">
+              <p className="section-eyebrow">
+                Section 02 · Category breakdown
+              </p>
+              <span className="pill">6 dimensions scored</span>
+            </div>
+            <h2 className="h2 mt-3">Where the score comes from.</h2>
+            <div className="category-score-grid mt-6">
+              {score.categories.map((cat) => (
+                <CategoryScoreCard key={cat.key} category={cat} />
+              ))}
+            </div>
+          </section>
+
+          {/* Top strengths — derived from category scores ≥ 70% */}
+          <section className="report-section-card report-section-strengths mt-10">
+            <div className="report-section-card-header">
+              <p className="section-eyebrow">Section 03 · Top strengths</p>
+              {strengths.length > 0 ? (
+                <span className="pill">{strengths.length} surfaced</span>
+              ) : null}
+            </div>
+            <h2 className="h2 mt-3">What&rsquo;s working in your favor.</h2>
+            {strengths.length > 0 ? (
+              <div className="strength-grid mt-6">
+                {strengths.map((s) => (
+                  <StrengthCard key={s.key} label={s.label} />
+                ))}
+              </div>
+            ) : (
+              <p className="muted mt-5 text-sm">
+                No category scored at least 70% of its maximum. Every
+                dimension has room to grow — see Top Issues and Quick
+                Fixes below.
+              </p>
+            )}
+          </section>
+
+          {/* Platform visibility — four fixed rows */}
+          <section className="report-section-card report-section-impact mt-10">
+            <div className="report-section-card-header">
+              <p className="section-eyebrow">
+                Section 04 · Platform visibility
+              </p>
+              <span className="pill">
+                ChatGPT · Claude · Gemini · Perplexity
+              </span>
+            </div>
+            <h2 className="h2 mt-3">How each AI search system sees you.</h2>
+            <p className="muted mt-3 max-w-2xl text-sm">
+              Derived from your audit&rsquo;s findings. Where the audit
+              doesn&rsquo;t surface a platform-specific signal, we say
+              so instead of guessing.
+            </p>
+            <div className="platform-list mt-6">
+              {platforms.map((p) => (
+                <PlatformVisibilityRow key={p.platform} status={p} />
+              ))}
+            </div>
+          </section>
 
           {whySection ? (
             <ItemListSection
@@ -159,9 +240,7 @@ export function ReportViewerClient({
                   Click to expand — for your developer
                 </span>
               </summary>
-              <div className="report-prose mt-5">
-                <ReactMarkdown>{stripScoreMath(techSection.body)}</ReactMarkdown>
-              </div>
+              <Prose className="mt-5">{stripScoreMath(techSection.body)}</Prose>
             </details>
           ) : null}
         </div>
@@ -195,7 +274,9 @@ function ExecutiveAtAGlance({
                 return (
                   <li key={`issue-${i}`} className="report-glance-row">
                     <span className="report-glance-index">#{i + 1}</span>
-                    <span className="report-glance-title">{it.title}</span>
+                    <span className="report-glance-title">
+                      <InlineProse>{it.title}</InlineProse>
+                    </span>
                     <span
                       className={`severity-badge severity-${sev.tone} report-glance-badge`}
                     >
@@ -216,7 +297,9 @@ function ExecutiveAtAGlance({
                 return (
                   <li key={`fix-${i}`} className="report-glance-row">
                     <span className="report-glance-index">#{i + 1}</span>
-                    <span className="report-glance-title">{it.title}</span>
+                    <span className="report-glance-title">
+                      <InlineProse>{it.title}</InlineProse>
+                    </span>
                     <span
                       className={`severity-badge severity-${fix.severity.tone} report-glance-badge`}
                     >
@@ -264,9 +347,7 @@ function ItemListSection({
           ))}
         </ol>
       ) : (
-        <div className="report-prose mt-5">
-          <ReactMarkdown>{stripScoreMath(fallbackBody)}</ReactMarkdown>
-        </div>
+        <Prose className="mt-5">{stripScoreMath(fallbackBody)}</Prose>
       )}
     </section>
   );
@@ -297,7 +378,9 @@ function ItemCard({
           {kind === "issue" ? <WarningIcon /> : <WrenchIcon />}
         </span>
         <span className="report-item-card-index">#{index}</span>
-        <h3 className="report-item-card-title">{item.title}</h3>
+        <h3 className="report-item-card-title">
+          <InlineProse>{item.title}</InlineProse>
+        </h3>
       </div>
       <div className="report-item-card-badges">
         {kind === "issue" && inferredIssueSeverity ? (
@@ -337,14 +420,16 @@ function ItemCard({
           {fields.map((f, i) => (
             <div className="report-item-card-field" key={`${f.label}-${i}`}>
               <dt>{f.label}</dt>
-              <dd>{f.content}</dd>
+              <dd>
+                <InlineProse>{f.content}</InlineProse>
+              </dd>
             </div>
           ))}
         </dl>
       ) : (
-        <div className="report-prose report-item-card-body">
-          <ReactMarkdown>{stripScoreMath(item.body)}</ReactMarkdown>
-        </div>
+        <Prose className="report-item-card-body">
+          {stripScoreMath(item.body)}
+        </Prose>
       )}
     </li>
   );
@@ -370,9 +455,7 @@ function SimpleSectionCard({
         {badge ? <span className="pill">{badge}</span> : null}
       </div>
       <h2 className="h2 mt-3">{heading}</h2>
-      <div className="report-prose mt-5">
-        <ReactMarkdown>{stripScoreMath(body)}</ReactMarkdown>
-      </div>
+      <Prose className="mt-5">{stripScoreMath(body)}</Prose>
     </section>
   );
 }
