@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { AuditReportContent } from "@/components/AuditReportContent";
+import {
+  parseReportScoreBreakdown,
+  plainEnglishBandLabel,
+  scoreToneFromOverall,
+} from "@/lib/parse-report";
 import {
   SAMPLE_REGISTRY,
   findAvailableSamples,
@@ -13,13 +17,16 @@ import {
 import "@/app/report/[id]/print/print.css";
 
 /**
- * Public featured sample report. Renders whichever slug
- * `getFeaturedSlug()` returns (default: `ohio-roofing-siding` — the
- * closest archetype to the actual GeoViz buyer; override per
- * environment via `GEO_VIZ_FEATURED_SAMPLE`). When that audit doesn't
- * yet exist in the database, falls back to a styled "coming soon"
- * page that still surfaces the registry's other available samples
- * below.
+ * Public sample-report INDEX. Renders a teaser/summary for the
+ * featured registry slug (default: `ohio-roofing-siding`; override
+ * via `GEO_VIZ_FEATURED_SAMPLE`) plus a "View Full Sample Report"
+ * button linking to `/sample-report/<slug>` for the full polished
+ * render. The full `<AuditReportContent />` lives only on the
+ * per-slug pages so this index stays scannable.
+ *
+ * "Additional sample audits" cards below show every other registry
+ * slug that has a generated audit. When the featured audit doesn't
+ * yet exist, falls back to a "coming soon" hero in the same style.
  */
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -49,11 +56,9 @@ export default async function SampleReportPage() {
       <Header />
 
       {featuredAudit && featuredAudit.reportMarkdown ? (
-        <FeaturedSample
+        <FeaturedSampleSummary
           entry={featuredEntry}
-          orderId={featuredAudit.id}
           reportMarkdown={featuredAudit.reportMarkdown}
-          reportGeneratedAt={featuredAudit.reportGeneratedAt}
         />
       ) : (
         <FallbackHero entry={featuredEntry} />
@@ -70,41 +75,67 @@ export default async function SampleReportPage() {
   );
 }
 
-function FeaturedSample({
+function FeaturedSampleSummary({
   entry,
-  orderId,
   reportMarkdown,
-  reportGeneratedAt,
 }: {
   entry: SampleEntry;
-  orderId: string;
   reportMarkdown: string;
-  reportGeneratedAt: Date | null;
 }) {
-  return (
-    <>
-      <section className="border-b border-white/5 bg-ink-950">
-        <div className="container-page py-10 text-center md:text-left">
-          <p className="pill">Sample · {entry.businessName}</p>
-          <h1 className="h2 mt-3 max-w-3xl mx-auto md:mx-0">
-            What a GeoViz audit actually looks like.
-          </h1>
-          <p className="muted mt-3 max-w-2xl mx-auto md:mx-0">
-            {entry.archetypeBlurb} Identical scoring rubric, layout, and
-            rendering to the report paying customers receive — only the
-            audited site is different.
-          </p>
-        </div>
-      </section>
+  // Pull just enough to make the index card substantive: the overall
+  // score and the plain-English band. The full breakdown (radar,
+  // categories, strengths, etc.) renders only on /sample-report/<slug>.
+  const score = parseReportScoreBreakdown(reportMarkdown);
+  const tone = scoreToneFromOverall(score.overall);
+  const band =
+    typeof score.overall === "number"
+      ? plainEnglishBandLabel(score.overall)
+      : null;
+  const reportHref = `/sample-report/${entry.slug}`;
 
-      <AuditReportContent
-        orderId={orderId}
-        businessLabel={entry.businessName}
-        websiteUrl={entry.publicUrl}
-        reportMarkdown={reportMarkdown}
-        reportGeneratedAt={reportGeneratedAt}
-      />
-    </>
+  return (
+    <section className="relative border-b border-white/5">
+      <div className="absolute inset-0 -z-10 bg-radial-orange opacity-50" />
+      <div className="container-page py-16">
+        <div className="grid gap-10 md:grid-cols-[1.5fr_auto] md:items-center">
+          <div>
+            <p className="pill">Featured sample · {entry.businessName}</p>
+            <h1 className="h1 mt-4 max-w-3xl">
+              See exactly what your audit will look like.
+            </h1>
+            <p className="muted mt-5 max-w-2xl text-base leading-relaxed">
+              {entry.archetypeBlurb} Identical scoring rubric, layout,
+              and rendering to the report paying customers receive.
+            </p>
+            {typeof score.overall === "number" ? (
+              <div className="mt-7 flex flex-wrap items-center gap-4">
+                <span
+                  className={`text-5xl font-bold report-band-inline-${tone}`}
+                >
+                  {score.overall}
+                </span>
+                <span className="text-2xl text-white/45">/ 100</span>
+                {band ? (
+                  <span
+                    className={`report-band-pill report-band-pill-${tone}`}
+                  >
+                    {band}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-3 md:flex-col md:items-end">
+            <Link href={reportHref} className="btn-primary text-base">
+              View Full Sample Report
+            </Link>
+            <Link href="/order" className="btn-ghost text-base">
+              Request my audit
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

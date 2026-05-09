@@ -19,7 +19,6 @@ import { prisma, isDatabaseConfigured } from "@/lib/db";
  */
 export type SampleSlug =
   | "geoviz"
-  | "anthropic"
   | "charles-boyk-law"
   | "ohio-roofing-siding";
 
@@ -43,14 +42,6 @@ export const SAMPLE_REGISTRY: SampleEntry[] = [
     businessName: "GeoViz",
     archetypeBlurb:
       "Self-audit of GeoViz's own public website — the SaaS product behind these reports.",
-  },
-  {
-    slug: "anthropic",
-    publicUrl: "https://www.anthropic.com",
-    urlMatch: "anthropic.com",
-    businessName: "Anthropic",
-    archetypeBlurb:
-      "AI research lab — large-brand, content-rich, structured-data heavy.",
   },
   {
     slug: "charles-boyk-law",
