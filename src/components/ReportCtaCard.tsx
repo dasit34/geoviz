@@ -35,8 +35,9 @@ export function ReportCtaCard({
           Want GeoViz to fix this for you?
         </h2>
         <p className="cta-card-lede">
-          We&rsquo;ll handle the technical updates found in this report
-          so AI tools can better understand and recommend your business.
+          We&rsquo;ll implement the fixes surfaced in this report so AI
+          search platforms can confidently identify, trust, and
+          recommend your business.
         </p>
 
         <div className="cta-card-badges">

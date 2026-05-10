@@ -8,8 +8,9 @@ export function Footer() {
         <div className="space-y-2">
           <Logo />
           <p className="max-w-md">
-            GeoViz audits whether AI tools recommend your business. We deliver a
-            full visibility report by email — typically within 24 hours.
+            GeoViz audits how AI search platforms read, trust, and
+            recommend your business. Full scored report delivered by
+            email — typically within 24 hours.
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 md:items-end">

@@ -92,8 +92,8 @@ export function ReportViewerClient({
             </div>
           ) : null}
           <p className="report-score-consistency-note">
-            Scores may vary slightly as pages, crawlability, and
-            available signals change.
+            Scores are directional benchmarks based on publicly
+            accessible AI-search signals.
           </p>
 
           {/* Category breakdown — primary, with radar as secondary support. */}

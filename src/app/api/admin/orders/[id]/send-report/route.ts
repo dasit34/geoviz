@@ -264,7 +264,7 @@ function pdfFilenameFor(id: string, businessName: string | null): string {
 }
 
 const FALLBACK_BIGGEST_ISSUE =
-  "Your audit highlights specific reasons your business isn't being recommended by AI tools — open the report to see them.";
+  "Your audit identifies the highest-impact gaps preventing AI search platforms from confidently recommending your business — open the report for the ranked fixes.";
 
 // Pull a one-line teaser from the "Why Your Business Is Not Showing Up"
 // section of the audit markdown for the email preview/callout. Tolerates

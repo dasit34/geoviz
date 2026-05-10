@@ -80,11 +80,11 @@ function riskLabelForTone(tone: "ok" | "warn" | "bad" | "muted"): string {
 function blurbForTone(tone: "ok" | "warn" | "bad" | "muted"): string {
   switch (tone) {
     case "ok":
-      return "AI tools have a clear picture of your business and you have a real chance of being recommended when local customers ask.";
+      return "AI search platforms have enough verified signals to confidently surface this business when customers ask for a local recommendation.";
     case "warn":
-      return "AI tools see some of what you do, but enough is missing that customers may pick a competitor when they ask for a local pro.";
+      return "AI search platforms can read parts of this business clearly, but key signals are missing — competitors with cleaner data are more likely to be cited.";
     case "bad":
-      return "AI tools don't have what they need to recommend you. When customers ask, your business is being skipped.";
+      return "AI search platforms lack enough verified signals to confidently surface this business.";
     default:
       return "Score breakdown will appear here once the audit completes.";
   }

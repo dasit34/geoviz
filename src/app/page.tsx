@@ -119,7 +119,7 @@ export default function Page() {
             <WhatCard
               icon={<IconShield />}
               title="Trust Signals"
-              body="Can AI tools verify your reputation, services, and credibility?"
+              body="Can AI search platforms verify your reputation, services, and credibility?"
             />
             <WhatCard
               icon={<IconTarget />}
