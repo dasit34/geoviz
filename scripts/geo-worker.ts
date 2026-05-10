@@ -44,6 +44,7 @@ import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { PrismaClient } from "@prisma/client";
 import { getDbFingerprint } from "../src/lib/db-fingerprint";
+import { notifyOperatorReportReady } from "../src/lib/notify-operator-report-ready";
 
 const TIMEOUT_MS = Number(process.env.GEO_WORKER_TIMEOUT_MS ?? 300_000); // 5 min hard cap
 const POLL_MS = Number(process.env.GEO_WORKER_POLL_MS ?? 12_000); // loop-mode poll cadence
@@ -1503,6 +1504,23 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
             `[geo-worker] score breakdown orderId=${candidate.id} ${breakdownLog}`,
           );
         }
+        // Operator notification — internal "report ready for review"
+        // ping. The function never throws; logs success/failure
+        // internally and returns a boolean. Wrapped in catch as a
+        // belt-and-suspenders so the worker never fails on email.
+        await notifyOperatorReportReady({
+          orderId: candidate.id,
+          businessName: candidate.businessName,
+          customerEmail: candidate.email,
+          websiteUrl: candidate.websiteUrl,
+          reportMarkdown: result.markdown,
+          reportGeneratedAt: saved.reportGeneratedAt ?? new Date(),
+        }).catch((err) => {
+          logErr(
+            `[geo-worker] notifyOperatorReportReady error orderId=${candidate.id} (non-fatal):`,
+            err,
+          );
+        });
         log(
           `[geo-worker] audit completed orderId=${candidate.id} elapsedMs=${result.elapsedMs}`,
         );

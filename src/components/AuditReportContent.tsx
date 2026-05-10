@@ -9,11 +9,13 @@ import {
   parseLabeledFields,
   parseReportScoreBreakdown,
   parseReportSections,
+  parseScoreDrivers,
   plainEnglishBandLabel,
   scoreToneFromOverall,
   stripInlineMarkdown,
   stripScoreMath,
   type ReportSection,
+  type ScoreDrivers,
 } from "@/lib/parse-report";
 import { Prose, InlineProse } from "@/components/Prose";
 import { ReportScoreCard } from "@/components/ReportScoreCard";
@@ -84,6 +86,16 @@ export function AuditReportContent({
   const issueItems = whySection ? parseEnumeratedItems(whySection.body) : [];
   const fixItems = fixSection ? parseEnumeratedItems(fixSection.body) : [];
 
+  // Structured executive summary — extracted from the score prose so
+  // the opening of the report scans as 2–3 short groups instead of a
+  // dense paragraph. The renderer takes over from `<Prose>{scoreProse}</Prose>`
+  // whenever any group has content.
+  const scoreDrivers = parseScoreDrivers(scoreProse);
+  const summaryHasContent =
+    scoreDrivers.positive.length > 0 ||
+    scoreDrivers.negative.length > 0 ||
+    fixItems.length > 0;
+
   const strengths = deriveStrengths(score);
   const platforms = derivePlatformVisibility(reportMarkdown, score);
 
@@ -145,7 +157,12 @@ export function AuditReportContent({
         {/* Overall score card */}
         <section className="mt-12">
           <ReportScoreCard score={score} markdown={reportMarkdown} />
-          {scoreProse ? (
+          {summaryHasContent ? (
+            <ExecutiveSummaryBlock
+              drivers={scoreDrivers}
+              fixes={fixItems.slice(0, 3).map((f) => f.title)}
+            />
+          ) : scoreProse ? (
             <div className="report-band-explainer">
               <Prose>{scoreProse}</Prose>
             </div>
@@ -323,6 +340,76 @@ const SECTION_EYEBROWS: Record<string, string> = {
 };
 
 type EnumeratedItem = { title: string; body: string };
+
+function ExecutiveSummaryBlock({
+  drivers,
+  fixes,
+}: {
+  drivers: ScoreDrivers;
+  fixes: string[];
+}) {
+  return (
+    <div className="report-band-explainer report-summary">
+      {drivers.positive.length > 0 ? (
+        <div className="report-summary-group">
+          <p className="report-summary-label report-summary-label-positive">
+            Strong signals
+          </p>
+          <ul className="report-summary-list">
+            {drivers.positive.map((item, i) => (
+              <li key={`pos-${i}`} className="report-summary-item">
+                <span className="report-summary-marker report-summary-marker-positive">
+                  ✓
+                </span>
+                <span className="report-summary-text">
+                  <InlineProse>{item}</InlineProse>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {drivers.negative.length > 0 ? (
+        <div className="report-summary-group">
+          <p className="report-summary-label report-summary-label-negative">
+            Biggest visibility gaps
+          </p>
+          <ul className="report-summary-list">
+            {drivers.negative.map((item, i) => (
+              <li key={`neg-${i}`} className="report-summary-item">
+                <span className="report-summary-marker report-summary-marker-negative">
+                  ✕
+                </span>
+                <span className="report-summary-text">
+                  <InlineProse>{item}</InlineProse>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {fixes.length > 0 ? (
+        <div className="report-summary-group">
+          <p className="report-summary-label report-summary-label-fix">
+            Fastest recommended fixes
+          </p>
+          <ul className="report-summary-list">
+            {fixes.map((title, i) => (
+              <li key={`fix-${i}`} className="report-summary-item">
+                <span className="report-summary-marker report-summary-marker-fix">
+                  →
+                </span>
+                <span className="report-summary-text">
+                  <InlineProse>{title}</InlineProse>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function ExecutiveAtAGlance({
   issues,

@@ -665,6 +665,52 @@ function stripWrappingSeparators(s: string): string {
 }
 
 /**
+ * Structured score drivers parsed out of the score-section body.
+ * Used by the renderer to build the executive-summary block (Strong
+ * signals + Biggest visibility gaps) instead of dumping the raw
+ * driver paragraph as prose.
+ */
+export type ScoreDrivers = {
+  positive: string[];
+  negative: string[];
+};
+
+/**
+ * Extracts ✅ / ✓ / ❌ / ✗ markers and the prose that follows each
+ * one, regardless of whether the source body is in inline-paragraph
+ * form ("✅ Strong A. ❌ Weak B.") or bullet-list form ("- ✅ Strong
+ * A\n- ❌ Weak B"). Empty lists when the body has no markers.
+ *
+ * Each item is the text that follows its marker, trimmed of bullet
+ * prefixes and trailing punctuation. The marker character itself is
+ * NOT included — the renderer adds its own visual treatment.
+ */
+export function parseScoreDrivers(
+  body: string | null | undefined,
+): ScoreDrivers {
+  const positive: string[] = [];
+  const negative: string[] = [];
+  if (!body) return { positive, negative };
+
+  // Match marker + the text up to the next marker, the next newline,
+  // or end-of-string. The lookahead boundary keeps each driver
+  // on its own logical line.
+  const re = /([✅❌✓✗])\s*([^✅❌✓✗\n]+?)(?=\s*[✅❌✓✗]|\s*\n|$)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) {
+    let text = m[2].trim();
+    // Strip bullet-list prefixes and trailing punctuation that
+    // bleeds in when "- ✅ Foo." sits next to "- ❌ Bar."
+    text = text.replace(/^[-*•]\s+/, "");
+    text = text.replace(/[.,;:\s]+$/g, "");
+    if (!text) continue;
+    if (m[1] === "✅" || m[1] === "✓") positive.push(text);
+    else negative.push(text);
+  }
+  return { positive, negative };
+}
+
+/**
  * Detects paragraphs that pack multiple score-driver markers (✅ / ❌
  * / ✓ / ✗) inline and converts them into a markdown bullet list — one
  * driver per item — so they render as scannable rows on mobile
@@ -672,11 +718,10 @@ function stripWrappingSeparators(s: string): string {
  * use bullet syntax and paragraphs with fewer than 2 markers (where
  * the inline form is fine).
  *
- * Mobile-first readability fix only — the underlying audit data is
- * unchanged. The ReactMarkdown pipeline renders the resulting bullet
- * list with the existing `.report-band-explainer ul` typography
- * (orange `::marker`, tightened line height) that was already added
- * for this surface in a prior pass.
+ * Used as the fallback render path when the new structured-summary
+ * component decides not to take over (e.g. the model emits drivers
+ * mixed with substantial extra prose). Keeps a viable mobile-friendly
+ * read in that edge case.
  */
 const SCORE_DRIVER_MARKER_RE = /[✅❌✓✗]/;
 const SCORE_DRIVER_MARKER_GLOBAL_RE = /[✅❌✓✗]/g;
@@ -748,8 +793,21 @@ export function cleanScoreSectionBody(body: string): string {
   // an orphan "Math: " label left behind after the arithmetic was cut.
   out = out.replace(/^\s*\(\s*\)\s*$/gm, "");
   out = out.replace(/^\s*(?:Math|Sum|Total|Calculation)\s*:?\s*$/gim, "");
+  // Strip internal calibration text that can leak into customer view
+  // when the model echoes the rubric instructions:
+  //   • "Bonus multipliers applied: …"
+  //   • "Total: 38 + 4 bonus …"
+  //   • "Structural Synergy Bonus: …"
+  // These read as raw rubric/math noise and break the executive feel.
+  out = out.replace(/^[^\n]*bonus\s+multiplier[^\n]*\n?/gim, "");
+  out = out.replace(/^[^\n]*\bTotal\s*:?\s*\d+\s*\+\s*\d*\s*bonus[^\n]*\n?/gim, "");
+  out = out.replace(
+    /^[^\n]*structural\s+synergy\s+bonus[^\n]*\n?/gim,
+    "",
+  );
+  out = out.replace(/^[^\n]*calibration\s+(?:v\d+(?:\.\d+)?|note|target)[^\n]*\n?/gim, "");
   // Mobile readability: convert dense inline ✅/❌ score-driver
-  // paragraphs into markdown bullet lists.
+  // paragraphs into markdown bullet lists (fallback path).
   out = splitInlineScoreDrivers(out);
   return out.replace(/\n{3,}/g, "\n\n").trim();
 }

@@ -38,10 +38,18 @@ export function resolveAppBaseUrl(req?: Request): string {
   }
 
   // Production deploy with no operator-set URL → use the canonical
-  // custom domain instead of leaking the Vercel deployment alias.
-  if (process.env.VERCEL_ENV === "production") {
+  // custom domain instead of leaking a deployment-specific alias or
+  // a localhost reference. Catches both Vercel production deploys
+  // (`VERCEL_ENV === "production"`) AND the Railway worker
+  // (`NODE_ENV === "production"` with no Vercel envs in scope) so
+  // operator emails sent from the worker include working URLs.
+  // NODE_ENV is cast to `string` because Next.js's build-time global
+  // narrows it to `"development" | "test"`; at runtime it's actually
+  // "production" in deployed Vercel functions and Railway services.
+  const nodeEnv = process.env.NODE_ENV as string | undefined;
+  if (process.env.VERCEL_ENV === "production" || nodeEnv === "production") {
     console.warn(
-      "[app-url] production deploy with no NEXT_PUBLIC_APP_URL set — falling back to canonical domain. Set NEXT_PUBLIC_APP_URL on Vercel to override.",
+      "[app-url] production runtime with no NEXT_PUBLIC_APP_URL set — falling back to canonical domain. Set NEXT_PUBLIC_APP_URL on Vercel and the Railway worker to override.",
     );
     return PRODUCTION_DOMAIN_FALLBACK;
   }

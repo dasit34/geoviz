@@ -403,6 +403,93 @@
   font-weight: 700;
 }
 
+/* ---- Executive summary block (replaces the dense score-band prose
+       with three short groups: Strong signals · Biggest visibility
+       gaps · Fastest recommended fixes). Lives inside the existing
+       `.report-band-explainer` wrapper so spacing/borders stay
+       consistent. Mobile-first: items wrap independently inside the
+       flex layout instead of forming one wall of text. ---- */
+.report-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.report-summary-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.report-summary-label {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.report-summary-label-positive {
+  color: #6ce39a;
+}
+.report-summary-label-negative {
+  color: #ff9a3c;
+}
+.report-summary-label-fix {
+  color: #6ea8ff;
+}
+.report-summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.report-summary-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.88);
+}
+.report-summary-marker {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: 1px;
+  border: 1px solid;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.report-summary-marker-positive {
+  color: #6ce39a;
+  background: rgba(45, 169, 79, 0.14);
+  border-color: rgba(108, 227, 154, 0.45);
+}
+.report-summary-marker-negative {
+  color: #ff9a3c;
+  background: rgba(255, 122, 24, 0.14);
+  border-color: rgba(255, 122, 24, 0.45);
+}
+.report-summary-marker-fix {
+  color: #6ea8ff;
+  background: rgba(43, 139, 255, 0.14);
+  border-color: rgba(110, 168, 255, 0.45);
+}
+.report-summary-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
 /* ============================================================
    New report template (May 2026 redesign) — visual audit dashboard
    ============================================================ */
@@ -1453,6 +1540,23 @@
   .report-band-explainer {
     page-break-inside: auto;
     break-inside: auto;
+  }
+  /* Executive summary — keep each group together (label + its bullets)
+     so a "Strong signals" header doesn't orphan from its first item.
+     The whole block can split between groups. */
+  .report-summary-group {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .report-summary {
+    gap: 14px !important;
+  }
+  .report-summary-list {
+    gap: 6px !important;
+  }
+  .report-summary-item {
+    font-size: 13px !important;
+    line-height: 1.5 !important;
   }
   /* Free prose, lists, and disclaimer-style paragraphs are allowed to
      split across pages so they pack into available space. Code blocks
