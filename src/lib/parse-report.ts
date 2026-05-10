@@ -298,10 +298,26 @@ export function deriveStrengths(score: ReportScore): CategoryStrength[] {
  * label is "Visibility profile pending" — still specific.
  */
 export type PlatformName = "ChatGPT" | "Claude" | "Gemini" | "Perplexity";
+
+/**
+ * Internal classification of how reachable the audit prose suggests a
+ * given platform's crawler is. Distinct from `label` (the customer-
+ * facing copy) on purpose: the label may be score-derived even when
+ * `crawlStatus = "accessible"` if the site's content/trust scores are
+ * low. Currently informational only — not rendered — so a future
+ * admin/debug surface can introspect without reparsing the markdown.
+ */
+export type CrawlStatus =
+  | "accessible"
+  | "partially_accessible"
+  | "blocked"
+  | "unknown";
+
 export type PlatformStatus = {
   platform: PlatformName;
   label: string;
   tone: "ok" | "warn" | "bad" | "muted";
+  crawlStatus: CrawlStatus;
 };
 
 type PlatformLens = {
@@ -372,8 +388,34 @@ const PLATFORM_ORDER: PlatformName[] = [
   "Perplexity",
 ];
 
-const BLOCKED_RE =
-  /\b(disallow|blocked?|cannot reach|does not reach|inaccessible|denied|forbidden)\b/i;
+/**
+ * Per-platform "robots.txt User-agent" lines that — when followed by a
+ * root-level Disallow — are treated as explicit blocking evidence.
+ * Pure presence of these UAs in the markdown is *not* enough; we also
+ * require a Disallow line targeting `/`. This avoids false-positives
+ * on prose that quotes a competitor's robots.txt for comparison.
+ */
+const PLATFORM_USER_AGENTS: Record<PlatformName, RegExp[]> = {
+  ChatGPT: [/User-?agent:\s*GPTBot\b/i, /User-?agent:\s*OAI[-\s]?SearchBot\b/i],
+  Claude: [
+    /User-?agent:\s*ClaudeBot\b/i,
+    /User-?agent:\s*anthropic[-\s]?ai\b/i,
+  ],
+  Gemini: [/User-?agent:\s*Google[-\s]?Extended\b/i],
+  Perplexity: [/User-?agent:\s*PerplexityBot\b/i],
+};
+
+/**
+ * Hard-block phrases that, *near a platform mention*, indicate a real
+ * crawl failure or robots-level block. Deliberately narrow — the old
+ * `BLOCKED_RE` matched bare words like "blocked" / "disallow" / "denied"
+ * which routinely appear in audit prose describing what other sites
+ * do wrong, false-positiving the override label.
+ */
+const HARD_BLOCK_PHRASES_RE =
+  /\b(fully\s+blocked|completely\s+disallowed|crawler\s+rejected|fetch(?:ed|ing)?\s+fail(?:ed|ure)?|cannot\s+(?:crawl|reach|access)|connection\s+refused|inaccessible\s+to\s+(?:bots?|crawlers?))\b/i;
+
+const HTTP_BLOCK_CODES_RE = /\b(403|401|429)\b/;
 
 type Tier = "ok" | "warnStrong" | "warnWeak" | "bad";
 
@@ -391,14 +433,29 @@ function toneFromTier(tier: Tier): "ok" | "warn" | "bad" {
 }
 
 /**
- * Returns true when the markdown explicitly describes the given
- * platform's crawler as blocked. Window is ±200 chars around the
- * first platform-keyword hit.
+ * Hard-evidence block detection. Three independent signals — only one
+ * needs to fire. Deliberately conservative: false negatives (missing a
+ * real block) are recoverable through the score-derived label;
+ * false positives (claiming "Crawler access blocked" without evidence)
+ * undermine trust in the entire report.
  */
-function isPlatformBlockedInMarkdown(
+function detectExplicitBlock(
   md: string,
+  platform: PlatformName,
   patterns: RegExp[],
 ): boolean {
+  // (1) robots.txt + root-level Disallow targeting this platform's bot.
+  for (const ua of PLATFORM_USER_AGENTS[platform]) {
+    const m = ua.exec(md);
+    if (!m) continue;
+    const tail = md.slice(
+      m.index + m[0].length,
+      Math.min(md.length, m.index + m[0].length + 200),
+    );
+    if (/Disallow:\s*\/\s*(?:\n|$|#)/m.test(tail)) return true;
+  }
+
+  // (2) + (3) need the first platform-keyword hit's surrounding window.
   let earliest: { index: number; len: number } | null = null;
   for (const pat of patterns) {
     const m = pat.exec(md);
@@ -409,10 +466,27 @@ function isPlatformBlockedInMarkdown(
   }
   if (!earliest) return false;
   const window = md.slice(
-    Math.max(0, earliest.index - 200),
-    Math.min(md.length, earliest.index + earliest.len + 200),
+    Math.max(0, earliest.index - 250),
+    Math.min(md.length, earliest.index + earliest.len + 250),
   );
-  return BLOCKED_RE.test(window);
+
+  // (2) HTTP error code (403/401/429) near platform mention.
+  if (HTTP_BLOCK_CODES_RE.test(window)) return true;
+
+  // (3) Strong block phrases near platform mention.
+  if (HARD_BLOCK_PHRASES_RE.test(window)) return true;
+
+  return false;
+}
+
+/**
+ * Returns true when the platform's keyword appears anywhere in the
+ * markdown — used to distinguish `accessible` (mentioned, no block
+ * evidence) from `unknown` (not mentioned at all) for the internal
+ * `crawlStatus` field.
+ */
+function platformMentioned(md: string, patterns: RegExp[]): boolean {
+  return patterns.some((pat) => pat.test(md));
 }
 
 export function derivePlatformVisibility(
@@ -427,12 +501,16 @@ export function derivePlatformVisibility(
   return PLATFORM_ORDER.map((platform) => {
     const lens = PLATFORM_LENS[platform];
 
-    // 1. Explicit-block override from the audit prose.
-    if (md && isPlatformBlockedInMarkdown(md, lens.patterns)) {
+    // 1. Hard-evidence block override (robots.txt-targeted Disallow,
+    //    HTTP 4xx/429 near mention, or strong block phrasing near
+    //    mention). This is the ONLY path that emits "Crawler access
+    //    blocked".
+    if (md && detectExplicitBlock(md, platform, lens.patterns)) {
       return {
         platform,
         label: "Crawler access blocked",
         tone: "bad" as const,
+        crawlStatus: "blocked" as const,
       };
     }
 
@@ -442,6 +520,7 @@ export function derivePlatformVisibility(
         platform,
         label: "Visibility profile pending",
         tone: "muted" as const,
+        crawlStatus: "unknown" as const,
       };
     }
 
@@ -455,10 +534,13 @@ export function derivePlatformVisibility(
     }
     const ratio = totalMax > 0 ? totalScore / totalMax : 0;
     const tier = tierFromRatio(ratio);
+    const crawlStatus: CrawlStatus =
+      md && platformMentioned(md, lens.patterns) ? "accessible" : "unknown";
     return {
       platform,
       label: lens.labels[tier],
       tone: toneFromTier(tier),
+      crawlStatus,
     };
   });
 }

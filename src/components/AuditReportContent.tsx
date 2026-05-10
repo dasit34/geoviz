@@ -212,7 +212,9 @@ export function AuditReportContent({
               ChatGPT · Claude · Gemini · Perplexity
             </span>
           </div>
-          <h2 className="h2 mt-3">How each AI search system sees you.</h2>
+          <h2 className="h2 mt-3">
+            How AI search systems may interpret this site.
+          </h2>
           <p className="muted mt-3 max-w-2xl text-sm">
             A short interpretive read of how each platform is positioned
             to find, parse, and confidently recommend your business.

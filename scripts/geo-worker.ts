@@ -1704,6 +1704,46 @@ function preflightOrExit(): void {
   log(`[geo-worker] preflight ok · mode=cli · claude ${probe.stdout.trim()}`);
 }
 
+/**
+ * Recovers rows stuck in `reportStatus = "running"` past the timeout
+ * window. The normal happy path always writes a terminal status via
+ * the per-job try/finally, but a process killed externally (SIGKILL,
+ * Railway container restart, OOM, host crash) leaves its in-flight
+ * row stranded. Without recovery, the queue is permanently blocked
+ * because new workers won't pick up "running" rows.
+ *
+ * Threshold: TIMEOUT_MS + 2 min safety buffer. If a row has been
+ * "running" longer than that, the worker that started it is gone.
+ * Reset to "queued" so the next poll picks it up. Idempotent and
+ * race-safe via updateMany. The previous reportError is replaced
+ * with a recovery breadcrumb so the audit trail shows what happened.
+ */
+async function recoverStaleRunningJobs(prisma: PrismaClient): Promise<number> {
+  const STALE_AFTER_MS = TIMEOUT_MS + 2 * 60_000;
+  const cutoff = new Date(Date.now() - STALE_AFTER_MS);
+  const recoveredAt = new Date();
+  const result = await prisma.auditOrder.updateMany({
+    where: {
+      reportStatus: "running",
+      OR: [
+        { reportStartedAt: { lt: cutoff } },
+        { reportStartedAt: null },
+      ],
+    },
+    data: {
+      reportStatus: "queued",
+      reportQueuedAt: recoveredAt,
+      reportError: `Recovered from stale "running" state at ${recoveredAt.toISOString()} — worker process likely killed mid-job.`,
+    },
+  });
+  if (result.count > 0) {
+    log(
+      `[geo-worker] recovered ${result.count} stale running job(s) → queued (older than ${Math.round(STALE_AFTER_MS / 60_000)} min)`,
+    );
+  }
+  return result.count;
+}
+
 async function main(): Promise<void> {
   preflightOrExit();
 
@@ -1716,6 +1756,12 @@ async function main(): Promise<void> {
     await prisma.$connect();
     log("[geo-worker] Prisma connected successfully");
     await logDbDiagnostics(prisma);
+    // Run stale-job recovery once at startup. Catches rows stranded
+    // by a previous worker process that died before its try/finally
+    // could write a terminal status.
+    await recoverStaleRunningJobs(prisma).catch((err) => {
+      logErr("[geo-worker] stale recovery on startup failed (continuing):", err);
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // Strip any accidental URL leakage from the message before logging.
@@ -1778,6 +1824,17 @@ async function main(): Promise<void> {
     while (!shutdown) {
       pollCount++;
       log(`[geo-worker] poll #${pollCount} starting`);
+      // Every 10 polls (~2 min at default 12s cadence), re-run the
+      // stale-job recovery. Cheap UPDATE; covers the rare case where
+      // a sibling worker process died while this one stayed alive.
+      if (pollCount > 1 && pollCount % 10 === 0) {
+        await recoverStaleRunningJobs(prisma).catch((err) => {
+          logErr(
+            "[geo-worker] periodic stale recovery failed (continuing):",
+            err,
+          );
+        });
+      }
       let result: PollResult = "no-jobs";
       try {
         result = await processOneJob(prisma);

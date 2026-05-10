@@ -13,6 +13,7 @@
     "verify": "tsx scripts/verify-system.ts",
     "seed:geoviz-sample": "tsx scripts/seed-geoviz-sample.ts",
     "seed:public-samples": "tsx scripts/seed-public-samples.ts",
+    "recover-stale-jobs": "tsx scripts/recover-stale-jobs.ts",
     "geo-worker": "tsx scripts/geo-worker.ts",
     "geo-worker:dev": "tsx scripts/geo-worker.ts --loop",
     "geo-worker:start": "tsx scripts/geo-worker.ts --loop"
