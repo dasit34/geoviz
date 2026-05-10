@@ -799,13 +799,30 @@ export function cleanScoreSectionBody(body: string): string {
   //   • "Total: 38 + 4 bonus …"
   //   • "Structural Synergy Bonus: …"
   // These read as raw rubric/math noise and break the executive feel.
+  // Defense-in-depth: line-anchored versions catch own-line leaks;
+  // inline versions catch occurrences buried inside a sentence.
   out = out.replace(/^[^\n]*bonus\s+multiplier[^\n]*\n?/gim, "");
   out = out.replace(/^[^\n]*\bTotal\s*:?\s*\d+\s*\+\s*\d*\s*bonus[^\n]*\n?/gim, "");
   out = out.replace(
     /^[^\n]*structural\s+synergy\s+bonus[^\n]*\n?/gim,
     "",
   );
-  out = out.replace(/^[^\n]*calibration\s+(?:v\d+(?:\.\d+)?|note|target)[^\n]*\n?/gim, "");
+  out = out.replace(/^[^\n]*calibration\s+(?:v\d+(?:\.\d+)?|note|target|tier)[^\n]*\n?/gim, "");
+  // ---- Inline strips (defense-in-depth) ----
+  // Parentheticals containing rubric vocabulary.
+  out = out.replace(/\([^)]*\bbonus\s+multiplier[^)]*\)/gi, "");
+  out = out.replace(/\([^)]*\bstructural\s+synergy\s+bonus[^)]*\)/gi, "");
+  out = out.replace(/\([^)]*\bcalibration\s+(?:v\d+(?:\.\d+)?|note|target|tier)[^)]*\)/gi, "");
+  out = out.replace(/\([^)]*\bbonus(?:es)?\s+applied[^)]*\)/gi, "");
+  // Mid-sentence "Total: 38 + 4 bonus = 42" patterns.
+  out = out.replace(/\bTotal\s*:?\s*\d+(?:\s*[+\-]\s*\d+\s*\w*){1,3}\s*(?:=\s*\d+)?[^.\n]*\.?/gi, "");
+  // "Score: 38 + 4 = 42" / "Subtotal: 38 + 4 = 42" patterns.
+  out = out.replace(/\b(?:Score|Subtotal|Sum)\s*:?\s*\d+(?:\s*[+\-]\s*\d+){1,4}\s*=\s*\d+\b[^.\n]*\.?/gi, "");
+  // Lone "+4 bonus" / "+4 synergy" leftovers (e.g. after stripping
+  // a parenthetical the orphan "+4" remains).
+  out = out.replace(/\s*[+\-]\s*\d+\s*(?:bonus(?:es)?|synerg(?:y|ies))/gi, "");
+  // Multiplicative arithmetic the model occasionally writes inline.
+  out = out.replace(/\b\d+(?:\.\d+)?\s*[×x*]\s*\d+(?:\.\d+)?\s*=\s*\d+(?:\.\d+)?\b/g, "");
   // Mobile readability: convert dense inline ✅/❌ score-driver
   // paragraphs into markdown bullet lists (fallback path).
   out = splitInlineScoreDrivers(out);

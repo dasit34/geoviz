@@ -1,10 +1,28 @@
 /* eslint-disable no-console */
-import { getResend, FROM_EMAIL } from "@/lib/resend";
+import { getResend } from "@/lib/resend";
 import {
   parseReportScoreBreakdown,
   plainEnglishBandLabel,
 } from "@/lib/parse-report";
 import { resolveAppBaseUrl, buildAdminReviewUrl } from "@/lib/app-url";
+
+/**
+ * FROM address used specifically for operator notifications. We do
+ * NOT inherit `FROM_EMAIL` from `lib/resend.ts` because that chain
+ * ends in an unverified `geoviz.local` placeholder which Resend
+ * rejects — meaning a misconfigured Railway env (no
+ * `RESEND_EMAIL_FROM`) would silently break operator emails. Falling
+ * back to the canonical `mail.geoviz.ai` subdomain keeps notifications
+ * working out-of-the-box even before env is fully configured.
+ */
+const OPERATOR_NOTIFICATION_FROM_FALLBACK =
+  "GeoViz Reports <reports@mail.geoviz.ai>";
+
+function operatorNotificationFrom(): string {
+  const fromEnv = process.env.RESEND_EMAIL_FROM?.trim();
+  if (fromEnv && fromEnv.length > 0) return fromEnv;
+  return OPERATOR_NOTIFICATION_FROM_FALLBACK;
+}
 
 /**
  * Internal "report ready for review" notification — fires from the
@@ -14,7 +32,12 @@ import { resolveAppBaseUrl, buildAdminReviewUrl } from "@/lib/app-url";
  * Routing:
  *   • To: `AUDIT_NOTIFICATION_EMAIL` if set, else
  *     `reports@geoviz.ai` as the documented fallback.
- *   • From: same `FROM_EMAIL` chain as every other GeoViz email.
+ *   • From: `RESEND_EMAIL_FROM` if set, else
+ *     `OPERATOR_NOTIFICATION_FROM_FALLBACK` — distinct from the
+ *     general `FROM_EMAIL` chain so operator notifications keep
+ *     working even when the Railway worker's env hasn't been fully
+ *     configured (the general chain ends in an unverified placeholder
+ *     domain that Resend rejects).
  *
  * Failure mode: every error is logged and swallowed. The function
  * never throws — caller can `await` without try/catch and never lose
@@ -112,7 +135,7 @@ export async function notifyOperatorReportReady(args: {
 
   try {
     const result = await getResend().emails.send({
-      from: FROM_EMAIL,
+      from: operatorNotificationFrom(),
       to: operatorEmail,
       subject,
       text: textBody,

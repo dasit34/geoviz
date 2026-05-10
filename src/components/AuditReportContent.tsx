@@ -162,10 +162,6 @@ export function AuditReportContent({
               drivers={scoreDrivers}
               fixes={fixItems.slice(0, 3).map((f) => f.title)}
             />
-          ) : scoreProse ? (
-            <div className="report-band-explainer">
-              <Prose>{scoreProse}</Prose>
-            </div>
           ) : null}
           <p className="report-score-consistency-note">
             Scores are directional benchmarks based on publicly
