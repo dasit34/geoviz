@@ -43,8 +43,9 @@ export function ReportScoreCard({
         <div className="score-card-top-status">{status}</div>
       </div>
       <p className="score-card-explainer">
-        GeoViz measures how clearly AI systems can read, understand, and
-        confidently recommend your business online.
+        GeoViz measures how clearly ChatGPT, Claude, Gemini, and other
+        AI search platforms can read, understand, and recommend your
+        business online.
       </p>
       <div className="score-card-overall-row">
         <div className="score-card-overall">

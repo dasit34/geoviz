@@ -106,14 +106,15 @@ export default function Page() {
           <p className="section-eyebrow">What is GeoViz</p>
           <h2 className="h2 mt-3 max-w-3xl">What Is GeoViz?</h2>
           <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
-            GeoViz shows whether AI systems can clearly read,
-            understand, and recommend your business.
+            GeoViz analyzes how visible and understandable your
+            business appears across AI-powered search and answer
+            platforms like ChatGPT, Claude, Gemini, and Perplexity.
           </p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <WhatCard
               icon={<IconEye />}
               title="AI Readability"
-              body="Can AI systems understand what your business does?"
+              body="Can AI search platforms understand what your business does?"
             />
             <WhatCard
               icon={<IconShield />}
@@ -123,7 +124,7 @@ export default function Page() {
             <WhatCard
               icon={<IconTarget />}
               title="Recommendation Readiness"
-              body="Are you easy for AI systems to confidently recommend?"
+              body="Are you easy for AI search platforms to confidently recommend?"
             />
             <WhatCard
               icon={<IconList />}

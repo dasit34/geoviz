@@ -56,7 +56,7 @@ const CATEGORIES: Array<
     label: "Structured Data / Schema",
     short: "Recommendation Readiness",
     tooltip:
-      "How clearly AI systems can identify who you are and what you do.",
+      "How clearly AI search platforms can identify who you are and what you do.",
     max: 25,
     pattern: /Structured\s*Data(?:\s*\/\s*Schema)?/i,
   },
@@ -65,7 +65,7 @@ const CATEGORIES: Array<
     label: "AI Crawler Readiness",
     short: "Technical Accessibility",
     tooltip:
-      "Whether AI systems can access and understand your website content.",
+      "Whether AI search platforms can access and understand your website content.",
     max: 20,
     pattern: /AI\s*Crawler\s*Readiness/i,
   },
@@ -101,7 +101,7 @@ const CATEGORIES: Array<
     label: "Technical Accessibility",
     short: "AI Readability",
     tooltip:
-      "How easily AI systems can retrieve and interpret your site structure and content.",
+      "How easily AI search platforms can retrieve and interpret your site structure and content.",
     max: 10,
     pattern: /Technical\s*Accessibility/i,
   },
