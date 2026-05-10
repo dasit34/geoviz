@@ -665,6 +665,58 @@ function stripWrappingSeparators(s: string): string {
 }
 
 /**
+ * Detects paragraphs that pack multiple score-driver markers (✅ / ❌
+ * / ✓ / ✗) inline and converts them into a markdown bullet list — one
+ * driver per item — so they render as scannable rows on mobile
+ * instead of a wrapping wall-of-text. Skips paragraphs that already
+ * use bullet syntax and paragraphs with fewer than 2 markers (where
+ * the inline form is fine).
+ *
+ * Mobile-first readability fix only — the underlying audit data is
+ * unchanged. The ReactMarkdown pipeline renders the resulting bullet
+ * list with the existing `.report-band-explainer ul` typography
+ * (orange `::marker`, tightened line height) that was already added
+ * for this surface in a prior pass.
+ */
+const SCORE_DRIVER_MARKER_RE = /[✅❌✓✗]/;
+const SCORE_DRIVER_MARKER_GLOBAL_RE = /[✅❌✓✗]/g;
+const SCORE_DRIVER_SPLIT_RE = /(?=[✅❌✓✗])/g;
+
+function splitInlineScoreDrivers(body: string): string {
+  return body
+    .split(/\n{2,}/)
+    .map((paragraph) => {
+      const matches = paragraph.match(SCORE_DRIVER_MARKER_GLOBAL_RE);
+      if (!matches || matches.length < 2) return paragraph;
+
+      const trimmed = paragraph.trim();
+      // Already a markdown list — leave it alone.
+      if (/^\s*[-*]\s/m.test(trimmed)) return paragraph;
+
+      // Capture any leading prose before the first marker (e.g.
+      // "**Why this band:**") and keep it as a header line above the
+      // bullet list so the customer still sees the framing.
+      const firstMarkerPos = trimmed.search(SCORE_DRIVER_MARKER_RE);
+      const prefix = firstMarkerPos > 0 ? trimmed.slice(0, firstMarkerPos).trim() : "";
+      const rest = firstMarkerPos >= 0 ? trimmed.slice(firstMarkerPos) : trimmed;
+
+      const items = rest
+        .split(SCORE_DRIVER_SPLIT_RE)
+        .map((s) => s.trim())
+        // Trim the trailing punctuation that bleeds in when "Foo. ✅ Bar"
+        // is split — we don't want "Foo." as the visible item.
+        .map((s) => s.replace(/[.,;:\s]+$/g, ""))
+        .filter((s) => s.length > 0);
+
+      if (items.length < 2) return paragraph;
+
+      const list = items.map((item) => `- ${item}`).join("\n");
+      return prefix ? `${prefix}\n\n${list}` : list;
+    })
+    .join("\n\n");
+}
+
+/**
  * Cleans up the score section body so the rendered card doesn't show
  * the breakdown bullets (the ScoreCard component renders those
  * visually) or any inline arithmetic the model occasionally emits.
@@ -696,6 +748,9 @@ export function cleanScoreSectionBody(body: string): string {
   // an orphan "Math: " label left behind after the arithmetic was cut.
   out = out.replace(/^\s*\(\s*\)\s*$/gm, "");
   out = out.replace(/^\s*(?:Math|Sum|Total|Calculation)\s*:?\s*$/gim, "");
+  // Mobile readability: convert dense inline ✅/❌ score-driver
+  // paragraphs into markdown bullet lists.
+  out = splitInlineScoreDrivers(out);
   return out.replace(/\n{3,}/g, "\n\n").trim();
 }
 

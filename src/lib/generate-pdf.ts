@@ -1,5 +1,6 @@
 import puppeteer, { type Browser } from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
+import { resolveAppBaseUrl } from "@/lib/app-url";
 
 /**
  * Generate a PDF for a given audit order by driving a headless Chromium
@@ -103,11 +104,8 @@ export async function generateAuditPdf(args: GeneratePdfArgs): Promise<Buffer> {
 }
 
 export function buildPdfBaseUrl(req: Request): string {
-  const fromEnv = process.env.NEXT_PUBLIC_APP_URL;
-  if (fromEnv) return fromEnv;
-  try {
-    return new URL(req.url).origin;
-  } catch {
-    return "http://localhost:3000";
-  }
+  // Delegates to the shared resolver so PDF + email surfaces share
+  // one URL-resolution policy (incl. the production-domain fallback
+  // that prevents preview-style `*.vercel.app` URLs from leaking).
+  return resolveAppBaseUrl(req);
 }

@@ -3,6 +3,7 @@ import type { AuditOrder } from "@prisma/client";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import { getResend, FROM_EMAIL } from "@/lib/resend";
+import { resolveAppBaseUrl, buildAdminReviewUrl } from "@/lib/app-url";
 
 export const runtime = "nodejs";
 // Stripe sends a raw body and we must verify the signature against it byte
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
         );
       }
       try {
-        await notifyAdmin(session, order);
+        await notifyAdmin(req, session, order);
       } catch (err) {
         // Log only — never fail the webhook because of an email send.
         console.error("[stripe-webhook] notifyAdmin error (non-fatal):", err);
@@ -169,6 +170,7 @@ async function persistOrder(
 }
 
 async function notifyAdmin(
+  req: Request,
   session: Stripe.Checkout.Session,
   order: AuditOrder,
 ): Promise<void> {
@@ -218,6 +220,7 @@ async function notifyAdmin(
   const amount = session.amount_total ?? order.amount;
   const currency = (session.currency ?? order.currency).toUpperCase();
   const amountFormatted = `$${(amount / 100).toFixed(2)} ${currency}`;
+  const adminReviewUrl = buildAdminReviewUrl(req);
 
   const lines = [
     "A new GeoViz Audit Order has come in. Details below.",
@@ -232,9 +235,20 @@ async function notifyAdmin(
     `Payment status:  ${order.paymentStatus}`,
     `Stripe session:  ${session.id}`,
     "",
-    "Run the audit and email the report back to the customer.",
+    `Review Audit in Admin: ${adminReviewUrl}`,
   );
   const body = lines.join("\n");
+
+  const htmlBody = buildAdminNotificationHtml({
+    businessName,
+    websiteUrl,
+    customerEmail,
+    competitorUrl,
+    amountFormatted,
+    paymentStatus: order.paymentStatus,
+    sessionId: session.id,
+    adminReviewUrl,
+  });
 
   console.log("[stripe-webhook] sending admin email");
   const result = await getResend().emails.send({
@@ -242,6 +256,7 @@ async function notifyAdmin(
     to: adminEmail,
     subject: "New GeoViz Audit Order — $97",
     text: body,
+    html: htmlBody,
   });
 
   if (result.error) {
@@ -337,7 +352,7 @@ async function notifyCustomer(
   }
 
   const businessLabel = order.businessName || order.websiteUrl;
-  const baseUrl = resolveCustomerLinkBase(req);
+  const baseUrl = resolveAppBaseUrl(req);
   const orderUrl = `${baseUrl}/checkout/success?session_id=${encodeURIComponent(session.id)}`;
 
   const subject = "GeoViz Audit Request Received";
@@ -411,37 +426,9 @@ async function notifyCustomer(
   );
 }
 
-/**
- * Resolve the public site URL for links in the customer email. Same
- * resolution chain as the checkout route, with a louder fallback log
- * if everything resolves to localhost (which would mean a misconfigured
- * production env). Never returns trailing slash.
- */
-function resolveCustomerLinkBase(req: Request): string {
-  const candidates = [
-    process.env.NEXT_PUBLIC_SITE_URL,
-    process.env.SITE_URL,
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
-  ];
-  for (const c of candidates) {
-    if (c && c.trim().length > 0) {
-      return c.trim().replace(/\/+$/, "");
-    }
-  }
-  // Last-ditch: parse from the incoming request origin.
-  try {
-    const origin = new URL(req.url).origin;
-    if (!/localhost/.test(origin)) return origin;
-    if (process.env.NODE_ENV !== "production") return origin;
-  } catch {
-    // fall through
-  }
-  console.warn(
-    "[stripe-webhook] resolveCustomerLinkBase falling back to localhost — set NEXT_PUBLIC_SITE_URL on Vercel.",
-  );
-  return "http://localhost:3000";
-}
+// URL resolution moved to `@/lib/app-url`. See `resolveAppBaseUrl` —
+// production deploys without an explicit env var now fall back to the
+// canonical custom domain instead of `*.vercel.app`.
 
 /**
  * HTML body for the audit-received confirmation. Same dark-on-light
@@ -520,4 +507,104 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/**
+ * HTML body for the operator's "new order" notification. Mirrors the
+ * customer-confirmation template's brand styling so both emails feel
+ * like the same product. The "Review Audit in Admin" CTA links
+ * directly to `/admin/reports?key=<ADMIN_SECRET>` so the operator
+ * lands on the live queue dashboard with one click.
+ */
+function buildAdminNotificationHtml(args: {
+  businessName: string;
+  websiteUrl: string;
+  customerEmail: string;
+  competitorUrl: string | null;
+  amountFormatted: string;
+  paymentStatus: string;
+  sessionId: string;
+  adminReviewUrl: string;
+}): string {
+  const {
+    businessName,
+    websiteUrl,
+    customerEmail,
+    competitorUrl,
+    amountFormatted,
+    paymentStatus,
+    sessionId,
+    adminReviewUrl,
+  } = args;
+  const safeBusiness = escapeHtml(businessName);
+  const safeWebsite = escapeHtml(websiteUrl);
+  const safeCustomer = escapeHtml(customerEmail);
+  const safeCompetitor = competitorUrl ? escapeHtml(competitorUrl) : null;
+  const safeAmount = escapeHtml(amountFormatted);
+  const safePayment = escapeHtml(paymentStatus);
+  const safeSession = escapeHtml(sessionId);
+  const safeAdminUrl = escapeHtml(adminReviewUrl);
+
+  const competitorRow = safeCompetitor
+    ? `<tr><td style="padding:6px 0;color:#666;font-size:13px;width:140px;">Competitor URL</td><td style="padding:6px 0;color:#111;font-size:13px;">${safeCompetitor}</td></tr>`
+    : "";
+
+  return `<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter','Helvetica Neue',Arial,sans-serif;color:#1a1a1a;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f5f5f5;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #ececec;">
+            <tr>
+              <td style="padding:28px 32px 8px;">
+                <div style="color:#ff7a18;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">GeoViz · Operator</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 8px;">
+                <h1 style="margin:8px 0 18px;font-size:22px;line-height:1.3;color:#111;font-weight:700;letter-spacing:-0.01em;">
+                  New audit order — ${safeBusiness}
+                </h1>
+                <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#2a2a2a;">
+                  A paid GeoViz audit just landed and is queued for the worker. Review it in the admin dashboard to track status, run / re-run, and send the report when ready.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 8px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:#fafafa;border:1px solid #ececec;border-radius:6px;padding:8px 14px;margin-bottom:18px;">
+                  <tr><td style="padding:6px 0;color:#666;font-size:13px;width:140px;">Customer email</td><td style="padding:6px 0;color:#111;font-size:13px;">${safeCustomer}</td></tr>
+                  <tr><td style="padding:6px 0;color:#666;font-size:13px;">Website URL</td><td style="padding:6px 0;color:#111;font-size:13px;">${safeWebsite}</td></tr>
+                  ${competitorRow}
+                  <tr><td style="padding:6px 0;color:#666;font-size:13px;">Amount paid</td><td style="padding:6px 0;color:#111;font-size:13px;">${safeAmount}</td></tr>
+                  <tr><td style="padding:6px 0;color:#666;font-size:13px;">Payment status</td><td style="padding:6px 0;color:#111;font-size:13px;">${safePayment}</td></tr>
+                  <tr><td style="padding:6px 0;color:#666;font-size:13px;">Stripe session</td><td style="padding:6px 0;color:#111;font-size:12.5px;font-family:ui-monospace,Menlo,monospace;word-break:break-all;">${safeSession}</td></tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td align="left" style="padding:4px 32px 8px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="background:#ff7a18;border-radius:6px;">
+                      <a href="${safeAdminUrl}" style="display:inline-block;padding:13px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;">Review Audit in Admin →</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px 26px;border-top:1px solid #eee;">
+                <p style="margin:14px 0 0;font-size:11.5px;line-height:1.5;color:#888;">
+                  GeoViz · Internal operator notification · do not forward
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
 }
