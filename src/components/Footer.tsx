@@ -14,13 +14,30 @@ export function Footer() {
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 md:items-end">
-          <div className="flex gap-5">
+          <div className="flex flex-wrap gap-x-5 gap-y-2 md:justify-end">
             <Link href="/sample-report" className="hover:text-white">
               Sample report
             </Link>
             <Link href="/order" className="hover:text-white">
               Order
             </Link>
+          </div>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 md:justify-end">
+            <Link href="/terms" className="hover:text-white">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-white">
+              Privacy
+            </Link>
+            <Link href="/refund-policy" className="hover:text-white">
+              Refund policy
+            </Link>
+            <a
+              href="mailto:support@geoviz.ai"
+              className="hover:text-white"
+            >
+              Contact
+            </a>
           </div>
           <p>© {new Date().getFullYear()} GeoViz. All rights reserved.</p>
         </div>
