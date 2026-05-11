@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Order your AI Visibility Audit · GeoViz",
   description:
-    "Order your $97 AI Visibility Audit. We audit how ChatGPT, Claude, Perplexity, and Gemini see your business and deliver a full report by email within 24 hours.",
+    "Order your $97 AI Visibility Audit. We audit how ChatGPT, Claude, Perplexity, and Gemini see your business and deliver a full report by email — most audits are delivered within minutes.",
 };
 
 export default function OrderPage({
@@ -33,9 +33,10 @@ export default function OrderPage({
               checkout — $97 one-time (normally $147).
             </p>
             <p className="mt-3 max-w-md text-sm text-white/70">
-              Delivered by email within 24 hours. Each report is generated
-              using AI-assisted analysis across ChatGPT, Claude, Perplexity,
-              and Gemini, then reviewed for clarity before delivery.
+              Delivered by email — most audits are delivered within
+              minutes. Each report is generated using AI-assisted analysis
+              across ChatGPT, Claude, Perplexity, and Gemini, then
+              reviewed for clarity before delivery.
             </p>
             <p className="mt-3 text-xs italic text-white/50">
               We run a limited number of audits per day to keep results accurate.

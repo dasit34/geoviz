@@ -31,9 +31,9 @@ export default function CheckoutSuccessPage() {
             </div>
             <h1 className="h2 mt-6">You’re booked. We’re on it.</h1>
             <p className="muted mx-auto mt-4 max-w-xl">
-              Your AI Visibility Audit is in our queue. We’ll email your report
-              — typically within 24 hours. Keep an eye on your inbox (and your
-              spam folder, just in case).
+              Your AI Visibility Audit is in our queue. We’ll email your
+              report — most reports are delivered within minutes. Keep an
+              eye on your inbox (and your spam folder, just in case).
             </p>
 
             <div className="card mx-auto mt-10 max-w-xl text-left">

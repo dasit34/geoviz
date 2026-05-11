@@ -165,9 +165,10 @@ export function OrderForm({
       </button>
 
       <p className="text-center text-xs text-white/40">
-        Secure payment via Stripe. One-time charge of $97 USD. Delivered by
-        email within 24 hours, generated using AI-assisted analysis across
-        ChatGPT, Claude, Perplexity, and Gemini.
+        Secure payment via Stripe. One-time charge of $97 USD. Delivered
+        by email — most audits are delivered within minutes — generated
+        using AI-assisted analysis across ChatGPT, Claude, Perplexity,
+        and Gemini.
       </p>
 
       {testBypassEnabled ? (

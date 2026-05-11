@@ -67,7 +67,7 @@ export default function Page() {
               </Link>
             </div>
             <p className="mt-3 text-xs text-white/65">
-              Automated AI analysis + human-reviewed delivery within 24 hours.
+              Automated AI analysis + human-reviewed delivery — most reports are delivered within minutes.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -189,8 +189,8 @@ export default function Page() {
             />
             <HowItWorksStep
               index={4}
-              title="You receive your report within 24 hours"
-              body="Delivered as a hosted link and PDF. Most reports land the same business day."
+              title="You receive your report — typically within minutes"
+              body="Delivered as a hosted link and PDF. Most audits complete in a handful of minutes; a complex site can take a little longer."
             />
           </div>
         </div>
@@ -303,8 +303,9 @@ export default function Page() {
                 Request My AI Visibility Audit
               </Link>
               <p className="mt-3 text-center text-xs text-white/55">
-                Get an instant AI visibility scan in minutes. Receive
-                your full scored GeoViz audit within 24 hours.
+                Most reports are delivered within minutes. Your full
+                scored GeoViz audit arrives by email as a hosted link
+                and PDF.
               </p>
               <p className="mt-2 text-center text-xs text-white/45">
                 Each audit includes automated AI-search analysis
@@ -362,8 +363,9 @@ export default function Page() {
             Find out exactly what ChatGPT, Claude, Perplexity, and Gemini see.
           </h2>
           <p className="muted mx-auto mt-4 max-w-xl">
-            Get an instant AI visibility scan in minutes. Receive
-            your full scored GeoViz audit within 24 hours.
+            Most reports are delivered within minutes. Your full
+            scored GeoViz audit arrives by email as a hosted link
+            and PDF.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/order" className="btn-primary">

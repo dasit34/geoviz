@@ -412,12 +412,17 @@
 .report-summary {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 22px;
 }
 .report-summary-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  padding-top: 4px;
+}
+.report-summary-group + .report-summary-group {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 18px;
 }
 .report-summary-label {
   margin: 0;
@@ -488,6 +493,18 @@
   min-width: 0;
   overflow-wrap: break-word;
   word-break: break-word;
+}
+/* Tablet/desktop: widen the rhythm between the three executive-summary
+   groups slightly so they read as distinct beats. Mobile keeps the
+   tighter 22px / 18px spacing — counterintuitively, less gap reads
+   better on a 375px viewport. */
+@media (min-width: 641px) {
+  .report-summary {
+    gap: 24px;
+  }
+  .report-summary-group + .report-summary-group {
+    padding-top: 20px;
+  }
 }
 
 /* ============================================================
@@ -1372,7 +1389,16 @@
 @media (max-width: 640px) {
   .report-meta {
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 18px;
+  }
+  .report-hero-assessment {
+    font-size: 14.5px;
+    line-height: 1.55;
+    margin-top: 12px;
+  }
+  .report-hero + section,
+  .report-glance + section {
+    margin-top: 28px;
   }
   .score-card-bars {
     grid-template-columns: 1fr;

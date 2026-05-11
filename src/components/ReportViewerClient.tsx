@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   cleanScoreSectionBody,
+  clipDriverText,
   derivePlatformVisibility,
   deriveStrengths,
   extractFixMeta,
@@ -56,11 +57,26 @@ export function ReportViewerClient({
     : "";
   const issueItems = whySection ? parseEnumeratedItems(whySection.body) : [];
   const fixItems = fixSection ? parseEnumeratedItems(fixSection.body) : [];
-  const scoreDrivers = parseScoreDrivers(scoreProse);
+  // Mirror the customer-page caps so the admin preview matches what
+  // ships: ≤ 3 bullets per group, ≤ 120 chars per bullet.
+  const SUMMARY_PER_GROUP_LIMIT = 3;
+  const SUMMARY_BULLET_CHAR_LIMIT = 120;
+  const rawDrivers = parseScoreDrivers(scoreProse);
+  const scoreDrivers: ScoreDrivers = {
+    positive: rawDrivers.positive
+      .slice(0, SUMMARY_PER_GROUP_LIMIT)
+      .map((s) => clipDriverText(s, SUMMARY_BULLET_CHAR_LIMIT)),
+    negative: rawDrivers.negative
+      .slice(0, SUMMARY_PER_GROUP_LIMIT)
+      .map((s) => clipDriverText(s, SUMMARY_BULLET_CHAR_LIMIT)),
+  };
+  const summaryFixes = fixItems
+    .slice(0, SUMMARY_PER_GROUP_LIMIT)
+    .map((f) => clipDriverText(f.title, SUMMARY_BULLET_CHAR_LIMIT));
   const summaryHasContent =
     scoreDrivers.positive.length > 0 ||
     scoreDrivers.negative.length > 0 ||
-    fixItems.length > 0;
+    summaryFixes.length > 0;
   const strengths = deriveStrengths(score);
   const platforms = derivePlatformVisibility(markdown, score);
 
@@ -96,7 +112,7 @@ export function ReportViewerClient({
           {summaryHasContent ? (
             <ExecutiveSummaryBlock
               drivers={scoreDrivers}
-              fixes={fixItems.slice(0, 3).map((f) => f.title)}
+              fixes={summaryFixes}
             />
           ) : null}
           <p className="report-score-consistency-note">

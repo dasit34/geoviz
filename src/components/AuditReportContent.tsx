@@ -1,5 +1,6 @@
 import {
   cleanScoreSectionBody,
+  clipDriverText,
   derivePlatformVisibility,
   deriveStrengths,
   extractFixMeta,
@@ -10,9 +11,9 @@ import {
   parseReportScoreBreakdown,
   parseReportSections,
   parseScoreDrivers,
+  pickCleanHeroSentence,
   plainEnglishBandLabel,
   scoreToneFromOverall,
-  stripInlineMarkdown,
   stripScoreMath,
   type ReportSection,
   type ScoreDrivers,
@@ -79,22 +80,34 @@ export function AuditReportContent({
   const scoreProse = scoreSection
     ? cleanScoreSectionBody(scoreSection.body)
     : "";
-  const heroAssessment = stripInlineMarkdown(
-    scoreProse.split(/(?<=[.!?])\s/).find((s) => s.trim().length > 12),
-  );
+  const heroAssessment = pickCleanHeroSentence(scoreProse);
 
   const issueItems = whySection ? parseEnumeratedItems(whySection.body) : [];
   const fixItems = fixSection ? parseEnumeratedItems(fixSection.body) : [];
 
   // Structured executive summary — extracted from the score prose so
   // the opening of the report scans as 2–3 short groups instead of a
-  // dense paragraph. The renderer takes over from `<Prose>{scoreProse}</Prose>`
-  // whenever any group has content.
-  const scoreDrivers = parseScoreDrivers(scoreProse);
+  // dense paragraph. Capped at 3 bullets per group and each bullet
+  // clipped to ~120 chars so each item targets a single desktop line
+  // (mobile wraps cleanly via the flex `report-summary-item` layout).
+  const SUMMARY_PER_GROUP_LIMIT = 3;
+  const SUMMARY_BULLET_CHAR_LIMIT = 120;
+  const rawDrivers = parseScoreDrivers(scoreProse);
+  const scoreDrivers: ScoreDrivers = {
+    positive: rawDrivers.positive
+      .slice(0, SUMMARY_PER_GROUP_LIMIT)
+      .map((s) => clipDriverText(s, SUMMARY_BULLET_CHAR_LIMIT)),
+    negative: rawDrivers.negative
+      .slice(0, SUMMARY_PER_GROUP_LIMIT)
+      .map((s) => clipDriverText(s, SUMMARY_BULLET_CHAR_LIMIT)),
+  };
+  const summaryFixes = fixItems
+    .slice(0, SUMMARY_PER_GROUP_LIMIT)
+    .map((f) => clipDriverText(f.title, SUMMARY_BULLET_CHAR_LIMIT));
   const summaryHasContent =
     scoreDrivers.positive.length > 0 ||
     scoreDrivers.negative.length > 0 ||
-    fixItems.length > 0;
+    summaryFixes.length > 0;
 
   const strengths = deriveStrengths(score);
   const platforms = derivePlatformVisibility(reportMarkdown, score);
@@ -119,7 +132,7 @@ export function AuditReportContent({
           ) : null}
           <dl className="report-meta">
             <div>
-              <dt>Site</dt>
+              <dt>Website audited</dt>
               <dd>
                 <a
                   href={websiteUrl}
@@ -127,7 +140,7 @@ export function AuditReportContent({
                   rel="noreferrer"
                   className="text-white/85 hover:text-accent"
                 >
-                  {websiteUrl}
+                  {prettifyUrlForDisplay(websiteUrl)}
                 </a>
               </dd>
             </div>
@@ -160,7 +173,7 @@ export function AuditReportContent({
           {summaryHasContent ? (
             <ExecutiveSummaryBlock
               drivers={scoreDrivers}
-              fixes={fixItems.slice(0, 3).map((f) => f.title)}
+              fixes={summaryFixes}
             />
           ) : null}
           <p className="report-score-consistency-note">
@@ -653,6 +666,23 @@ function WarningIcon() {
       <circle cx="10" cy="14.5" r="0.9" fill="currentColor" />
     </svg>
   );
+}
+
+/**
+ * Strips protocol + trailing slash from a URL for premium hero
+ * display — `https://www.geoviz.ai/` becomes `www.geoviz.ai`. The
+ * full URL stays on the anchor's `href` so click-through still
+ * lands on the original target. Falls back to the raw string when
+ * the input isn't parseable as a URL.
+ */
+function prettifyUrlForDisplay(url: string): string {
+  try {
+    const u = new URL(url);
+    const path = u.pathname === "/" ? "" : u.pathname;
+    return `${u.hostname}${path}${u.search}`.replace(/\/+$/, "");
+  } catch {
+    return url;
+  }
 }
 
 function WrenchIcon() {

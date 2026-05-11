@@ -361,7 +361,7 @@ async function notifyCustomer(
     "",
     `We've received your audit request${businessLabel ? ` for ${businessLabel}` : ""} and started reviewing your AI visibility signals.`,
     "",
-    "Your reviewed GeoViz audit will be delivered within 24 hours.",
+    "Your reviewed GeoViz audit is typically delivered within minutes.",
     "",
     `Order confirmation: ${orderUrl}`,
     "",
@@ -463,7 +463,7 @@ function buildCustomerConfirmationHtml(args: {
                   We've received your audit request for <strong style="color:#111;">${safeBiz}</strong> and started reviewing your AI visibility signals.
                 </p>
                 <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#2a2a2a;">
-                  Your reviewed GeoViz audit will be delivered within <strong style="color:#111;">24 hours</strong>. Most reports land the same business day.
+                  Your reviewed GeoViz audit is typically delivered <strong style="color:#111;">within minutes</strong>. We'll email you the moment it's ready.
                 </p>
               </td>
             </tr>

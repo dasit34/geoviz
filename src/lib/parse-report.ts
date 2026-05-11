@@ -676,6 +676,23 @@ export type ScoreDrivers = {
 };
 
 /**
+ * Caps a single executive-summary bullet to roughly one line of
+ * desktop width. Truncation prefers a word boundary; falls back to a
+ * hard slice if there's no nearby space. Trailing punctuation is
+ * trimmed before the ellipsis so the result reads cleanly. Pure
+ * helper — no parsing, no scoring, no side effects.
+ */
+export function clipDriverText(s: string, maxLen = 120): string {
+  if (!s) return "";
+  const trimmed = s.trim();
+  if (trimmed.length <= maxLen) return trimmed;
+  const slice = trimmed.slice(0, maxLen - 1);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = lastSpace > maxLen * 0.6 ? slice.slice(0, lastSpace) : slice;
+  return `${cut.replace(/[,;:.\-\s]+$/g, "")}…`;
+}
+
+/**
  * Extracts ✅ / ✓ / ❌ / ✗ markers and the prose that follows each
  * one, regardless of whether the source body is in inline-paragraph
  * form ("✅ Strong A. ❌ Weak B.") or bullet-list form ("- ✅ Strong
@@ -1087,6 +1104,63 @@ export function stripInlineMarkdown(s: string | null | undefined): string {
   out = out.replace(/^#{1,6}\s+/gm, "");
   // Collapse residual whitespace.
   return out.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Picks a clean, executive-grade sentence from the score-section prose
+ * for the report hero one-liner that sits directly under the band
+ * status label. Selection rules, in order:
+ *
+ *   1. Skip sentences shorter than the existing length guard (≤ 12).
+ *   2. Skip sentences that lead with rubric/framing prefixes
+ *      ("Why this band", "Score", "Breakdown", "Note", "Bonus",
+ *      "Total", "Calibration") — those read as raw rubric notes,
+ *      not as an executive summary line.
+ *   3. Skip sentences containing developer-vocabulary tokens
+ *      (JSON-LD, robots.txt, llms.txt, sitemap, HTTP status, XML,
+ *      markup, crawler directives, noindex, disallow). These terms
+ *      are valid findings in the issue/fix cards below — but at the
+ *      hero, they break the executive feel.
+ *   4. Skip sentences over 220 chars (likely run-on / parser drift).
+ *   5. Cap the first survivor at 160 chars via word-boundary
+ *      truncation with ellipsis, then strip inline markdown.
+ *
+ * Returns null when no sentence passes — caller renders nothing,
+ * and the structured executive-summary block below the score card
+ * carries the explanatory weight.
+ */
+const HERO_FRAMING_PREFIX_RE =
+  /^(Why\s+this\s+band|Score|Breakdown|Note|Bonus|Total|Calibration)\b/i;
+const HERO_TECHNICAL_TOKENS_RE =
+  /\b(JSON[-\s]?LD|robots\.txt|llms\.txt|sitemap\.xml|sitemap\s+file|HTTP\s+\d{3}|HTTPS?\s+headers?|meta\s+tag|XML|markup|crawler\s+directives?|noindex|disallow)\b/i;
+
+export function pickCleanHeroSentence(
+  prose: string | null | undefined,
+): string | null {
+  if (!prose) return null;
+  const trimmedProse = prose.trim();
+  if (!trimmedProse) return null;
+  const sentences = trimmedProse
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 12);
+  for (const s of sentences) {
+    if (HERO_FRAMING_PREFIX_RE.test(s)) continue;
+    if (HERO_TECHNICAL_TOKENS_RE.test(s)) continue;
+    if (s.length > 220) continue;
+    const capped =
+      s.length <= 160
+        ? s
+        : (() => {
+            const slice = s.slice(0, 159);
+            const lastSpace = slice.lastIndexOf(" ");
+            const cut =
+              lastSpace > 160 * 0.6 ? slice.slice(0, lastSpace) : slice;
+            return `${cut.replace(/[,;:.\-\s]+$/g, "")}…`;
+          })();
+    return stripInlineMarkdown(capped);
+  }
+  return null;
 }
 
 /**

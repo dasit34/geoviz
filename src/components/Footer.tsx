@@ -10,7 +10,7 @@ export function Footer() {
           <p className="max-w-md">
             GeoViz audits how AI search platforms read, trust, and
             recommend your business. Full scored report delivered by
-            email — typically within 24 hours.
+            email — typically within minutes.
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 md:items-end">
