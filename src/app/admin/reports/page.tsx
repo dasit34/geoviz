@@ -3,6 +3,13 @@ import { Footer } from "@/components/Footer";
 import { AdminReportCard } from "@/components/AdminReportCard";
 import { prisma, isDatabaseConfigured } from "@/lib/db";
 import { getDbFingerprint } from "@/lib/db-fingerprint";
+import {
+  logReportAccessAttempt,
+  validateAdminAccess,
+} from "@/lib/report-access";
+import { checkPageRateLimit } from "@/lib/rate-limit";
+import { RateLimitedNotice } from "@/components/RateLimitedNotice";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,22 +23,42 @@ export default async function AdminReportsPage({
 }: {
   searchParams?: { key?: string | string[] };
 }) {
-  // Read process.env at request time. No fallback, no module-level cache,
-  // no helper — the env value must come from the running Vercel function.
-  const ADMIN_SECRET = process.env.ADMIN_SECRET;
+  // Rate-limit BEFORE the admin check + DB work — same posture as the
+  // mutating admin API routes. 20 hits per 5 min per IP. A legitimate
+  // operator hits this page a handful of times per session; the limit
+  // exists to stop a script grinding through admin-key guesses or DB
+  // diagnostics. Reads only the request headers — no body, no params,
+  // and no `prisma.*` call happens before this check passes.
+  const rl = checkPageRateLimit({
+    headers: headers(),
+    routeKey: "page:admin:reports",
+    limit: 20,
+    windowMs: 5 * 60_000,
+  });
+  if (rl.blocked) {
+    return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+  }
 
+  // Centralized admin compare lives in `lib/report-access.ts` — read
+  // ADMIN_SECRET at request time, length-stable compare, no module-level
+  // cache. Fail-closed when ADMIN_SECRET is unset.
   const rawKey = searchParams?.key;
   const key = Array.isArray(rawKey) ? rawKey[0] : rawKey;
+  const access = validateAdminAccess(rawKey);
 
-  // Fail closed when ADMIN_SECRET isn't set (otherwise undefined === undefined
-  // would let an unauth'd request through). The actual compare is the strict
-  // !== required by the spec.
-  if (!ADMIN_SECRET || key !== ADMIN_SECRET) {
+  if (!access.ok) {
+    logReportAccessAttempt({
+      route: "/admin/reports",
+      outcome: "blocked",
+      reason: access.reason,
+      expectedLength: access.expectedLength,
+      receivedLength: access.receivedLength,
+    });
     return (
       <UnauthorizedPage
-        configured={Boolean(ADMIN_SECRET)}
-        expectedLength={ADMIN_SECRET ? ADMIN_SECRET.length : 0}
-        receivedLength={key ? key.length : 0}
+        configured={access.reason !== "server_misconfigured"}
+        expectedLength={access.expectedLength}
+        receivedLength={access.receivedLength}
       />
     );
   }
@@ -220,7 +247,7 @@ export default async function AdminReportsPage({
             {orders.map((o) => (
               <AdminReportCard
                 key={o.id}
-                adminKey={key}
+                adminKey={key!}
                 order={{
                   id: o.id,
                   email: o.email,

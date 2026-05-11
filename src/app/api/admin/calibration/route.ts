@@ -6,6 +6,7 @@ import {
   CALIBRATION_PREFIX,
   parseCalibrationNotes,
 } from "@/lib/calibration";
+import { applyApiRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,14 @@ export const dynamic = "force-dynamic";
  */
 
 export async function GET(req: Request) {
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:admin:calibration-list",
+    limit: 20,
+    windowMs: 5 * 60_000,
+  });
+  if (limited) return limited;
+
   if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -81,6 +90,14 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:admin:calibration-create",
+    limit: 20,
+    windowMs: 5 * 60_000,
+  });
+  if (limited) return limited;
+
   if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

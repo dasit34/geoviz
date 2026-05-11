@@ -6,6 +6,7 @@ import {
   parseCalibrationNotes,
   stringifyCalibrationNotes,
 } from "@/lib/calibration";
+import { applyApiRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,14 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } },
 ) {
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:admin:calibration-update",
+    limit: 20,
+    windowMs: 5 * 60_000,
+  });
+  if (limited) return limited;
+
   if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -72,6 +81,14 @@ export async function DELETE(
   req: Request,
   { params }: { params: { id: string } },
 ) {
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:admin:calibration-delete",
+    limit: 20,
+    windowMs: 5 * 60_000,
+  });
+  if (limited) return limited;
+
   if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

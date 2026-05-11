@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
+import { applyApiRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,14 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string } },
 ) {
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:admin:review",
+    limit: 20,
+    windowMs: 5 * 60_000,
+  });
+  if (limited) return limited;
+
   if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
     console.warn(`[admin-review] unauthorized request for orderId=${params.id}`);
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

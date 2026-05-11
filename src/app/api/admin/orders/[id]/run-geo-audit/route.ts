@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { getDbFingerprint } from "@/lib/db-fingerprint";
+import { applyApiRateLimit } from "@/lib/rate-limit";
 
 /**
  * Enqueue-only handler.
@@ -37,6 +38,14 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string } },
 ) {
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:admin:run-audit",
+    limit: 20,
+    windowMs: 5 * 60_000,
+  });
+  if (limited) return limited;
+
   const fp = getDbFingerprint();
   const dbHost = fp ? fp.fingerprint : null;
 

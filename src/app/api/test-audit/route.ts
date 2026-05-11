@@ -2,11 +2,20 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { prisma, isDatabaseConfigured } from "@/lib/db";
 import { orderInputSchema } from "@/lib/validation";
+import { applyApiRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:test-audit",
+    limit: 5,
+    windowMs: 10 * 60_000,
+  });
+  if (limited) return limited;
+
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json(
       { error: "Test bypass is disabled in production." },

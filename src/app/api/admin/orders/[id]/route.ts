@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
+import { applyApiRateLimit } from "@/lib/rate-limit";
 
 /**
  * Reconciliation GET — returns the current DB state of one order.
@@ -19,6 +20,19 @@ export async function GET(
   req: Request,
   { params }: { params: { id: string } },
 ) {
+  // Polling endpoint — the admin card hits this every 5s while a job
+  // is queued/running. 5s polling × 5min window = 60 hits/5min from
+  // one legitimate admin tab; 200 leaves headroom for two simultaneous
+  // tabs + manual refreshes while still being an upper bound that
+  // stops a runaway loop. Mutating admin routes use the tighter 20/5min.
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:admin:orders",
+    limit: 200,
+    windowMs: 5 * 60_000,
+  });
+  if (limited) return limited;
+
   if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
     return NextResponse.json(
       { success: false, error: "Unauthorized" },

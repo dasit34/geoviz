@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { AuditReportContent } from "@/components/AuditReportContent";
+import { logReportAccessAttempt } from "@/lib/report-access";
+import { checkPageRateLimit } from "@/lib/rate-limit";
+import { RateLimitedNotice } from "@/components/RateLimitedNotice";
 import "./print.css";
 
 /**
@@ -29,10 +33,30 @@ export default async function PrintPage({
 }: {
   params: { id: string };
 }) {
+  // 30 hits per 5 min per IP. Throttle BEFORE the Prisma lookup so a
+  // script can't churn `findUnique` calls fishing for CUIDs.
+  const rl = checkPageRateLimit({
+    headers: headers(),
+    routeKey: "page:report:print",
+    limit: 30,
+    windowMs: 5 * 60_000,
+  });
+  if (rl.blocked) {
+    return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+  }
+
   const order = await prisma.auditOrder.findUnique({
     where: { id: params.id },
   });
-  if (!order || !order.reportMarkdown) notFound();
+  if (!order || !order.reportMarkdown) {
+    logReportAccessAttempt({
+      route: "/report/[id]/print",
+      orderId: params.id,
+      outcome: "not_found",
+      reason: !order ? "no_order_row" : "no_report_markdown",
+    });
+    notFound();
+  }
 
   const businessLabel = order.businessName ?? order.email;
 

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { buildPdfBaseUrl, generateAuditPdf } from "@/lib/generate-pdf";
+import { logReportAccessAttempt } from "@/lib/report-access";
+import { applyApiRateLimit } from "@/lib/rate-limit";
 
 /**
  * GET /api/report/[id]/pdf
@@ -36,9 +38,30 @@ export async function GET(
   req: Request,
   { params }: { params: { id: string } },
 ) {
+  // Rate limit FIRST — PDF generation is the most expensive route in
+  // the app (~20–40s of headless Chromium per call). 5 hits per 5 min
+  // per IP is generous for a real customer (they download once, maybe
+  // re-download once). Blocks runaway scripts before they can launch a
+  // chromium instance.
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:pdf",
+    limit: 5,
+    windowMs: 5 * 60_000,
+  });
+  if (limited) return limited;
+
   // Auth: anyone with the URL can download. Order IDs are 25-char cuids
   // (~120 bits of entropy) so URL-as-token is the access model. Same as
   // the print page at /report/[id]/print.
+  //
+  // Security: deliberately collapse "no order row" and "order exists but
+  // report not generated yet" into the SAME 404 + neutral body. The
+  // previous 404/409 split let an external attacker probing CUIDs
+  // distinguish a valid order in-flight from a non-existent ID. Real
+  // operator/admin context for "not ready" lives in the admin queue
+  // page — this public API surface stays uniform. Log the actual reason
+  // server-side via `logReportAccessAttempt`.
   const order = await prisma.auditOrder.findUnique({
     where: { id: params.id },
     select: {
@@ -48,20 +71,26 @@ export async function GET(
       businessName: true,
     },
   });
+  const NEUTRAL_404_BODY = { error: "Report not available." } as const;
   if (!order) {
-    return NextResponse.json(
-      { error: "Order not found" },
-      { status: 404 },
-    );
+    logReportAccessAttempt({
+      route: "/api/report/[id]/pdf",
+      orderId: params.id,
+      outcome: "not_found",
+      reason: "no_order_row",
+    });
+    return NextResponse.json(NEUTRAL_404_BODY, { status: 404 });
   }
   if (!order.reportMarkdown || order.reportStatus !== "generated") {
-    return NextResponse.json(
-      {
-        error:
-          "Report not generated yet. Run the audit first, then download.",
-      },
-      { status: 409 },
-    );
+    logReportAccessAttempt({
+      route: "/api/report/[id]/pdf",
+      orderId: params.id,
+      outcome: "not_ready",
+      reason: !order.reportMarkdown
+        ? "no_report_markdown"
+        : `reportStatus=${order.reportStatus}`,
+    });
+    return NextResponse.json(NEUTRAL_404_BODY, { status: 404 });
   }
 
   const baseUrl = buildPdfBaseUrl(req);
@@ -79,11 +108,20 @@ export async function GET(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    // Full error to server log (Vercel/Railway log collectors); sanitized
+    // body to the client so we never echo a stack trace, chromium path,
+    // tmp filename, or any other internal detail back to a caller.
     console.error(
       `[pdf] orderId=${order.id} generation failed (${Date.now() - startedAt}ms): ${message}`,
     );
+    logReportAccessAttempt({
+      route: "/api/report/[id]/pdf",
+      orderId: order.id,
+      outcome: "render_failed",
+      reason: "pdf_generation_threw",
+    });
     return NextResponse.json(
-      { error: `PDF generation failed: ${message}` },
+      { error: "PDF generation failed. Please retry shortly." },
       { status: 500 },
     );
   }

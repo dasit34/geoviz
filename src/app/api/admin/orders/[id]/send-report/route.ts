@@ -4,6 +4,7 @@ import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { getResend, FROM_EMAIL } from "@/lib/resend";
 import { buildPdfBaseUrl, generateAuditPdf } from "@/lib/generate-pdf";
 import { parseReportScore } from "@/lib/parse-report-score";
+import { applyApiRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,14 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string } },
 ) {
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:admin:send-report",
+    limit: 20,
+    windowMs: 5 * 60_000,
+  });
+  if (limited) return limited;
+
   if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
     console.warn(`[admin-send] unauthorized request for orderId=${params.id}`);
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

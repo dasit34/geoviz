@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { orderInputSchema } from "@/lib/validation";
+import { applyApiRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -34,13 +35,20 @@ function resolveSiteUrl(): string | null {
   return null;
 }
 
-// TODO(rate-limit): /api/checkout is a public POST. A bad actor can
-// hammer it to mint Stripe sessions (no charge until they actually
-// pay, but it pollutes Stripe metrics and adds API spend). Before live
-// launch, add per-IP throttling (e.g., 10 requests / 5 minutes / IP)
-// or a Vercel WAF rule. Keep it simple — an in-memory Map keyed on
-// `req.headers.get("x-forwarded-for")` is enough for the pilot.
+// Public POST that mints a Stripe checkout session. Pre-check throttles
+// abuse (script hammering Stripe to pollute metrics / burn API spend)
+// at 5 hits per 10 min per IP — enough for a real customer to retry a
+// few times across price changes / typos, but stops obvious automation.
+// Rate-limit check runs BEFORE the Stripe session is created.
 export async function POST(req: Request) {
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:checkout",
+    limit: 5,
+    windowMs: 10 * 60_000,
+  });
+  if (limited) return limited;
+
   const PRICE_ID = process.env.STRIPE_PRICE_ID;
 
   if (!process.env.STRIPE_SECRET_KEY || !PRICE_ID) {
