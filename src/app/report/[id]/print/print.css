@@ -17,10 +17,17 @@
   overflow-x: hidden;
 }
 
-/* ---- hero ---- */
+/* ---- hero ----
+ * Horizontal padding intentionally matches the inset of `.score-card`
+ * (32px) directly below the hero so the eyebrow, business name, status
+ * pill, score-driver one-liner, and metadata row align visually with
+ * the card content rather than sitting flush with the container edge.
+ * Border-bottom still spans the full hero width (it's outside the
+ * content box), so the section separator below the hero reads
+ * full-bleed inside the container. */
 .report-hero {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding-bottom: 32px;
+  padding: 0 32px 32px;
 }
 .report-hero-subtitle {
   margin-top: 14px;
@@ -1387,6 +1394,10 @@
 
 /* ---- mobile responsive ---- */
 @media (max-width: 640px) {
+  .report-hero {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
   .report-meta {
     grid-template-columns: 1fr;
     gap: 18px;
@@ -1615,7 +1626,7 @@
    * a tighter — but still premium — print rhythm.
    */
   .report-hero {
-    padding-bottom: 22px !important;
+    padding: 0 26px 22px !important;
   }
   .report-meta {
     margin-top: 18px !important;
