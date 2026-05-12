@@ -42,6 +42,20 @@ export async function GET(req: Request) {
     where: { businessName: { startsWith: CALIBRATION_PREFIX } },
     orderBy: { createdAt: "desc" },
     take: 500,
+    include: {
+      // Pull the V2 intelligence row (industry slug, operator
+      // calibration fields). Cheap one-to-one join; nullable for
+      // historic rows that pre-date the intelligence table.
+      intelligence: {
+        select: {
+          industryCategoryNormalized: true,
+          operatorVerdict: true,
+          operatorConfidence: true,
+          benchmarkTag: true,
+          calibrationNotes: true,
+        },
+      },
+    },
   });
 
   // Diagnostic — surfaces the live row counts in Vercel logs so any
@@ -95,6 +109,14 @@ export async function GET(req: Request) {
       workerRuntimeMs: row.workerRuntimeMs,
       retryCount: row.retryCount,
       failureReason: row.failureReason,
+      // V2 intelligence layer fields (null when no intelligence row
+      // exists yet — historic audits before the backfill).
+      industryCategoryNormalized:
+        row.intelligence?.industryCategoryNormalized ?? null,
+      operatorVerdict: row.intelligence?.operatorVerdict ?? null,
+      operatorConfidence: row.intelligence?.operatorConfidence ?? null,
+      benchmarkTag: row.intelligence?.benchmarkTag ?? null,
+      calibrationNotes: row.intelligence?.calibrationNotes ?? null,
     };
   });
 

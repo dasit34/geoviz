@@ -156,6 +156,30 @@ model AuditIntelligence {
   operatorNotes      String?
   rawSignalSnapshot  Json
 
+  // Operator-judgment calibration intelligence — structured fields
+  // captured when an operator manually reviews an audit. NOT machine
+  // learning, NOT self-modifying. Pure operator memory. See
+  // `src/lib/intelligence/calibration.ts` for the type taxonomy +
+  // summary helpers.
+  //
+  //   operatorVerdict    — accurate / slightly_high / too_high /
+  //                        slightly_low / too_low. Null when not yet
+  //                        tagged.
+  //   operatorConfidence — high / medium / low. The OPERATOR's
+  //                        confidence in the score (distinct from
+  //                        `confidenceLevel` above, which is the
+  //                        parser's confidence in the rubric extraction).
+  //   benchmarkTag       — excellent_example / average_example /
+  //                        weak_example / edge_case. For curating a
+  //                        future benchmark dataset.
+  //   calibrationNotes   — freeform operator memo. Distinct from
+  //                        `operatorNotes` so calibration context
+  //                        stays separable from general review notes.
+  operatorVerdict    String?
+  operatorConfidence String?
+  benchmarkTag       String?
+  calibrationNotes   String?
+
   @@index([createdAt])
   @@index([websiteUrl])
 }

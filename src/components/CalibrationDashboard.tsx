@@ -2,6 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { costTone, type CostTone } from "@/lib/pricing";
+import {
+  BENCHMARK_TAG_OPTIONS,
+  OPERATOR_CONFIDENCE_OPTIONS,
+  OPERATOR_VERDICT_OPTIONS,
+  benchmarkTagLabel,
+  formatAvgConfidence,
+  operatorConfidenceLabel,
+  operatorVerdictLabel,
+  summarizeCalibration,
+  type CalibrationInput,
+} from "@/lib/intelligence/calibration";
 
 type CategoryScore = {
   key: string;
@@ -36,6 +47,15 @@ type CalibrationRun = {
   workerRuntimeMs: number | null;
   retryCount: number;
   failureReason: string | null;
+  // V2 calibration intelligence — operator-judgment fields. Null
+  // until the operator tags this audit. industryCategoryNormalized
+  // is auto-derived by the V2 taxonomy module; the four "operator*"
+  // / benchmark / notes fields are manually set.
+  industryCategoryNormalized: string | null;
+  operatorVerdict: string | null;
+  operatorConfidence: string | null;
+  benchmarkTag: string | null;
+  calibrationNotes: string | null;
 };
 
 type Filter =
@@ -207,6 +227,18 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
     () => computeOperatorIntelligence(runs),
     [runs],
   );
+  const calibrationSummary = useMemo(
+    () =>
+      summarizeCalibration(
+        runs.map<CalibrationInput>((r) => ({
+          operatorVerdict: r.operatorVerdict,
+          operatorConfidence: r.operatorConfidence,
+          benchmarkTag: r.benchmarkTag,
+          industryCategoryNormalized: r.industryCategoryNormalized,
+        })),
+      ),
+    [runs],
+  );
 
   const lastFetchedAgo =
     lastFetched === null ? null : Math.max(0, Math.round((Date.now() - lastFetched.getTime()) / 1000));
@@ -226,6 +258,11 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
           category-leader observations that an operator scanning
           this page needs without opening a row. */}
       <OperatorIntelligenceBlock intel={opIntelligence} />
+
+      {/* Calibration intelligence — structured operator-judgment
+          summary. Renders only once there's at least one tagged
+          row; stays out of the way during empty-state. */}
+      <CalibrationIntelligenceBlock summary={calibrationSummary} />
 
       {/* Live status strip — always visible, updates every poll */}
       <StatusStrip
@@ -417,6 +454,7 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
                 <th className="px-2 py-2 font-semibold text-right">Clarity /10</th>
                 <th className="px-2 py-2 font-semibold text-right">Tech /10</th>
                 <th className="px-2 py-2 font-semibold text-right">Expected</th>
+                <th className="px-2 py-2 font-semibold">Calibration</th>
                 <th className="px-2 py-2 font-semibold text-right">Δ</th>
                 <th className="px-2 py-2 font-semibold">Report</th>
                 <th className="px-2 py-2 font-semibold"></th>
@@ -584,6 +622,44 @@ function RunRow({
     run.expectedScore === null ? "" : String(run.expectedScore),
   );
   const [saving, setSaving] = useState(false);
+  // V2 calibration intelligence — operator-judgment editor expansion.
+  // Each row tracks its own expand state; only the editor row below
+  // renders conditionally. Notes use a local draft so we don't PATCH
+  // on every keystroke; dropdowns save on change.
+  const [calOpen, setCalOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState<string>(
+    run.calibrationNotes ?? "",
+  );
+  const [calSaving, setCalSaving] = useState(false);
+  useEffect(() => {
+    setNotesDraft(run.calibrationNotes ?? "");
+  }, [run.calibrationNotes]);
+  const patchCalibration = useCallback(
+    async (
+      patch: Partial<{
+        operatorVerdict: string | null;
+        operatorConfidence: string | null;
+        benchmarkTag: string | null;
+        calibrationNotes: string | null;
+      }>,
+    ) => {
+      setCalSaving(true);
+      try {
+        await fetch(
+          `/api/admin/audit-intelligence/${encodeURIComponent(run.id)}?key=${encodeURIComponent(adminKey)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+          },
+        );
+        await onChange();
+      } finally {
+        setCalSaving(false);
+      }
+    },
+    [run.id, adminKey, onChange],
+  );
 
   useEffect(() => {
     setExpectedDraft(
@@ -628,6 +704,7 @@ function RunRow({
   }, [run.id, run.url, adminKey, onChange]);
 
   return (
+    <>
     <tr className="border-t border-white/5 align-top">
       <td className="px-2 py-3">
         <div className="font-semibold text-white break-words">
@@ -712,6 +789,20 @@ function RunRow({
         )}
       </td>
       <td className="px-2 py-3">
+        <button
+          type="button"
+          onClick={() => setCalOpen((v) => !v)}
+          className={`pill text-[10px] ${run.operatorVerdict ? "border-accent/40 text-accent" : ""}`}
+          aria-expanded={calOpen}
+          aria-label="Toggle calibration editor"
+        >
+          {run.operatorVerdict
+            ? operatorVerdictLabel(run.operatorVerdict)
+            : "Tag"}
+          <span className="ml-1 text-white/40">{calOpen ? "▾" : "▸"}</span>
+        </button>
+      </td>
+      <td className="px-2 py-3">
         {run.reportStatus === "generated" ? (
           <a
             href={`/report/${encodeURIComponent(run.id)}/print`}
@@ -736,6 +827,151 @@ function RunRow({
         </button>
       </td>
     </tr>
+    {calOpen ? (
+      <tr className="border-t border-white/[0.03] bg-white/[0.015]">
+        <td colSpan={18} className="px-4 py-4">
+          <CalibrationEditor
+            run={run}
+            notesDraft={notesDraft}
+            setNotesDraft={setNotesDraft}
+            saving={calSaving}
+            onPatch={patchCalibration}
+            onClose={() => setCalOpen(false)}
+          />
+        </td>
+      </tr>
+    ) : null}
+    </>
+  );
+}
+
+function CalibrationEditor({
+  run,
+  notesDraft,
+  setNotesDraft,
+  saving,
+  onPatch,
+  onClose,
+}: {
+  run: CalibrationRun;
+  notesDraft: string;
+  setNotesDraft: (s: string) => void;
+  saving: boolean;
+  onPatch: (patch: {
+    operatorVerdict?: string | null;
+    operatorConfidence?: string | null;
+    benchmarkTag?: string | null;
+    calibrationNotes?: string | null;
+  }) => void | Promise<void>;
+  onClose: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55">
+          Calibration intelligence
+          <span className="ml-2 font-normal normal-case tracking-normal text-white/35">
+            (internal · operator memory only)
+          </span>
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[11px] text-white/45 hover:text-white/85"
+        >
+          Close
+        </button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <CalSelect
+          label="Operator verdict"
+          value={run.operatorVerdict}
+          options={OPERATOR_VERDICT_OPTIONS.map((o) => ({
+            value: o.value,
+            label: o.label,
+          }))}
+          disabled={saving}
+          onChange={(v) => onPatch({ operatorVerdict: v })}
+        />
+        <CalSelect
+          label="Operator confidence in score"
+          value={run.operatorConfidence}
+          options={OPERATOR_CONFIDENCE_OPTIONS.map((o) => ({
+            value: o.value,
+            label: o.label,
+          }))}
+          disabled={saving}
+          onChange={(v) => onPatch({ operatorConfidence: v })}
+        />
+        <CalSelect
+          label="Benchmark tag"
+          value={run.benchmarkTag}
+          options={BENCHMARK_TAG_OPTIONS.map((o) => ({
+            value: o.value,
+            label: o.label,
+          }))}
+          disabled={saving}
+          onChange={(v) => onPatch({ benchmarkTag: v })}
+        />
+      </div>
+      <div>
+        <label className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55">
+          Calibration notes
+        </label>
+        <textarea
+          value={notesDraft}
+          onChange={(e) => setNotesDraft(e.target.value)}
+          onBlur={() =>
+            onPatch({
+              calibrationNotes:
+                notesDraft.trim().length === 0 ? null : notesDraft,
+            })
+          }
+          disabled={saving}
+          placeholder="Why this score feels right / wrong, what to recalibrate, edge-case context…"
+          rows={2}
+          className="mt-1.5 w-full resize-y rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder-white/30"
+        />
+        <p className="mt-1 text-[10px] text-white/35">
+          Saved on blur · up to 2,000 chars
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function CalSelect({
+  label,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string | null;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  disabled: boolean;
+  onChange: (v: string | null) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/55">
+        {label}
+      </span>
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+        disabled={disabled}
+        className="mt-1.5 w-full rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-sm text-white"
+      >
+        <option value="">— Not tagged</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -1275,6 +1511,80 @@ function OperatorIntelligenceBlock({
             <span>{line}</span>
           </li>
         ))}
+      </ul>
+    </div>
+  );
+}
+
+function CalibrationIntelligenceBlock({
+  summary,
+}: {
+  summary: ReturnType<typeof summarizeCalibration>;
+}) {
+  // Empty state — don't add another card to the page until at least
+  // one operator has tagged a row. Keeps the dashboard quiet.
+  if (summary.taggedCount === 0) return null;
+  return (
+    <div className="rounded-xl border border-accent/20 bg-accent/[0.04] p-4 text-xs leading-relaxed text-white/85">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">
+        Calibration intelligence
+        <span className="ml-2 font-normal normal-case tracking-normal text-white/45">
+          (operator memory, n={summary.taggedCount})
+        </span>
+      </p>
+      <ul className="mt-2 space-y-1">
+        <li className="flex items-start gap-2">
+          <span aria-hidden className="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-accent" />
+          <span>
+            <strong className="text-white">Tagged audits:</strong>{" "}
+            {summary.taggedCount} (over-scored {summary.overScoredCount} ·
+            under-scored {summary.underScoredCount})
+          </span>
+        </li>
+        {summary.avgConfidenceLevel !== null ? (
+          <li className="flex items-start gap-2">
+            <span aria-hidden className="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-accent" />
+            <span>
+              <strong className="text-white">Average operator confidence:</strong>{" "}
+              {formatAvgConfidence(summary.avgConfidenceLevel)}
+            </span>
+          </li>
+        ) : null}
+        {summary.overScoredByIndustry.length > 0 ? (
+          <li className="flex items-start gap-2">
+            <span aria-hidden className="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-accent" />
+            <span>
+              <strong className="text-white">Most commonly over-scored industries:</strong>{" "}
+              {summary.overScoredByIndustry
+                .slice(0, 3)
+                .map((r) => `${r.industry} (${r.count})`)
+                .join(" · ")}
+            </span>
+          </li>
+        ) : null}
+        {summary.underScoredByIndustry.length > 0 ? (
+          <li className="flex items-start gap-2">
+            <span aria-hidden className="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-accent" />
+            <span>
+              <strong className="text-white">Most commonly under-scored industries:</strong>{" "}
+              {summary.underScoredByIndustry
+                .slice(0, 3)
+                .map((r) => `${r.industry} (${r.count})`)
+                .join(" · ")}
+            </span>
+          </li>
+        ) : null}
+        {summary.benchmarkTagCounts.length > 0 ? (
+          <li className="flex items-start gap-2">
+            <span aria-hidden className="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-accent" />
+            <span>
+              <strong className="text-white">Benchmark examples:</strong>{" "}
+              {summary.benchmarkTagCounts
+                .map((r) => `${r.label} (${r.count})`)
+                .join(" · ")}
+            </span>
+          </li>
+        ) : null}
       </ul>
     </div>
   );
