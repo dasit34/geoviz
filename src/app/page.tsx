@@ -415,33 +415,54 @@ export default function Page() {
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-16">
           <div className="rounded-2xl border border-accent/30 bg-ink-900/70 p-8 md:p-10 shadow-card transition duration-200 ease-out hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-glow">
-            <p className="section-eyebrow">Optional next step</p>
-            <h2 className="h2 mt-3 max-w-2xl">
-              Need help improving the signals the audit identified?
+            {/* Brand row — surfaces the offer name at the top of the
+                card so the headline can lead with the value
+                proposition, not the label. */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-accent">
+                GEO Foundation Fix
+              </p>
+              <span className="pill">Optional next step</span>
+            </div>
+
+            <h2 className="h2 mt-5 max-w-2xl">
+              Need help improving the signals identified in your audit?
             </h2>
             <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
-              The GEO Foundation Fix is a foundational implementation
-              service — not magic automation. We work through the
-              priority fixes the audit surfaced so AI systems can
-              identify, trust, and recommend your business more
-              clearly.
+              The GeoViz Foundation Fix is a structured implementation
+              engagement focused on improving machine understanding,
+              trust signals, semantic clarity, and AI accessibility.
             </p>
-            <p className="mt-5 text-sm text-white/70">
-              <span className="text-white font-semibold">$497</span> ·
-              3–5 business days · re-check included · most cases
-              (complex sites quoted upfront).
-            </p>
-            <p className="mt-6 text-xs uppercase tracking-[0.18em] text-white/45">
-              Engagements typically include
+
+            {/* Price panel — distinct visual unit inside the card so
+                $497 reads at the same weight as the $97 audit card
+                above ($97 also uses text-5xl). Sub-card fill
+                (bg-ink-950/50) and a thin border give it card-within-
+                card hierarchy without breaking the parent's accent
+                border. */}
+            <div className="mt-7 rounded-xl border border-white/5 bg-ink-950/50 px-6 py-5 max-w-2xl">
+              <div className="flex flex-wrap items-end gap-3">
+                <span className="text-5xl font-bold text-white">$497</span>
+                <span className="pb-1 text-sm text-white/55">
+                  One-time implementation engagement
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/60">
+                <span>3–5 business days</span>
+                <span className="text-white/25" aria-hidden>•</span>
+                <span>re-check included</span>
+              </div>
+            </div>
+
+            <p className="mt-8 text-xs uppercase tracking-[0.18em] text-white/45">
+              Implementation areas
             </p>
             <ul className="mt-3 grid gap-3 sm:grid-cols-2 max-w-2xl">
-              <PricingBullet>
-                Schema / structured data recommendations or implementation
-              </PricingBullet>
-              <PricingBullet>Business identity cleanup</PricingBullet>
+              <PricingBullet>Schema / structured data improvements</PricingBullet>
               <PricingBullet>AI-readable content improvements</PricingBullet>
-              <PricingBullet>Crawler accessibility review</PricingBullet>
               <PricingBullet>Trust signal improvements</PricingBullet>
+              <PricingBullet>Crawler accessibility review</PricingBullet>
+              <PricingBullet>Business identity cleanup</PricingBullet>
               <PricingBullet>
                 llms.txt / AI crawler guidance where appropriate
               </PricingBullet>
@@ -452,9 +473,31 @@ export default function Page() {
                 Report-based priority fixes from your audit
               </PricingBullet>
             </ul>
-            <p className="mt-6 text-xs text-white/45">
-              Available after your audit completes. Scope is grounded
-              in the audit&rsquo;s findings, not a templated checklist.
+
+            {/* Operational safety — sets expectations honestly without
+                weakening the offer. Each line addresses a specific
+                question a buyer might have before committing. */}
+            <ul className="mt-7 space-y-2 max-w-2xl text-sm leading-relaxed text-white/70">
+              <SafetyLine>
+                Scope is based on your audit findings, not a templated checklist.
+              </SafetyLine>
+              <SafetyLine>
+                Implementation recommendations are tailored to your website structure and platform.
+              </SafetyLine>
+              <SafetyLine>
+                Complex sites may require custom scoping — we&rsquo;ll quote upfront.
+              </SafetyLine>
+            </ul>
+
+            <a
+              href="mailto:support@geoviz.ai?subject=GEO%20Foundation%20Fix%20inquiry"
+              className="btn-primary mt-8 w-full justify-center text-base sm:w-auto"
+            >
+              Request Foundation Fix
+            </a>
+            <p className="mt-3 text-xs text-white/45">
+              Available after your audit completes. We&rsquo;ll reply
+              with a scoped implementation plan within one business day.
             </p>
           </div>
         </div>
@@ -685,6 +728,18 @@ function InsightCard({ body }: { body: string }) {
         <p className="text-sm leading-relaxed text-white/85">{body}</p>
       </div>
     </div>
+  );
+}
+
+function SafetyLine({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-3">
+      <span
+        aria-hidden
+        className="mt-2 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-white/30"
+      />
+      <span>{children}</span>
+    </li>
   );
 }
 
