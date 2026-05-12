@@ -125,9 +125,9 @@ function FeaturedSampleSummary({
               </div>
             ) : null}
             <p className="mt-5 max-w-xl text-xs italic text-white/45">
-              GeoViz scores are directional visibility benchmarks
-              designed to identify AI search visibility gaps and
-              improvement opportunities.
+              GeoViz scores are directional intelligence signals
+              designed to show relative readiness, risk, and improvement
+              opportunities — not absolute guarantees of any AI outcome.
             </p>
           </div>
           <div className="flex flex-wrap gap-3 md:flex-col md:items-end">

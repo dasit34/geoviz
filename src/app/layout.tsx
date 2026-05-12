@@ -2,23 +2,23 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GeoViz — AI Search Visibility Audits for Businesses",
+  title: "GeoViz — AI Visibility Intelligence for Businesses",
   description:
-    "GeoViz analyzes how ChatGPT, Claude, Gemini, and AI search engines interpret and recommend your business online — with scored audits and clear fixes.",
+    "GeoViz audits whether AI systems like ChatGPT, Claude, Gemini, and Perplexity can understand, crawl, trust, and recommend your business — directional intelligence reports, reviewed before delivery.",
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ),
   openGraph: {
-    title: "GeoViz — AI Search Visibility Audits for Businesses",
+    title: "GeoViz — AI Visibility Intelligence for Businesses",
     description:
-      "GeoViz analyzes how ChatGPT, Claude, Gemini, and AI search engines interpret and recommend your business online — with scored audits and clear fixes.",
+      "GeoViz audits whether AI systems like ChatGPT, Claude, Gemini, and Perplexity can understand, crawl, trust, and recommend your business — directional intelligence reports, reviewed before delivery.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "GeoViz — AI Search Visibility Audits for Businesses",
+    title: "GeoViz — AI Visibility Intelligence for Businesses",
     description:
-      "GeoViz analyzes how ChatGPT, Claude, Gemini, and AI search engines interpret and recommend your business online — with scored audits and clear fixes.",
+      "GeoViz audits whether AI systems like ChatGPT, Claude, Gemini, and Perplexity can understand, crawl, trust, and recommend your business — directional intelligence reports, reviewed before delivery.",
   },
 };
 

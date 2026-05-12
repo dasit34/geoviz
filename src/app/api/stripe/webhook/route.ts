@@ -2,8 +2,25 @@ import type Stripe from "stripe";
 import type { AuditOrder } from "@prisma/client";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
-import { getResend, FROM_EMAIL } from "@/lib/resend";
+import { getResend } from "@/lib/resend";
 import { resolveAppBaseUrl, buildAdminReviewUrl } from "@/lib/app-url";
+
+/**
+ * Webhook-specific FROM fallback. We deliberately do NOT inherit
+ * `FROM_EMAIL` from `@/lib/resend` because that chain ends in an
+ * unverified `geoviz.local` placeholder which Resend rejects. A
+ * misconfigured Vercel env (no `RESEND_EMAIL_FROM`) would silently
+ * break BOTH customer confirmations and admin notifications. Falling
+ * back to the canonical `mail.geoviz.ai` subdomain keeps both flows
+ * working out-of-the-box. Mirrors the pattern in
+ * `lib/notify-operator-report-ready.ts`.
+ */
+const WEBHOOK_FROM_FALLBACK = "GeoViz Orders <orders@mail.geoviz.ai>";
+
+function webhookFromEmail(): string {
+  const fromEnv = process.env.RESEND_EMAIL_FROM?.trim();
+  return fromEnv && fromEnv.length > 0 ? fromEnv : WEBHOOK_FROM_FALLBACK;
+}
 
 export const runtime = "nodejs";
 // Stripe sends a raw body and we must verify the signature against it byte
@@ -181,18 +198,6 @@ async function notifyAdmin(
     return;
   }
 
-  // ---- Duplicate protection (DB-backed) ----
-  // The Stripe session ID is the unique key (schema enforces @unique). If
-  // adminEmailSentAt is already set on the row, this is a retry / replay /
-  // dashboard "Resend" — bail out without sending again.
-  if (order.adminEmailSentAt) {
-    console.log(
-      "[stripe-webhook] admin email already sent, skipping duplicate",
-    );
-    return;
-  }
-  console.log("[stripe-webhook] duplicate check passed");
-
   const apiKey = process.env.RESEND_API_KEY;
   const adminEmail = process.env.AUDIT_NOTIFICATION_EMAIL;
   if (!apiKey) {
@@ -204,6 +209,20 @@ async function notifyAdmin(
   if (!adminEmail) {
     console.warn(
       "[stripe-webhook] notifyAdmin skipped — AUDIT_NOTIFICATION_EMAIL not set",
+    );
+    return;
+  }
+
+  // ---- Atomic claim — only proceed if adminEmailSentAt is still null.
+  // Replaces the prior check-then-set pattern (which could race on
+  // concurrent webhook replays). Mirrors the `notifyCustomer` claim.
+  const claim = await prisma.auditOrder.updateMany({
+    where: { id: order.id, adminEmailSentAt: null },
+    data: { adminEmailSentAt: new Date() },
+  });
+  if (claim.count !== 1) {
+    console.log(
+      `[stripe-webhook] notifyAdmin skipped — already sent for orderId=${order.id}`,
     );
     return;
   }
@@ -252,7 +271,7 @@ async function notifyAdmin(
 
   console.log("[stripe-webhook] sending admin email");
   const result = await getResend().emails.send({
-    from: FROM_EMAIL,
+    from: webhookFromEmail(),
     to: adminEmail,
     subject: "New GeoViz Audit Order — $97",
     text: body,
@@ -261,29 +280,22 @@ async function notifyAdmin(
 
   if (result.error) {
     console.error(
-      `[stripe-webhook] email send failed: ${result.error.name} — ${result.error.message}`,
+      `[stripe-webhook] admin email send failed: ${result.error.name} — ${result.error.message}`,
     );
+    // Roll back the atomic claim so a future delivery attempt can retry.
+    await prisma.auditOrder
+      .update({
+        where: { id: order.id },
+        data: { adminEmailSentAt: null },
+      })
+      .catch(() => {
+        /* ignore — best-effort rollback */
+      });
     return;
   }
 
-  // Mark sent so subsequent retries / replays / "resend" clicks don't
-  // re-fire the email. Failure to update is logged but not fatal — Resend
-  // already accepted the message; we'd rather risk one duplicate than fail
-  // the whole webhook.
-  try {
-    await prisma.auditOrder.update({
-      where: { id: order.id },
-      data: { adminEmailSentAt: new Date() },
-    });
-  } catch (err) {
-    console.error(
-      "[stripe-webhook] failed to mark adminEmailSentAt (non-fatal):",
-      err,
-    );
-  }
-
   console.log(
-    `[stripe-webhook] email sent successfully — id=${result.data?.id ?? "unknown"}`,
+    `[stripe-webhook] admin email sent successfully — id=${result.data?.id ?? "unknown"}`,
   );
 }
 
@@ -376,14 +388,15 @@ async function notifyCustomer(
     orderUrl,
   });
 
+  const fromAddress = webhookFromEmail();
   console.log(
-    `[stripe-webhook] CUSTOMER_DISPATCH orderId=${order.id} to=${customerEmail} from=${FROM_EMAIL} subject="${subject}"`,
+    `[stripe-webhook] CUSTOMER_DISPATCH orderId=${order.id} to=${customerEmail} from=${fromAddress} subject="${subject}"`,
   );
 
   let resendId: string | undefined;
   try {
     const result = await getResend().emails.send({
-      from: FROM_EMAIL,
+      from: fromAddress,
       to: customerEmail,
       subject,
       text: textBody,

@@ -40,22 +40,21 @@ export default function Page() {
         <div className="container-page grid gap-10 py-20 md:grid-cols-[1.15fr_1fr] md:py-28 md:gap-16">
           <div>
             <span className="pill animate-pulseSoft">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> AI search
-              visibility audits for businesses
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> AI
+              Visibility Intelligence
             </span>
             <h1 className="h1 mt-5">
-              When customers ask{" "}
+              See how visible your business is to{" "}
               <span className="bg-gradient-to-r from-accent to-accent-glow bg-clip-text text-transparent">
-                ChatGPT
-              </span>{" "}
-              who to hire — does your business get named?
+                AI
+              </span>
+              .
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/70">
-              AI answer engines are the new front door for local
-              hiring. When ChatGPT, Claude, Perplexity, and Gemini
-              can&rsquo;t parse your site clearly, they cite the
-              competitor whose business identity is easier to confirm.
-              We show you why — and exactly what to fix.
+              GeoViz audits whether AI systems can understand, crawl,
+              trust, and recommend your business — across the signals
+              that matter for AI discovery on ChatGPT, Claude,
+              Perplexity, Gemini, and the answer engines coming next.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -104,11 +103,14 @@ export default function Page() {
       >
         <div className="container-page py-14">
           <p className="section-eyebrow">What is GeoViz</p>
-          <h2 className="h2 mt-3 max-w-3xl">What Is GeoViz?</h2>
+          <h2 className="h2 mt-3 max-w-3xl">
+            AI Visibility Intelligence for modern businesses.
+          </h2>
           <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
-            GeoViz analyzes how visible and understandable your
-            business appears across AI-powered search and answer
-            platforms like ChatGPT, Claude, Gemini, and Perplexity.
+            AI systems must understand your business before they can
+            recommend it. GeoViz audits how clearly ChatGPT, Claude,
+            Gemini, and Perplexity can read, trust, and surface your
+            business — across the signals that matter for AI discovery.
           </p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <WhatCard
@@ -169,30 +171,114 @@ export default function Page() {
         <div className="container-page py-14">
           <p className="section-eyebrow">How it works</p>
           <h2 className="h2 mt-3 max-w-2xl">
-            Four steps. One reviewed report.
+            Five steps. One reviewed report.
           </h2>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             <HowItWorksStep
               index={1}
-              title="Submit your website"
-              body="Drop in your URL. Optional: business name and a competitor URL for comparison context."
+              title="Submit your business"
+              body="Your website URL, your email, and optionally your business name and a competitor URL for comparison context."
             />
             <HowItWorksStep
               index={2}
               title="GeoViz analyzes AI visibility signals"
-              body="Automated analysis across AI readability, crawl access, trust signals, content clarity, and technical signals."
+              body="Automated analysis across AI readability, crawler accessibility, trust signals, structured identity, and semantic clarity."
             />
             <HowItWorksStep
               index={3}
-              title="We review the report for clarity"
-              body="Every report is read end-to-end before it ships — no raw model output."
+              title="Human review checks the report"
+              body="Every report is read end-to-end before delivery — directional intelligence framed for action, not raw model output."
             />
             <HowItWorksStep
               index={4}
-              title="You receive your report — typically within minutes"
-              body="Delivered as a hosted link and PDF. Most audits complete in a handful of minutes; a complex site can take a little longer."
+              title="You receive a clear AI visibility report"
+              body="Delivered by email as a hosted link and PDF — typically within minutes. A complex site can take a little longer."
+            />
+            <HowItWorksStep
+              index={5}
+              title="Optional foundation fixes improve your AI readiness"
+              body="If you want us to implement the audit's priority fixes, the GEO Foundation Fix is available as a separate engagement."
             />
           </div>
+        </div>
+      </section>
+
+      {/* WHAT WE MEASURE — the eight AI-visibility dimensions GeoViz
+          scans for. Sits between How It Works (process) and Sample
+          Report (proof). Reads as a structural detail block so a
+          technical buyer can grok the rubric in 10 seconds; remains
+          plain-English so a non-technical owner can still scan it. */}
+      <section
+        id="what-we-measure"
+        className="border-t border-white/5 bg-ink-950 scroll-mt-20"
+      >
+        <div className="container-page py-14">
+          <p className="section-eyebrow">What we measure</p>
+          <h2 className="h2 mt-3 max-w-3xl">
+            The signals AI systems use to understand a business.
+          </h2>
+          <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
+            Every audit scores your site across the eight dimensions
+            that drive AI discoverability today.
+          </p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MeasureCard
+              title="AI readability"
+              body="How easily AI systems can retrieve and interpret your content."
+            />
+            <MeasureCard
+              title="Semantic clarity"
+              body="Whether your services, locations, and offers are clearly described in plain language."
+            />
+            <MeasureCard
+              title="Business identity consistency"
+              body="Whether your name, address, and core facts are aligned across the web."
+            />
+            <MeasureCard
+              title="Crawler accessibility"
+              body="Whether the AI crawlers behind ChatGPT, Claude, Perplexity, and Gemini can actually reach your pages."
+            />
+            <MeasureCard
+              title="Structured data"
+              body="Whether machine-readable signals tell AI systems exactly what your business does and where."
+            />
+            <MeasureCard
+              title="Trust signals"
+              body="Reviews, citations, and verifications that make AI confident enough to recommend you."
+            />
+            <MeasureCard
+              title="Recommendation readiness"
+              body="Whether your site has the depth and clarity AI needs to name you when a customer asks."
+            />
+            <MeasureCard
+              title="Competitor visibility signals"
+              body="How your AI visibility profile compares against the competitor you submit (optional)."
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* WHAT GEOVIZ IS NOT — concise expectation-setter. Plain bullets,
+          no scary tone. Sits adjacent to "What we measure" so the
+          buyer reads "here is what we are, here is what we are not"
+          as a paired thought. */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-14">
+          <p className="section-eyebrow">What GeoViz is not</p>
+          <h2 className="h2 mt-3 max-w-3xl">
+            What this is — and what it isn&rsquo;t.
+          </h2>
+          <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
+            GeoViz is AI visibility intelligence. It is intentionally
+            not these things.
+          </p>
+          <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <NotCard label="Not traditional SEO." />
+            <NotCard label="Not keyword stuffing." />
+            <NotCard label="Not guaranteed rankings." />
+            <NotCard label="Not fake AI citation promises." />
+            <NotCard label="Not a one-click magic fix." />
+          </ul>
         </div>
       </section>
 
@@ -270,8 +356,10 @@ export default function Page() {
             <p className="section-eyebrow">Pricing</p>
             <h2 className="h2 mt-3">One audit. One price. No subscription.</h2>
             <p className="muted mt-4">
-              The full picture of how generative search engines see your
-              business — and exactly what to fix first.
+              A diagnostic intelligence report — not an instant fix. The
+              audit identifies where your business is clear, weak,
+              blocked, or under-explained to AI systems, and ranks the
+              fixes by impact.
             </p>
           </div>
 
@@ -328,29 +416,44 @@ export default function Page() {
           <div className="rounded-2xl border border-accent/30 bg-ink-900/70 p-8 md:p-10 shadow-card transition duration-200 ease-out hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-glow">
             <p className="section-eyebrow">Optional next step</p>
             <h2 className="h2 mt-3 max-w-2xl">
-              Want us to fix what the audit found?
+              Want us to implement what the audit found?
             </h2>
             <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
-              The GEO Foundation Fix implements every repair the audit
-              flagged — schema, AI-crawler access, FAQ + service-page
-              structure — then re-scores your site against the same
-              rubric so the lift is measurable, not a guess.
+              The GEO Foundation Fix is a foundational implementation
+              service — not magic automation. We work through the
+              priority fixes the audit surfaced so AI systems can
+              identify, trust, and recommend your business more
+              clearly.
             </p>
             <p className="mt-5 text-sm text-white/70">
               <span className="text-white font-semibold">$497</span> ·
               3–5 business days · re-check included · most cases
               (complex sites quoted upfront).
             </p>
-            <ul className="mt-6 grid gap-3 sm:grid-cols-2 max-w-2xl">
-              <PricingBullet>Schema, llms.txt, and robots.txt</PricingBullet>
-              <PricingBullet>FAQ + service-page structure</PricingBullet>
-              <PricingBullet>Per-location entity signals</PricingBullet>
-              <PricingBullet>Final visibility score after implementation</PricingBullet>
+            <p className="mt-6 text-xs uppercase tracking-[0.18em] text-white/45">
+              Engagements typically include
+            </p>
+            <ul className="mt-3 grid gap-3 sm:grid-cols-2 max-w-2xl">
+              <PricingBullet>
+                Schema / structured data recommendations or implementation
+              </PricingBullet>
+              <PricingBullet>Business identity cleanup</PricingBullet>
+              <PricingBullet>AI-readable content improvements</PricingBullet>
+              <PricingBullet>Crawler accessibility review</PricingBullet>
+              <PricingBullet>Trust signal improvements</PricingBullet>
+              <PricingBullet>
+                llms.txt / AI crawler guidance where appropriate
+              </PricingBullet>
+              <PricingBullet>
+                Citation and source clarity improvements
+              </PricingBullet>
+              <PricingBullet>
+                Report-based priority fixes from your audit
+              </PricingBullet>
             </ul>
             <p className="mt-6 text-xs text-white/45">
-              Available after your audit completes — most customers
-              decide whether to engage based on the audit&rsquo;s top
-              fixes section.
+              Available after your audit completes. Scope is grounded
+              in the audit&rsquo;s findings, not a templated checklist.
             </p>
           </div>
         </div>
@@ -360,12 +463,12 @@ export default function Page() {
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-20 text-center">
           <h2 className="h2 mx-auto max-w-3xl">
-            Find out exactly what ChatGPT, Claude, Perplexity, and Gemini see.
+            See how ChatGPT, Claude, Perplexity, and Gemini read your
+            business.
           </h2>
           <p className="muted mx-auto mt-4 max-w-xl">
-            Most reports are delivered within minutes. Your full
-            scored GeoViz audit arrives by email as a hosted link
-            and PDF.
+            A directional AI visibility report — most are delivered
+            within minutes. Hosted link plus PDF, by email.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/order" className="btn-primary">
@@ -544,6 +647,29 @@ function HowItWorksStep({
       </div>
       <p className="muted mt-4 text-sm leading-relaxed">{body}</p>
     </div>
+  );
+}
+
+function MeasureCard({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="card card-hover">
+      <h3 className="text-base font-semibold text-white">{title}</h3>
+      <p className="muted mt-2 text-sm leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function NotCard({ label }: { label: string }) {
+  return (
+    <li className="card flex items-start gap-3">
+      <span
+        aria-hidden
+        className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] text-xs font-bold text-white/55"
+      >
+        ✕
+      </span>
+      <span className="text-sm leading-relaxed text-white/85">{label}</span>
+    </li>
   );
 }
 

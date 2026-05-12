@@ -177,8 +177,9 @@ export function AuditReportContent({
             />
           ) : null}
           <p className="report-score-consistency-note">
-            Scores are directional benchmarks based on publicly
-            accessible AI-search signals.
+            Scores are directional intelligence signals designed to
+            show relative readiness, risk, and improvement opportunities
+            — not absolute guarantees of any AI outcome.
           </p>
         </section>
 

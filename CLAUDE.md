@@ -267,3 +267,353 @@ passing the prompt via stdin so long URLs / competitor strings can't trip shell 
 - **`Pillow` install failure during `install.sh`** — bundled `requirements.txt` needs Python 3.10+. The macOS system Python 3.9 will fail. Recreate the venv with Homebrew Python 3.11: `rm -rf ~/.claude/skills/geo/.venv && /opt/homebrew/bin/python3.11 -m venv ~/.claude/skills/geo/.venv && ~/.claude/skills/geo/.venv/bin/python3 -m pip install -r vendor/geo-seo-claude/requirements.txt`.
 - **`claude -p` returns text but no markdown report** — the geo skill's sub-agents may be running. Bump the wrapper timeout via the `timeoutMs` option in `runGeoAudit` (default 5 min) or rerun. The full audit typically takes 1–3 minutes.
 - **Sandboxed CLI sessions block the spawn** — the Claude Code CLI sandbox blocks recursive `claude -p` invocations of skills that fetch from external GitHub repos. This affects automated test runs from a CLI session but not the admin API route running under `npm run dev`.
+
+# GeoViz Product Roadmap
+
+## Product Positioning
+
+GeoViz helps businesses understand how visible, understandable, and recommendable they are to modern AI systems such as ChatGPT, Claude, Gemini, Perplexity, and future AI-powered discovery platforms.
+
+The platform is designed around the evolution from:
+1. Audit Layer
+2. Intelligence Layer
+3. Action Layer
+
+GeoViz is NOT a traditional SEO tool.
+GeoViz focuses on AI visibility, AI readability, semantic clarity, trust signals, structured identity, and recommendation potential.
+
+━━━━━━━━━━━━━━━━━━━━
+V1 — AUDIT LAYER (CURRENT)
+━━━━━━━━━━━━━━━━━━━━
+
+Current focus:
+- AI visibility audits
+- reviewed reports
+- directional scoring
+- recommendation framing
+- foundation fixes
+- manual review workflow
+- operator-controlled delivery
+- AI visibility education
+
+Key principles:
+- Reports are reviewed before delivery
+- Quality matters more than automation
+- Directional insight is more important than false precision
+- Clear recommendations beat technical overload
+- Manual calibration is acceptable during V1
+
+Current infrastructure:
+- Next.js
+- Stripe
+- Railway workers
+- PDF generation
+- Admin review queue
+- Protected report access
+- Rate limiting
+- Legal pages
+- Mobile-first report rendering
+
+━━━━━━━━━━━━━━━━━━━━
+V2 — INTELLIGENCE LAYER
+━━━━━━━━━━━━━━━━━━━━
+
+Future V2 direction:
+- recurring monitoring
+- competitor comparisons
+- AI readability analysis
+- AI renderability analysis
+- recommendation tracking
+- historical trend tracking
+- stronger crawler infrastructure
+- headless browser analysis
+- structured scoring evolution
+- benchmark datasets
+- scoring normalization
+- longitudinal business visibility tracking
+
+V2 goals:
+- Move beyond one-time audits
+- Build proprietary visibility intelligence
+- Develop stronger scoring consistency
+- Track AI visibility changes over time
+- Compare businesses against competitors and category averages
+- Improve defensibility through data accumulation
+
+Important:
+- Do not overclaim scoring precision
+- Avoid "magic AI" positioning
+- Prioritize understandable business value
+- Benchmarking must be statistically grounded before aggressive marketing claims
+
+━━━━━━━━━━━━━━━━━━━━
+V3 — ACTION LAYER
+━━━━━━━━━━━━━━━━━━━━
+
+Future V3 direction:
+- automated fixes
+- CMS integrations
+- schema deployment
+- AI visibility optimization agents
+- automated GEO workflows
+- continuous recommendation testing
+- site change detection
+- AI crawler monitoring
+- alerting systems
+- structured deployment pipelines
+
+V3 principles:
+- Automation must remain explainable
+- Never deploy risky changes silently
+- Human review should remain available
+- Reliability matters more than feature count
+- Minimize customer technical complexity
+
+Important:
+- V3 should only expand after V1 and V2 stabilize
+- Avoid premature automation
+- Avoid fragile integrations
+- Maintain clear rollback paths for all automated actions
+
+━━━━━━━━━━━━━━━━━━━━
+PRODUCT PHILOSOPHY
+━━━━━━━━━━━━━━━━━━━━
+
+GeoViz succeeds by:
+- helping businesses adapt to AI-driven discovery
+- making AI visibility understandable
+- combining technical analysis with practical business recommendations
+- prioritizing trust and clarity over hype
+- evolving from audits → intelligence → action over time
+
+Do NOT position GeoViz as:
+- guaranteed rankings
+- guaranteed citations
+- guaranteed AI recommendations
+- "instant AI optimization"
+- fully autonomous SEO replacement
+
+Position GeoViz as:
+- AI visibility intelligence
+- AI readability analysis
+- recommendation readiness
+- semantic business clarity
+- practical AI discoverability guidance
+
+━━━━━━━━━━━━━━━━━━━━
+BUILD PRIORITIES
+━━━━━━━━━━━━━━━━━━━━
+
+Current priority order:
+1. Stability
+2. Security
+3. Report quality
+4. Calibration consistency
+5. Customer workflow
+6. Operational reliability
+7. Intelligence expansion
+8. Automation later
+
+Avoid:
+- feature bloat
+- unnecessary dashboards
+- excessive complexity
+- premature scaling
+- overengineering before customer validation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# GeoViz System Architecture Principles
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GeoViz must be built as modular layers and services.
+
+Do NOT tightly couple:
+- audits
+- scoring
+- crawlers
+- rendering
+- monitoring
+- competitor tracking
+- automation
+- notifications
+- report generation
+
+Each major capability must evolve independently.
+
+━━━━━━━━━━━━━━━━━━━━
+CORE MODULES
+━━━━━━━━━━━━━━━━━━━━
+
+## 1. Audit Engine Module (V1)
+
+Purpose:
+Generate AI visibility audits.
+
+Responsibilities:
+- website ingestion
+- crawl orchestration
+- AI analysis
+- recommendation generation
+- score calculation
+- audit summaries
+- report generation
+
+Requirements:
+- isolated
+- testable
+- reusable
+- provider-agnostic where possible
+
+━━━━━━━━━━━━━━━━━━━━
+
+## 2. Scoring & Calibration Module
+
+Purpose:
+Centralize all scoring logic.
+
+Responsibilities:
+- category weights
+- score normalization
+- scoring bands
+- benchmark logic
+- calibration rules
+- score explanations
+
+Rules:
+- Never scatter scoring logic across UI components
+- Maintain centralized scoring authority
+- All score adjustments must happen inside this module only
+
+━━━━━━━━━━━━━━━━━━━━
+
+## 3. Report Rendering Module
+
+Purpose:
+Render:
+- web reports
+- PDFs
+- email previews
+- sample reports
+
+Responsibilities:
+- formatting
+- typography
+- mobile rendering
+- executive summaries
+- charts/cards
+- export formatting
+
+Rules:
+- Rendering module must NOT contain:
+  - scoring logic
+  - crawler logic
+  - audit business rules
+
+━━━━━━━━━━━━━━━━━━━━
+
+## 4. Monitoring & Intelligence Module (V2)
+
+Purpose:
+Track visibility changes over time.
+
+Responsibilities:
+- recurring scans
+- competitor tracking
+- trend history
+- visibility deltas
+- recommendation tracking
+- longitudinal analytics
+
+Rules:
+- Must operate independently from one-time audits
+- Must support future recurring subscriptions
+
+━━━━━━━━━━━━━━━━━━━━
+
+## 5. Crawler & Renderability Module (V2)
+
+Purpose:
+Analyze real AI accessibility and renderability.
+
+Responsibilities:
+- headless rendering
+- crawler simulation
+- AI readability checks
+- sitemap analysis
+- robots.txt handling
+- renderability analysis
+- JS hydration checks
+
+Requirements:
+- Must support future headless infrastructure
+- Must support stronger crawler infrastructure later
+
+━━━━━━━━━━━━━━━━━━━━
+
+## 6. Automation & Action Module (V3)
+
+Purpose:
+Perform AI visibility optimizations and automated actions.
+
+Responsibilities:
+- schema deployment
+- CMS integrations
+- automated fixes
+- GEO workflows
+- change detection
+- deployment validation
+
+Critical Rules:
+- Must support rollback paths
+- Never silently modify customer websites
+- Human approval/review must remain possible
+
+━━━━━━━━━━━━━━━━━━━━
+
+## 7. Notification & Workflow Module
+
+Purpose:
+Handle operational workflow and delivery.
+
+Responsibilities:
+- operator notifications
+- customer delivery
+- retry logic
+- admin review flow
+- alerting
+- queue state messaging
+
+Rules:
+- Must remain independent from:
+  - report rendering
+  - scoring
+  - crawler logic
+
+━━━━━━━━━━━━━━━━━━━━
+ARCHITECTURE RULES
+━━━━━━━━━━━━━━━━━━━━
+
+- Keep modules loosely coupled
+- Prefer interfaces/contracts over hard dependencies
+- Avoid monolithic "god services"
+- Avoid business logic inside UI components
+- Maintain separation between:
+  - analysis
+  - scoring
+  - rendering
+  - delivery
+  - automation
+
+Future development must allow:
+- swapping crawler systems
+- evolving scoring independently
+- changing AI providers
+- adding monitoring without rewriting audits
+- adding automation without rewriting rendering
+
+GeoViz must evolve from:
+V1 Audit Layer
+→ V2 Intelligence Layer
+→ V3 Action Layer
+
+without requiring major rewrites.

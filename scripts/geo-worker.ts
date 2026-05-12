@@ -45,6 +45,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { PrismaClient } from "@prisma/client";
 import { getDbFingerprint } from "../src/lib/db-fingerprint";
 import { notifyOperatorReportReady } from "../src/lib/notify-operator-report-ready";
+import { persistAuditIntelligence } from "../src/lib/audit-intelligence";
 
 const TIMEOUT_MS = Number(process.env.GEO_WORKER_TIMEOUT_MS ?? 300_000); // 5 min hard cap
 const POLL_MS = Number(process.env.GEO_WORKER_POLL_MS ?? 12_000); // loop-mode poll cadence
@@ -1504,6 +1505,35 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
             `[geo-worker] score breakdown orderId=${candidate.id} ${breakdownLog}`,
           );
         }
+
+        // V2 data foundation — write the normalized intelligence row.
+        // Wrapped in try/catch so a failure here NEVER breaks the
+        // customer report flow (which has already been durably saved
+        // above) or the operator notification (which fires below).
+        // `persistAuditIntelligence` itself never throws — this is
+        // belt-and-suspenders. See `src/lib/audit-intelligence.ts`.
+        try {
+          const intel = await persistAuditIntelligence({
+            orderId: candidate.id,
+            businessName: candidate.businessName,
+            websiteUrl: candidate.websiteUrl,
+            competitorUrl: candidate.competitorUrl,
+            reportMarkdown: result.markdown,
+          });
+          if (intel.ok) {
+            log(`[geo-worker] intelligence persisted orderId=${candidate.id}`);
+          } else {
+            logErr(
+              `[geo-worker] intelligence persist failed orderId=${candidate.id} reason=${intel.reason} (non-fatal)`,
+            );
+          }
+        } catch (err) {
+          logErr(
+            `[geo-worker] intelligence persist threw orderId=${candidate.id} (non-fatal):`,
+            err,
+          );
+        }
+
         // Operator notification — internal "report ready for review"
         // ping. The function never throws; logs success/failure
         // internally and returns a boolean. Wrapped in catch as a

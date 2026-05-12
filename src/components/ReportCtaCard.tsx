@@ -32,12 +32,13 @@ export function ReportCtaCard({
       <div className="cta-card-body">
         <div className="cta-card-eyebrow">GEO Foundation Fix</div>
         <h2 className="cta-card-headline">
-          Want GeoViz to fix this for you?
+          Want us to implement these fixes for you?
         </h2>
         <p className="cta-card-lede">
-          We&rsquo;ll implement the fixes surfaced in this report so AI
-          search platforms can confidently identify, trust, and
-          recommend your business.
+          A foundational implementation service — not magic automation.
+          We work through the priority fixes this audit surfaced so AI
+          systems can identify, trust, and recommend your business
+          more clearly.
         </p>
 
         <div className="cta-card-badges">
@@ -50,11 +51,12 @@ export function ReportCtaCard({
         </div>
 
         <a className="cta-card-button" href={mailto}>
-          Request My Fix →
+          Request My Foundation Fix →
         </a>
         <p className="cta-card-fineprint">
-          Or reply to your delivery email — we&rsquo;ll send a fix plan
-          within one business day.
+          Or reply to your delivery email — we&rsquo;ll send a scoped
+          plan within one business day. Scope is grounded in this
+          audit&rsquo;s findings, not a templated checklist.
         </p>
       </div>
     </section>

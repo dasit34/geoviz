@@ -19,34 +19,116 @@ enum AuditStatus {
 }
 
 model AuditOrder {
-  id               String        @id @default(cuid())
-  websiteUrl       String
-  email            String
-  businessName     String?
-  competitorUrl    String?
-  stripeSessionId  String        @unique
-  amount           Int           @default(9700)
-  currency         String        @default("usd")
-  paymentStatus    PaymentStatus @default(pending)
-  auditStatus      AuditStatus   @default(pending)
-  notes            String?
-  adminEmailSentAt DateTime?
-  reportStatus     String        @default("pending")
-  reportMarkdown   String?
-  reportError      String?
-  reportQueuedAt   DateTime?
-  reportStartedAt  DateTime?
-  reportGeneratedAt DateTime?
-  reportSentToCustomerAt DateTime?
-  reviewStatus     String        @default("pending")
-  adminNotes       String?
-  qualityScore     Int?
-  sentTo           String?
-  sentCc           String?
+  id                         String        @id @default(cuid())
+  websiteUrl                 String
+  email                      String
+  businessName               String?
+  competitorUrl              String?
+  stripeSessionId            String        @unique
+  amount                     Int           @default(9700)
+  currency                   String        @default("usd")
+  paymentStatus              PaymentStatus @default(pending)
+  auditStatus                AuditStatus   @default(pending)
+  notes                      String?
+  adminEmailSentAt           DateTime?
+  reportStatus               String        @default("pending")
+  reportMarkdown             String?
+  reportError                String?
+  reportQueuedAt             DateTime?
+  reportStartedAt            DateTime?
+  reportGeneratedAt          DateTime?
+  reportSentToCustomerAt     DateTime?
+  reviewStatus               String        @default("pending")
+  adminNotes                 String?
+  qualityScore               Int?
+  sentTo                     String?
+  sentCc                     String?
   customerConfirmationSentAt DateTime?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
+
+  intelligence AuditIntelligence?
 
   @@index([email])
   @@index([createdAt])
+}
+
+/// V2 data foundation — normalized intelligence row written once per
+/// generated audit. NOT customer-facing. NOT exposed via any public
+/// route. Written by `scripts/geo-worker.ts` via
+/// `src/lib/audit-intelligence.ts` immediately after the customer
+/// report-markdown write succeeds, inside its own try/catch so a
+/// failure here never breaks the customer report flow.
+///
+/// Fields the V1 audit engine doesn't yet produce are deliberately
+/// nullable — we store null over fake precision. V2 modules
+/// (benchmarking, calibration, historical tracking, competitor
+/// comparison, recurring monitoring, crawler intelligence) will read
+/// from this table without coupling to V1 implementation details.
+model AuditIntelligence {
+  id           String     @id @default(cuid())
+  auditOrderId String     @unique
+  auditOrder   AuditOrder @relation(fields: [auditOrderId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  // Identity (denormalized for V2 query speed)
+  businessName     String?
+  websiteUrl       String
+  /// DEPRECATED — superseded by `industryCategoryRaw` +
+  /// `industryCategoryNormalized` + `industryTaxonomyVersion`. Kept
+  /// nullable + always-null in V1 so we don't need a drop migration
+  /// right now. A future cleanup can drop this column once we're
+  /// confident no historic data exists in it.
+  industryCategory String?
+  location         String?
+  competitorUrl    String?
+
+  // Industry taxonomy (V2 benchmarking). Three columns kept together:
+  //   - raw: the unnormalized value as detected / entered.
+  //   - normalized: the canonical taxonomy slug (see
+  //     `src/lib/intelligence/industry-taxonomy.ts`).
+  //   - version: lets a future taxonomy rev (v2, v3…) coexist with
+  //     historic rows without corrupting old benchmark cohorts.
+  industryCategoryRaw        String?
+  industryCategoryNormalized String?
+  industryTaxonomyVersion    String  @default("v1")
+
+  // Scores — all 0..100 normalized. null when the rubric category
+  // wasn't parseable from the audit markdown.
+  overallScore                 Int?
+  semanticClarityScore         Int?
+  crawlerAccessibilityScore    Int?
+  trustSignalScore             Int?
+  structuredIdentityScore      Int?
+  recommendationReadinessScore Int?
+  renderabilityScore           Int?
+
+  // Technical signals — currently nullable placeholders. V1 engine
+  // doesn't reliably detect any of these; V2 crawler module will.
+  schemaDetected    Boolean?
+  llmsTxtDetected   Boolean?
+  robotsTxtDetected Boolean?
+  sitemapDetected   Boolean?
+  mobileRenderOk    Boolean?
+  pagesIndexable    Boolean?
+
+  // Categorizations (Postgres jsonb via Prisma Json). Always written
+  // (can be empty arrays) so V2 queries can ARRAY_LENGTH safely.
+  aiReadabilityFlags    Json
+  majorIssueCategories  Json
+  majorFixCategories    Json
+  topObservedStrengths  Json
+  topObservedWeaknesses Json
+
+  // Calibration / versioning
+  confidenceLevel    String // "low" | "medium" | "high"
+  auditEngineVersion String
+  scoringVersion     String
+  promptVersion      String?
+  operatorReviewed   Boolean @default(false)
+  operatorNotes      String?
+  rawSignalSnapshot  Json
+
+  @@index([createdAt])
+  @@index([websiteUrl])
 }
