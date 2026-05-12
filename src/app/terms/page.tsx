@@ -34,7 +34,7 @@ export default function TermsPage() {
               <p>
                 GeoViz is an AI Visibility Audit platform. We analyze
                 publicly accessible signals on your website and generate
-                a directional report describing how AI search systems
+                a directional report describing how AI systems
                 (such as ChatGPT, Claude, Gemini, Perplexity, and Google
                 AI Overviews) are likely to read, interpret, and surface
                 your business.

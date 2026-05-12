@@ -240,7 +240,7 @@ export function AuditReportContent({
             </span>
           </div>
           <h2 className="h2 mt-3">
-            How AI search systems may interpret this site.
+            How AI systems may interpret this site.
           </h2>
           <p className="muted mt-3 max-w-2xl text-sm">
             A short interpretive read of how each platform is positioned

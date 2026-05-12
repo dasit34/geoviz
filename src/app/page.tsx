@@ -44,16 +44,16 @@ export default function Page() {
               Visibility Intelligence
             </span>
             <h1 className="h1 mt-5">
-              See how visible your business is to{" "}
+              Understand how{" "}
               <span className="bg-gradient-to-r from-accent to-accent-glow bg-clip-text text-transparent">
                 AI
-              </span>
-              .
+              </span>{" "}
+              systems see your business.
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/70">
               GeoViz audits whether AI systems can understand, crawl,
-              trust, and recommend your business — across the signals
-              that matter for AI discovery on ChatGPT, Claude,
+              trust, and confidently recommend your business across the
+              signals that influence AI discovery — on ChatGPT, Claude,
               Perplexity, Gemini, and the answer engines coming next.
             </p>
 
@@ -115,23 +115,23 @@ export default function Page() {
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <WhatCard
               icon={<IconEye />}
-              title="AI Readability"
-              body="Can AI search platforms understand what your business does?"
+              title="Machine understanding"
+              body="Can AI systems clearly read and interpret what your business does?"
             />
             <WhatCard
               icon={<IconShield />}
-              title="Trust Signals"
-              body="Can AI search platforms verify your reputation, services, and credibility?"
+              title="Trust signals"
+              body="Can AI systems verify your reputation, services, and credibility?"
             />
             <WhatCard
               icon={<IconTarget />}
-              title="Recommendation Readiness"
-              body="Are you easy for AI search platforms to confidently recommend?"
+              title="Recommendation confidence"
+              body="Do AI systems have enough signal to recommend you with confidence?"
             />
             <WhatCard
               icon={<IconList />}
-              title="Fix Priority"
-              body="Which issues should you fix first to improve visibility?"
+              title="Fix priority"
+              body="Which gaps to close first, ranked by impact on AI readiness."
             />
           </div>
         </div>
@@ -143,20 +143,21 @@ export default function Page() {
         <div className="container-page py-14">
           <p className="section-eyebrow">Why this matters</p>
           <h2 className="h2 mt-3 max-w-3xl">
-            Customers are choosing who to call before they ever open Google.
+            AI-generated answers are increasingly shaping which
+            businesses customers discover and trust.
           </h2>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             <ProblemCard
-              title="AI is the new front door"
-              body="Buyers are asking ChatGPT, Claude, and Gemini who to hire — long before any traditional search happens."
+              title="AI is shaping discovery"
+              body="Customers are asking ChatGPT, Claude, Gemini, and Perplexity who to hire — well before they reach a traditional search engine."
             />
             <ProblemCard
-              title="Strong reputations, weak AI visibility"
-              body="Even businesses with great reviews can be invisible to AI when their site lacks the structure AI needs."
+              title="Strong reputations, weak machine understanding"
+              body="Businesses with real reviews and real customers can still be unreadable to AI when their site lacks the structural signals AI relies on."
             />
             <ProblemCard
-              title="GeoViz finds the gap"
-              body="A scored audit pinpointing what AI can&rsquo;t see — and the highest-impact fixes to close it."
+              title="GeoViz identifies the gap"
+              body="A scored intelligence report that surfaces what AI can&rsquo;t see — and the highest-impact fixes to close it."
             />
           </div>
         </div>
@@ -416,7 +417,7 @@ export default function Page() {
           <div className="rounded-2xl border border-accent/30 bg-ink-900/70 p-8 md:p-10 shadow-card transition duration-200 ease-out hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-glow">
             <p className="section-eyebrow">Optional next step</p>
             <h2 className="h2 mt-3 max-w-2xl">
-              Want us to implement what the audit found?
+              Need help improving the signals the audit identified?
             </h2>
             <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
               The GEO Foundation Fix is a foundational implementation
@@ -463,12 +464,12 @@ export default function Page() {
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-20 text-center">
           <h2 className="h2 mx-auto max-w-3xl">
-            See how ChatGPT, Claude, Perplexity, and Gemini read your
-            business.
+            See how ChatGPT, Claude, Perplexity, and Gemini understand
+            your business.
           </h2>
           <p className="muted mx-auto mt-4 max-w-xl">
-            A directional AI visibility report — most are delivered
-            within minutes. Hosted link plus PDF, by email.
+            A directional AI visibility intelligence report — most are
+            delivered within minutes. Hosted link plus PDF, by email.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/order" className="btn-primary">

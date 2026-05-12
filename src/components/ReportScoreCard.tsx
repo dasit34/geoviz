@@ -80,11 +80,11 @@ function riskLabelForTone(tone: "ok" | "warn" | "bad" | "muted"): string {
 function blurbForTone(tone: "ok" | "warn" | "bad" | "muted"): string {
   switch (tone) {
     case "ok":
-      return "AI search platforms have enough verified signals to confidently surface this business when customers ask for a local recommendation.";
+      return "AI systems have enough verified signal to recommend this business with confidence when a customer asks for a local option.";
     case "warn":
-      return "AI search platforms can read parts of this business clearly, but key signals are missing — competitors with cleaner data are more likely to be cited.";
+      return "AI systems can read parts of this business clearly, but key signals are missing — competitors with cleaner structure and trust signals are more likely to be cited.";
     case "bad":
-      return "AI search platforms lack enough verified signals to confidently surface this business.";
+      return "AI systems lack enough verified signal to recommend this business with confidence.";
     default:
       return "Score breakdown will appear here once the audit completes.";
   }
