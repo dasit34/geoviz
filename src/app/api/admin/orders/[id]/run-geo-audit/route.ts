@@ -41,7 +41,7 @@ export async function POST(
   const limited = applyApiRateLimit({
     req,
     routeKey: "api:admin:run-audit",
-    limit: 20,
+    limit: 60,
     windowMs: 5 * 60_000,
   });
   if (limited) return limited;

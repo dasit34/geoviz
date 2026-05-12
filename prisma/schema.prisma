@@ -44,6 +44,33 @@ model AuditOrder {
   sentTo                     String?
   sentCc                     String?
   customerConfirmationSentAt DateTime?
+  // Operational state model (added to disambiguate infrastructure
+  // failures from audit outcomes). See `src/lib/processing-status.ts`
+  // for the full taxonomy and the derive function consumed by the
+  // admin queue UI. The legacy `reportStatus` column stays as the
+  // canonical state machine; `failureReason` adds the granular
+  // operator-facing category when reportStatus = "failed". The legacy
+  // `reportError` column keeps the full error text for debugging.
+  failureReason              String?
+  retryCount                 Int           @default(0)
+  lastRetryAt                DateTime?
+  // Token + cost tracking (Phase 1 — visibility only, no behavioural
+  // change). Captured from `response.usage` after each Anthropic API
+  // call. estimatedCostUsd is computed via `src/lib/pricing.ts`. All
+  // nullable so historic rows without usage data still validate.
+  // See COST_AND_USAGE_TRACKING.md for the cost model + roadmap.
+  inputTokens                Int?
+  outputTokens               Int?
+  cacheCreationTokens        Int?
+  cacheReadTokens            Int?
+  modelUsed                  String?
+  estimatedCostUsd           Decimal?      @db.Decimal(10, 6)
+  // Worker runtime captured at audit completion (the wrapper's
+  // elapsedMs — full Anthropic API call + tool-use round-trips).
+  // Stored as INT milliseconds. Null for historic rows, CLI-mode
+  // runs, and failed/in-flight audits that never reached the
+  // success path.
+  workerRuntimeMs            Int?
   createdAt                  DateTime      @default(now())
   updatedAt                  DateTime      @updatedAt
 

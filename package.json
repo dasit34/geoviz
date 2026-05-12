@@ -17,6 +17,7 @@
     "backfill:audit-intelligence": "tsx scripts/backfill-audit-intelligence.ts",
     "intelligence:summary": "tsx scripts/intelligence-summary.ts",
     "intelligence:industry": "tsx scripts/intelligence-industry.ts",
+    "intelligence:cost": "tsx scripts/intelligence-cost-summary.ts",
     "geo-worker": "tsx scripts/geo-worker.ts",
     "geo-worker:dev": "tsx scripts/geo-worker.ts --loop",
     "geo-worker:start": "tsx scripts/geo-worker.ts --loop"

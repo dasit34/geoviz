@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { ReportViewerClient } from "./ReportViewerClient";
 import { parseReportScore, scoreTone } from "@/lib/parse-report-score";
+import {
+  deriveProcessingStatus,
+  failureReasonDescription,
+  type FailureReason,
+} from "@/lib/processing-status";
+import { costTone } from "@/lib/pricing";
 
 type Order = {
   id: string;
@@ -14,6 +20,15 @@ type Order = {
   reportStatus: string;
   reportMarkdown: string | null;
   reportError: string | null;
+  failureReason: string | null;
+  retryCount: number;
+  lastRetryAt: string | null;
+  // Cost telemetry (Phase 1.5) — internal admin-only.
+  inputTokens: number | null;
+  outputTokens: number | null;
+  estimatedCostUsd: number | null;
+  modelUsed: string | null;
+  workerRuntimeMs: number | null;
   reportGeneratedAt: string | null;
   reportSentToCustomerAt: string | null;
   reviewStatus: string;
@@ -148,14 +163,34 @@ export function AdminReportCard({
   useEffect(() => {
     if (reportStatus !== "queued" && reportStatus !== "running") return;
     let cancelled = false;
+    // Pause clock — when the server returns 429, set this to a future
+    // timestamp and every subsequent setInterval tick returns
+    // immediately until the clock passes. Avoids the prior retry-loop
+    // behavior where the poll would keep hammering the rate-limited
+    // endpoint every 5s with no back-off. Naturally resumes once the
+    // clock passes; no manual restart needed.
+    let pausedUntilMs = 0;
     const tick = async () => {
       if (cancelled) return;
+      if (Date.now() < pausedUntilMs) return;
       try {
         const res = await fetch(
           `/api/admin/orders/${order.id}?key=${encodeURIComponent(adminKey)}`,
           { headers: { "x-admin-secret": adminKey }, cache: "no-store" },
         );
         if (cancelled) return;
+        if (res.status === 429) {
+          // Honor Retry-After (seconds). Falls back to 30s when the
+          // header is missing. Logs a single line per pause; the next
+          // tick after the pause naturally retries.
+          const retryAfter =
+            Number(res.headers.get("Retry-After")) || 30;
+          pausedUntilMs = Date.now() + retryAfter * 1000;
+          console.warn(
+            `[admin-card] poll throttled — pausing ${retryAfter}s orderId=${order.id}`,
+          );
+          return;
+        }
         const data = (await res.json().catch(() => ({}))) as {
           success?: boolean;
           order?: Parameters<typeof applyOrderUpdate>[0];
@@ -168,7 +203,11 @@ export function AdminReportCard({
       }
     };
     tick();
-    const id = setInterval(tick, 5000);
+    // 8s interval (was 5s) — 38% fewer requests with no perceptible
+    // delay for the operator. Coupled with the 600/5min API limit
+    // for /api/admin/orders/[id], multiple concurrent jobs + admin
+    // tabs comfortably fit under the cap.
+    const id = setInterval(tick, 8000);
     return () => {
       cancelled = true;
       clearInterval(id);
@@ -453,9 +492,28 @@ export function AdminReportCard({
   // Single per-order status banner — the headline an operator should be able
   // to read from across the room. Distinct from the granular pills (paid /
   // audit / review / sent) which are still useful for at-a-glance scanning.
+  //
+  // Operational vs result split:
+  //   • Operational state is derived from (reportStatus + failureReason +
+  //     retryCount) via `deriveProcessingStatus`. Banner shows the
+  //     category (TIMEOUT / FETCH_FAILED / etc.) instead of a generic
+  //     "Audit failed" so the operator can act without opening logs.
+  //   • Result classification (Weak / Needs Improvement / Strong /
+  //     Excellent visibility) is computed from the score and surfaced
+  //     elsewhere — it's an outcome, not a processing state.
+  const processingStatus = deriveProcessingStatus({
+    reportStatus,
+    failureReason: order.failureReason,
+    retryCount: order.retryCount,
+  });
   const banner: { text: string; tone: "err" | "ok" | "ready" | "warn" | "info" | "muted" } =
     reportStatus === "failed"
-      ? { text: "Audit failed — needs attention", tone: "err" }
+      ? {
+          text: order.failureReason
+            ? `${processingStatus.replace(/_/g, " ")} — ${failureReasonDescription(order.failureReason as FailureReason)}`
+            : "Audit failed — needs attention",
+          tone: "err",
+        }
       : reportSentAt
         ? { text: "Sent to customer", tone: "ok" }
         : reviewStatus === "approved" && reportStatus === "generated"
@@ -465,7 +523,13 @@ export function AdminReportCard({
             : reportStatus === "running"
               ? { text: "Generating report", tone: "info" }
               : reportStatus === "queued"
-                ? { text: "Queued — waiting on worker", tone: "warn" }
+                ? {
+                    text:
+                      order.retryCount > 0
+                        ? `Retrying — attempt ${order.retryCount + 1} (after ${(order.failureReason ?? "transient failure").replace(/_/g, " ")})`
+                        : "Queued — waiting on worker",
+                    tone: "warn",
+                  }
                 : { text: "Paid — report not generated", tone: "muted" };
   const bannerClass =
     banner.tone === "err"
@@ -637,6 +701,95 @@ export function AdminReportCard({
           </span>
         ) : null}
       </div>
+
+      {/* Audit Cost & Runtime — operator-facing, always visible.
+          Promoted from a collapsed <details> to an inline strip so
+          the operator can scan cost/runtime/retries during active
+          testing without clicking. Cost cell carries the
+          green/yellow/red tone from `costTone()`. Admin-card-only;
+          never reaches a customer surface. */}
+      {order.inputTokens === null && order.outputTokens === null ? (
+        <div className="border-b border-white/10 bg-white/[0.015] px-5 py-3 text-xs">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55">
+              Audit cost &amp; runtime
+            </span>
+            <span className="text-[10px] text-white/35">(internal)</span>
+          </div>
+          <p className="mt-1 text-white/55">
+            Cost data unavailable for this audit (CLI mode or
+            pre-telemetry row).
+          </p>
+        </div>
+      ) : (
+        <div className="border-b border-white/10 bg-white/[0.015] px-5 py-3 text-xs">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55">
+              Audit cost &amp; runtime
+            </span>
+            <span className="text-[10px] text-white/35">(internal)</span>
+          </div>
+          <dl className="mt-2 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+            <CostRow
+              label="Estimated AI cost"
+              value={
+                typeof order.estimatedCostUsd === "number"
+                  ? `$${order.estimatedCostUsd.toFixed(4)}`
+                  : "—"
+              }
+              tone={
+                typeof order.estimatedCostUsd === "number"
+                  ? costTone(order.estimatedCostUsd)
+                  : "none"
+              }
+            />
+            <CostRow
+              label="Model"
+              value={order.modelUsed ?? "—"}
+              mono
+            />
+            <CostRow
+              label="Input tokens"
+              value={
+                typeof order.inputTokens === "number"
+                  ? order.inputTokens.toLocaleString()
+                  : "—"
+              }
+              mono
+            />
+            <CostRow
+              label="Output tokens"
+              value={
+                typeof order.outputTokens === "number"
+                  ? order.outputTokens.toLocaleString()
+                  : "—"
+              }
+              mono
+            />
+            <CostRow
+              label="Runtime"
+              value={formatRuntime(order.workerRuntimeMs)}
+              mono
+            />
+            <CostRow label="Retry count" value={String(order.retryCount)} />
+            <CostRow
+              label="Status"
+              value={deriveProcessingStatus({
+                reportStatus,
+                failureReason: order.failureReason,
+                retryCount: order.retryCount,
+              }).replace(/_/g, " ")}
+            />
+            {order.failureReason ? (
+              <CostRow
+                label="Failure reason"
+                value={order.failureReason}
+                mono
+              />
+            ) : null}
+          </dl>
+        </div>
+      )}
 
       {/* Pre-flight panel — only meaningful once a report exists. Recipient
           confirmation gates the Send button (alongside review approval);
@@ -1067,4 +1220,62 @@ function formatShort(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function CostRow({
+  label,
+  value,
+  mono,
+  tone,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  tone?: "low" | "medium" | "high" | "none";
+}) {
+  // Color dot reserved for the cost cell — green/yellow/red signals
+  // whether this audit was low, normal, or unusually expensive.
+  // Other rows pass no `tone` and get no dot.
+  const dotClass =
+    tone === "low"
+      ? "bg-emerald-300"
+      : tone === "medium"
+        ? "bg-amber-300"
+        : tone === "high"
+          ? "bg-red-400"
+          : null;
+  const valueClass =
+    tone === "low"
+      ? "text-emerald-200"
+      : tone === "medium"
+        ? "text-amber-200"
+        : tone === "high"
+          ? "text-red-200"
+          : "text-white/85";
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-white/45">{label}</dt>
+      <dd
+        className={`flex items-center gap-1.5 ${valueClass} ${mono ? "font-mono text-[11px]" : "text-[11.5px]"}`}
+      >
+        {dotClass ? (
+          <span
+            aria-hidden
+            className={`inline-block h-1.5 w-1.5 rounded-full ${dotClass}`}
+          />
+        ) : null}
+        <span>{value}</span>
+      </dd>
+    </div>
+  );
+}
+
+function formatRuntime(ms: number | null): string {
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return "—";
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remSeconds = Math.round(seconds - minutes * 60);
+  return `${minutes}m ${remSeconds}s`;
 }

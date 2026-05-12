@@ -10,6 +10,7 @@ import {
 import { checkPageRateLimit } from "@/lib/rate-limit";
 import { RateLimitedNotice } from "@/components/RateLimitedNotice";
 import { headers } from "next/headers";
+import { costTone, type CostTone } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -23,16 +24,16 @@ export default async function AdminReportsPage({
 }: {
   searchParams?: { key?: string | string[] };
 }) {
-  // Rate-limit BEFORE the admin check + DB work — same posture as the
-  // mutating admin API routes. 20 hits per 5 min per IP. A legitimate
-  // operator hits this page a handful of times per session; the limit
-  // exists to stop a script grinding through admin-key guesses or DB
-  // diagnostics. Reads only the request headers — no body, no params,
-  // and no `prisma.*` call happens before this check passes.
+  // Rate-limit BEFORE the admin check + DB work. 60 hits per 5 min
+  // per IP — bumped from 20 after active testing sessions hit the
+  // ceiling on legit reloads (every Run/Send/Review action redirects
+  // the operator back to this page). 60 still bounds a runaway
+  // grinder; the API surfaces (which a script would target) have
+  // their own per-route limits.
   const rl = checkPageRateLimit({
     headers: headers(),
     routeKey: "page:admin:reports",
-    limit: 20,
+    limit: 60,
     windowMs: 5 * 60_000,
   });
   if (rl.blocked) {
@@ -90,6 +91,60 @@ export default async function AdminReportsPage({
     take: 200,
   });
 
+  // ---- Today's cost & runtime summary (operator-facing) ----
+  //
+  // Aggregates over rows with `reportGeneratedAt` since midnight UTC
+  // today. We use UTC because the worker writes timestamps in UTC and
+  // operators glancing at the strip don't need TZ-perfect boundaries —
+  // they need "what's happening today" at the order of magnitude. The
+  // strip lives at the top of the page so cost outliers surface
+  // before the operator scans the queue.
+  const startOfTodayUtc = new Date();
+  startOfTodayUtc.setUTCHours(0, 0, 0, 0);
+
+  const [todayAgg, todayFailed] = await Promise.all([
+    prisma.auditOrder.aggregate({
+      where: {
+        reportStatus: "generated",
+        reportGeneratedAt: { gte: startOfTodayUtc },
+        estimatedCostUsd: { not: null },
+        // Exclude calibration runs from the operator-facing rollup.
+        OR: [
+          { businessName: null },
+          { businessName: { not: { startsWith: "[CAL]" } } },
+        ],
+      },
+      _count: { _all: true },
+      _avg: { estimatedCostUsd: true },
+      _max: { estimatedCostUsd: true },
+      _sum: { estimatedCostUsd: true },
+    }),
+    prisma.auditOrder.count({
+      where: {
+        reportStatus: "failed",
+        updatedAt: { gte: startOfTodayUtc },
+        OR: [
+          { businessName: null },
+          { businessName: { not: { startsWith: "[CAL]" } } },
+        ],
+      },
+    }),
+  ]);
+
+  const todayCount = todayAgg._count._all;
+  const todayAvg =
+    todayAgg._avg.estimatedCostUsd === null
+      ? null
+      : Number(todayAgg._avg.estimatedCostUsd);
+  const todayMax =
+    todayAgg._max.estimatedCostUsd === null
+      ? null
+      : Number(todayAgg._max.estimatedCostUsd);
+  const todayTotal =
+    todayAgg._sum.estimatedCostUsd === null
+      ? null
+      : Number(todayAgg._sum.estimatedCostUsd);
+
   // ---- Debug DB diagnostics (no credentials ever rendered) ----
   const fp = getDbFingerprint();
   const totalCount = await prisma.auditOrder.count();
@@ -144,6 +199,37 @@ export default async function AdminReportsPage({
             Open the calibration harness →
           </a>
         </p>
+
+        {/* Today's cost summary — operator-facing strip. Internal
+            only; never reaches a customer surface. Mobile: 2x2.
+            Desktop: 4x1. Avg/highest cost get color tones based on
+            COST_THRESHOLD_LOW / COST_THRESHOLD_HIGH in pricing.ts. */}
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <CostStatCell
+            label="Audits today"
+            value={String(todayCount)}
+            footnote={
+              todayTotal !== null && todayTotal > 0
+                ? `total $${todayTotal.toFixed(4)}`
+                : null
+            }
+          />
+          <CostStatCell
+            label="Avg cost"
+            value={todayAvg !== null ? `$${todayAvg.toFixed(4)}` : "—"}
+            tone={costTone(todayAvg)}
+          />
+          <CostStatCell
+            label="Highest cost"
+            value={todayMax !== null ? `$${todayMax.toFixed(4)}` : "—"}
+            tone={costTone(todayMax)}
+          />
+          <CostStatCell
+            label="Failed today"
+            value={String(todayFailed)}
+            tone={todayFailed > 0 ? "high" : "low"}
+          />
+        </div>
 
         <details className="mt-6 rounded-lg border border-white/10 bg-white/[0.02] p-4 text-xs">
           <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55 hover:text-white">
@@ -258,6 +344,22 @@ export default async function AdminReportsPage({
                   reportStatus: o.reportStatus,
                   reportMarkdown: o.reportMarkdown,
                   reportError: o.reportError,
+                  failureReason: o.failureReason,
+                  retryCount: o.retryCount,
+                  lastRetryAt: o.lastRetryAt
+                    ? o.lastRetryAt.toISOString()
+                    : null,
+                  inputTokens: o.inputTokens,
+                  outputTokens: o.outputTokens,
+                  // Prisma Decimal serializes as string by default; coerce
+                  // to number for the client component so we can format
+                  // it with `.toFixed(4)` without a runtime check.
+                  estimatedCostUsd:
+                    o.estimatedCostUsd === null
+                      ? null
+                      : Number(o.estimatedCostUsd),
+                  modelUsed: o.modelUsed,
+                  workerRuntimeMs: o.workerRuntimeMs,
                   reportGeneratedAt: o.reportGeneratedAt
                     ? o.reportGeneratedAt.toISOString()
                     : null,
@@ -280,6 +382,54 @@ export default async function AdminReportsPage({
       </section>
       <Footer />
     </main>
+  );
+}
+
+/**
+ * Single stat tile used in the operator-facing "Today" cost strip at
+ * the top of the admin reports page. Mobile: stacks to 2x2. Desktop:
+ * 4x1. Tone provides the cost-color indicator the spec requires
+ * (green/yellow/red). NOT customer-facing.
+ */
+function CostStatCell({
+  label,
+  value,
+  footnote,
+  tone,
+}: {
+  label: string;
+  value: string;
+  footnote?: string | null;
+  tone?: CostTone;
+}) {
+  const toneClass =
+    tone === "low"
+      ? "border-emerald-300/30 bg-emerald-300/[0.06]"
+      : tone === "medium"
+        ? "border-amber-300/30 bg-amber-300/[0.06]"
+        : tone === "high"
+          ? "border-red-400/30 bg-red-500/[0.06]"
+          : "border-white/10 bg-white/[0.02]";
+  const valueClass =
+    tone === "low"
+      ? "text-emerald-200"
+      : tone === "medium"
+        ? "text-amber-200"
+        : tone === "high"
+          ? "text-red-200"
+          : "text-white/85";
+  return (
+    <div className={`rounded-lg border px-4 py-3 ${toneClass}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/55">
+        {label}
+      </p>
+      <p className={`mt-1.5 font-mono text-lg font-semibold ${valueClass}`}>
+        {value}
+      </p>
+      {footnote ? (
+        <p className="mt-0.5 text-[10px] text-white/40">{footnote}</p>
+      ) : null}
+    </div>
   );
 }
 
