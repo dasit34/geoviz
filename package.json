@@ -19,6 +19,7 @@
     "intelligence:industry": "tsx scripts/intelligence-industry.ts",
     "intelligence:cost": "tsx scripts/intelligence-cost-summary.ts",
     "diagnose:cost-telemetry": "tsx scripts/diagnose-cost-telemetry.ts",
+    "test:stage1-intelligence": "tsx scripts/test-stage1-intelligence.ts",
     "geo-worker": "tsx scripts/geo-worker.ts",
     "geo-worker:dev": "tsx scripts/geo-worker.ts --loop",
     "geo-worker:start": "tsx scripts/geo-worker.ts --loop"
