@@ -268,6 +268,46 @@ passing the prompt via stdin so long URLs / competitor strings can't trip shell 
 - **`claude -p` returns text but no markdown report** — the geo skill's sub-agents may be running. Bump the wrapper timeout via the `timeoutMs` option in `runGeoAudit` (default 5 min) or rerun. The full audit typically takes 1–3 minutes.
 - **Sandboxed CLI sessions block the spawn** — the Claude Code CLI sandbox blocks recursive `claude -p` invocations of skills that fetch from external GitHub repos. This affects automated test runs from a CLI session but not the admin API route running under `npm run dev`.
 
+## Operational Verification (post-deploy)
+
+The Railway CLI is installed, authenticated, and linked to the GeoViz production environment (project `refreshing-love`, service `geoviz`). Claude should use it directly — do not ask the operator to tail logs manually unless the CLI fails, auth expires, or browser-only verification is required.
+
+### When to run the verification suite
+
+Fire on any change that touches:
+- `prisma/` (schema, migrations)
+- `scripts/geo-worker.ts` (worker prompt, audit pipeline)
+- `src/lib/intelligence/` (V2 intelligence layer)
+- `src/lib/audit-intelligence.ts` (intelligence ingestion orchestrator)
+- cost telemetry persistence
+- any Railway or Vercel deploy
+
+Do **not** fire on UI / copy / PDF / email-template / docs-only changes.
+
+### Preferred commands
+
+1. `npx @railway/cli logs` — worker startup + recent errors. Look for `[geo-worker-version]`, `[geo-intelligence] ingest start/success`, and absence of stack traces.
+2. `npx @railway/cli run npx prisma migrate status` — migration health on production.
+3. `npm run intelligence:summary` — intelligence ingestion is populating recent rows.
+4. `npm run intelligence:cost` — cost telemetry is reporting.
+
+### What to summarize after a qualifying change
+
+- deployment health
+- worker health
+- telemetry health
+- intelligence ingestion health
+- migration health
+- rollback risk
+
+### Escalation
+
+Only ask the operator to inspect Railway manually if:
+- The CLI fails (returns non-zero or hangs).
+- Authentication has expired.
+- A CLI access error blocks the command.
+- Browser-only verification is genuinely required (UI screenshot, Vercel preview review).
+
 # GeoViz Product Roadmap
 
 ## Product Positioning
