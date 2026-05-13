@@ -21,10 +21,15 @@ export const dynamic = "force-dynamic";
  */
 
 export async function GET(req: Request) {
+  // Polled endpoint — CalibrationDashboard hits this every 6s while
+  // any audit is inflight (~50 polls/5min per tab) and every 30s
+  // when idle. 300/5min covers 5+ concurrent tabs running active
+  // calibration batches without throttling legitimate operator use.
+  // Frontend back-off honors 429 if the cap is ever reached.
   const limited = applyApiRateLimit({
     req,
     routeKey: "api:admin:calibration-list",
-    limit: 20,
+    limit: 300,
     windowMs: 5 * 60_000,
   });
   if (limited) return limited;
@@ -37,6 +42,20 @@ export async function GET(req: Request) {
     where: { businessName: { startsWith: CALIBRATION_PREFIX } },
     orderBy: { createdAt: "desc" },
     take: 500,
+    include: {
+      // Pull the V2 intelligence row (industry slug, operator
+      // calibration fields). Cheap one-to-one join; nullable for
+      // historic rows that pre-date the intelligence table.
+      intelligence: {
+        select: {
+          industryCategoryNormalized: true,
+          operatorVerdict: true,
+          operatorConfidence: true,
+          benchmarkTag: true,
+          calibrationNotes: true,
+        },
+      },
+    },
   });
 
   // Diagnostic — surfaces the live row counts in Vercel logs so any
@@ -78,6 +97,26 @@ export async function GET(req: Request) {
       })),
       expectedScore: cal?.expected ?? null,
       notes: cal?.notes ?? null,
+      // Operator-intelligence telemetry (Phase 1 + 1.5). Null for
+      // historic rows / CLI-mode runs / failed audits without usage.
+      estimatedCostUsd:
+        row.estimatedCostUsd === null
+          ? null
+          : Number(row.estimatedCostUsd),
+      inputTokens: row.inputTokens,
+      outputTokens: row.outputTokens,
+      modelUsed: row.modelUsed,
+      workerRuntimeMs: row.workerRuntimeMs,
+      retryCount: row.retryCount,
+      failureReason: row.failureReason,
+      // V2 intelligence layer fields (null when no intelligence row
+      // exists yet — historic audits before the backfill).
+      industryCategoryNormalized:
+        row.intelligence?.industryCategoryNormalized ?? null,
+      operatorVerdict: row.intelligence?.operatorVerdict ?? null,
+      operatorConfidence: row.intelligence?.operatorConfidence ?? null,
+      benchmarkTag: row.intelligence?.benchmarkTag ?? null,
+      calibrationNotes: row.intelligence?.calibrationNotes ?? null,
     };
   });
 
@@ -93,7 +132,7 @@ export async function POST(req: Request) {
   const limited = applyApiRateLimit({
     req,
     routeKey: "api:admin:calibration-create",
-    limit: 20,
+    limit: 60,
     windowMs: 5 * 60_000,
   });
   if (limited) return limited;
@@ -171,6 +210,15 @@ export async function POST(req: Request) {
       );
     }
   }
+
+  // Batch-summary log line — one greppable record per submission so an
+  // operator following along on mobile can see the outcome shape at a
+  // glance without scanning every per-URL line above. Each URL was
+  // already isolated in its own try/catch, so partial failures here
+  // never block the rest of the batch.
+  console.log(
+    `[calibration] batch complete submitted=${cleaned.length} queued=${created.length} skipped=${skipped.length}`,
+  );
 
   return NextResponse.json({
     queued: created.length,

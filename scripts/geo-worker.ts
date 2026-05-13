@@ -46,6 +46,18 @@ import { PrismaClient } from "@prisma/client";
 import { getDbFingerprint } from "../src/lib/db-fingerprint";
 import { notifyOperatorReportReady } from "../src/lib/notify-operator-report-ready";
 import { persistAuditIntelligence } from "../src/lib/audit-intelligence";
+import {
+  classifyWorkerException,
+  classifyWrapperFailure,
+  failureReasonDescription,
+  shouldRetry,
+  type FailureReason,
+} from "../src/lib/processing-status";
+import {
+  estimateAuditCostUsd,
+  formatUsageLog,
+  type TokenUsage,
+} from "../src/lib/pricing";
 
 const TIMEOUT_MS = Number(process.env.GEO_WORKER_TIMEOUT_MS ?? 300_000); // 5 min hard cap
 const POLL_MS = Number(process.env.GEO_WORKER_POLL_MS ?? 12_000); // loop-mode poll cadence
@@ -113,7 +125,17 @@ function logErr(...args: unknown[]): void {
 // ---- wrapper execution ----
 
 type WrapperResult =
-  | { ok: true; markdown: string; exitCode: number; stderr: string; elapsedMs: number }
+  | {
+      ok: true;
+      markdown: string;
+      exitCode: number;
+      stderr: string;
+      elapsedMs: number;
+      /** Anthropic `response.usage` block. Null for CLI mode (no usage available). */
+      usage?: TokenUsage | null;
+      /** Model ID at time of call. Null for CLI mode. */
+      modelUsed?: string | null;
+    }
   | {
       ok: false;
       reason: "spawn-failed" | "timeout" | "non-zero-exit" | "empty-output";
@@ -1108,9 +1130,50 @@ async function runViaApi(
       .join("")
       .trim();
 
+    // ---- [geo-cost-debug] runApi sdk-response ----
+    // Capture the raw response shape BEFORE any field extraction.
+    // Answers: does `response.usage` actually contain the four token
+    // fields the SDK type promises? If `usageJson=null` here, the
+    // SDK isn't returning usage on this account/model/tool combo and
+    // the issue is upstream of our code.
+    log(
+      `[geo-cost-debug] runApi sdk-response stopReason=${response.stop_reason} contentBlocks=${response.content.length} hasUsage=${response.usage !== null && response.usage !== undefined} usageJson=${JSON.stringify(response.usage ?? null)}`,
+    );
+
+    // Capture token usage for cost tracking. The Anthropic SDK
+    // returns `response.usage` with input/output and (when prompt
+    // caching is active) cache_creation/cache_read counts. All fields
+    // are optional in the type — defensive ?? null guards keep this
+    // from breaking if the SDK shape changes.
+    const rawUsage = response.usage as
+      | {
+          input_tokens?: number;
+          output_tokens?: number;
+          cache_creation_input_tokens?: number;
+          cache_read_input_tokens?: number;
+        }
+      | undefined
+      | null;
+    const usage: TokenUsage = {
+      inputTokens: rawUsage?.input_tokens ?? null,
+      outputTokens: rawUsage?.output_tokens ?? null,
+      cacheCreationTokens: rawUsage?.cache_creation_input_tokens ?? null,
+      cacheReadTokens: rawUsage?.cache_read_input_tokens ?? null,
+    };
+
+    // ---- [geo-cost-debug] runApi extracted-usage ----
+    // The post-cast object. If `usageJson` above had a value but
+    // `extracted-usage` has all-null fields here, the SDK's actual
+    // key names differ from our type-assertion (e.g. `prompt_tokens`
+    // vs `input_tokens`). Inspect `usageJson` to find the real keys.
+    log(
+      `[geo-cost-debug] runApi extracted-usage ${JSON.stringify(usage)} modelUsed=${ANTHROPIC_MODEL}`,
+    );
+
     log(
       `[geo-worker] api response received model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS} timeoutMs=${TIMEOUT_MS} elapsedMs=${elapsedMs} stopReason=${response.stop_reason} bytes=${markdown.length}`,
     );
+    log(`[geo-worker] api usage ${formatUsageLog(ANTHROPIC_MODEL, usage)}`);
 
     if (!markdown) {
       return {
@@ -1129,6 +1192,8 @@ async function runViaApi(
       exitCode: 0,
       stderr: "",
       elapsedMs,
+      usage,
+      modelUsed: ANTHROPIC_MODEL,
     };
   } catch (err) {
     clearTimeout(timer);
@@ -1257,6 +1322,16 @@ function runWrapperCli(
       }
 
       if (code === 0 && stdout.trim().length > 0) {
+        // ---- [geo-cost-debug] runWrapperCli success ----
+        // CLI mode never carries SDK usage — the Claude CLI wrapper
+        // doesn't surface token counts. If this line ever appears in
+        // Railway logs, the worker is routing through CLI mode
+        // unexpectedly, which would explain why cost columns stay
+        // NULL even on successful audits. Production GEO_AUDIT_MODE
+        // must be "api".
+        log(
+          `[geo-cost-debug] runWrapperCli success — CLI mode never carries SDK usage; cost columns will stay null for this audit. Switch GEO_AUDIT_MODE to 'api' for cost telemetry.`,
+        );
         settle({ ok: true, markdown: stdout, exitCode: 0, stderr, elapsedMs });
         return;
       }
@@ -1421,6 +1496,92 @@ function formatScoreBreakdownForLog(markdown: string): string | null {
 // ---- per-job pipeline ----
 type PollResult = "processed" | "claimed-by-other" | "no-jobs";
 
+/**
+ * Single source of truth for "this audit just failed — what do we
+ * write to the DB?" — consulted by every failure path in the worker
+ * (wrapper failure, post-success DB-save failure, catch-all worker
+ * exception). Combines:
+ *
+ *   1. Classification — `reason` is the stable FailureReason code
+ *      assigned by the caller via `classifyWrapperFailure` or
+ *      `classifyWorkerException`. The `reportError` text stays in
+ *      its existing column for operator debugging.
+ *
+ *   2. Retry decision — transient reasons (timeout / fetch_failed /
+ *      queue_interruption / render_failed) are flipped back to
+ *      `reportStatus = "queued"` so the next poll picks them up,
+ *      provided `retryCount < MAX_AUTO_RETRIES`. `retryCount` is
+ *      incremented and `lastRetryAt` stamped so the operator can
+ *      see retry pressure on the row.
+ *
+ *   3. Terminal write — non-transient or out-of-retries reasons go
+ *      to `reportStatus = "failed"` with `failureReason` set. The
+ *      admin UI derives the operator-facing label (TIMEOUT /
+ *      FETCH_FAILED / etc.) from that field.
+ *
+ * Returns `"retried"` or `"failed"` so the caller can log the
+ * outcome distinctly. Never throws — DB errors on the failure-
+ * write are caught and logged but never propagated.
+ */
+async function markFailureWithRetry(
+  prisma: PrismaClient,
+  args: {
+    orderId: string;
+    retryCount: number;
+    reason: FailureReason;
+    reportError: string;
+  },
+): Promise<"retried" | "failed"> {
+  const { orderId, retryCount, reason, reportError } = args;
+
+  if (shouldRetry(reason, retryCount)) {
+    try {
+      await prisma.auditOrder.update({
+        where: { id: orderId },
+        data: {
+          reportStatus: "queued",
+          reportQueuedAt: new Date(),
+          reportError: null,
+          failureReason: reason, // preserved as breadcrumb
+          retryCount: retryCount + 1,
+          lastRetryAt: new Date(),
+        },
+      });
+      log(
+        `[geo-worker] retry scheduled orderId=${orderId} reason=${reason} attempt=${retryCount + 1}/${2}`,
+      );
+      return "retried";
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logErr(
+        `[geo-worker] retry-write failed orderId=${orderId}: ${message} (falling through to terminal failure)`,
+      );
+      // fall through to terminal write below
+    }
+  }
+
+  try {
+    await prisma.auditOrder.update({
+      where: { id: orderId },
+      data: {
+        reportStatus: "failed",
+        failureReason: reason,
+        reportError,
+      },
+    });
+    logErr(
+      `[geo-worker] terminal failure orderId=${orderId} reason=${reason} (${failureReasonDescription(reason)}) retryCount=${retryCount}`,
+    );
+    return "failed";
+  } catch (markErr) {
+    const message = markErr instanceof Error ? markErr.message : String(markErr);
+    logErr(
+      `[geo-worker] CRITICAL — could not mark failed orderId=${orderId}: ${message}`,
+    );
+    return "failed";
+  }
+}
+
 async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
   // Newest-first: when an admin clicks "Run GEO Audit" we want the audit
   // they JUST queued to be the next one processed, not whatever stale row
@@ -1474,6 +1635,16 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
       candidate.competitorUrl,
     );
 
+    // ---- [geo-cost-debug] processOneJob result-received ----
+    // Captures the runtime shape of the WrapperResult BEFORE the
+    // success-path conditional. Answers: does `"usage" in result`
+    // pick up the key? Is `result.usage` truthy? Is `modelUsed`
+    // present? These four boolean flags pinpoint exactly which
+    // condition fails on the path to the DB write.
+    log(
+      `[geo-cost-debug] processOneJob result.ok=${result.ok} elapsedMs=${result.elapsedMs} hasUsageKey=${"usage" in result} usageTruthy=${"usage" in result && Boolean(result.usage)} hasModelKey=${"modelUsed" in result} modelUsedVal=${"modelUsed" in result ? String(result.modelUsed) : "absent"}`,
+    );
+
     if (result.ok) {
       log(
         `[geo-worker] markdown length orderId=${candidate.id} bytes=${result.markdown.length}`,
@@ -1485,6 +1656,35 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
       // Wrap the success-path DB write in its own try/catch so a save
       // failure is loudly visible instead of being swallowed by the outer
       // catch (which would mark the row "failed" with a vaguer message).
+      // Per-audit cost data — only populated when the wrapper returns
+      // usage (API mode). CLI mode leaves these null because the
+      // wrapper has no visibility into the underlying Claude CLI's
+      // token accounting.
+      const usageData =
+        "usage" in result && result.usage
+          ? {
+              inputTokens: result.usage.inputTokens,
+              outputTokens: result.usage.outputTokens,
+              cacheCreationTokens: result.usage.cacheCreationTokens,
+              cacheReadTokens: result.usage.cacheReadTokens,
+              modelUsed: result.modelUsed ?? ANTHROPIC_MODEL,
+              estimatedCostUsd: estimateAuditCostUsd(
+                result.modelUsed ?? ANTHROPIC_MODEL,
+                result.usage,
+              ),
+              workerRuntimeMs: result.elapsedMs,
+            }
+          : { workerRuntimeMs: result.elapsedMs };
+
+      // ---- [geo-cost-debug] DB write payload (pre-write) ----
+      // The exact object the Prisma layer is about to receive. If
+      // `keys` is missing the token/cost fields here, the conditional
+      // above fell into the runtime-only branch — investigation
+      // belongs upstream in `result.usage`.
+      log(
+        `[geo-cost-debug] DB write payload orderId=${candidate.id} keys=${Object.keys(usageData).join(",")} payloadJson=${JSON.stringify(usageData)}`,
+      );
+
       try {
         const saved = await prisma.auditOrder.update({
           where: { id: candidate.id },
@@ -1493,12 +1693,44 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
             reportMarkdown: result.markdown,
             reportError: null,
             reportGeneratedAt: new Date(),
+            ...usageData,
           },
         });
         wroteTerminal = true;
+        // ---- [geo-cost-debug] DB write success (smoking-gun line) ----
+        // Echoes the post-write row state back. If the pre-write
+        // `payloadJson` contained populated token/cost fields but the
+        // post-write values here are null, Prisma either silently
+        // dropped the keys (column not in the client's generated
+        // model — regenerate) or the columns don't exist on the DB
+        // (migration not applied). Run `npx prisma migrate status`
+        // and `npx prisma generate` on the Railway side to fix.
+        log(
+          `[geo-cost-debug] DB write success orderId=${candidate.id} dbInputTokens=${saved.inputTokens ?? "null"} dbOutputTokens=${saved.outputTokens ?? "null"} dbModelUsed=${saved.modelUsed ?? "null"} dbEstimatedCostUsd=${saved.estimatedCostUsd?.toString() ?? "null"} dbWorkerRuntimeMs=${saved.workerRuntimeMs ?? "null"}`,
+        );
         log(
           `[geo-worker] report saved orderId=${candidate.id} dbReportStatus=${saved.reportStatus} reportGeneratedAt=${saved.reportGeneratedAt?.toISOString() ?? "null"} bytes=${result.markdown.length}`,
         );
+        // Single-line operator cost-summary log — distinct prefix so
+        // an operator can `grep '\[geo-cost\]'` and get one line per
+        // completed audit with everything they need to map dollars
+        // back to orders. See COST_AND_USAGE_TRACKING.md §1.5.
+        {
+          const usageForLog =
+            "usage" in result && result.usage
+              ? result.usage
+              : {
+                  inputTokens: null,
+                  outputTokens: null,
+                  cacheCreationTokens: null,
+                  cacheReadTokens: null,
+                };
+          const modelForLog = result.modelUsed ?? ANTHROPIC_MODEL;
+          const costForLog = estimateAuditCostUsd(modelForLog, usageForLog);
+          log(
+            `[geo-cost] auditId=${candidate.id} model=${modelForLog} input=${usageForLog.inputTokens ?? 0} output=${usageForLog.outputTokens ?? 0} cost=$${costForLog.toFixed(4)} runtime=${result.elapsedMs}ms url=${candidate.websiteUrl} status=generated retries=${candidate.retryCount}`,
+          );
+        }
         const breakdownLog = formatScoreBreakdownForLog(result.markdown);
         if (breakdownLog) {
           log(
@@ -1561,33 +1793,24 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
         logErr(
           `[geo-worker] DB SAVE FAILED orderId=${candidate.id} after successful Anthropic response (${result.markdown.length} bytes): ${message}`,
         );
-        // Recovery: mark the row failed so the UI doesn't stick at
-        // "running" forever. We still couldn't preserve the markdown,
-        // but at least the dashboard flips to a terminal state.
-        try {
-          await prisma.auditOrder.update({
-            where: { id: candidate.id },
-            data: {
-              reportStatus: "failed",
-              reportError: `Anthropic returned ${result.markdown.length} bytes but DB save failed: ${message}`,
-            },
-          });
-          wroteTerminal = true;
-          logErr(
-            `[geo-worker] recovered orderId=${candidate.id} to failed (markdown lost — re-queue to retry)`,
-          );
-        } catch (markErr) {
-          const markMessage =
-            markErr instanceof Error ? markErr.message : String(markErr);
-          logErr(
-            `[geo-worker] CRITICAL — could not mark failed after save error orderId=${candidate.id}: ${markMessage}`,
-          );
-        }
+        // db_save_failed is NOT transient — almost always a schema
+        // or permission issue, retrying would burn AI provider spend
+        // without addressing the root cause. Mark failed terminally.
+        await markFailureWithRetry(prisma, {
+          orderId: candidate.id,
+          retryCount: candidate.retryCount,
+          reason: "db_save_failed",
+          reportError: `Anthropic returned ${result.markdown.length} bytes but DB save failed: ${message}`,
+        });
+        wroteTerminal = true;
         return "processed";
       }
     }
 
-    // Failure — preserve the last 20 lines of stderr in reportError.
+    // Wrapper failure path — classify the WrapperResult, decide
+    // retry vs terminal in markFailureWithRetry. Preserves the
+    // existing rich reportError text (stderr tail + reason label)
+    // for operator debugging.
     const stderrTail = tail(result.stderr, 20);
     const reasonLabel =
       result.reason === "timeout"
@@ -1602,33 +1825,40 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
       `--- reason: ${reasonLabel} · elapsedMs=${result.elapsedMs} ---\n` +
       `--- last 20 lines of stderr ---\n${stderrTail}`;
 
-    await prisma.auditOrder.update({
-      where: { id: candidate.id },
-      data: {
-        reportStatus: "failed",
-        reportError,
-      },
+    const classified = classifyWrapperFailure(result.reason, result.error);
+    const outcome = await markFailureWithRetry(prisma, {
+      orderId: candidate.id,
+      retryCount: candidate.retryCount,
+      reason: classified,
+      reportError,
     });
     wroteTerminal = true;
 
     logErr(
-      `[geo-worker] audit failed orderId=${candidate.id} reason=${result.reason} exit=${result.exitCode ?? "null"} elapsedMs=${result.elapsedMs}: ${result.error}`,
+      `[geo-worker] audit ${outcome} orderId=${candidate.id} classified=${classified} wrapperReason=${result.reason} exit=${result.exitCode ?? "null"} elapsedMs=${result.elapsedMs}: ${result.error}`,
+    );
+    // Cost-summary line for failed audits — tokens may have been
+    // consumed before the failure (e.g. timeout mid-response), so
+    // the operator should see this in the cost grep too.
+    log(
+      `[geo-cost] auditId=${candidate.id} model=${ANTHROPIC_MODEL} input=0 output=0 cost=$0.0000 runtime=${result.elapsedMs}ms url=${candidate.websiteUrl} status=${outcome} reason=${classified} retries=${candidate.retryCount}`,
     );
     return "processed";
   } catch (err) {
     // Catch-all for any unexpected exception inside the worker (DB blip,
-    // promise rejection, etc.). Mark the row failed so it doesn't stick.
+    // promise rejection, etc.). Classify so transient errors retry and
+    // non-transient ones surface as the right operator category.
     const message = err instanceof Error ? err.message : String(err);
+    const classified = classifyWorkerException(err);
     logErr(
-      `[geo-worker] worker exception during orderId=${candidate.id}: ${message}`,
+      `[geo-worker] worker exception orderId=${candidate.id} classified=${classified}: ${message}`,
     );
     try {
-      await prisma.auditOrder.update({
-        where: { id: candidate.id },
-        data: {
-          reportStatus: "failed",
-          reportError: `Worker exception: ${message}`,
-        },
+      await markFailureWithRetry(prisma, {
+        orderId: candidate.id,
+        retryCount: candidate.retryCount,
+        reason: classified,
+        reportError: `Worker exception: ${message}`,
       });
       wroteTerminal = true;
     } catch (writeErr) {
@@ -1640,23 +1870,18 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
   } finally {
     if (!wroteTerminal) {
       // Last-ditch — should be unreachable but defends against any future
-      // path that returns without writing. Better to mark failed than to
-      // leave the UI stuck.
-      try {
-        await prisma.auditOrder.update({
-          where: { id: candidate.id },
-          data: {
-            reportStatus: "failed",
-            reportError:
-              "Worker exited without writing a terminal status. Re-run.",
-          },
-        });
-        logErr(
-          `[geo-worker] no terminal write detected — recovered orderId=${candidate.id} to failed`,
-        );
-      } catch {
-        // already logged above
-      }
+      // path that returns without writing. queue_interruption is a
+      // transient reason; this row will auto-retry if retryCount < cap.
+      await markFailureWithRetry(prisma, {
+        orderId: candidate.id,
+        retryCount: candidate.retryCount,
+        reason: "queue_interruption",
+        reportError:
+          "Worker exited without writing a terminal status. Re-run.",
+      });
+      logErr(
+        `[geo-worker] no terminal write detected — recovered orderId=${candidate.id}`,
+      );
     }
   }
   return "processed";
@@ -1794,6 +2019,36 @@ async function recoverStaleRunningJobs(prisma: PrismaClient): Promise<number> {
 
 async function main(): Promise<void> {
   preflightOrExit();
+
+  // ---- [geo-worker-version] permanent deploy identity ----
+  // Reads the deployed commit SHA from whichever env the host
+  // injected — Railway sets RAILWAY_GIT_COMMIT_SHA, Vercel sets
+  // VERCEL_GIT_COMMIT_SHA on every build. The fallback "unknown"
+  // is what you'll see if the worker is running outside CI/CD
+  // (e.g. local dev). This line is permanent — it's not part of
+  // the [geo-cost-debug] suite that gets cleaned up later.
+  //
+  // After every Railway deploy, the operator should grep for
+  // `[geo-worker-version]` to confirm which commit is actually
+  // running before debugging anything else.
+  const commitSha =
+    process.env.RAILWAY_GIT_COMMIT_SHA ??
+    process.env.VERCEL_GIT_COMMIT_SHA ??
+    process.env.GIT_COMMIT_SHA ??
+    "unknown";
+  const commitShaShort = commitSha === "unknown" ? "unknown" : commitSha.slice(0, 7);
+  log(
+    `[geo-worker-version] commit=${commitShaShort} commitFull=${commitSha} telemetry=true worker=geo-worker auditMode=${AUDIT_MODE} model=${ANTHROPIC_MODEL} startedAt=${new Date().toISOString()}`,
+  );
+
+  // ---- [geo-cost-debug] worker boot — telemetry instrumentation ----
+  // Fires once per worker start so the operator can confirm in Railway
+  // logs that this instrumented build is the one actually running.
+  // Pure additive logging; remove with a single grep when the cost-
+  // telemetry root cause is identified.
+  log(
+    `[geo-cost-debug] worker boot — telemetry instrumentation v1 active · auditMode=${AUDIT_MODE} model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS}`,
+  );
 
   const prisma = new PrismaClient();
 

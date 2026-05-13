@@ -20,15 +20,16 @@ export async function GET(
   req: Request,
   { params }: { params: { id: string } },
 ) {
-  // Polling endpoint — the admin card hits this every 5s while a job
-  // is queued/running. 5s polling × 5min window = 60 hits/5min from
-  // one legitimate admin tab; 200 leaves headroom for two simultaneous
-  // tabs + manual refreshes while still being an upper bound that
-  // stops a runaway loop. Mutating admin routes use the tighter 20/5min.
+  // Polling endpoint — the admin card hits this every 8s while a job
+  // is queued/running (8s × 5min = ~37 polls/window per active card).
+  // Real testing workflow runs 5–10 concurrent jobs and keeps multiple
+  // admin tabs open, easily reaching 300–500 polls/5min. 600 caps the
+  // legitimate ceiling while still bounding a runaway loop. Mutating
+  // admin routes use the tighter 60/5min.
   const limited = applyApiRateLimit({
     req,
     routeKey: "api:admin:orders",
-    limit: 200,
+    limit: 600,
     windowMs: 5 * 60_000,
   });
   if (limited) return limited;

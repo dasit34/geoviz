@@ -44,6 +44,33 @@ model AuditOrder {
   sentTo                     String?
   sentCc                     String?
   customerConfirmationSentAt DateTime?
+  // Operational state model (added to disambiguate infrastructure
+  // failures from audit outcomes). See `src/lib/processing-status.ts`
+  // for the full taxonomy and the derive function consumed by the
+  // admin queue UI. The legacy `reportStatus` column stays as the
+  // canonical state machine; `failureReason` adds the granular
+  // operator-facing category when reportStatus = "failed". The legacy
+  // `reportError` column keeps the full error text for debugging.
+  failureReason              String?
+  retryCount                 Int           @default(0)
+  lastRetryAt                DateTime?
+  // Token + cost tracking (Phase 1 — visibility only, no behavioural
+  // change). Captured from `response.usage` after each Anthropic API
+  // call. estimatedCostUsd is computed via `src/lib/pricing.ts`. All
+  // nullable so historic rows without usage data still validate.
+  // See COST_AND_USAGE_TRACKING.md for the cost model + roadmap.
+  inputTokens                Int?
+  outputTokens               Int?
+  cacheCreationTokens        Int?
+  cacheReadTokens            Int?
+  modelUsed                  String?
+  estimatedCostUsd           Decimal?      @db.Decimal(10, 6)
+  // Worker runtime captured at audit completion (the wrapper's
+  // elapsedMs — full Anthropic API call + tool-use round-trips).
+  // Stored as INT milliseconds. Null for historic rows, CLI-mode
+  // runs, and failed/in-flight audits that never reached the
+  // success path.
+  workerRuntimeMs            Int?
   createdAt                  DateTime      @default(now())
   updatedAt                  DateTime      @updatedAt
 
@@ -128,6 +155,30 @@ model AuditIntelligence {
   operatorReviewed   Boolean @default(false)
   operatorNotes      String?
   rawSignalSnapshot  Json
+
+  // Operator-judgment calibration intelligence — structured fields
+  // captured when an operator manually reviews an audit. NOT machine
+  // learning, NOT self-modifying. Pure operator memory. See
+  // `src/lib/intelligence/calibration.ts` for the type taxonomy +
+  // summary helpers.
+  //
+  //   operatorVerdict    — accurate / slightly_high / too_high /
+  //                        slightly_low / too_low. Null when not yet
+  //                        tagged.
+  //   operatorConfidence — high / medium / low. The OPERATOR's
+  //                        confidence in the score (distinct from
+  //                        `confidenceLevel` above, which is the
+  //                        parser's confidence in the rubric extraction).
+  //   benchmarkTag       — excellent_example / average_example /
+  //                        weak_example / edge_case. For curating a
+  //                        future benchmark dataset.
+  //   calibrationNotes   — freeform operator memo. Distinct from
+  //                        `operatorNotes` so calibration context
+  //                        stays separable from general review notes.
+  operatorVerdict    String?
+  operatorConfidence String?
+  benchmarkTag       String?
+  calibrationNotes   String?
 
   @@index([createdAt])
   @@index([websiteUrl])

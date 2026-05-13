@@ -27,7 +27,7 @@ export async function PATCH(
   const limited = applyApiRateLimit({
     req,
     routeKey: "api:admin:calibration-update",
-    limit: 20,
+    limit: 60,
     windowMs: 5 * 60_000,
   });
   if (limited) return limited;
@@ -84,7 +84,7 @@ export async function DELETE(
   const limited = applyApiRateLimit({
     req,
     routeKey: "api:admin:calibration-delete",
-    limit: 20,
+    limit: 60,
     windowMs: 5 * 60_000,
   });
   if (limited) return limited;

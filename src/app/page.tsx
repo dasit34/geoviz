@@ -51,10 +51,9 @@ export default function Page() {
               systems see your business.
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/70">
-              GeoViz audits whether AI systems can understand, crawl,
-              trust, and confidently recommend your business across the
-              signals that influence AI discovery — on ChatGPT, Claude,
-              Perplexity, Gemini, and the answer engines coming next.
+              GeoViz audits whether modern AI systems can understand,
+              trust, and recommend your business — and where your
+              visibility is breaking down.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -65,9 +64,6 @@ export default function Page() {
                 View Sample Report
               </Link>
             </div>
-            <p className="mt-3 text-xs text-white/65">
-              Automated AI analysis + human-reviewed delivery — most reports are delivered within minutes.
-            </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
               <span className="text-xs uppercase tracking-[0.2em] text-white/40">
@@ -84,6 +80,9 @@ export default function Page() {
                 ))}
               </div>
             </div>
+            <p className="mt-6 text-xs text-white/65">
+              Operator-reviewed before delivery.
+            </p>
           </div>
 
           <div className="relative flex items-center justify-center">

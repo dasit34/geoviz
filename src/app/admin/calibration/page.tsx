@@ -5,7 +5,7 @@ import { CalibrationDashboard } from "@/components/CalibrationDashboard";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const metadata = {
-  title: "Calibration · Admin · GeoViz",
+  title: "Operator Intelligence · Admin · GeoViz",
   robots: { index: false, follow: false },
 };
 
@@ -40,13 +40,15 @@ export default function AdminCalibrationPage({
       <Header />
       <section className="container-page py-12 md:py-16">
         <header className="mb-8">
-          <p className="section-eyebrow">Internal · Calibration harness</p>
-          <h1 className="h2 mt-3">Score calibration</h1>
+          <p className="section-eyebrow">Internal · Operator intelligence</p>
+          <h1 className="h2 mt-3">GeoViz Operator Intelligence</h1>
           <p className="muted mt-3 max-w-2xl">
-            Queue many businesses through the live audit pipeline, store
-            their category scores, and compare against a human-expected
-            baseline. Each entry runs the same Anthropic prompt + worker
-            queue + scoring rubric the real customers hit.
+            The internal cockpit for active testing and calibration —
+            today&rsquo;s audit volume, cost &amp; runtime telemetry,
+            queue state, retry pressure, and expected-vs-actual score
+            drift. Same audit pipeline, same scoring rubric, same
+            worker queue customers hit. Calibration batch workflow is
+            preserved end-to-end.
           </p>
         </header>
         <CalibrationDashboard adminKey={key!} />
