@@ -156,6 +156,34 @@ model AuditIntelligence {
   operatorNotes      String?
   rawSignalSnapshot  Json
 
+  // V2 Stage 1 — Intelligence Stabilization fields. All nullable.
+  // Populated post-audit by `src/lib/intelligence/intelligenceIngest.ts`
+  // in a fail-soft try/catch. NOT consumed by scoring, NOT consumed by
+  // report rendering. Pre-Stage-1 rows stay null on every field below.
+  cmsDetected         String?    // e.g. "shopify" | "wordpress" | "wix" | "squarespace"
+  frameworkDetected   String?    // e.g. "nextjs" | "react" | "vanilla" | "vue"
+  schemaTypes         Json?      // string[] — detected schema.org types
+  aiReadabilityScore  Int?       // 0..100 composite heuristic
+  contentDensity      Int?       // approximate words per discoverable page
+  // Render-required is a heuristic flag for future browser-rendering work.
+  // Stage 1 ships the flags only; no browser infrastructure yet. The three
+  // render* columns stay null on every row until Stage 6 (post-launch).
+  renderRequired      Boolean?
+  renderAttempted     Boolean?
+  renderSuccessful    Boolean?
+  renderEngineVersion String?
+  // benchmarkTags is SYSTEM-set (Json array), distinct from the existing
+  // `benchmarkTag` scalar which is OPERATOR-set (calibration intelligence).
+  // Both can coexist; the system-set array is for automated cohort tags
+  // like "high_js_density" / "thin_content" / etc.
+  benchmarkTags       Json?
+  extractedEntities   Json?      // string[] — business names, services, locations
+  // Score provenance — per-dimension reasons + signals for explainability.
+  // Shape: { schema: { score, reasons[], signals[] }, crawlability: …,
+  //          trust: …, content: …, aiReadability: …, recommendationReadiness: … }
+  // See `src/lib/intelligence/scoreProvenance.ts` for the type.
+  scoreProvenance     Json?
+
   // Operator-judgment calibration intelligence — structured fields
   // captured when an operator manually reviews an audit. NOT machine
   // learning, NOT self-modifying. Pure operator memory. See

@@ -1,4 +1,5 @@
 /* eslint-disable no-console */
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   derivePlatformVisibility,
@@ -15,6 +16,18 @@ import {
   inferIndustryFromAuditInputs,
   normalizeIndustry,
 } from "@/lib/intelligence/industry-taxonomy";
+import { runIntelligenceIngest } from "@/lib/intelligence/intelligenceIngest";
+
+/**
+ * Prisma's nullable Json columns require the `Prisma.JsonNull`
+ * sentinel to persist a SQL NULL — plain JS `null` isn't accepted
+ * by the generated input type. This helper centralizes the
+ * convention so every nullable-Json field in the payload follows
+ * the same pattern.
+ */
+function jsonOrNull<T extends object>(value: T | null): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  return value === null ? Prisma.JsonNull : (value as unknown as Prisma.InputJsonValue);
+}
 
 /**
  * GeoViz V2 data foundation — normalized intelligence persistence.
@@ -335,6 +348,65 @@ function buildIntelligencePayload(args: {
     // on insert — the @default(false) handles operatorReviewed; the
     // upsert update branch explicitly preserves operator state.
     rawSignalSnapshot: rawSignalSnapshot as unknown as object,
+
+    // ─── V2 Stage 1 — Intelligence ingestion ────────────────────
+    // runIntelligenceIngest is itself fail-soft: every module is
+    // wrapped in try/catch internally and returns nulls for any
+    // dimension that failed. The whole call is ALSO wrapped here as
+    // belt-and-suspenders — if the orchestrator itself throws (it
+    // shouldn't), the audit row still writes with V2 fields null.
+    // The customer report has already been saved by the worker
+    // BEFORE this code runs, so nothing here can affect delivery.
+    ...(() => {
+      try {
+        const ingest = runIntelligenceIngest({
+          reportMarkdown,
+          businessName,
+          websiteUrl,
+          score,
+          orderId,
+        });
+        return {
+          cmsDetected: ingest.cmsDetected,
+          frameworkDetected: ingest.frameworkDetected,
+          schemaTypes: jsonOrNull(ingest.schemaTypes as unknown as object | null),
+          aiReadabilityScore: ingest.aiReadabilityScore,
+          contentDensity: ingest.contentDensity,
+          renderRequired: ingest.renderRequired,
+          renderAttempted: ingest.renderAttempted,
+          renderSuccessful: ingest.renderSuccessful,
+          renderEngineVersion: ingest.renderEngineVersion,
+          benchmarkTags: jsonOrNull(ingest.benchmarkTags as unknown as object | null),
+          extractedEntities: jsonOrNull(
+            ingest.extractedEntities as unknown as object | null,
+          ),
+          scoreProvenance: jsonOrNull(
+            ingest.scoreProvenance as unknown as object | null,
+          ),
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        // ---- [geo-intelligence] ingest failed ----
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[geo-intelligence] ingest failed orderId=${orderId} (non-fatal): ${message}`,
+        );
+        return {
+          cmsDetected: null,
+          frameworkDetected: null,
+          schemaTypes: Prisma.JsonNull,
+          aiReadabilityScore: null,
+          contentDensity: null,
+          renderRequired: null,
+          renderAttempted: null,
+          renderSuccessful: null,
+          renderEngineVersion: null,
+          benchmarkTags: Prisma.JsonNull,
+          extractedEntities: Prisma.JsonNull,
+          scoreProvenance: Prisma.JsonNull,
+        };
+      }
+    })(),
   };
 }
 
