@@ -27,18 +27,18 @@ export function ReportCtaCard({
   const mailto = `mailto:${fixRequestEmail}?subject=${encodeURIComponent(subject)}`;
 
   return (
-    <section className="cta-card" aria-label="GEO Foundation Fix offer">
+    <section className="cta-card" aria-label="AI Visibility Profile Setup offer">
       <div className="cta-card-accent" />
       <div className="cta-card-body">
-        <div className="cta-card-eyebrow">GEO Foundation Fix</div>
+        <div className="cta-card-eyebrow">AI Visibility Profile Setup</div>
         <h2 className="cta-card-headline">
-          Want us to implement these fixes for you?
+          Install your AI Visibility Profile
         </h2>
         <p className="cta-card-lede">
-          A foundational implementation service — not magic automation.
-          We work through the priority fixes this audit surfaced so AI
-          systems can identify, trust, and recommend your business
-          more clearly.
+          We create and help install a machine-readable business identity
+          layer — schema, llms.txt, entity signals, AI-readable summary
+          — so AI systems can better understand, crawl, and interpret
+          your business.
         </p>
 
         <div className="cta-card-badges">
@@ -51,12 +51,12 @@ export function ReportCtaCard({
         </div>
 
         <a className="cta-card-button" href={mailto}>
-          Request My Foundation Fix →
+          Request My AI Visibility Profile Setup →
         </a>
         <p className="cta-card-fineprint">
           Or reply to your delivery email — we&rsquo;ll send a scoped
-          plan within one business day. Scope is grounded in this
-          audit&rsquo;s findings, not a templated checklist.
+          setup plan within one business day. Complex websites may
+          require custom scoping.
         </p>
       </div>
     </section>

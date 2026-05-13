@@ -5,7 +5,7 @@ import { Footer } from "@/components/Footer";
 export const metadata = {
   title: "Refund Policy · GeoViz",
   description:
-    "GeoViz refund policy for the AI Visibility Audit and the optional GEO Foundation Fix.",
+    "GeoViz refund policy for the AI Visibility Audit and the optional AI Visibility Profile Setup.",
 };
 
 const LAST_UPDATED = "May 11, 2026";
@@ -25,7 +25,7 @@ export default function RefundPolicyPage() {
             <p className="mt-8 text-base leading-relaxed text-white/85">
               We want you to feel good about ordering from GeoViz. This
               page explains how refunds work for the AI Visibility Audit
-              ($97) and the GEO Foundation Fix ($497).
+              ($97) and the AI Visibility Profile Setup ($497).
             </p>
 
             <Section title="1. When audits start processing">
@@ -84,9 +84,9 @@ export default function RefundPolicyPage() {
               </p>
             </Section>
 
-            <Section title="5. GEO Foundation Fix ($497)">
+            <Section title="5. AI Visibility Profile Setup ($497)">
               <p>
-                The optional GEO Foundation Fix is a multi-day
+                The optional AI Visibility Profile Setup is a multi-day
                 implementation engagement, not a software product. Refunds
                 are handled separately:
               </p>
@@ -99,8 +99,8 @@ export default function RefundPolicyPage() {
                   to the work completed.
                 </li>
                 <li>
-                  No refund on completed Foundation Fix engagements once
-                  the deliverables have been handed off.
+                  No refund on completed AI Visibility Profile Setup
+                  engagements once the deliverables have been handed off.
                 </li>
               </ul>
             </Section>

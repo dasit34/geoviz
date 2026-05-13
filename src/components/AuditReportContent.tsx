@@ -591,7 +591,7 @@ function ItemCard({
           <span
             className={`severity-badge foundation-${meta.foundationFix.yes ? "yes" : "no"}`}
           >
-            GeoViz Foundation Fix: {meta.foundationFix.label}
+            GeoViz Profile Setup: {meta.foundationFix.label}
           </span>
         ) : null}
         {kind === "fix" && !meta?.priority && inferredFix ? (
