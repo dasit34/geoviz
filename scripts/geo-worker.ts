@@ -2020,6 +2020,27 @@ async function recoverStaleRunningJobs(prisma: PrismaClient): Promise<number> {
 async function main(): Promise<void> {
   preflightOrExit();
 
+  // ---- [geo-worker-version] permanent deploy identity ----
+  // Reads the deployed commit SHA from whichever env the host
+  // injected — Railway sets RAILWAY_GIT_COMMIT_SHA, Vercel sets
+  // VERCEL_GIT_COMMIT_SHA on every build. The fallback "unknown"
+  // is what you'll see if the worker is running outside CI/CD
+  // (e.g. local dev). This line is permanent — it's not part of
+  // the [geo-cost-debug] suite that gets cleaned up later.
+  //
+  // After every Railway deploy, the operator should grep for
+  // `[geo-worker-version]` to confirm which commit is actually
+  // running before debugging anything else.
+  const commitSha =
+    process.env.RAILWAY_GIT_COMMIT_SHA ??
+    process.env.VERCEL_GIT_COMMIT_SHA ??
+    process.env.GIT_COMMIT_SHA ??
+    "unknown";
+  const commitShaShort = commitSha === "unknown" ? "unknown" : commitSha.slice(0, 7);
+  log(
+    `[geo-worker-version] commit=${commitShaShort} commitFull=${commitSha} telemetry=true worker=geo-worker auditMode=${AUDIT_MODE} model=${ANTHROPIC_MODEL} startedAt=${new Date().toISOString()}`,
+  );
+
   // ---- [geo-cost-debug] worker boot — telemetry instrumentation ----
   // Fires once per worker start so the operator can confirm in Railway
   // logs that this instrumented build is the one actually running.
