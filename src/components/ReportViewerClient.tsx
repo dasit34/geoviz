@@ -29,7 +29,7 @@ import "@/app/report/[id]/print/print.css";
 /**
  * Admin-facing report preview. Mirrors the customer-facing print
  * page exactly — same score card, same section cards, same
- * Foundation Fix card — so the admin preview shows what the
+ * AI Visibility Profile Setup card — so the admin preview shows what the
  * customer sees in their email link / PDF. Toggle to raw markdown
  * when triaging audit output.
  */
@@ -499,7 +499,7 @@ function ItemCard({
           <span
             className={`severity-badge foundation-${meta.foundationFix.yes ? "yes" : "no"}`}
           >
-            GeoViz Foundation Fix: {meta.foundationFix.label}
+            GeoViz Profile Setup: {meta.foundationFix.label}
           </span>
         ) : null}
         {kind === "fix" && !meta?.priority && inferredFix ? (

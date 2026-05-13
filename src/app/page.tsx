@@ -196,8 +196,8 @@ export default function Page() {
             />
             <HowItWorksStep
               index={5}
-              title="Optional foundation fixes improve your AI readiness"
-              body="If you want us to implement the audit's priority fixes, the GEO Foundation Fix is available as a separate engagement."
+              title="Optional AI Visibility Profile Setup improves AI readiness"
+              body="If you want us to install your AI Visibility Profile — schema, llms.txt, entity signals, and AI-readable summary — the setup is available as a separate engagement."
             />
           </div>
         </div>
@@ -419,18 +419,21 @@ export default function Page() {
                 proposition, not the label. */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-accent">
-                GEO Foundation Fix
+                AI Visibility Profile
               </p>
               <span className="pill">Optional next step</span>
             </div>
 
             <h2 className="h2 mt-5 max-w-2xl">
-              Need help improving the signals identified in your audit?
+              GeoViz AI Visibility Profile Setup
             </h2>
             <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
-              The GeoViz Foundation Fix is a structured implementation
-              engagement focused on improving machine understanding,
-              trust signals, semantic clarity, and AI accessibility.
+              Turn your audit findings into a machine-readable business
+              profile AI systems can better understand. After your audit,
+              GeoViz can create and help install an AI-readable visibility
+              layer for your business — including structured schema,
+              service/location mapping, trust signals, llms.txt guidance,
+              and an AI-readable business profile.
             </p>
 
             {/* Price panel — distinct visual unit inside the card so
@@ -443,7 +446,7 @@ export default function Page() {
               <div className="flex flex-wrap items-end gap-3">
                 <span className="text-5xl font-bold text-white">$497</span>
                 <span className="pb-1 text-sm text-white/55">
-                  One-time implementation engagement
+                  One-time AI Visibility Profile setup
                 </span>
               </div>
               <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/60">
@@ -454,23 +457,16 @@ export default function Page() {
             </div>
 
             <p className="mt-8 text-xs uppercase tracking-[0.18em] text-white/45">
-              Implementation areas
+              What&rsquo;s included
             </p>
             <ul className="mt-3 grid gap-3 sm:grid-cols-2 max-w-2xl">
-              <PricingBullet>Schema / structured data improvements</PricingBullet>
-              <PricingBullet>AI-readable content improvements</PricingBullet>
-              <PricingBullet>Trust signal improvements</PricingBullet>
-              <PricingBullet>Crawler accessibility review</PricingBullet>
-              <PricingBullet>Business identity cleanup</PricingBullet>
-              <PricingBullet>
-                llms.txt / AI crawler guidance where appropriate
-              </PricingBullet>
-              <PricingBullet>
-                Citation and source clarity improvements
-              </PricingBullet>
-              <PricingBullet>
-                Report-based priority fixes from your audit
-              </PricingBullet>
+              <PricingBullet>AI-readable business profile</PricingBullet>
+              <PricingBullet>Structured schema package</PricingBullet>
+              <PricingBullet>Service and location entity mapping</PricingBullet>
+              <PricingBullet>Trust and citation signal structuring</PricingBullet>
+              <PricingBullet>llms.txt / AI crawler guidance</PricingBullet>
+              <PricingBullet>FAQ and service clarity improvements</PricingBullet>
+              <PricingBullet>Before/after GeoViz re-check</PricingBullet>
             </ul>
 
             {/* Operational safety — sets expectations honestly without
@@ -489,14 +485,15 @@ export default function Page() {
             </ul>
 
             <a
-              href="mailto:support@geoviz.ai?subject=GEO%20Foundation%20Fix%20inquiry"
+              href="mailto:support@geoviz.ai?subject=AI%20Visibility%20Profile%20Setup%20inquiry"
               className="btn-primary mt-8 w-full justify-center text-base sm:w-auto"
             >
-              Request Foundation Fix
+              Request AI Visibility Profile Setup
             </a>
             <p className="mt-3 text-xs text-white/45">
-              Available after your audit completes. We&rsquo;ll reply
-              with a scoped implementation plan within one business day.
+              Available after your audit completes. We&rsquo;ll review
+              your results and reply with a scoped setup plan within one
+              business day. Complex websites may require custom scoping.
             </p>
           </div>
         </div>
