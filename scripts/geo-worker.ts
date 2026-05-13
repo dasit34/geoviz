@@ -1130,6 +1130,16 @@ async function runViaApi(
       .join("")
       .trim();
 
+    // ---- [geo-cost-debug] runApi sdk-response ----
+    // Capture the raw response shape BEFORE any field extraction.
+    // Answers: does `response.usage` actually contain the four token
+    // fields the SDK type promises? If `usageJson=null` here, the
+    // SDK isn't returning usage on this account/model/tool combo and
+    // the issue is upstream of our code.
+    log(
+      `[geo-cost-debug] runApi sdk-response stopReason=${response.stop_reason} contentBlocks=${response.content.length} hasUsage=${response.usage !== null && response.usage !== undefined} usageJson=${JSON.stringify(response.usage ?? null)}`,
+    );
+
     // Capture token usage for cost tracking. The Anthropic SDK
     // returns `response.usage` with input/output and (when prompt
     // caching is active) cache_creation/cache_read counts. All fields
@@ -1150,6 +1160,15 @@ async function runViaApi(
       cacheCreationTokens: rawUsage?.cache_creation_input_tokens ?? null,
       cacheReadTokens: rawUsage?.cache_read_input_tokens ?? null,
     };
+
+    // ---- [geo-cost-debug] runApi extracted-usage ----
+    // The post-cast object. If `usageJson` above had a value but
+    // `extracted-usage` has all-null fields here, the SDK's actual
+    // key names differ from our type-assertion (e.g. `prompt_tokens`
+    // vs `input_tokens`). Inspect `usageJson` to find the real keys.
+    log(
+      `[geo-cost-debug] runApi extracted-usage ${JSON.stringify(usage)} modelUsed=${ANTHROPIC_MODEL}`,
+    );
 
     log(
       `[geo-worker] api response received model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS} timeoutMs=${TIMEOUT_MS} elapsedMs=${elapsedMs} stopReason=${response.stop_reason} bytes=${markdown.length}`,
@@ -1303,6 +1322,16 @@ function runWrapperCli(
       }
 
       if (code === 0 && stdout.trim().length > 0) {
+        // ---- [geo-cost-debug] runWrapperCli success ----
+        // CLI mode never carries SDK usage — the Claude CLI wrapper
+        // doesn't surface token counts. If this line ever appears in
+        // Railway logs, the worker is routing through CLI mode
+        // unexpectedly, which would explain why cost columns stay
+        // NULL even on successful audits. Production GEO_AUDIT_MODE
+        // must be "api".
+        log(
+          `[geo-cost-debug] runWrapperCli success — CLI mode never carries SDK usage; cost columns will stay null for this audit. Switch GEO_AUDIT_MODE to 'api' for cost telemetry.`,
+        );
         settle({ ok: true, markdown: stdout, exitCode: 0, stderr, elapsedMs });
         return;
       }
@@ -1606,6 +1635,16 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
       candidate.competitorUrl,
     );
 
+    // ---- [geo-cost-debug] processOneJob result-received ----
+    // Captures the runtime shape of the WrapperResult BEFORE the
+    // success-path conditional. Answers: does `"usage" in result`
+    // pick up the key? Is `result.usage` truthy? Is `modelUsed`
+    // present? These four boolean flags pinpoint exactly which
+    // condition fails on the path to the DB write.
+    log(
+      `[geo-cost-debug] processOneJob result.ok=${result.ok} elapsedMs=${result.elapsedMs} hasUsageKey=${"usage" in result} usageTruthy=${"usage" in result && Boolean(result.usage)} hasModelKey=${"modelUsed" in result} modelUsedVal=${"modelUsed" in result ? String(result.modelUsed) : "absent"}`,
+    );
+
     if (result.ok) {
       log(
         `[geo-worker] markdown length orderId=${candidate.id} bytes=${result.markdown.length}`,
@@ -1637,6 +1676,15 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
             }
           : { workerRuntimeMs: result.elapsedMs };
 
+      // ---- [geo-cost-debug] DB write payload (pre-write) ----
+      // The exact object the Prisma layer is about to receive. If
+      // `keys` is missing the token/cost fields here, the conditional
+      // above fell into the runtime-only branch — investigation
+      // belongs upstream in `result.usage`.
+      log(
+        `[geo-cost-debug] DB write payload orderId=${candidate.id} keys=${Object.keys(usageData).join(",")} payloadJson=${JSON.stringify(usageData)}`,
+      );
+
       try {
         const saved = await prisma.auditOrder.update({
           where: { id: candidate.id },
@@ -1649,6 +1697,17 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
           },
         });
         wroteTerminal = true;
+        // ---- [geo-cost-debug] DB write success (smoking-gun line) ----
+        // Echoes the post-write row state back. If the pre-write
+        // `payloadJson` contained populated token/cost fields but the
+        // post-write values here are null, Prisma either silently
+        // dropped the keys (column not in the client's generated
+        // model — regenerate) or the columns don't exist on the DB
+        // (migration not applied). Run `npx prisma migrate status`
+        // and `npx prisma generate` on the Railway side to fix.
+        log(
+          `[geo-cost-debug] DB write success orderId=${candidate.id} dbInputTokens=${saved.inputTokens ?? "null"} dbOutputTokens=${saved.outputTokens ?? "null"} dbModelUsed=${saved.modelUsed ?? "null"} dbEstimatedCostUsd=${saved.estimatedCostUsd?.toString() ?? "null"} dbWorkerRuntimeMs=${saved.workerRuntimeMs ?? "null"}`,
+        );
         log(
           `[geo-worker] report saved orderId=${candidate.id} dbReportStatus=${saved.reportStatus} reportGeneratedAt=${saved.reportGeneratedAt?.toISOString() ?? "null"} bytes=${result.markdown.length}`,
         );
@@ -1960,6 +2019,15 @@ async function recoverStaleRunningJobs(prisma: PrismaClient): Promise<number> {
 
 async function main(): Promise<void> {
   preflightOrExit();
+
+  // ---- [geo-cost-debug] worker boot — telemetry instrumentation ----
+  // Fires once per worker start so the operator can confirm in Railway
+  // logs that this instrumented build is the one actually running.
+  // Pure additive logging; remove with a single grep when the cost-
+  // telemetry root cause is identified.
+  log(
+    `[geo-cost-debug] worker boot — telemetry instrumentation v1 active · auditMode=${AUDIT_MODE} model=${ANTHROPIC_MODEL} maxTokens=${ANTHROPIC_MAX_TOKENS}`,
+  );
 
   const prisma = new PrismaClient();
 

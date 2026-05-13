@@ -80,12 +80,17 @@ const BANDS: Array<{ label: string; min: number; max: number }> = [
 ];
 
 // Active = at least one calibration row is queued/running. Idle =
-// everything terminal. Active cadence at 6s gives the operator a
-// snappy "live" feel without hammering the API (was 3s; cut load in
-// half). Idle cadence at 30s is plenty when nothing's moving.
+// everything terminal. Active cadence at 8s sits in the middle of
+// the 8–10s "operator-grade" target — snappy enough that the queue
+// feels live during active testing, calm enough not to hammer the
+// API or flicker the operator's screen. Idle cadence at 30s is the
+// upper end of the 20–30s spec; safe when nothing's moving.
+//
+// History: started at 3s during early-build testing → cut to 6s in
+// the first rate-limit pass → 8s now per the operator-polling spec.
 // Coupled with the 300/5min cap on `/api/admin/calibration` and the
 // in-component 429 pause below.
-const POLL_ACTIVE_MS = 6000;
+const POLL_ACTIVE_MS = 8000;
 const POLL_IDLE_MS = 30000;
 
 export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
@@ -227,6 +232,14 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
     () => computeOperatorIntelligence(runs),
     [runs],
   );
+  const failureIntel = useMemo(
+    () => computeFailureIntelligence(runs),
+    [runs],
+  );
+  const topExpensive = useMemo(
+    () => computeTopExpensive(runs, 5),
+    [runs],
+  );
   const calibrationSummary = useMemo(
     () =>
       summarizeCalibration(
@@ -263,6 +276,20 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
           summary. Renders only once there's at least one tagged
           row; stays out of the way during empty-state. */}
       <CalibrationIntelligenceBlock summary={calibrationSummary} />
+
+      {/* Failure intelligence — surfaces the dominant failure modes
+          across today's run + total retry pressure. Renders only
+          when there's at least one failure or retry to discuss. */}
+      <FailureIntelligenceBlock intel={failureIntel} />
+
+      {/* Top expensive audits — the 5 highest-cost rows across the
+          whole window with their token + runtime profile, so an
+          operator can spot outliers without sorting the table. */}
+      <TopExpensiveAuditsBlock rows={topExpensive} />
+
+      {/* Operator guidance — static text hints. No data; just a
+          shared mental model for what makes audits expensive. */}
+      <OperatorGuidanceBlock />
 
       {/* Live status strip — always visible, updates every poll */}
       <StatusStrip
@@ -1253,7 +1280,11 @@ type TodayStats = {
   inflight: number;
   failed: number;
   avgCostUsd: number | null;
+  highestCostUsd: number | null;
+  totalSpendUsd: number;
   avgRuntimeMs: number | null;
+  totalRetries: number;
+  mostUsedModel: string | null;
 };
 
 function computeTodayStats(runs: CalibrationRun[]): TodayStats {
@@ -1280,6 +1311,22 @@ function computeTodayStats(runs: CalibrationRun[]): TodayStats {
   const runtimes = generated
     .map((r) => r.workerRuntimeMs)
     .filter((v): v is number => typeof v === "number");
+  const totalRetries = today.reduce((sum, r) => sum + r.retryCount, 0);
+  // Most-used model across today's audits (only counts rows that
+  // recorded a model — backfilled rows leave modelUsed null).
+  const modelCounts = new Map<string, number>();
+  for (const r of today) {
+    if (!r.modelUsed) continue;
+    modelCounts.set(r.modelUsed, (modelCounts.get(r.modelUsed) ?? 0) + 1);
+  }
+  let mostUsedModel: string | null = null;
+  let mostUsedCount = 0;
+  for (const [model, count] of modelCounts) {
+    if (count > mostUsedCount) {
+      mostUsedModel = model;
+      mostUsedCount = count;
+    }
+  }
   return {
     total: today.length,
     generated: generated.length,
@@ -1287,18 +1334,24 @@ function computeTodayStats(runs: CalibrationRun[]): TodayStats {
     failed: failed.length,
     avgCostUsd:
       costs.length === 0 ? null : costs.reduce((a, b) => a + b, 0) / costs.length,
+    highestCostUsd: costs.length === 0 ? null : Math.max(...costs),
+    totalSpendUsd: costs.reduce((a, b) => a + b, 0),
     avgRuntimeMs:
       runtimes.length === 0
         ? null
         : runtimes.reduce((a, b) => a + b, 0) / runtimes.length,
+    totalRetries,
+    mostUsedModel,
   };
 }
 
 function OperatorTodayStrip({ stats }: { stats: TodayStats }) {
   return (
     <div className="rounded-xl border border-white/10 bg-ink-900/60 p-5 shadow-card backdrop-blur-sm">
-      <p className="section-eyebrow">Today (since 00:00 UTC)</p>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <p className="section-eyebrow">
+        Operational intelligence · today (since 00:00 UTC)
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
         <TodayTile label="Audits today" value={String(stats.total)} />
         <TodayTile label="Generated" value={String(stats.generated)} tone="ok" />
         <TodayTile
@@ -1307,12 +1360,17 @@ function OperatorTodayStrip({ stats }: { stats: TodayStats }) {
           tone={stats.inflight > 0 ? "info" : "muted"}
         />
         <TodayTile
-          label="Failed"
+          label="Failed today"
           value={String(stats.failed)}
           tone={stats.failed > 0 ? "bad" : "muted"}
         />
         <TodayTile
-          label="Avg cost"
+          label="Retries today"
+          value={String(stats.totalRetries)}
+          tone={stats.totalRetries > 0 ? "info" : "muted"}
+        />
+        <TodayTile
+          label="Avg audit cost"
           value={
             stats.avgCostUsd === null
               ? "—"
@@ -1321,8 +1379,31 @@ function OperatorTodayStrip({ stats }: { stats: TodayStats }) {
           costTone={costTone(stats.avgCostUsd)}
         />
         <TodayTile
+          label="Highest cost"
+          value={
+            stats.highestCostUsd === null
+              ? "—"
+              : `$${stats.highestCostUsd.toFixed(4)}`
+          }
+          costTone={costTone(stats.highestCostUsd)}
+        />
+        <TodayTile
+          label="Total spend today"
+          value={
+            stats.totalSpendUsd === 0
+              ? "—"
+              : `$${stats.totalSpendUsd.toFixed(4)}`
+          }
+        />
+        <TodayTile
           label="Avg runtime"
           value={formatShortRuntime(stats.avgRuntimeMs)}
+        />
+        <TodayTile
+          label="Most-used model"
+          value={
+            stats.mostUsedModel ? formatShortModel(stats.mostUsedModel) : "—"
+          }
         />
       </div>
     </div>
@@ -1508,6 +1589,262 @@ function OperatorIntelligenceBlock({
         {lines.map((line, i) => (
           <li key={i} className="flex items-start gap-2">
             <span aria-hidden className="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-accent" />
+            <span>{line}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Failure intelligence — operator-facing breakdown of failure
+// modes + retry pressure. Reads only the existing runs[] array;
+// no extra fetches.
+// ────────────────────────────────────────────────────────────
+
+type FailureIntel = {
+  failedTotal: number;
+  failedToday: number;
+  retriesToday: number;
+  byReason: Array<{ reason: string; count: number }>;
+  topReason: { reason: string; count: number } | null;
+};
+
+function computeFailureIntelligence(runs: CalibrationRun[]): FailureIntel {
+  const startOfTodayUtc = (() => {
+    const d = new Date();
+    d.setUTCHours(0, 0, 0, 0);
+    return d.getTime();
+  })();
+  const today = runs.filter((r) => {
+    const created = Date.parse(r.createdAt);
+    return Number.isFinite(created) && created >= startOfTodayUtc;
+  });
+  const todayFailed = today.filter((r) => r.reportStatus === "failed");
+  const allFailed = runs.filter((r) => r.reportStatus === "failed");
+  const retriesToday = today.reduce((sum, r) => sum + r.retryCount, 0);
+
+  // Count failure reasons across ALL failed rows (broader window for
+  // pattern detection). The "today" count above is for the operator's
+  // immediate situational awareness.
+  const reasonCounts = new Map<string, number>();
+  for (const r of allFailed) {
+    const reason = r.failureReason ?? "unspecified";
+    reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+  }
+  const byReason = [...reasonCounts.entries()]
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    failedTotal: allFailed.length,
+    failedToday: todayFailed.length,
+    retriesToday,
+    byReason,
+    topReason: byReason[0] ?? null,
+  };
+}
+
+function FailureIntelligenceBlock({ intel }: { intel: FailureIntel }) {
+  // Hide entirely when there's nothing to surface — keeps the
+  // dashboard quiet on clean days.
+  if (intel.failedTotal === 0 && intel.retriesToday === 0) return null;
+
+  // Targeted counts for the failure reasons the operator cares
+  // about most. Other reasons accumulate under "Other" so the
+  // operator sees them but they don't bloat the strip.
+  const knownReasons = new Set([
+    "timeout",
+    "fetch_failed",
+    "generation_failed",
+  ]);
+  const knownCount = (reason: string) =>
+    intel.byReason.find((r) => r.reason === reason)?.count ?? 0;
+  const otherCount = intel.byReason
+    .filter((r) => !knownReasons.has(r.reason))
+    .reduce((sum, r) => sum + r.count, 0);
+
+  return (
+    <div className="rounded-xl border border-red-400/20 bg-red-500/[0.04] p-5 shadow-card backdrop-blur-sm">
+      <p className="section-eyebrow text-red-200/85">Failure intelligence</p>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+        <TodayTile
+          label="Failed today"
+          value={String(intel.failedToday)}
+          tone={intel.failedToday > 0 ? "bad" : "muted"}
+        />
+        <TodayTile
+          label="Retries today"
+          value={String(intel.retriesToday)}
+          tone={intel.retriesToday > 0 ? "info" : "muted"}
+        />
+        <TodayTile
+          label="Timeouts (all)"
+          value={String(knownCount("timeout"))}
+          tone={knownCount("timeout") > 0 ? "bad" : "muted"}
+        />
+        <TodayTile
+          label="Fetch failed (all)"
+          value={String(knownCount("fetch_failed"))}
+          tone={knownCount("fetch_failed") > 0 ? "bad" : "muted"}
+        />
+        <TodayTile
+          label="Generation failed (all)"
+          value={String(knownCount("generation_failed"))}
+          tone={knownCount("generation_failed") > 0 ? "bad" : "muted"}
+        />
+      </div>
+      {intel.topReason ? (
+        <p className="mt-3 text-xs text-white/65">
+          <span className="text-white/85">
+            Most common failure reason:
+          </span>{" "}
+          <span className="font-mono text-red-200/85">
+            {intel.topReason.reason.replace(/_/g, " ")}
+          </span>{" "}
+          ({intel.topReason.count}{" "}
+          {intel.topReason.count === 1 ? "occurrence" : "occurrences"})
+          {otherCount > 0 ? ` · ${otherCount} other` : ""}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Top expensive audits — the 5 highest-cost rows in the window.
+// ────────────────────────────────────────────────────────────
+
+type ExpensiveRow = {
+  id: string;
+  url: string;
+  businessName: string;
+  estimatedCostUsd: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  workerRuntimeMs: number | null;
+  modelUsed: string | null;
+};
+
+function computeTopExpensive(
+  runs: CalibrationRun[],
+  limit: number,
+): ExpensiveRow[] {
+  return runs
+    .filter(
+      (r): r is CalibrationRun & { estimatedCostUsd: number } =>
+        typeof r.estimatedCostUsd === "number",
+    )
+    .sort((a, b) => b.estimatedCostUsd - a.estimatedCostUsd)
+    .slice(0, limit)
+    .map((r) => ({
+      id: r.id,
+      url: r.url,
+      businessName: r.businessName,
+      estimatedCostUsd: r.estimatedCostUsd,
+      inputTokens: r.inputTokens,
+      outputTokens: r.outputTokens,
+      workerRuntimeMs: r.workerRuntimeMs,
+      modelUsed: r.modelUsed,
+    }));
+}
+
+function TopExpensiveAuditsBlock({ rows }: { rows: ExpensiveRow[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-5 shadow-card backdrop-blur-sm">
+      <p className="section-eyebrow text-amber-200/85">
+        Top expensive audits
+      </p>
+      <p className="mt-1 text-[11px] text-white/55">
+        Highest-cost rows. Outliers usually indicate JS-heavy
+        homepages, max-tokens cap saturation, or retries.
+      </p>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[760px] text-left text-xs">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-[0.16em] text-white/45">
+              <th className="px-2 py-2 font-semibold">#</th>
+              <th className="px-2 py-2 font-semibold">Business · Host</th>
+              <th className="px-2 py-2 font-semibold text-right">Cost</th>
+              <th className="px-2 py-2 font-semibold text-right">
+                Tokens (in / out)
+              </th>
+              <th className="px-2 py-2 font-semibold text-right">Runtime</th>
+              <th className="px-2 py-2 font-semibold">Model</th>
+              <th className="px-2 py-2 font-semibold">Report</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={row.id} className="border-t border-white/5 align-top">
+                <td className="px-2 py-2 text-white/45">{i + 1}</td>
+                <td className="px-2 py-2">
+                  <div className="font-semibold text-white">
+                    {row.businessName}
+                  </div>
+                  <div className="text-[10px] text-white/40">
+                    {hostFromUrl(row.url)}
+                  </div>
+                </td>
+                <td className="px-2 py-2 text-right font-mono">
+                  <CostCell cost={row.estimatedCostUsd} />
+                </td>
+                <td className="px-2 py-2 text-right font-mono text-white/80">
+                  {(row.inputTokens ?? 0).toLocaleString()} /{" "}
+                  {(row.outputTokens ?? 0).toLocaleString()}
+                </td>
+                <td className="px-2 py-2 text-right font-mono text-white/80">
+                  {formatShortRuntime(row.workerRuntimeMs)}
+                </td>
+                <td className="px-2 py-2 font-mono text-white/65">
+                  {formatShortModel(row.modelUsed)}
+                </td>
+                <td className="px-2 py-2">
+                  <a
+                    href={`/report/${encodeURIComponent(row.id)}/print`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-accent hover:underline"
+                  >
+                    Open ↗
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Operator guidance — static heuristics for interpreting cost
+// outliers. No data; just a shared mental model. Stays the same
+// across audits unless the cost model changes meaningfully.
+// ────────────────────────────────────────────────────────────
+
+const OPERATOR_GUIDANCE: ReadonlyArray<string> = [
+  "Large JS-heavy homepages increase input token usage — the web_search tool pulls more content into context.",
+  "Retries multiply cost. A row with retryCount > 0 was billed for every attempt, not just the final one.",
+  "Long output reports usually correlate with higher spend. Look for outputTokens near 8,000 (the max-tokens cap).",
+  "Most audits should land in the $0.05–$0.15 range. Audits over $0.15 are worth investigating individually.",
+  "Failed-audit token spend is logged via [geo-cost] lines but not persisted on the row — check Railway logs for the actual waste.",
+];
+
+function OperatorGuidanceBlock() {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+      <p className="section-eyebrow">Operator guidance</p>
+      <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-white/65">
+        {OPERATOR_GUIDANCE.map((line, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <span
+              aria-hidden
+              className="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-accent"
+            />
             <span>{line}</span>
           </li>
         ))}
