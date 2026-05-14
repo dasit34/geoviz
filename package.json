@@ -23,6 +23,7 @@
     "test:stage2-render": "tsx scripts/test-stage2-render.ts",
     "test:report-sanitizer": "tsx scripts/test-report-sanitizer.ts",
     "test:score-consistency": "tsx scripts/test-score-consistency.ts",
+    "test:customer-failure-safety": "tsx scripts/test-customer-failure-safety.ts",
     "geo-worker": "tsx scripts/geo-worker.ts",
     "geo-worker:dev": "tsx scripts/geo-worker.ts --loop",
     "geo-worker:start": "tsx scripts/geo-worker.ts --loop"

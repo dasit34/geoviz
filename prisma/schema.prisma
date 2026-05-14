@@ -71,6 +71,12 @@ model AuditOrder {
   // runs, and failed/in-flight audits that never reached the
   // success path.
   workerRuntimeMs            Int?
+  // Customer-facing failure notification timestamp. Set when the worker
+  // sends either the "delayed" or "failed" customer email so we never
+  // double-send on a retry pass through the same terminal state. Null
+  // when the order is healthy / queued / completed. See
+  // `src/lib/customer-emails.ts` and `src/lib/customer-failure-mapping.ts`.
+  customerFailureNotifiedAt  DateTime?
   createdAt                  DateTime      @default(now())
   updatedAt                  DateTime      @updatedAt
 
