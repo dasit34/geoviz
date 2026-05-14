@@ -47,6 +47,7 @@ import { getDbFingerprint } from "../src/lib/db-fingerprint";
 import { notifyOperatorReportReady } from "../src/lib/notify-operator-report-ready";
 import { persistAuditIntelligence } from "../src/lib/audit-intelligence";
 import { parseCalibrationNotes } from "../src/lib/calibration";
+import { sanitizeReportMarkdown } from "../src/lib/sanitize-report-markdown";
 import {
   classifyWorkerException,
   classifyWrapperFailure,
@@ -467,9 +468,30 @@ scores, classify the overall and explain WHY in the report:
     different sites land within 3 points of each other, recheck
     each sub-check independently — variance is a feature.
 
+OUTPUT DISCIPLINE (mandatory — this is a paid customer report):
+  • Output ONLY the final report markdown. NOTHING ELSE.
+  • Begin the response with the literal line "# GEO Visibility Report"
+    on the very first line. NO text before that heading.
+  • Do NOT include any preamble, chain-of-thought, tool-use
+    narration, planning text, or "thinking aloud" — none of:
+    - "Now I have…" / "I have enough evidence…"
+    - "The search results returned…" / "The fetches show…"
+    - "I need to fetch…" / "Let me fetch…" / "I'll start by…"
+    - "Based on my analysis…" / "Looking at the evidence…"
+    - "Let me compile the findings…" / "First, I will…"
+    - Any other meta-narration about the audit process.
+  • Do NOT echo the rubric, the scoring math, or the prompt back
+    to the user outside the Technical Appendix.
+  • Do NOT speculate about what the model is doing. Just produce
+    the report.
+  • For the Generated date: write exactly the literal string
+    "<GENERATED_DATE>" (with the angle brackets). The system will
+    replace this placeholder server-side with the correct date.
+    Do NOT write a real date — the placeholder is required.
+
 # GEO Visibility Report
 
-**Site:** ${websiteUrl}  ·  **Generated:** <today, plain English>
+**Site:** ${websiteUrl}  ·  **Generated:** <GENERATED_DATE>
 
 ## 1. AI Visibility Score
 **Overall Score: <N>/100 — <Band>** (Band ∈ Invisible / At Risk /
@@ -901,9 +923,30 @@ scores, classify the overall and explain WHY in the report:
     different sites land within 3 points of each other, recheck
     each sub-check independently — variance is a feature.
 
+OUTPUT DISCIPLINE (mandatory — this is a paid customer report):
+  • Output ONLY the final report markdown. NOTHING ELSE.
+  • Begin the response with the literal line "# GEO Visibility Report"
+    on the very first line. NO text before that heading.
+  • Do NOT include any preamble, chain-of-thought, tool-use
+    narration, planning text, or "thinking aloud" — none of:
+    - "Now I have…" / "I have enough evidence…"
+    - "The search results returned…" / "The fetches show…"
+    - "I need to fetch…" / "Let me fetch…" / "I'll start by…"
+    - "Based on my analysis…" / "Looking at the evidence…"
+    - "Let me compile the findings…" / "First, I will…"
+    - Any other meta-narration about the audit process.
+  • Do NOT echo the rubric, the scoring math, or the prompt back
+    to the user outside the Technical Appendix.
+  • Do NOT speculate about what the model is doing. Just produce
+    the report.
+  • For the Generated date: write exactly the literal string
+    "<GENERATED_DATE>" (with the angle brackets). The system will
+    replace this placeholder server-side with the correct date.
+    Do NOT write a real date — the placeholder is required.
+
 # GEO Visibility Report
 
-**Site:** ${websiteUrl}  ·  **Generated:** <today, plain English>
+**Site:** ${websiteUrl}  ·  **Generated:** <GENERATED_DATE>
 
 ## 1. AI Visibility Score
 **Overall Score: <N>/100 — <Band>** (Band ∈ Invisible / At Risk /
@@ -1647,11 +1690,31 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
     );
 
     if (result.ok) {
+      // Sanitize raw model output before any downstream use. This
+      // strips chain-of-thought / preamble leakage (e.g. "Now I have
+      // sufficient evidence...", "The search results returned...")
+      // and replaces the model-supplied date placeholder with the
+      // actual server timestamp. The DB write, intelligence ingest,
+      // operator email, and PDF render all use this single
+      // sanitized string — one pass at the worker covers every
+      // customer-facing surface. See src/lib/sanitize-report-markdown.ts.
+      const reportGeneratedAt = new Date();
+      const sanitizedMarkdown = sanitizeReportMarkdown(
+        result.markdown,
+        reportGeneratedAt,
+      );
+      const sanitizerStrippedBytes =
+        result.markdown.length - sanitizedMarkdown.length;
+      if (sanitizerStrippedBytes > 0) {
+        log(
+          `[geo-worker] sanitizer stripped orderId=${candidate.id} rawBytes=${result.markdown.length} cleanBytes=${sanitizedMarkdown.length} stripped=${sanitizerStrippedBytes}`,
+        );
+      }
       log(
-        `[geo-worker] markdown length orderId=${candidate.id} bytes=${result.markdown.length}`,
+        `[geo-worker] markdown length orderId=${candidate.id} bytes=${sanitizedMarkdown.length}`,
       );
       log(
-        `[geo-worker] saving report orderId=${candidate.id} bytes=${result.markdown.length}`,
+        `[geo-worker] saving report orderId=${candidate.id} bytes=${sanitizedMarkdown.length}`,
       );
 
       // Wrap the success-path DB write in its own try/catch so a save
@@ -1691,9 +1754,9 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
           where: { id: candidate.id },
           data: {
             reportStatus: "generated",
-            reportMarkdown: result.markdown,
+            reportMarkdown: sanitizedMarkdown,
             reportError: null,
-            reportGeneratedAt: new Date(),
+            reportGeneratedAt,
             ...usageData,
           },
         });
@@ -1732,7 +1795,7 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
             `[geo-cost] auditId=${candidate.id} model=${modelForLog} input=${usageForLog.inputTokens ?? 0} output=${usageForLog.outputTokens ?? 0} cost=$${costForLog.toFixed(4)} runtime=${result.elapsedMs}ms url=${candidate.websiteUrl} status=generated retries=${candidate.retryCount}`,
           );
         }
-        const breakdownLog = formatScoreBreakdownForLog(result.markdown);
+        const breakdownLog = formatScoreBreakdownForLog(sanitizedMarkdown);
         if (breakdownLog) {
           log(
             `[geo-worker] score breakdown orderId=${candidate.id} ${breakdownLog}`,
@@ -1767,7 +1830,7 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
             businessName: candidate.businessName,
             websiteUrl: candidate.websiteUrl,
             competitorUrl: candidate.competitorUrl,
-            reportMarkdown: result.markdown,
+            reportMarkdown: sanitizedMarkdown,
             industryRaw: operatorIndustry,
             benchmarkTag: operatorBenchmarkTag,
           });
@@ -1794,8 +1857,8 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
           businessName: candidate.businessName,
           customerEmail: candidate.email,
           websiteUrl: candidate.websiteUrl,
-          reportMarkdown: result.markdown,
-          reportGeneratedAt: saved.reportGeneratedAt ?? new Date(),
+          reportMarkdown: sanitizedMarkdown,
+          reportGeneratedAt: saved.reportGeneratedAt ?? reportGeneratedAt,
         }).catch((err) => {
           logErr(
             `[geo-worker] notifyOperatorReportReady error orderId=${candidate.id} (non-fatal):`,
