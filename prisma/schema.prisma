@@ -208,6 +208,34 @@ model AuditIntelligence {
   benchmarkTag       String?
   calibrationNotes   String?
 
+  // ─── V2 Stage 2 — Render intelligence (optional, additive) ──────
+  // Populated by the optional post-ingest render pass in
+  // `src/lib/intelligence/render/renderIntelligence.ts`. NEVER blocks
+  // audit completion: render is gated by `GEO_RENDER_ENABLED` AND a
+  // multi-signal eligibility check. Render failure stores
+  // `renderFailureReason` and leaves successful-render fields null.
+  //
+  // Render intelligence is operator/admin/calibration data only —
+  // NOT consumed by scoring, NOT shown to customers in V1/V2. Stage 6+
+  // may consider feeding renderability findings back into the score
+  // weighting; until then, treat these columns as research surface.
+  renderDurationMs           Int?
+  renderedHtmlLength         Int?
+  renderedTextLength         Int?
+  renderedSchemaTypes        Json?    // string[] — schema.org types found after render
+  hydrationDetected          Boolean?
+  blankShellRisk             Boolean? // true when raw HTML is mostly empty shell
+  clientOnlyContentDetected  Boolean? // true when rendered content >> raw content
+  renderConfidence           String?  // "low" | "medium" | "high"
+  renderFailureReason        String?
+  // Raw-vs-rendered comparison snapshot. `rawTextLength` and
+  // `rawSchemaTypes` are captured pre-render so a future analyst can
+  // diff without re-fetching the source page.
+  rawTextLength              Int?
+  rawSchemaTypes             Json?    // string[]
+  schemaDeltaDetected        Boolean? // true when renderedSchemaTypes ⊋ rawSchemaTypes
+  contentDeltaDetected       Boolean? // true when renderedTextLength / rawTextLength > threshold
+
   @@index([createdAt])
   @@index([websiteUrl])
 }
