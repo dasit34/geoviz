@@ -53,6 +53,8 @@ export type ProcessingStatusLabel =
   | "TIMEOUT"
   | "FETCH_FAILED"
   | "GENERATION_FAILED"
+  | "SPENDING_CAP_REACHED"
+  | "TEMPORARY_PROVIDER_OUTAGE"
   | "ROBOTS_BLOCKED"
   | "INVALID_HTML"
   | "RENDER_FAILED"
@@ -75,6 +77,16 @@ export type FailureReason =
   | "timeout"
   | "fetch_failed"
   | "generation_failed"
+  // Account-level spending cap hit (e.g. Anthropic monthly limit
+  // reached). NOT retryable — retrying would never succeed until
+  // the cap resets / operator raises it. Customer-facing layer
+  // maps this to "delayed" (situation is recoverable, just not by
+  // the worker alone).
+  | "spending_cap_reached"
+  // Provider returned a transient 5xx / overloaded / "service
+  // unavailable" signal. Retryable — provider outages typically
+  // self-recover within minutes.
+  | "temporary_provider_outage"
   | "robots_blocked"
   | "invalid_html"
   | "render_failed"
@@ -113,6 +125,9 @@ const TRANSIENT_REASONS: ReadonlySet<FailureReason> = new Set<FailureReason>([
   "fetch_failed",
   "queue_interruption",
   "render_failed",
+  // Provider 5xx / overload — almost always self-recovers within
+  // minutes. Retryable to give the provider a chance to clear.
+  "temporary_provider_outage",
 ]);
 
 export const MAX_AUTO_RETRIES = 2;
@@ -157,6 +172,28 @@ export function classifyWrapperFailure(
   if (reason === "empty-output") return "empty_output";
 
   // "non-zero-exit" or unknown — inspect the error text for hints.
+  //
+  // Spending-cap signatures — Anthropic's 400 error explicitly names
+  // the cap. Customer-facing layer projects this to "delayed" status
+  // (recoverable via operator action) rather than "failed", but we
+  // do NOT retry — retrying burns nothing but log noise until the
+  // cap resets. See `src/lib/customer-failure-mapping.ts`.
+  if (
+    /specified API usage limits|spending limit|usage limit/i.test(msg) ||
+    /you have reached your|regain access/i.test(msg)
+  ) {
+    return "spending_cap_reached";
+  }
+  // Provider 5xx / overload signatures — these are retryable.
+  // Anthropic, OpenAI, and other LLM gateways use these phrases
+  // for transient capacity issues.
+  if (
+    /\b5\d\d\b|service unavailable|overloaded|provider.*unavailable/i.test(
+      msg,
+    )
+  ) {
+    return "temporary_provider_outage";
+  }
   if (/robots\.txt|disallowed|blocked by robots/i.test(msg)) {
     return "robots_blocked";
   }
@@ -231,6 +268,10 @@ function labelForReason(reason: FailureReason): ProcessingStatusLabel {
       return "FETCH_FAILED";
     case "generation_failed":
       return "GENERATION_FAILED";
+    case "spending_cap_reached":
+      return "SPENDING_CAP_REACHED";
+    case "temporary_provider_outage":
+      return "TEMPORARY_PROVIDER_OUTAGE";
     case "robots_blocked":
       return "ROBOTS_BLOCKED";
     case "invalid_html":
@@ -267,6 +308,10 @@ export function failureReasonDescription(reason: FailureReason): string {
       return "Could not reach the target site (network/DNS).";
     case "generation_failed":
       return "AI generation returned an error without a transient signal.";
+    case "spending_cap_reached":
+      return "Anthropic account spending cap hit — operator action required (raise the limit).";
+    case "temporary_provider_outage":
+      return "Provider returned a transient 5xx / overload signal — auto-retry scheduled.";
     case "robots_blocked":
       return "Target site blocks our crawler via robots.txt.";
     case "invalid_html":

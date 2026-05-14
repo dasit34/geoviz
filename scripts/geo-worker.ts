@@ -49,6 +49,12 @@ import { persistAuditIntelligence } from "../src/lib/audit-intelligence";
 import { parseCalibrationNotes } from "../src/lib/calibration";
 import { sanitizeReportMarkdown } from "../src/lib/sanitize-report-markdown";
 import {
+  deriveCustomerStatus,
+  isCalibrationOrder,
+  isLaunchRiskFailure,
+} from "../src/lib/customer-failure-mapping";
+import { sendCustomerFailureEmail } from "../src/lib/customer-emails";
+import {
   classifyWorkerException,
   classifyWrapperFailure,
   failureReasonDescription,
@@ -1567,6 +1573,88 @@ type PollResult = "processed" | "claimed-by-other" | "no-jobs";
  * outcome distinctly. Never throws — DB errors on the failure-
  * write are caught and logged but never propagated.
  */
+/**
+ * Customer-facing failure notification helper. Idempotent: skips the
+ * send if the order has already been notified (`customerFailureNotifiedAt`
+ * is set). Skips calibration orders entirely. Never throws — the
+ * inner sendCustomerFailureEmail is fail-soft and the DB write is
+ * wrapped in try/catch.
+ *
+ * Launch-risk failures (spending cap, provider outage on a paid order,
+ * generation_failed, db_save_failed, worker_exception) get a separate
+ * `[geo-launch-risk]` log line so the operator can grep for these in
+ * Railway and react before customer-trust events accumulate.
+ */
+async function maybeNotifyCustomerOfFailure(
+  prisma: PrismaClient,
+  args: {
+    orderId: string;
+    businessName: string | null;
+    customerEmail: string;
+    websiteUrl: string;
+    reason: FailureReason;
+    retryCount: number;
+    alreadyNotifiedAt: Date | null;
+  },
+): Promise<void> {
+  const isCalibration = isCalibrationOrder(args.customerEmail);
+
+  // Operator launch-risk alarm — fires regardless of calibration
+  // status because the operator needs to know about these patterns
+  // even when triggered by calibration runs.
+  if (isLaunchRiskFailure({ reason: args.reason, isCalibration })) {
+    logErr(
+      `[geo-launch-risk] orderId=${args.orderId} reason=${args.reason} retryCount=${args.retryCount} customerEmail=${args.customerEmail} websiteUrl=${args.websiteUrl} — paid-customer-impact risk if this pattern continues`,
+    );
+  }
+
+  if (isCalibration) {
+    log(
+      `[customer-email] skipped (calibration) orderId=${args.orderId} reason=${args.reason}`,
+    );
+    return;
+  }
+  if (args.alreadyNotifiedAt) {
+    log(
+      `[customer-email] skipped (already notified at ${args.alreadyNotifiedAt.toISOString()}) orderId=${args.orderId}`,
+    );
+    return;
+  }
+
+  const customerStatus = deriveCustomerStatus({
+    reportStatus: "failed",
+    failureReason: args.reason,
+    retryCount: args.retryCount,
+  });
+  if (customerStatus !== "delayed" && customerStatus !== "failed") {
+    log(
+      `[customer-email] skipped (unexpected status ${customerStatus}) orderId=${args.orderId}`,
+    );
+    return;
+  }
+
+  const ok = await sendCustomerFailureEmail({
+    orderId: args.orderId,
+    businessName: args.businessName,
+    customerEmail: args.customerEmail,
+    websiteUrl: args.websiteUrl,
+    customerStatus,
+  });
+  if (ok) {
+    try {
+      await prisma.auditOrder.update({
+        where: { id: args.orderId },
+        data: { customerFailureNotifiedAt: new Date() },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logErr(
+        `[customer-email] DB stamp failed orderId=${args.orderId}: ${message} (email already sent; rerun-safe via Resend idempotency on retry)`,
+      );
+    }
+  }
+}
+
 async function markFailureWithRetry(
   prisma: PrismaClient,
   args: {
@@ -1925,6 +2013,23 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
     log(
       `[geo-cost] auditId=${candidate.id} model=${ANTHROPIC_MODEL} input=0 output=0 cost=$0.0000 runtime=${result.elapsedMs}ms url=${candidate.websiteUrl} status=${outcome} reason=${classified} retries=${candidate.retryCount}`,
     );
+
+    // Customer-facing failure notification — only fires when the
+    // outcome is terminal "failed" (not on retry). Calibration
+    // orders skip the email (operator-only). See
+    // `src/lib/customer-failure-mapping.ts` and
+    // `src/lib/customer-emails.ts`. Wrapped to never throw.
+    if (outcome === "failed") {
+      await maybeNotifyCustomerOfFailure(prisma, {
+        orderId: candidate.id,
+        businessName: candidate.businessName,
+        customerEmail: candidate.email,
+        websiteUrl: candidate.websiteUrl,
+        reason: classified,
+        retryCount: candidate.retryCount,
+        alreadyNotifiedAt: candidate.customerFailureNotifiedAt ?? null,
+      });
+    }
     return "processed";
   } catch (err) {
     // Catch-all for any unexpected exception inside the worker (DB blip,
@@ -1936,13 +2041,25 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
       `[geo-worker] worker exception orderId=${candidate.id} classified=${classified}: ${message}`,
     );
     try {
-      await markFailureWithRetry(prisma, {
+      const outcome = await markFailureWithRetry(prisma, {
         orderId: candidate.id,
         retryCount: candidate.retryCount,
         reason: classified,
         reportError: `Worker exception: ${message}`,
       });
       wroteTerminal = true;
+      // Same customer-notification path as the wrapper-failure branch.
+      if (outcome === "failed") {
+        await maybeNotifyCustomerOfFailure(prisma, {
+          orderId: candidate.id,
+          businessName: candidate.businessName,
+          customerEmail: candidate.email,
+          websiteUrl: candidate.websiteUrl,
+          reason: classified,
+          retryCount: candidate.retryCount,
+          alreadyNotifiedAt: candidate.customerFailureNotifiedAt ?? null,
+        });
+      }
     } catch (writeErr) {
       const wm = writeErr instanceof Error ? writeErr.message : String(writeErr);
       logErr(
