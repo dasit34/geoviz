@@ -37,9 +37,27 @@ export type ScoreCategory = {
 };
 
 export type ReportScore = {
+  /**
+   * Canonical 0–100 overall score. Equal to the sum of the six rubric
+   * sub-scores when all six parsed; otherwise falls back to the
+   * model's declared header value. ALWAYS the source of truth for
+   * customer-facing displays (hero, PDF, email, admin table).
+   */
   overall: number | null;
   status: string | null;
   categories: ScoreCategory[];
+  /**
+   * The value the model literally wrote in the `**Overall Score: N/100**`
+   * line. Exposed so callers can detect (and surface) model
+   * arithmetic inconsistencies. Not customer-facing.
+   */
+  declaredOverall?: number | null;
+  /**
+   * The pure sum of the six rubric sub-scores when all six parsed.
+   * Null when one or more sub-scores could not be extracted. Exposed
+   * for diagnostics + tests.
+   */
+  rubricSum?: number | null;
 };
 
 export type ReportLayout = {
@@ -147,6 +165,8 @@ export function parseReportScoreBreakdown(
         ...rest,
         score: null,
       })),
+      declaredOverall: null,
+      rubricSum: null,
     };
   }
 
@@ -169,7 +189,55 @@ export function parseReportScoreBreakdown(
   const overallMatch =
     /Overall\s*Score\s*[:\-—]?\s*\*?\*?(\d{1,3})\s*\/\s*100/i.exec(md) ??
     /\b(\d{1,3})\s*\/\s*100\b/.exec(md);
-  const overall = overallMatch ? clamp(Number(overallMatch[1]), 0, 100) : null;
+  const declaredOverall = overallMatch
+    ? clamp(Number(overallMatch[1]), 0, 100)
+    : null;
+
+  // ─── Canonical overall = sum of rubric sub-scores ───
+  //
+  // Each category's `max` already encodes its rubric weight (Schema 25,
+  // Crawler 20, Trust 20, Content 15, Brand 10, Tech 10 → 100). So the
+  // sum of the six sub-scores IS the 0–100 canonical score. The
+  // model's declared "Overall Score" header in the markdown is a
+  // SECONDARY signal — when it disagrees with the sum, the sum wins.
+  //
+  // This protects us from the class of bug seen on
+  // `cmp2ip6q00005yqfehx9h1d2l` (littekenplumbing.com, 2026-05-12):
+  // the model wrote `Overall Score: 51/100` in the header while its
+  // own sub-scores summed to 57, and its appendix self-check claimed
+  // 61 via an invalid Structural Synergy Bonus. The hero used to show
+  // 51 (parser trusted the model's hero), the audit-intelligence row
+  // persisted 51, but the customer's eye-level rubric math said 57.
+  // Now the parser deterministically returns 57.
+  //
+  // We do NOT change rubric weights, bands, or bonus gates — those
+  // stay frozen per CLAUDE.md. We only change which value the parser
+  // treats as canonical when the model contradicts itself.
+  const allCategoriesParsed = categories.every(
+    (c) => typeof c.score === "number",
+  );
+  const rubricSum = allCategoriesParsed
+    ? clamp(
+        categories.reduce((sum, c) => sum + (c.score as number), 0),
+        0,
+        100,
+      )
+    : null;
+  const overall = rubricSum ?? declaredOverall;
+
+  // Greppable consistency log — fires when the model's declared
+  // header disagrees with its own sub-score sum. NOT customer-facing.
+  // Pipeline keeps shipping the canonical value either way.
+  if (
+    typeof rubricSum === "number" &&
+    typeof declaredOverall === "number" &&
+    rubricSum !== declaredOverall
+  ) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[geo-score-consistency] mismatch declared=${declaredOverall} canonical=${rubricSum} delta=${rubricSum - declaredOverall} (using canonical)`,
+    );
+  }
 
   const statusMatch =
     /\b(AI[-\s]?Ready|Competitive|Needs\s+Work|At\s+Risk|Invisible|Strong|Elite|Poor)\b/i.exec(
@@ -179,7 +247,7 @@ export function parseReportScoreBreakdown(
     ? statusMatch[1].replace(/\s+/g, " ").replace(/^AI[-\s]?Ready$/i, "AI-Ready")
     : null;
 
-  return { overall, status, categories };
+  return { overall, status, categories, declaredOverall, rubricSum };
 }
 
 export function scoreToneFromOverall(
