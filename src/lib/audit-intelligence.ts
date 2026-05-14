@@ -17,6 +17,12 @@ import {
   normalizeIndustry,
 } from "@/lib/intelligence/industry-taxonomy";
 import { runIntelligenceIngest } from "@/lib/intelligence/intelligenceIngest";
+import {
+  createDefaultRawFetcher,
+  runRenderIntelligence,
+} from "@/lib/intelligence/render/renderIntelligence";
+import { obscuraProvider } from "@/lib/intelligence/render/obscuraProvider";
+import type { RenderIntelligenceResult } from "@/lib/intelligence/render/renderProvider";
 
 /**
  * Prisma's nullable Json columns require the `Prisma.JsonNull`
@@ -164,7 +170,6 @@ export async function persistAuditIntelligence(args: {
         createdAt: undefined,
       },
     });
-    return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(
@@ -172,6 +177,75 @@ export async function persistAuditIntelligence(args: {
     );
     return { ok: false, reason: "upsert_failed" };
   }
+
+  // ─── V2 Stage 2 — Optional render pass ──────────────────────────
+  // Runs AFTER the main upsert so a render failure cannot leave the
+  // base intelligence row unwritten. Gated by `GEO_RENDER_ENABLED`
+  // (default false) AND a multi-signal eligibility check. The whole
+  // block is wrapped in try/catch — any throw is logged with
+  // `[geo-render] failed` and the audit row stays correct.
+  //
+  // The render fields are persisted via a separate `update()` so the
+  // main upsert payload stays small + fast. We never await render
+  // intelligence as a blocker — but we DO await it here so a
+  // `await persistAuditIntelligence(...)` from the worker gets the
+  // updated row before returning. The worker's audit-completion
+  // status was already saved on `AuditOrder` BEFORE this function
+  // was called, so render slowness can't delay customer delivery.
+  try {
+    const renderResult: RenderIntelligenceResult = await runRenderIntelligence({
+      orderId,
+      url: websiteUrl,
+      frameworkDetected: (payload as { frameworkDetected: string | null }).frameworkDetected,
+      contentDensity: (payload as { contentDensity: number | null }).contentDensity,
+      provider: obscuraProvider,
+      rawFetcher: createDefaultRawFetcher(),
+    });
+
+    // Only update if render produced at least one populated field —
+    // skip writes that would only persist nulls.
+    const anyPopulated =
+      renderResult.renderAttempted !== null ||
+      renderResult.rawTextLength !== null ||
+      renderResult.rawSchemaTypes !== null;
+    if (anyPopulated) {
+      await prisma.auditIntelligence.update({
+        where: { auditOrderId: orderId },
+        data: {
+          renderAttempted: renderResult.renderAttempted,
+          renderSuccessful: renderResult.renderSuccessful,
+          renderEngineVersion: renderResult.renderEngineVersion,
+          renderFailureReason: renderResult.renderFailureReason,
+          renderDurationMs: renderResult.renderDurationMs,
+          renderedHtmlLength: renderResult.renderedHtmlLength,
+          renderedTextLength: renderResult.renderedTextLength,
+          renderedSchemaTypes: jsonOrNull(
+            renderResult.renderedSchemaTypes as unknown as object | null,
+          ),
+          hydrationDetected: renderResult.hydrationDetected,
+          blankShellRisk: renderResult.blankShellRisk,
+          clientOnlyContentDetected: renderResult.clientOnlyContentDetected,
+          renderConfidence: renderResult.renderConfidence,
+          rawTextLength: renderResult.rawTextLength,
+          rawSchemaTypes: jsonOrNull(
+            renderResult.rawSchemaTypes as unknown as object | null,
+          ),
+          schemaDeltaDetected: renderResult.schemaDeltaDetected,
+          contentDeltaDetected: renderResult.contentDeltaDetected,
+        },
+      });
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    // Render failures are operational — log and continue. The main
+    // intelligence row is already persisted; render fields just stay
+    // null on this audit.
+    console.warn(
+      `[geo-render] orchestrator threw orderId=${orderId} (non-fatal): ${message}`,
+    );
+  }
+
+  return { ok: true };
 }
 
 /**
