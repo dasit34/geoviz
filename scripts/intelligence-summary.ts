@@ -73,6 +73,16 @@ async function main(): Promise<void> {
     }
   }
 
+  // Operator-supplied benchmark tag cohorts. Only shown when at
+  // least one row carries a tag — keeps the summary terse for
+  // installations that don't use cohort tagging.
+  if (summary.benchmarkTagDistribution.length > 0) {
+    console.log("\n  Operator benchmark tags:");
+    for (const row of summary.benchmarkTagDistribution) {
+      console.log(`    - ${pad(row.tag, 28)} ${row.count}`);
+    }
+  }
+
   console.log("");
   await prisma.$disconnect();
 }

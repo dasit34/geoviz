@@ -46,6 +46,7 @@ import { PrismaClient } from "@prisma/client";
 import { getDbFingerprint } from "../src/lib/db-fingerprint";
 import { notifyOperatorReportReady } from "../src/lib/notify-operator-report-ready";
 import { persistAuditIntelligence } from "../src/lib/audit-intelligence";
+import { parseCalibrationNotes } from "../src/lib/calibration";
 import {
   classifyWorkerException,
   classifyWrapperFailure,
@@ -1744,6 +1745,22 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
         // above) or the operator notification (which fires below).
         // `persistAuditIntelligence` itself never throws — this is
         // belt-and-suspenders. See `src/lib/audit-intelligence.ts`.
+        // Lift operator-supplied benchmark tagging out of adminNotes
+        // (if any). When the bulk-queue POST persisted operator
+        // industry / benchmarkTag into the calibration JSON, pass
+        // them through so the intelligence row records the operator's
+        // choice instead of the inferred industry. Absent / null on
+        // the parsed result leaves the existing inference path
+        // unchanged — fully backwards compatible.
+        const calOperatorTags = parseCalibrationNotes(candidate.adminNotes);
+        const operatorIndustry = calOperatorTags?.industry ?? null;
+        const operatorBenchmarkTag = calOperatorTags?.benchmarkTag ?? null;
+        if (operatorIndustry || operatorBenchmarkTag) {
+          log(
+            `[geo-benchmark] operator tag applied orderId=${candidate.id} industry=${operatorIndustry ?? "(none)"} benchmarkTag=${operatorBenchmarkTag ?? "(none)"}`,
+          );
+        }
+
         try {
           const intel = await persistAuditIntelligence({
             orderId: candidate.id,
@@ -1751,6 +1768,8 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
             websiteUrl: candidate.websiteUrl,
             competitorUrl: candidate.competitorUrl,
             reportMarkdown: result.markdown,
+            industryRaw: operatorIndustry,
+            benchmarkTag: operatorBenchmarkTag,
           });
           if (intel.ok) {
             log(`[geo-worker] intelligence persisted orderId=${candidate.id}`);
