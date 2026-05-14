@@ -119,6 +119,15 @@ export async function persistAuditIntelligence(args: {
    * the result is normalized via the frozen v1 taxonomy.
    */
   industryRaw?: string | null;
+  /**
+   * Optional operator-supplied benchmark cohort tag. When present,
+   * persisted to `AuditIntelligence.benchmarkTag` (the operator-set
+   * scalar — distinct from the system-set `benchmarkTags` JSON
+   * array). Used by bulk batches to group audits into named cohorts
+   * like `roofing_batch_1`. Absent leaves `benchmarkTag` unset on
+   * insert and PRESERVED on re-run update.
+   */
+  benchmarkTag?: string | null;
 }): Promise<PersistAuditIntelligenceResult> {
   const {
     orderId,
@@ -127,6 +136,7 @@ export async function persistAuditIntelligence(args: {
     competitorUrl,
     reportMarkdown,
     industryRaw,
+    benchmarkTag,
   } = args;
 
   if (!reportMarkdown || reportMarkdown.trim().length === 0) {
@@ -145,6 +155,7 @@ export async function persistAuditIntelligence(args: {
       competitorUrl,
       reportMarkdown,
       industryRaw: industryRaw ?? null,
+      benchmarkTag: benchmarkTag ?? null,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -259,6 +270,7 @@ function buildIntelligencePayload(args: {
   competitorUrl: string | null;
   reportMarkdown: string;
   industryRaw: string | null;
+  benchmarkTag: string | null;
 }) {
   const {
     orderId,
@@ -267,6 +279,7 @@ function buildIntelligencePayload(args: {
     competitorUrl,
     reportMarkdown,
     industryRaw,
+    benchmarkTag,
   } = args;
 
   // -- Industry taxonomy (V2 benchmarking). Three columns:
@@ -422,6 +435,13 @@ function buildIntelligencePayload(args: {
     // on insert — the @default(false) handles operatorReviewed; the
     // upsert update branch explicitly preserves operator state.
     rawSignalSnapshot: rawSignalSnapshot as unknown as object,
+
+    // Operator-supplied benchmark cohort tag from the bulk-queue
+    // POST. Only included when the caller passed a non-null value
+    // so re-running an audit without a tag never blanks the prior
+    // operator-set tag. Distinct from the system-set
+    // `benchmarkTags` JSON array populated by Stage 1 ingest.
+    ...(benchmarkTag ? { benchmarkTag } : {}),
 
     // ─── V2 Stage 1 — Intelligence ingestion ────────────────────
     // runIntelligenceIngest is itself fail-soft: every module is
@@ -589,6 +609,9 @@ export async function backfillAuditIntelligence(args: {
       competitorUrl,
       reportMarkdown,
       industryRaw: null,
+      // Backfill never overwrites operator-set benchmarkTag; the
+      // backfill path stays a pure historic-data fill.
+      benchmarkTag: null,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

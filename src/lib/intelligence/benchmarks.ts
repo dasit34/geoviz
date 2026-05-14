@@ -90,6 +90,14 @@ export type BenchmarkSummary = {
   confidenceDistribution: Array<{ level: string; count: number }>;
   auditEngineVersions: Array<{ version: string; count: number }>;
   scoringVersions: Array<{ version: string; count: number }>;
+  /**
+   * Operator-supplied benchmark tag distribution. Counts rows where
+   * the operator explicitly tagged the audit with a cohort name
+   * (`AuditIntelligence.benchmarkTag` — distinct from the system-set
+   * `benchmarkTags` JSON array). Excludes null. Useful for spot-
+   * checking that a bulk batch landed cohort-coherent rows.
+   */
+  benchmarkTagDistribution: Array<{ tag: string; count: number }>;
 };
 
 // ────────────────────────────────────────────────────────────
@@ -285,31 +293,44 @@ export async function getWeakestCategoriesByIndustry(
  * Handles an empty table gracefully — zero counts, null averages.
  */
 export async function getBenchmarkSummary(): Promise<BenchmarkSummary> {
-  const [agg, industry, confidence, engineVersions, scoringVersions] =
-    await Promise.all([
-      prisma.auditIntelligence.aggregate({
-        _count: { _all: true, overallScore: true },
-        _avg: { overallScore: true },
-        _min: { overallScore: true },
-        _max: { overallScore: true },
-      }),
-      prisma.auditIntelligence.groupBy({
-        by: ["industryCategoryNormalized"],
-        _count: { _all: true },
-      }),
-      prisma.auditIntelligence.groupBy({
-        by: ["confidenceLevel"],
-        _count: { _all: true },
-      }),
-      prisma.auditIntelligence.groupBy({
-        by: ["auditEngineVersion"],
-        _count: { _all: true },
-      }),
-      prisma.auditIntelligence.groupBy({
-        by: ["scoringVersion"],
-        _count: { _all: true },
-      }),
-    ]);
+  const [
+    agg,
+    industry,
+    confidence,
+    engineVersions,
+    scoringVersions,
+    benchmarkTags,
+  ] = await Promise.all([
+    prisma.auditIntelligence.aggregate({
+      _count: { _all: true, overallScore: true },
+      _avg: { overallScore: true },
+      _min: { overallScore: true },
+      _max: { overallScore: true },
+    }),
+    prisma.auditIntelligence.groupBy({
+      by: ["industryCategoryNormalized"],
+      _count: { _all: true },
+    }),
+    prisma.auditIntelligence.groupBy({
+      by: ["confidenceLevel"],
+      _count: { _all: true },
+    }),
+    prisma.auditIntelligence.groupBy({
+      by: ["auditEngineVersion"],
+      _count: { _all: true },
+    }),
+    prisma.auditIntelligence.groupBy({
+      by: ["scoringVersion"],
+      _count: { _all: true },
+    }),
+    // Operator-supplied benchmarkTag — filter null so we don't
+    // pollute the count with untagged historic rows.
+    prisma.auditIntelligence.groupBy({
+      by: ["benchmarkTag"],
+      where: { benchmarkTag: { not: null } },
+      _count: { _all: true },
+    }),
+  ]);
 
   return {
     totalRows: agg._count._all,
@@ -336,6 +357,10 @@ export async function getBenchmarkSummary(): Promise<BenchmarkSummary> {
       .sort((a, b) => b.count - a.count),
     scoringVersions: scoringVersions
       .map((r) => ({ version: r.scoringVersion, count: r._count._all }))
+      .sort((a, b) => b.count - a.count),
+    benchmarkTagDistribution: benchmarkTags
+      .filter((r): r is typeof r & { benchmarkTag: string } => r.benchmarkTag !== null)
+      .map((r) => ({ tag: r.benchmarkTag, count: r._count._all }))
       .sort((a, b) => b.count - a.count),
   };
 }

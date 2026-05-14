@@ -98,6 +98,8 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bulkText, setBulkText] = useState("");
+  const [bulkIndustry, setBulkIndustry] = useState("");
+  const [bulkBenchmarkTag, setBulkBenchmarkTag] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -191,13 +193,20 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
         setSubmitting(false);
         return;
       }
+      // Optional operator-supplied benchmark tagging. Empty inputs
+      // submit as undefined so the POST handler falls back to the
+      // original URL-only behavior — no inference change, fully
+      // backwards compatible.
+      const industry = bulkIndustry.trim().length > 0 ? bulkIndustry.trim() : undefined;
+      const benchmarkTag =
+        bulkBenchmarkTag.trim().length > 0 ? bulkBenchmarkTag.trim() : undefined;
       try {
         const res = await fetch(
           `/api/admin/calibration?key=${encodeURIComponent(adminKey)}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ urls }),
+            body: JSON.stringify({ urls, industry, benchmarkTag }),
           },
         );
         const data = await res.json();
@@ -211,6 +220,8 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
               : ""),
         );
         setBulkText("");
+        setBulkIndustry("");
+        setBulkBenchmarkTag("");
         await fetchRuns();
       } catch (err) {
         setSubmitMsg(err instanceof Error ? err.message : String(err));
@@ -218,7 +229,7 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
         setSubmitting(false);
       }
     },
-    [bulkText, adminKey, fetchRuns],
+    [bulkText, bulkIndustry, bulkBenchmarkTag, adminKey, fetchRuns],
   );
 
   const counts = useMemo(() => bucketCounts(runs), [runs]);
@@ -328,6 +339,38 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
           value={bulkText}
           onChange={(e) => setBulkText(e.target.value)}
         />
+        {/* Optional operator-supplied benchmark tagging. Both fields
+            are entirely optional — leave blank to keep the existing
+            URL-only inference behavior. When supplied, the values
+            apply to every URL in this batch and override automatic
+            industry inference on the resulting AuditIntelligence
+            rows. */}
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <label className="block text-xs">
+            <span className="text-white/55">
+              Industry (optional, applies to all URLs)
+            </span>
+            <input
+              type="text"
+              className="input-field mt-1 font-mono text-sm"
+              placeholder="e.g. roofing, hvac, legal"
+              value={bulkIndustry}
+              onChange={(e) => setBulkIndustry(e.target.value)}
+            />
+          </label>
+          <label className="block text-xs">
+            <span className="text-white/55">
+              Benchmark tag (optional, e.g. roofing_batch_1)
+            </span>
+            <input
+              type="text"
+              className="input-field mt-1 font-mono text-sm"
+              placeholder="cohort name for this batch"
+              value={bulkBenchmarkTag}
+              onChange={(e) => setBulkBenchmarkTag(e.target.value)}
+            />
+          </label>
+        </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="submit"

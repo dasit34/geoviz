@@ -5,6 +5,7 @@ import { parseReportScoreBreakdown } from "@/lib/parse-report";
 import {
   CALIBRATION_PREFIX,
   parseCalibrationNotes,
+  stringifyCalibrationNotes,
 } from "@/lib/calibration";
 import { applyApiRateLimit } from "@/lib/rate-limit";
 
@@ -141,7 +142,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { urls?: string[]; expectedByUrl?: Record<string, number> };
+  let body: {
+    urls?: string[];
+    expectedByUrl?: Record<string, number>;
+    // Optional operator-supplied benchmark tagging — preserves the
+    // existing URL-only contract. Top-level `industry` /
+    // `benchmarkTag` apply to every URL in the batch as defaults;
+    // per-URL entries in `industryByUrl` / `benchmarkTagByUrl`
+    // override the batch default for that single URL. Absent means
+    // no tag — the existing inference path runs unchanged.
+    industry?: string | null;
+    benchmarkTag?: string | null;
+    industryByUrl?: Record<string, string>;
+    benchmarkTagByUrl?: Record<string, string>;
+  };
   try {
     body = await req.json();
   } catch {
@@ -161,6 +175,16 @@ export async function POST(req: Request) {
   }
 
   const expectedByUrl = body.expectedByUrl ?? {};
+  const industryByUrl = body.industryByUrl ?? {};
+  const benchmarkTagByUrl = body.benchmarkTagByUrl ?? {};
+  const defaultIndustry =
+    typeof body.industry === "string" && body.industry.trim().length > 0
+      ? body.industry.trim()
+      : null;
+  const defaultBenchmarkTag =
+    typeof body.benchmarkTag === "string" && body.benchmarkTag.trim().length > 0
+      ? body.benchmarkTag.trim()
+      : null;
   const created: Array<{ id: string; url: string }> = [];
   const skipped: Array<{ url: string; reason: string }> = [];
   const now = new Date();
@@ -178,10 +202,22 @@ export async function POST(req: Request) {
     }
 
     const expected = expectedByUrl[rawUrl];
-    const calNotes = JSON.stringify({
-      calibration: {
-        expected: typeof expected === "number" ? expected : null,
-      },
+    // Per-URL override wins; otherwise fall back to the batch
+    // default; otherwise null (no operator tag — inference path runs).
+    const industryForUrl =
+      typeof industryByUrl[rawUrl] === "string" &&
+      industryByUrl[rawUrl]!.trim().length > 0
+        ? industryByUrl[rawUrl]!.trim()
+        : defaultIndustry;
+    const benchmarkTagForUrl =
+      typeof benchmarkTagByUrl[rawUrl] === "string" &&
+      benchmarkTagByUrl[rawUrl]!.trim().length > 0
+        ? benchmarkTagByUrl[rawUrl]!.trim()
+        : defaultBenchmarkTag;
+    const calNotes = stringifyCalibrationNotes({
+      expected: typeof expected === "number" ? expected : null,
+      industry: industryForUrl,
+      benchmarkTag: benchmarkTagForUrl,
     });
 
     try {
@@ -200,8 +236,16 @@ export async function POST(req: Request) {
       });
       created.push({ id: order.id, url: websiteUrl });
       console.log(
-        `[calibration] queued orderId=${order.id} url=${websiteUrl} expected=${expected ?? "(none)"}`,
+        `[calibration] queued orderId=${order.id} url=${websiteUrl} expected=${expected ?? "(none)"} industry=${industryForUrl ?? "(none)"} benchmarkTag=${benchmarkTagForUrl ?? "(none)"}`,
       );
+      // Greppable one-liner whenever the operator supplies tagging —
+      // separate prefix lets `npx @railway/cli logs | grep '\[geo-benchmark\]'`
+      // find every cohort assignment at a glance.
+      if (industryForUrl || benchmarkTagForUrl) {
+        console.log(
+          `[geo-benchmark] operator tag applied orderId=${order.id} url=${websiteUrl} industry=${industryForUrl ?? "(none)"} benchmarkTag=${benchmarkTagForUrl ?? "(none)"}`,
+        );
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       skipped.push({ url: rawUrl, reason: message });
