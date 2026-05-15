@@ -569,21 +569,52 @@ top of Section 1 OR in Business Impact):
   "directional intelligence", "machine-readable confidence",
   "relative readiness".
 
-POSITIONING (mandatory — frame every page around AI TRUST and
-DISCOVERABILITY for the business, not "AI SEO" or technical
-plumbing):
-  Lean INTO: whether AI can VERIFY this business, whether AI
-  TRUSTS the entity, whether AI has enough USABLE INFORMATION
-  to recommend it, whether competitors provide CLEARER signals.
-  Lean AWAY FROM: "AI SEO", "search optimization", schema-tag
-  jargon for its own sake, abstract methodology talk.
-  Examples of GOOD framing language:
-    - "AI systems struggle to verify this business."
-    - "Competitors provide clearer machine-readable signals."
-    - "Conflicting location signals weaken recommendation
-       confidence."
-    - "Without a verified business identity, AI tools default
-       to whoever they can confirm faster."
+POSITIONING (mandatory — this report is an AI TRUST + DISCOVERABILITY
+audit, NOT an "AI SEO" audit. Frame every section around whether
+AI systems can VERIFY this business, TRUST what they find, and
+have enough USABLE INFORMATION to recommend it):
+
+  Lean INTO:
+    - Trust: contradictions, inconsistencies, conflicting NAP,
+      mismatched founding dates, unverified claims.
+    - Verification: machine-readable business identity, structured
+      data, consistent entity signals across the web.
+    - Recommendation confidence: whether the site gives AI enough
+      signal to confidently name this business when a customer asks.
+    - Discoverability: whether the site is reachable by AI crawlers
+      and whether content depth supports being quoted in an answer.
+    - Customer-answer content: does the site answer the actual
+      questions customers ask AI tools? (pricing, hours, service
+      area, what's included, response time, etc.)
+
+  Lean AWAY FROM:
+    - "AI SEO" / "search optimization" / "ranking" framing.
+    - Schema-tag jargon for its own sake.
+    - Abstract methodology talk ("directional intelligence
+      signals", "machine-readable confidence", "relative readiness").
+    - Promising AI placement, recommendation, or ranking outcomes.
+    - Generic "best practices" prose unanchored to specific found-
+      or-missing signals on THIS site.
+
+  Each weakness statement MUST name the specific missing signal +
+  the specific business consequence. Examples:
+    - "AI systems struggle to verify this business — no structured
+       business identity in the page source."
+    - "Conflicting location signals (Trenton, IL vs. St. Louis Metro
+       East) weaken recommendation confidence."
+    - "Competitors provide a single answer to 'how fast can a
+       plumber come' — this site has none, so the AI cites them."
+    - "Reviews exist on Google (4.8 stars) but are invisible on the
+       site itself, so AI can't confirm what a customer would see."
+    - "Without a verified business identity, AI tools default to
+       whoever they can confirm faster."
+
+  Style discipline:
+    - Short sentences. Lead with the consequence.
+    - Plain English. No filler ("it's important to note that…",
+      "in essence", "fundamentally").
+    - Each finding is one specific gap + the consequence — no
+      back-to-back paragraphs that say the same thing twice.
 
 # GEO Visibility Report
 
@@ -1114,21 +1145,52 @@ top of Section 1 OR in Business Impact):
   "directional intelligence", "machine-readable confidence",
   "relative readiness".
 
-POSITIONING (mandatory — frame every page around AI TRUST and
-DISCOVERABILITY for the business, not "AI SEO" or technical
-plumbing):
-  Lean INTO: whether AI can VERIFY this business, whether AI
-  TRUSTS the entity, whether AI has enough USABLE INFORMATION
-  to recommend it, whether competitors provide CLEARER signals.
-  Lean AWAY FROM: "AI SEO", "search optimization", schema-tag
-  jargon for its own sake, abstract methodology talk.
-  Examples of GOOD framing language:
-    - "AI systems struggle to verify this business."
-    - "Competitors provide clearer machine-readable signals."
-    - "Conflicting location signals weaken recommendation
-       confidence."
-    - "Without a verified business identity, AI tools default
-       to whoever they can confirm faster."
+POSITIONING (mandatory — this report is an AI TRUST + DISCOVERABILITY
+audit, NOT an "AI SEO" audit. Frame every section around whether
+AI systems can VERIFY this business, TRUST what they find, and
+have enough USABLE INFORMATION to recommend it):
+
+  Lean INTO:
+    - Trust: contradictions, inconsistencies, conflicting NAP,
+      mismatched founding dates, unverified claims.
+    - Verification: machine-readable business identity, structured
+      data, consistent entity signals across the web.
+    - Recommendation confidence: whether the site gives AI enough
+      signal to confidently name this business when a customer asks.
+    - Discoverability: whether the site is reachable by AI crawlers
+      and whether content depth supports being quoted in an answer.
+    - Customer-answer content: does the site answer the actual
+      questions customers ask AI tools? (pricing, hours, service
+      area, what's included, response time, etc.)
+
+  Lean AWAY FROM:
+    - "AI SEO" / "search optimization" / "ranking" framing.
+    - Schema-tag jargon for its own sake.
+    - Abstract methodology talk ("directional intelligence
+      signals", "machine-readable confidence", "relative readiness").
+    - Promising AI placement, recommendation, or ranking outcomes.
+    - Generic "best practices" prose unanchored to specific found-
+      or-missing signals on THIS site.
+
+  Each weakness statement MUST name the specific missing signal +
+  the specific business consequence. Examples:
+    - "AI systems struggle to verify this business — no structured
+       business identity in the page source."
+    - "Conflicting location signals (Trenton, IL vs. St. Louis Metro
+       East) weaken recommendation confidence."
+    - "Competitors provide a single answer to 'how fast can a
+       plumber come' — this site has none, so the AI cites them."
+    - "Reviews exist on Google (4.8 stars) but are invisible on the
+       site itself, so AI can't confirm what a customer would see."
+    - "Without a verified business identity, AI tools default to
+       whoever they can confirm faster."
+
+  Style discipline:
+    - Short sentences. Lead with the consequence.
+    - Plain English. No filler ("it's important to note that…",
+      "in essence", "fundamentally").
+    - Each finding is one specific gap + the consequence — no
+      back-to-back paragraphs that say the same thing twice.
 
 # GEO Visibility Report
 
