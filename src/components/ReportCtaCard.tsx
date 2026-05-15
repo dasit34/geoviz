@@ -32,12 +32,13 @@ export function ReportCtaCard({
       <div className="cta-card-body">
         <div className="cta-card-eyebrow">AI Visibility Profile Setup</div>
         <h2 className="cta-card-headline">
-          Install your AI Visibility Profile
+          Set up your AI Visibility Profile
         </h2>
         <p className="cta-card-lede">
-          We create and help install a machine-readable business identity
-          layer — schema, llms.txt, entity signals, AI-readable summary
-          — so AI systems can better understand, crawl, and interpret
+          Turn this audit into an AI-readable business profile. We
+          create and help install the machine-readable identity layer
+          — schema, llms.txt, entity signals, AI-readable summary —
+          so AI systems can better understand, crawl, and interpret
           your business.
         </p>
 

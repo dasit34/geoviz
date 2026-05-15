@@ -406,6 +406,14 @@ type PlatformLens = {
   };
 };
 
+// Labels are SHORT tier markers (3–8 words) shown in the Platform
+// Visibility row UI. The accompanying audit prose explains the
+// inference in detail. Phrasing is calibrated to be defensible:
+// labels describe what AI systems likely CAN or CANNOT do with the
+// available signals — they do NOT claim we directly queried each
+// platform. The model's prose (guarded by the DEFENSIBLE LANGUAGE
+// block in the worker prompt) carries the longer "why confidence
+// is low / what signal is missing" framing.
 const PLATFORM_LENS: Record<PlatformName, PlatformLens> = {
   ChatGPT: {
     patterns: [/GPTBot/i, /OAI[-\s]?SearchBot/i, /OpenAI/i, /\bChatGPT\b/i],
@@ -414,7 +422,7 @@ const PLATFORM_LENS: Record<PlatformName, PlatformLens> = {
       ok: "Strong AI readability",
       warnStrong: "Moderate AI readability",
       warnWeak: "Limited AI readability",
-      bad: "Weak AI readability",
+      bad: "Limited content for AI to interpret",
     },
   },
   Claude: {
@@ -424,7 +432,7 @@ const PLATFORM_LENS: Record<PlatformName, PlatformLens> = {
       ok: "Strong entity recognition",
       warnStrong: "Adequate content depth",
       warnWeak: "Entity recognition limited",
-      bad: "Weak entity recognition",
+      bad: "AI may struggle to verify identity",
     },
   },
   Gemini: {
@@ -434,7 +442,7 @@ const PLATFORM_LENS: Record<PlatformName, PlatformLens> = {
       ok: "Strong schema compatibility",
       warnStrong: "Some structured signals present",
       warnWeak: "Limited business identity signals",
-      bad: "Business identity unclear",
+      bad: "Limited structured data to confirm identity",
     },
   },
   Perplexity: {
@@ -444,7 +452,7 @@ const PLATFORM_LENS: Record<PlatformName, PlatformLens> = {
       ok: "Strong citation footprint",
       warnStrong: "Moderate citation footprint",
       warnWeak: "Limited citation signals detected",
-      bad: "Poor authority footprint",
+      bad: "Few verifiable citations found",
     },
   },
 };
