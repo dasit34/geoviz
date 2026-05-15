@@ -197,7 +197,7 @@ export default function Page() {
             <HowItWorksStep
               index={5}
               title="Optional AI Visibility Foundation Fix repairs what's missing"
-              body="If you want us to install the foundation — structured business identity, llms.txt, entity signals, AI-readable summary — the Foundation Fix is available as a separate engagement."
+              body="If you want us to address the underlying technical, trust, and discoverability gaps your audit surfaces, the AI Visibility Foundation Fix is available as a separate engagement."
             />
           </div>
         </div>
@@ -429,11 +429,11 @@ export default function Page() {
             </h2>
             <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
               Repair the foundation AI systems use to find, verify, and
-              recommend your business. After your audit, GeoViz installs
-              the machine-readable layer — structured business identity,
-              service and location signals, trust markers, llms.txt
-              guidance, and an AI-readable summary — so AI tools can
-              understand and recommend you with confidence.
+              recommend your business. If requested, GeoViz can
+              implement the technical and structural improvements
+              needed to improve AI discoverability, machine readability,
+              and recommendation confidence — scoped from the specific
+              gaps your audit surfaces.
             </p>
 
             {/* Price panel — distinct visual unit inside the card so
@@ -457,16 +457,14 @@ export default function Page() {
             </div>
 
             <p className="mt-8 text-xs uppercase tracking-[0.18em] text-white/45">
-              What&rsquo;s included
+              What you get
             </p>
             <ul className="mt-3 grid gap-3 sm:grid-cols-2 max-w-2xl">
-              <PricingBullet>AI-readable business profile</PricingBullet>
-              <PricingBullet>Structured schema package</PricingBullet>
-              <PricingBullet>Service and location entity mapping</PricingBullet>
-              <PricingBullet>Trust and citation signal structuring</PricingBullet>
-              <PricingBullet>llms.txt / AI crawler guidance</PricingBullet>
-              <PricingBullet>FAQ and service clarity improvements</PricingBullet>
-              <PricingBullet>Before/after GeoViz re-check</PricingBullet>
+              <PricingBullet>Machine-readability improvements for AI retrieval</PricingBullet>
+              <PricingBullet>Trust and verification signal strengthening</PricingBullet>
+              <PricingBullet>Cross-platform business identity alignment</PricingBullet>
+              <PricingBullet>Customer-answer content gaps closed</PricingBullet>
+              <PricingBullet>Before/after GeoViz re-check (verification audit)</PricingBullet>
             </ul>
 
             {/* Operational safety — sets expectations honestly without

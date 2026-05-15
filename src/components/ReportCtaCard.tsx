@@ -35,11 +35,10 @@ export function ReportCtaCard({
           Fix the foundation AI systems use to recommend you
         </h2>
         <p className="cta-card-lede">
-          A scoped infrastructure engagement that installs the
-          machine-readable signals AI systems use to identify,
-          verify, and reference your business — structured business
-          identity, llms.txt, entity signals, AI-readable summary,
-          cross-platform NAP alignment.
+          A scoped infrastructure engagement that addresses the
+          underlying technical, trust, and discoverability gaps
+          surfaced in your audit — so AI systems can identify,
+          verify, and reference your business more confidently.
         </p>
 
         <div className="cta-card-badges">
