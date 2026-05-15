@@ -495,6 +495,78 @@ OUTPUT DISCIPLINE (mandatory — this is a paid customer report):
     replace this placeholder server-side with the correct date.
     Do NOT write a real date — the placeholder is required.
 
+DEFENSIBLE LANGUAGE (mandatory — every customer-visible sentence
+must remain defensible if challenged by a skeptical operator or
+legal review):
+
+  Banned absolutes — NEVER use any of these phrasings (they
+  overclaim what an audit of public web signals can know):
+    - "your website has nothing to offer" / "nothing to offer
+      as an answer"
+    - "showing up nowhere" / "showing up nowhere online"
+    - "AI tools found nothing" / "we found nothing"
+    - "every AI system will skip you" / "every AI tool"
+    - "your business will never appear" / "guaranteed to be
+      skipped" / "guaranteed to rank"
+    - "no AI tool will recommend you" / "AI tools won't read
+      your site"
+    - "you are invisible to AI" / "completely invisible"
+    - any "always" / "never" / "every" / "all" claim about a
+      specific platform's behavior toward this site.
+
+  Preferred replacements (use phrasings of this shape):
+    - "AI systems found very limited usable visibility signals"
+    - "Your site contributes very little machine-readable
+      information to AI-driven recommendations"
+    - "The audit found minimal verified signals connected to
+      this domain"
+    - "AI systems may have low confidence recommending this
+      business"
+    - "Based on available site and visibility signals, AI
+      systems may struggle to…"
+    - "AI tools are likely to skip over this business when…"
+    - "Confidence is low because no machine-readable identity
+      was found in the page source."
+
+  Tone: keep urgency, but make every claim precise. Pair every
+  weakness statement with the SIGNAL that's missing (no JSON-LD
+  / no FAQ schema / no llms.txt / inconsistent NAP / no review
+  widget / etc.) so the customer can see why the audit reached
+  that read.
+
+DISTINCT SECTION ROLES (mandatory — keep each section's job
+sharp; do NOT repeat the same finding across sections):
+
+  • Section 1 (AI Visibility Score) — the number + the six-
+    category breakdown + 3–5 score-driver bullets (mix of ✅
+    positives and ❌ gaps). Cite specific found-or-missing
+    signals.
+  • Section 2 (What's Holding You Back) — WHAT IS WRONG. Top
+    3 issues only. Each issue = one specific gap + a one-sentence
+    "why it hurts visibility." Do NOT list fixes here.
+  • Section 3 (What To Fix First) — WHAT TO FIX. Top 3 fixes
+    only, 1:1 mapped to the 3 issues above. Each fix = the
+    concrete change + difficulty + "Can GeoViz Foundation Fix
+    handle this?" Yes/No. Do NOT re-explain the issue itself.
+  • Section 4 (Business Impact) — WHY IT MATTERS to revenue
+    /customers. Plain English, two short paragraphs maximum.
+    Do NOT restate issues or fixes here.
+  • Platform Visibility (when present) — HOW AI SYSTEMS MAY
+    INTERPRET this site. Frame as inference from observed
+    signals, never as direct platform queries. Do NOT claim
+    we queried ChatGPT/Claude/Gemini/Perplexity directly.
+    Preferred opener: "Based on available site and visibility
+    signals, AI systems may struggle to…" Identify what
+    AI systems CAN likely understand, what they CANNOT confidently
+    verify, what SIGNAL is missing, and WHY confidence is low.
+
+SCORE FRAMING (mandatory — one short clarifying line near the
+top of Section 1 OR in Business Impact):
+  The score is directional. A lower score means weaker
+  machine-readable confidence — NOT a ranking guarantee. Customers
+  should treat it as a visibility-quality read, not a position
+  promise.
+
 # GEO Visibility Report
 
 **Site:** ${websiteUrl}  ·  **Generated:** <GENERATED_DATE>
@@ -949,6 +1021,78 @@ OUTPUT DISCIPLINE (mandatory — this is a paid customer report):
     "<GENERATED_DATE>" (with the angle brackets). The system will
     replace this placeholder server-side with the correct date.
     Do NOT write a real date — the placeholder is required.
+
+DEFENSIBLE LANGUAGE (mandatory — every customer-visible sentence
+must remain defensible if challenged by a skeptical operator or
+legal review):
+
+  Banned absolutes — NEVER use any of these phrasings (they
+  overclaim what an audit of public web signals can know):
+    - "your website has nothing to offer" / "nothing to offer
+      as an answer"
+    - "showing up nowhere" / "showing up nowhere online"
+    - "AI tools found nothing" / "we found nothing"
+    - "every AI system will skip you" / "every AI tool"
+    - "your business will never appear" / "guaranteed to be
+      skipped" / "guaranteed to rank"
+    - "no AI tool will recommend you" / "AI tools won't read
+      your site"
+    - "you are invisible to AI" / "completely invisible"
+    - any "always" / "never" / "every" / "all" claim about a
+      specific platform's behavior toward this site.
+
+  Preferred replacements (use phrasings of this shape):
+    - "AI systems found very limited usable visibility signals"
+    - "Your site contributes very little machine-readable
+      information to AI-driven recommendations"
+    - "The audit found minimal verified signals connected to
+      this domain"
+    - "AI systems may have low confidence recommending this
+      business"
+    - "Based on available site and visibility signals, AI
+      systems may struggle to…"
+    - "AI tools are likely to skip over this business when…"
+    - "Confidence is low because no machine-readable identity
+      was found in the page source."
+
+  Tone: keep urgency, but make every claim precise. Pair every
+  weakness statement with the SIGNAL that's missing (no JSON-LD
+  / no FAQ schema / no llms.txt / inconsistent NAP / no review
+  widget / etc.) so the customer can see why the audit reached
+  that read.
+
+DISTINCT SECTION ROLES (mandatory — keep each section's job
+sharp; do NOT repeat the same finding across sections):
+
+  • Section 1 (AI Visibility Score) — the number + the six-
+    category breakdown + 3–5 score-driver bullets (mix of ✅
+    positives and ❌ gaps). Cite specific found-or-missing
+    signals.
+  • Section 2 (What's Holding You Back) — WHAT IS WRONG. Top
+    3 issues only. Each issue = one specific gap + a one-sentence
+    "why it hurts visibility." Do NOT list fixes here.
+  • Section 3 (What To Fix First) — WHAT TO FIX. Top 3 fixes
+    only, 1:1 mapped to the 3 issues above. Each fix = the
+    concrete change + difficulty + "Can GeoViz Foundation Fix
+    handle this?" Yes/No. Do NOT re-explain the issue itself.
+  • Section 4 (Business Impact) — WHY IT MATTERS to revenue
+    /customers. Plain English, two short paragraphs maximum.
+    Do NOT restate issues or fixes here.
+  • Platform Visibility (when present) — HOW AI SYSTEMS MAY
+    INTERPRET this site. Frame as inference from observed
+    signals, never as direct platform queries. Do NOT claim
+    we queried ChatGPT/Claude/Gemini/Perplexity directly.
+    Preferred opener: "Based on available site and visibility
+    signals, AI systems may struggle to…" Identify what
+    AI systems CAN likely understand, what they CANNOT confidently
+    verify, what SIGNAL is missing, and WHY confidence is low.
+
+SCORE FRAMING (mandatory — one short clarifying line near the
+top of Section 1 OR in Business Impact):
+  The score is directional. A lower score means weaker
+  machine-readable confidence — NOT a ranking guarantee. Customers
+  should treat it as a visibility-quality read, not a position
+  promise.
 
 # GEO Visibility Report
 
