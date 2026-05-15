@@ -669,7 +669,15 @@
 }
 .category-score-head {
   display: flex;
-  align-items: baseline;
+  /* `flex-start` rather than `baseline` — Safari/iOS has a long-
+     standing baseline-alignment quirk where a baseline-aligned
+     element on a multi-line wrapped sibling can render in
+     unexpected positions, causing the score block to visually
+     intrude into the label's wrapped second line. `flex-start`
+     anchors both label and score to the top of the row, which
+     renders identically across browsers regardless of how the
+     label wraps. */
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   /* Reserve a consistent label-area height so cards with a 1-line
@@ -691,6 +699,16 @@
   /* Keep label compact on narrow widths — preserves the rhythm if
      a label is just-too-long for one line. */
   line-height: 1.25;
+  /* Hard ceiling so the label slot can never extend into the
+     score's reserved space, even if flex measurement wobbles
+     during initial paint. 64px = score's min-width (56px) + 8px
+     visual buffer to avoid touching the score edge. */
+  max-width: calc(100% - 64px);
+  /* Force unbreakable strings ("Recommendation") to break inside
+     the slot rather than overflowing horizontally and visually
+     overlapping the score column. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .category-score-num {
   font-size: 18px;
@@ -706,6 +724,13 @@
      and 3-digit scores have visually consistent positioning. */
   flex-shrink: 0;
   text-align: right;
+  /* Explicit horizontal floor. flex-shrink: 0 prevents shrinking
+     under flex pressure, but min-width also guarantees the score
+     block reserves render space during the initial flex measurement
+     pass — defends against Safari's flex-measurement edge cases
+     where a long sibling label can momentarily nudge the score
+     during paint. */
+  min-width: 56px;
 }
 .category-score-tone-ok .category-score-num {
   color: #6ce39a;
@@ -774,9 +799,17 @@
   }
   .category-score-label {
     font-size: 12.5px;
+    /* Tighter score min-width at this breakpoint (48px below) means
+       the label slot can extend a bit further. Keeps the same 8px
+       visual buffer between label and score (48 + 8 = 56). */
+    max-width: calc(100% - 56px);
   }
   .category-score-num {
     font-size: 16px;
+    /* Score font drops to 16px here, so the rendered "100 / 100"
+       width fits in ~48px. Match the min-width to avoid wasted
+       right-side space on iPhone SE / Mini widths. */
+    min-width: 48px;
   }
   .category-score-max {
     font-size: 11.5px;
