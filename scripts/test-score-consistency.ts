@@ -100,11 +100,14 @@ test("declared 61, sum 57 → canonical 57 (NOT 61, no invalid bonus)", () => {
 });
 
 // ── 4. Defensive fallback: missing sub-score ─────────────────────
-console.log("\n[4] Missing sub-score — falls back to declared header");
-test("declared 51, only 5/6 sub-scores parseable → canonical = declared", () => {
+console.log("\n[4] Missing sub-score — derived from overall when 5 of 6 parse");
+test("5/6 parsed + overall=51 → 6th derived → sum equals overall", () => {
   // Drop the "Technical Accessibility" line entirely so the parser
-  // can't find its sub-score. With incomplete data we MUST NOT
-  // emit a wrong canonical (sum without one term would under-count).
+  // can't find its sub-score from the markdown. The 5-of-6 derived-
+  // fill (added 2026-05-15 to kill the customer-facing "— / 100"
+  // placeholder) fills tech = 51 - (14+8+12+9+8) = 0, in-range for
+  // tech.max=10, so the parser injects it. Canonical sum then
+  // equals overall.
   const md = `# GEO Visibility Report
 ## 1. AI Visibility Score
 **Overall Score: 51/100 — Needs Work**
@@ -116,8 +119,35 @@ Breakdown:
 - **Brand / Entity Clarity: 8/10** — reason.
 `;
   const s = parseReportScoreBreakdown(md);
-  assert.equal(s.overall, 51, "fallback to declared when sub-scores incomplete");
-  assert.equal(s.rubricSum, null, "rubricSum should be null on partial parse");
+  // Canonical now equals declared because 5/6 parsed + 1 derived
+  // sums to 51.
+  assert.equal(s.overall, 51, "5/6 parsed + 1 derived → canonical sums to declared");
+  assert.equal(s.rubricSum, 51, "rubricSum is populated after derived-fill");
+  // The derived sub-score is the missing tech category, value 0.
+  const tech = s.categories.find((c) => c.key === "tech");
+  assert.equal(tech?.score, 0, "missing tech derived as 51 - sum(other 5) = 0");
+});
+
+test("2-of-6 missing → both stay null (no over-eager fill)", () => {
+  // When more than one sub-score is missing, the derived-fill must
+  // NOT attempt to guess — the math has too many unknowns. Both
+  // missing categories stay null.
+  const md = `# GEO Visibility Report
+## 1. AI Visibility Score
+**Overall Score: 51/100 — Needs Work**
+Breakdown:
+- **Structured Data / Schema: 14/25** — reason.
+- **AI Crawler Readiness: 8/20** — reason.
+- **Local Trust Signals: 12/20** — reason.
+- **Content Depth + FAQ Quality: 9/15** — reason.
+`;
+  const s = parseReportScoreBreakdown(md);
+  const brand = s.categories.find((c) => c.key === "brand");
+  const tech = s.categories.find((c) => c.key === "tech");
+  assert.equal(brand?.score, null, "brand stays null when 2+ are missing");
+  assert.equal(tech?.score, null, "tech stays null when 2+ are missing");
+  // With 4/6 sub-scores only, rubricSum is null (need all 6).
+  assert.equal(s.rubricSum, null);
 });
 
 // ── 5. The exact cmp2ip6q regression ─────────────────────────────

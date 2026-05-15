@@ -27,19 +27,18 @@ export function ReportCtaCard({
   const mailto = `mailto:${fixRequestEmail}?subject=${encodeURIComponent(subject)}`;
 
   return (
-    <section className="cta-card" aria-label="AI Visibility Profile Setup offer">
+    <section className="cta-card" aria-label="AI Visibility Foundation Fix offer">
       <div className="cta-card-accent" />
       <div className="cta-card-body">
-        <div className="cta-card-eyebrow">AI Visibility Profile Setup</div>
+        <div className="cta-card-eyebrow">AI Visibility Foundation Fix</div>
         <h2 className="cta-card-headline">
-          Set up your AI Visibility Profile
+          Fix the foundation AI systems use to recommend you
         </h2>
         <p className="cta-card-lede">
-          Turn this audit into an AI-readable business profile. We
-          create and help install the machine-readable identity layer
-          — schema, llms.txt, entity signals, AI-readable summary —
-          so AI systems can better understand, crawl, and interpret
-          your business.
+          We repair the machine-readable foundation behind your site
+          — structured business identity, llms.txt, entity signals,
+          AI-readable summary — so AI systems can verify, trust, and
+          recommend your business with confidence.
         </p>
 
         <div className="cta-card-badges">
@@ -52,7 +51,7 @@ export function ReportCtaCard({
         </div>
 
         <a className="cta-card-button" href={mailto}>
-          Request My AI Visibility Profile Setup →
+          Request My AI Visibility Foundation Fix →
         </a>
         <p className="cta-card-fineprint">
           Or reply to your delivery email — we&rsquo;ll send a scoped

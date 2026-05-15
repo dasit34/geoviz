@@ -107,7 +107,7 @@ export default async function TestReportPage() {
       <section className="border-t border-white/5">
         <div className="container-page py-12">
           <p className="section-eyebrow">Fix Pack — customer deliverable</p>
-          <h2 className="h3 mt-2">The AI Visibility Profile Setup template, prefilled.</h2>
+          <h2 className="h3 mt-2">The AI Visibility Foundation Fix template, prefilled.</h2>
           <p className="muted mt-2 text-sm">
             Bracketed placeholders are filled by the consultant during
             fulfillment.

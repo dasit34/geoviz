@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   cleanScoreSectionBody,
   clipDriverText,
-  derivePlatformVisibility,
   deriveStrengths,
   extractFixMeta,
   inferFixPriority,
@@ -22,14 +21,13 @@ import { ReportScoreCard } from "./ReportScoreCard";
 import { ReportCtaCard } from "./ReportCtaCard";
 import { CategoryScoreCard } from "./CategoryScoreCard";
 import { StrengthCard } from "./StrengthCard";
-import { PlatformVisibilityRow } from "./PlatformVisibilityRow";
 import { RadarChart } from "./RadarChart";
 import "@/app/report/[id]/print/print.css";
 
 /**
  * Admin-facing report preview. Mirrors the customer-facing print
  * page exactly — same score card, same section cards, same
- * AI Visibility Profile Setup card — so the admin preview shows what the
+ * AI Visibility Foundation Fix card — so the admin preview shows what the
  * customer sees in their email link / PDF. Toggle to raw markdown
  * when triaging audit output.
  */
@@ -78,7 +76,6 @@ export function ReportViewerClient({
     scoreDrivers.negative.length > 0 ||
     summaryFixes.length > 0;
   const strengths = deriveStrengths(score);
-  const platforms = derivePlatformVisibility(markdown, score);
 
   return (
     <div>
@@ -166,30 +163,10 @@ export function ReportViewerClient({
             )}
           </section>
 
-          {/* Platform visibility — four fixed rows */}
-          <section className="report-section-card report-section-impact mt-10">
-            <div className="report-section-card-header">
-              <p className="section-eyebrow">
-                Section 04 · Platform visibility
-              </p>
-              <span className="pill">
-                ChatGPT · Claude · Gemini · Perplexity
-              </span>
-            </div>
-            <h2 className="h2 mt-3">
-              How AI systems may interpret this site.
-            </h2>
-            <p className="muted mt-3 max-w-2xl text-sm">
-              A short interpretive read of how each platform is
-              positioned to find, parse, and confidently recommend your
-              business.
-            </p>
-            <div className="platform-list mt-6">
-              {platforms.map((p) => (
-                <PlatformVisibilityRow key={p.platform} status={p} />
-              ))}
-            </div>
-          </section>
+          {/* Platform visibility section removed pre-launch
+              (2026-05-15). The per-platform tier rows were inferred
+              from rubric scores rather than direct platform queries
+              and felt unfinished in customer PDFs. */}
 
           {whySection ? (
             <ItemListSection

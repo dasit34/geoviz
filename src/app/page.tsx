@@ -187,7 +187,7 @@ export default function Page() {
             <HowItWorksStep
               index={3}
               title="Human review checks the report"
-              body="Every report is read end-to-end before delivery — directional intelligence framed for action, not raw model output."
+              body="Every report is read end-to-end before delivery — clear, actionable findings, not raw model output."
             />
             <HowItWorksStep
               index={4}
@@ -196,8 +196,8 @@ export default function Page() {
             />
             <HowItWorksStep
               index={5}
-              title="Optional AI Visibility Profile Setup improves AI readiness"
-              body="If you want us to install your AI Visibility Profile — schema, llms.txt, entity signals, and AI-readable summary — the setup is available as a separate engagement."
+              title="Optional AI Visibility Foundation Fix repairs what's missing"
+              body="If you want us to install the foundation — structured business identity, llms.txt, entity signals, AI-readable summary — the Foundation Fix is available as a separate engagement."
             />
           </div>
         </div>
@@ -419,21 +419,21 @@ export default function Page() {
                 proposition, not the label. */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-accent">
-                AI Visibility Profile
+                AI Visibility Foundation Fix
               </p>
               <span className="pill">Optional next step</span>
             </div>
 
             <h2 className="h2 mt-5 max-w-2xl">
-              GeoViz AI Visibility Profile Setup
+              GeoViz AI Visibility Foundation Fix
             </h2>
             <p className="muted mt-4 max-w-2xl text-base leading-relaxed">
-              Turn your audit findings into a machine-readable business
-              profile AI systems can better understand. After your audit,
-              GeoViz can create and help install an AI-readable visibility
-              layer for your business — including structured schema,
-              service/location mapping, trust signals, llms.txt guidance,
-              and an AI-readable business profile.
+              Repair the foundation AI systems use to find, verify, and
+              recommend your business. After your audit, GeoViz installs
+              the machine-readable layer — structured business identity,
+              service and location signals, trust markers, llms.txt
+              guidance, and an AI-readable summary — so AI tools can
+              understand and recommend you with confidence.
             </p>
 
             {/* Price panel — distinct visual unit inside the card so
@@ -446,7 +446,7 @@ export default function Page() {
               <div className="flex flex-wrap items-end gap-3">
                 <span className="text-5xl font-bold text-white">$497</span>
                 <span className="pb-1 text-sm text-white/55">
-                  One-time AI Visibility Profile setup
+                  One-time AI Visibility Foundation Fix
                 </span>
               </div>
               <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/60">
@@ -485,10 +485,10 @@ export default function Page() {
             </ul>
 
             <a
-              href="mailto:support@geoviz.ai?subject=AI%20Visibility%20Profile%20Setup%20inquiry"
+              href="mailto:support@geoviz.ai?subject=AI%20Visibility%20Foundation%20Fix%20inquiry"
               className="btn-primary mt-8 w-full justify-center text-base sm:w-auto"
             >
-              Request AI Visibility Profile Setup
+              Request AI Visibility Foundation Fix
             </a>
             <p className="mt-3 text-xs text-white/45">
               Available after your audit completes. We&rsquo;ll review

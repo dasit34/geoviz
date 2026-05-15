@@ -1,7 +1,6 @@
 import {
   cleanScoreSectionBody,
   clipDriverText,
-  derivePlatformVisibility,
   deriveStrengths,
   extractFixMeta,
   inferFixPriority,
@@ -23,7 +22,6 @@ import { ReportScoreCard } from "@/components/ReportScoreCard";
 import { ReportCtaCard } from "@/components/ReportCtaCard";
 import { CategoryScoreCard } from "@/components/CategoryScoreCard";
 import { StrengthCard } from "@/components/StrengthCard";
-import { PlatformVisibilityRow } from "@/components/PlatformVisibilityRow";
 import { RadarChart } from "@/components/RadarChart";
 
 /**
@@ -110,7 +108,6 @@ export function AuditReportContent({
     summaryFixes.length > 0;
 
   const strengths = deriveStrengths(score);
-  const platforms = derivePlatformVisibility(reportMarkdown, score);
 
   return (
     <div className="report-host bg-ink-950 text-white">
@@ -177,9 +174,9 @@ export function AuditReportContent({
             />
           ) : null}
           <p className="report-score-consistency-note">
-            Scores are directional intelligence signals designed to
-            show relative readiness, risk, and improvement opportunities
-            — not absolute guarantees of any AI outcome.
+            These scores estimate how clearly AI systems can
+            understand and recommend your business — directional,
+            not a ranking guarantee.
           </p>
         </section>
 
@@ -231,27 +228,13 @@ export function AuditReportContent({
           )}
         </section>
 
-        {/* Platform visibility — 4 fixed rows */}
-        <section className="report-section-card report-section-impact mt-10">
-          <div className="report-section-card-header">
-            <p className="section-eyebrow">Section 04 · Platform visibility</p>
-            <span className="pill">
-              ChatGPT · Claude · Gemini · Perplexity
-            </span>
-          </div>
-          <h2 className="h2 mt-3">
-            How AI systems may interpret this site.
-          </h2>
-          <p className="muted mt-3 max-w-2xl text-sm">
-            A short interpretive read of how each platform is positioned
-            to find, parse, and confidently recommend your business.
-          </p>
-          <div className="platform-list mt-6">
-            {platforms.map((p) => (
-              <PlatformVisibilityRow key={p.platform} status={p} />
-            ))}
-          </div>
-        </section>
+        {/* Platform visibility section removed pre-launch (2026-05-15)
+            — the per-platform "Visibility profile pending" rows were
+            inferred from rubric tiers, not direct platform queries,
+            and the placeholder copy felt unfinished in customer PDFs.
+            The underlying inference now lives only in the model's
+            prose (where it can name the specific missing signal)
+            rather than as a dedicated section. */}
 
         {whySection ? (
           <ItemListSection

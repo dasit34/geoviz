@@ -562,10 +562,28 @@ sharp; do NOT repeat the same finding across sections):
 
 SCORE FRAMING (mandatory — one short clarifying line near the
 top of Section 1 OR in Business Impact):
-  The score is directional. A lower score means weaker
-  machine-readable confidence — NOT a ranking guarantee. Customers
-  should treat it as a visibility-quality read, not a position
-  promise.
+  These scores estimate how clearly AI systems can understand
+  and recommend the business. Lower = AI has less usable signal
+  to verify and recommend. NOT a ranking guarantee. Write this
+  framing in plain business-owner language; avoid jargon like
+  "directional intelligence", "machine-readable confidence",
+  "relative readiness".
+
+POSITIONING (mandatory — frame every page around AI TRUST and
+DISCOVERABILITY for the business, not "AI SEO" or technical
+plumbing):
+  Lean INTO: whether AI can VERIFY this business, whether AI
+  TRUSTS the entity, whether AI has enough USABLE INFORMATION
+  to recommend it, whether competitors provide CLEARER signals.
+  Lean AWAY FROM: "AI SEO", "search optimization", schema-tag
+  jargon for its own sake, abstract methodology talk.
+  Examples of GOOD framing language:
+    - "AI systems struggle to verify this business."
+    - "Competitors provide clearer machine-readable signals."
+    - "Conflicting location signals weaken recommendation
+       confidence."
+    - "Without a verified business identity, AI tools default
+       to whoever they can confirm faster."
 
 # GEO Visibility Report
 
@@ -1089,10 +1107,28 @@ sharp; do NOT repeat the same finding across sections):
 
 SCORE FRAMING (mandatory — one short clarifying line near the
 top of Section 1 OR in Business Impact):
-  The score is directional. A lower score means weaker
-  machine-readable confidence — NOT a ranking guarantee. Customers
-  should treat it as a visibility-quality read, not a position
-  promise.
+  These scores estimate how clearly AI systems can understand
+  and recommend the business. Lower = AI has less usable signal
+  to verify and recommend. NOT a ranking guarantee. Write this
+  framing in plain business-owner language; avoid jargon like
+  "directional intelligence", "machine-readable confidence",
+  "relative readiness".
+
+POSITIONING (mandatory — frame every page around AI TRUST and
+DISCOVERABILITY for the business, not "AI SEO" or technical
+plumbing):
+  Lean INTO: whether AI can VERIFY this business, whether AI
+  TRUSTS the entity, whether AI has enough USABLE INFORMATION
+  to recommend it, whether competitors provide CLEARER signals.
+  Lean AWAY FROM: "AI SEO", "search optimization", schema-tag
+  jargon for its own sake, abstract methodology talk.
+  Examples of GOOD framing language:
+    - "AI systems struggle to verify this business."
+    - "Competitors provide clearer machine-readable signals."
+    - "Conflicting location signals weaken recommendation
+       confidence."
+    - "Without a verified business identity, AI tools default
+       to whoever they can confirm faster."
 
 # GEO Visibility Report
 

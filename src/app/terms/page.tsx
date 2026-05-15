@@ -86,7 +86,7 @@ export default function TermsPage() {
                 The AI Visibility Audit is offered at the price displayed
                 at checkout. Payment is processed by Stripe; we never
                 store your full card number on our servers. The optional
-                AI Visibility Profile Setup is quoted separately.
+                AI Visibility Foundation Fix is quoted separately.
               </p>
               <p>
                 Refund handling is covered by our{" "}
