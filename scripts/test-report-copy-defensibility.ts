@@ -234,6 +234,115 @@ test("'bad'-tier labels are not absolute or overclaim", () => {
   }
 });
 
+// ─── 4. "AI Discoverability / Machine Trust" positioning ─────────
+console.log("\n[4] AI Discoverability + machine-trust positioning (final polish 2026-05-15)");
+
+test("worker prompt names the canonical audit-shape options", () => {
+  // The prompt should explicitly name the four positioning options
+  // the user specified in the final-polish pass so the model never
+  // drifts back to "AI SEO" framing.
+  const shapes = [
+    "AI Visibility Audit",
+    "AI Discoverability Audit",
+    "Machine Readability Audit",
+    "Recommendation Readiness Audit",
+  ];
+  for (const shape of shapes) {
+    assert.ok(
+      WORKER_FLAT.includes(shape),
+      `worker prompt must explicitly name the audit shape "${shape}"`,
+    );
+  }
+});
+
+test("worker prompt includes the canonical evidence-based framing line", () => {
+  // The user-specified canonical framing line that the model can
+  // use when explaining what was evaluated. Must appear verbatim
+  // so the model has a stock phrase to reach for.
+  assert.ok(
+    WORKER_FLAT.includes(
+      "We evaluated whether modern AI systems can confidently identify, retrieve, interpret, and recommend this business based on publicly accessible signals",
+    ),
+    "worker prompt must include the canonical evidence-based framing line",
+  );
+});
+
+test("worker prompt bans the 10 hype phrases from the final-polish spec", () => {
+  // The exact 10 banned phrases from the user's final-polish spec.
+  // These must all appear in the worker prompt's banned list so the
+  // model can never emit them.
+  const banned = [
+    "AI SEO",
+    "AI hack",
+    "dominate AI",
+    "rank higher in AI",
+    "AI ranking",
+    "ChatGPT visibility",
+    "Claude ranking",
+    "Perplexity score",
+    "guaranteed recommendations",
+    "guaranteed ranking",
+  ];
+  for (const phrase of banned) {
+    assert.ok(
+      WORKER_FLAT.includes(phrase),
+      `worker prompt must include "${phrase}" in its banned-phrase list (so the model sees it labeled as forbidden)`,
+    );
+  }
+});
+
+test("worker prompt forbids direct-platform-query claims explicitly", () => {
+  // Final-polish hardening: ensure the prompt explicitly tells the
+  // model NEVER to say or imply that we queried any specific
+  // platform live.
+  assert.ok(
+    WORKER_FLAT.includes("We tested ChatGPT/Claude/Gemini live") ||
+      WORKER_FLAT.includes("We queried <platform> directly"),
+    "prompt should list explicit forbidden direct-query phrasings",
+  );
+  assert.ok(
+    WORKER_FLAT.includes("Based on available site and visibility signals"),
+    "prompt should provide the preferred inference-shaped opener",
+  );
+});
+
+test("AuditReportContent score-clarification line uses the evidence-based framing", () => {
+  // The customer-visible score-clarification line must use the
+  // exact evidence-based wording the user specified, not the
+  // earlier shorter version.
+  const audit = readFileSync(
+    join(REPO, "src/components/AuditReportContent.tsx"),
+    "utf-8",
+  ).replace(/\s+/g, " ");
+  assert.ok(
+    audit.includes(
+      "The GeoViz score reflects how confidently modern AI systems can identify, interpret, and reference your business using publicly accessible website and trust signals",
+    ),
+    "score-clarification line should use the canonical evidence-based wording",
+  );
+});
+
+test("CTA lede frames the offer as scoped infrastructure work, not magic", () => {
+  // The CTA lede must read as foundational infrastructure
+  // engagement — calm, technical, NOT "magic ranking service".
+  const flat = CTA.replace(/\s+/g, " ");
+  assert.ok(
+    flat.includes("scoped infrastructure engagement"),
+    "CTA lede should describe the offer as a scoped infrastructure engagement",
+  );
+  // And must not contain any of the banned hype phrases.
+  const bannedInCta = [
+    /\bmagic\b/i,
+    /\binstant fix\b/i,
+    /\bguaranteed\b/i,
+    /\bdominate\b/i,
+    /\bAI SEO\b/i,
+  ];
+  for (const rx of bannedInCta) {
+    assert.ok(!rx.test(CTA), `CTA must not contain hype pattern ${rx.source}`);
+  }
+});
+
 console.log(
   `\n[report-copy-defensibility] passed=${passed} failed=${failed} total=${passed + failed}`,
 );

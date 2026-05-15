@@ -35,10 +35,11 @@ export function ReportCtaCard({
           Fix the foundation AI systems use to recommend you
         </h2>
         <p className="cta-card-lede">
-          We repair the machine-readable foundation behind your site
-          — structured business identity, llms.txt, entity signals,
-          AI-readable summary — so AI systems can verify, trust, and
-          recommend your business with confidence.
+          A scoped infrastructure engagement that installs the
+          machine-readable signals AI systems use to identify,
+          verify, and reference your business — structured business
+          identity, llms.txt, entity signals, AI-readable summary,
+          cross-platform NAP alignment.
         </p>
 
         <div className="cta-card-badges">

@@ -569,10 +569,21 @@ top of Section 1 OR in Business Impact):
   "directional intelligence", "machine-readable confidence",
   "relative readiness".
 
-POSITIONING (mandatory — this report is an AI TRUST + DISCOVERABILITY
-audit, NOT an "AI SEO" audit. Frame every section around whether
-AI systems can VERIFY this business, TRUST what they find, and
-have enough USABLE INFORMATION to recommend it):
+POSITIONING (mandatory — this report is one of:
+  AI Visibility Audit / AI Discoverability Audit / Machine Readability
+  Audit / Recommendation Readiness Audit
+  It is NOT "AI SEO". It is NOT a marketing ranking service. It is
+  NOT a magic-fix product. The audit evaluates whether your site
+  contains the technical, structural, and trust signals commonly
+  required for AI retrieval and recommendation systems — based
+  ENTIRELY on publicly accessible signals, never on direct platform
+  queries.
+
+  The canonical framing line to use when the report needs to
+  explain what was evaluated:
+    "We evaluated whether modern AI systems can confidently
+     identify, retrieve, interpret, and recommend this business
+     based on publicly accessible signals."
 
   Lean INTO:
     - Trust: contradictions, inconsistencies, conflicting NAP,
@@ -586,18 +597,50 @@ have enough USABLE INFORMATION to recommend it):
     - Customer-answer content: does the site answer the actual
       questions customers ask AI tools? (pricing, hours, service
       area, what's included, response time, etc.)
+    - Cross-platform consistency: same business name, address,
+      phone, founding date, services across the site + third-party
+      surfaces (Google, BBB, Yelp, social).
+    - Publicly accessible signals: ONLY evaluate what an AI crawler
+      could reach on the open web — no behind-login content, no
+      assumed-but-unverified claims.
 
-  Lean AWAY FROM:
-    - "AI SEO" / "search optimization" / "ranking" framing.
-    - Schema-tag jargon for its own sake.
+  Lean AWAY FROM (banned phrasing — never use these):
+    - "AI SEO" / "search optimization" / "rank in AI" / "rank
+      higher in AI" / "AI ranking"
+    - "ChatGPT visibility" / "Claude ranking" / "Perplexity score"
+      / "Gemini ranking" (any phrasing that implies we measured a
+      specific platform's behavior directly)
+    - "querying GPT directly" / "we asked ChatGPT" / "we tested
+      Claude" / "we evaluated Perplexity's response" (we did NOT
+      query any platform live)
+    - "dominate AI search" / "beat competitors instantly" / "AI
+      hack" / "AI growth hack" / "guaranteed recommendations" /
+      "guaranteed ranking"
+    - "magic" / "instant fix" (the offer is a multi-day engagement,
+      not a button)
     - Abstract methodology talk ("directional intelligence
       signals", "machine-readable confidence", "relative readiness").
+    - Schema-tag jargon for its own sake.
     - Promising AI placement, recommendation, or ranking outcomes.
     - Generic "best practices" prose unanchored to specific found-
       or-missing signals on THIS site.
 
+  Platform-visibility framing (when the prose discusses what
+  individual AI systems may interpret):
+    NEVER say or imply:
+      "We tested ChatGPT/Claude/Gemini live."
+      "We queried <platform> directly."
+      "<platform> sees your business as…"
+    INSTEAD say:
+      "Based on available site and visibility signals, AI systems
+       may struggle to…"
+      "The signals AI retrieval systems commonly use to verify a
+       business are missing here."
+      "AI systems would need the following to confidently
+       recommend…"
+
   Each weakness statement MUST name the specific missing signal +
-  the specific business consequence. Examples:
+  the specific business consequence. Examples (target this tone):
     - "AI systems struggle to verify this business — no structured
        business identity in the page source."
     - "Conflicting location signals (Trenton, IL vs. St. Louis Metro
@@ -608,6 +651,8 @@ have enough USABLE INFORMATION to recommend it):
        site itself, so AI can't confirm what a customer would see."
     - "Without a verified business identity, AI tools default to
        whoever they can confirm faster."
+    - "Cross-platform NAP consistency is incomplete — the homepage
+       shows one address, the contact page another."
 
   Style discipline:
     - Short sentences. Lead with the consequence.
@@ -1145,10 +1190,21 @@ top of Section 1 OR in Business Impact):
   "directional intelligence", "machine-readable confidence",
   "relative readiness".
 
-POSITIONING (mandatory — this report is an AI TRUST + DISCOVERABILITY
-audit, NOT an "AI SEO" audit. Frame every section around whether
-AI systems can VERIFY this business, TRUST what they find, and
-have enough USABLE INFORMATION to recommend it):
+POSITIONING (mandatory — this report is one of:
+  AI Visibility Audit / AI Discoverability Audit / Machine Readability
+  Audit / Recommendation Readiness Audit
+  It is NOT "AI SEO". It is NOT a marketing ranking service. It is
+  NOT a magic-fix product. The audit evaluates whether your site
+  contains the technical, structural, and trust signals commonly
+  required for AI retrieval and recommendation systems — based
+  ENTIRELY on publicly accessible signals, never on direct platform
+  queries.
+
+  The canonical framing line to use when the report needs to
+  explain what was evaluated:
+    "We evaluated whether modern AI systems can confidently
+     identify, retrieve, interpret, and recommend this business
+     based on publicly accessible signals."
 
   Lean INTO:
     - Trust: contradictions, inconsistencies, conflicting NAP,
@@ -1162,18 +1218,50 @@ have enough USABLE INFORMATION to recommend it):
     - Customer-answer content: does the site answer the actual
       questions customers ask AI tools? (pricing, hours, service
       area, what's included, response time, etc.)
+    - Cross-platform consistency: same business name, address,
+      phone, founding date, services across the site + third-party
+      surfaces (Google, BBB, Yelp, social).
+    - Publicly accessible signals: ONLY evaluate what an AI crawler
+      could reach on the open web — no behind-login content, no
+      assumed-but-unverified claims.
 
-  Lean AWAY FROM:
-    - "AI SEO" / "search optimization" / "ranking" framing.
-    - Schema-tag jargon for its own sake.
+  Lean AWAY FROM (banned phrasing — never use these):
+    - "AI SEO" / "search optimization" / "rank in AI" / "rank
+      higher in AI" / "AI ranking"
+    - "ChatGPT visibility" / "Claude ranking" / "Perplexity score"
+      / "Gemini ranking" (any phrasing that implies we measured a
+      specific platform's behavior directly)
+    - "querying GPT directly" / "we asked ChatGPT" / "we tested
+      Claude" / "we evaluated Perplexity's response" (we did NOT
+      query any platform live)
+    - "dominate AI search" / "beat competitors instantly" / "AI
+      hack" / "AI growth hack" / "guaranteed recommendations" /
+      "guaranteed ranking"
+    - "magic" / "instant fix" (the offer is a multi-day engagement,
+      not a button)
     - Abstract methodology talk ("directional intelligence
       signals", "machine-readable confidence", "relative readiness").
+    - Schema-tag jargon for its own sake.
     - Promising AI placement, recommendation, or ranking outcomes.
     - Generic "best practices" prose unanchored to specific found-
       or-missing signals on THIS site.
 
+  Platform-visibility framing (when the prose discusses what
+  individual AI systems may interpret):
+    NEVER say or imply:
+      "We tested ChatGPT/Claude/Gemini live."
+      "We queried <platform> directly."
+      "<platform> sees your business as…"
+    INSTEAD say:
+      "Based on available site and visibility signals, AI systems
+       may struggle to…"
+      "The signals AI retrieval systems commonly use to verify a
+       business are missing here."
+      "AI systems would need the following to confidently
+       recommend…"
+
   Each weakness statement MUST name the specific missing signal +
-  the specific business consequence. Examples:
+  the specific business consequence. Examples (target this tone):
     - "AI systems struggle to verify this business — no structured
        business identity in the page source."
     - "Conflicting location signals (Trenton, IL vs. St. Louis Metro
@@ -1184,6 +1272,8 @@ have enough USABLE INFORMATION to recommend it):
        site itself, so AI can't confirm what a customer would see."
     - "Without a verified business identity, AI tools default to
        whoever they can confirm faster."
+    - "Cross-platform NAP consistency is incomplete — the homepage
+       shows one address, the contact page another."
 
   Style discipline:
     - Short sentences. Lead with the consequence.
