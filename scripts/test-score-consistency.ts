@@ -27,6 +27,7 @@ import {
   parseReportScoreBreakdown,
   bandLabelForOverall,
 } from "../src/lib/parse-report";
+import { parseReportScore } from "../src/lib/parse-report-score";
 
 let passed = 0;
 let failed = 0;
@@ -204,6 +205,53 @@ test("empty markdown returns all-null score shape", () => {
   assert.equal(s.overall, null);
   assert.equal(s.declaredOverall, null);
   assert.equal(s.rubricSum, null);
+});
+
+// ── 9. Canonical-source invariant: admin parser === PDF parser ───
+console.log("\n[9] Canonical-source invariant — parseReportScore matches parseReportScoreBreakdown");
+test("admin parser returns the same overall as the PDF parser (cmp2ip6q regression)", () => {
+  // 2026-05-15 launch-hardening fix: admin dashboard used a SECOND
+  // parser (parseReportScore) that ignored the canonical fix and
+  // returned the model's declared hero. Result: admin showed 38
+  // while the PDF showed 42 for the same audit. This test locks in
+  // the unification.
+  const md = make({ declaredOverall: 51, schema: 14, crawler: 8, trust: 12, content: 9, brand: 8, tech: 6 });
+  const breakdown = parseReportScoreBreakdown(md);
+  const adminScore = parseReportScore(md);
+  assert.ok(adminScore !== null, "admin parser must return non-null when breakdown succeeds");
+  assert.equal(
+    adminScore!.score,
+    breakdown.overall,
+    `admin parser (${adminScore!.score}) must equal canonical (${breakdown.overall})`,
+  );
+});
+
+test("admin parser uses canonical even when model's declared header disagrees with rubric sum", () => {
+  // Mirrors the prod bug exactly: model wrote 38 in header, sub-
+  // scores sum to 42. Pre-fix: admin showed 38, PDF showed 42.
+  // Post-fix: both show 42.
+  const md = make({ declaredOverall: 38, schema: 12, crawler: 7, trust: 9, content: 7, brand: 4, tech: 3 });
+  const breakdown = parseReportScoreBreakdown(md);
+  const adminScore = parseReportScore(md);
+  assert.equal(breakdown.declaredOverall, 38, "test setup sanity — declared was 38");
+  assert.equal(breakdown.rubricSum, 42, "test setup sanity — sub-scores sum to 42");
+  assert.equal(breakdown.overall, 42, "canonical pipeline returns 42");
+  assert.equal(adminScore!.score, 42, "admin pipeline must ALSO return 42 (unified)");
+});
+
+test("admin parser band label tracks canonical, not declared", () => {
+  // declared 28 (At Risk band 26-45) → canonical sum 50 (Needs Work
+  // band 46-65). Admin must show "Needs Work", not "At Risk".
+  const md = make({ declaredOverall: 28, schema: 12, crawler: 8, trust: 10, content: 9, brand: 6, tech: 5 });
+  const adminScore = parseReportScore(md);
+  assert.equal(adminScore!.score, 50);
+  assert.equal(adminScore!.status, "Needs Work");
+});
+
+test("admin parser returns null on empty / unparseable input (no fake score)", () => {
+  assert.equal(parseReportScore(""), null);
+  assert.equal(parseReportScore("nothing in here"), null);
+  assert.equal(parseReportScore(null), null);
 });
 
 console.log(

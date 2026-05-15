@@ -704,11 +704,16 @@
      during initial paint. 64px = score's min-width (56px) + 8px
      visual buffer to avoid touching the score edge. */
   max-width: calc(100% - 64px);
-  /* Force unbreakable strings ("Recommendation") to break inside
-     the slot rather than overflowing horizontally and visually
-     overlapping the score column. */
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  /* 2026-05-15 launch-hardening: prefer word-boundary breaks over
+     mid-word breaks. `overflow-wrap: break-word` only breaks WORDS
+     that don't fit (vs. `anywhere` which breaks at ANY character
+     and produced ugly mid-word splits like "Recommendati / on
+     Readiness" in PDFs). Disable hyphens so we don't leak any
+     browser-default hyphenation that would also look unfinished. */
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 .category-score-num {
   font-size: 18px;
@@ -1843,6 +1848,18 @@
     padding: 14px 16px 16px !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+  /* 2026-05-15: PDF rendering was splitting long category labels
+     mid-word ("Recommendati / on Readiness"). In the print/PDF
+     context the 3-col card has plenty of room for any single word
+     in our label set — force WORD-BOUNDARY breaks only, and
+     disable hyphenation explicitly so Chromium's PDF renderer
+     can't insert a soft-hyphen break. */
+  .category-score-label {
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+    hyphens: none !important;
+    -webkit-hyphens: none !important;
   }
   .strength-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
