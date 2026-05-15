@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { AuditReportContent } from "@/components/AuditReportContent";
 import {
   SAMPLE_REGISTRY,
+  findAvailableSamples,
   findSampleAudit,
   findSampleEntryBySlug,
   type SampleEntry,
@@ -56,6 +57,16 @@ export default async function SampleReportSlugPage({
 
   const audit = await findSampleAudit(entry).catch(() => null);
 
+  // Pull every other archetype that has a generated audit so we can
+  // render the "Additional sample audits" grid below the report.
+  // This grid used to live on `/sample-report` (the index page);
+  // moved here when /sample-report became a redirect so the cross-
+  // archetype affordance isn't lost.
+  const allAvailable = await findAvailableSamples().catch(
+    () => [] as SampleEntry[],
+  );
+  const otherAvailable = allAvailable.filter((e) => e.slug !== entry.slug);
+
   return (
     <main>
       <Header />
@@ -66,6 +77,7 @@ export default async function SampleReportSlugPage({
           orderId={audit.id}
           reportMarkdown={audit.reportMarkdown}
           reportGeneratedAt={audit.reportGeneratedAt}
+          otherAvailable={otherAvailable}
         />
       ) : (
         <PendingSample entry={entry} />
@@ -81,11 +93,13 @@ function RealSample({
   orderId,
   reportMarkdown,
   reportGeneratedAt,
+  otherAvailable,
 }: {
   entry: SampleEntry;
   orderId: string;
   reportMarkdown: string;
   reportGeneratedAt: Date | null;
+  otherAvailable: SampleEntry[];
 }) {
   return (
     <>
@@ -111,6 +125,14 @@ function RealSample({
         reportGeneratedAt={reportGeneratedAt}
       />
 
+      {/* Additional sample audits — moved here from the old
+          `/sample-report` index page (which is now a redirect).
+          Lets a visitor see other archetypes without leaving the
+          full-report context. */}
+      {otherAvailable.length > 0 ? (
+        <AdditionalSamples entries={otherAvailable} />
+      ) : null}
+
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-16 text-center">
           <h2 className="h2 mx-auto max-w-2xl">
@@ -124,13 +146,57 @@ function RealSample({
             <Link href="/order" className="btn-primary">
               Request My AI Visibility Audit
             </Link>
-            <Link href="/sample-report" className="btn-ghost">
-              View other samples
+            <Link href="/" className="btn-ghost">
+              Back to homepage
             </Link>
           </div>
         </div>
       </section>
     </>
+  );
+}
+
+/**
+ * "Additional sample audits" grid. Renders every archetype other
+ * than the current one so a visitor can jump straight to a peer
+ * sample (e.g. plumbing → roofing). Previously lived on the
+ * `/sample-report` index page; moved here when that became a
+ * redirect. Same markup, same hover styles — only relocated.
+ */
+function AdditionalSamples({ entries }: { entries: SampleEntry[] }) {
+  return (
+    <section className="border-t border-white/5 bg-ink-950">
+      <div className="container-page py-14">
+        <p className="section-eyebrow">Additional sample audits</p>
+        <h2 className="h2 mt-3 max-w-3xl">
+          See the same dashboard across different business archetypes.
+        </h2>
+        <p className="muted mt-3 max-w-2xl text-sm">
+          Real audits — real scores, real findings — produced by the
+          same engine and template you&rsquo;d receive.
+        </p>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {entries.map((entry) => (
+            <Link
+              key={entry.slug}
+              href={`/sample-report/${entry.slug}`}
+              className="card card-hover block"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
+                {entry.businessName}
+              </p>
+              <p className="muted mt-2 text-[11px] break-all">
+                {entry.publicUrl}
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-white/85">
+                {entry.archetypeBlurb}
+              </p>
+              <p className="mt-4 text-xs text-accent">View report →</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
