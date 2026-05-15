@@ -174,9 +174,10 @@ export function AuditReportContent({
             />
           ) : null}
           <p className="report-score-consistency-note">
-            These scores estimate how clearly AI systems can
-            understand and recommend your business — directional,
-            not a ranking guarantee.
+            The GeoViz score reflects how confidently modern AI
+            systems can identify, interpret, and reference your
+            business using publicly accessible website and trust
+            signals. Directional — not a ranking guarantee.
           </p>
         </section>
 
