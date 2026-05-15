@@ -123,28 +123,55 @@ test("worker prompt forbids direct-platform-query claims", () => {
 });
 
 test("worker prompt frames score as directional, not a ranking guarantee", () => {
-  assert.ok(/score is directional/i.test(WORKER), "score framing line should mark score as directional");
-  assert.ok(/NOT a ranking guarantee/i.test(WORKER), "score framing line should explicitly disclaim rankings");
+  // 2026-05-15 polish: prompt now uses plain business-owner wording
+  // ("estimate how clearly AI systems can understand and recommend
+  // the business") instead of "directional / machine-readable
+  // confidence" jargon. The non-ranking-guarantee discipline must
+  // still be present.
+  assert.ok(
+    /estimate how clearly AI systems can understand/i.test(WORKER) ||
+      /score is directional/i.test(WORKER),
+    "score framing should explain in plain language that the score estimates AI-recommendation clarity",
+  );
+  assert.ok(
+    /NOT a ranking guarantee/i.test(WORKER),
+    "score framing should still disclaim rankings",
+  );
 });
 
 // ─── 2. Static CTA copy — premium + conversion-oriented ──────────
 console.log("\n[2] CTA card — premium + non-absolute static copy");
 
-test("CTA headline uses 'Set up your AI Visibility Profile'", () => {
+test("CTA headline matches the AI Visibility Foundation Fix framing", () => {
+  // 2026-05-15 rename: "AI Visibility Profile Setup" → "AI Visibility
+  // Foundation Fix" — the offer name now emphasizes infrastructure
+  // repair, not profile setup. Headline shifted from "Set up your
+  // …" passive framing to "Fix the foundation …" active framing.
   assert.ok(
-    CTA.includes("Set up your AI Visibility Profile"),
-    "expected the new CTA headline to be present",
+    /Fix the foundation/i.test(CTA),
+    "expected the Foundation Fix headline to be present",
   );
   assert.ok(
     !CTA.includes("Install your AI Visibility Profile"),
-    "old 'Install' headline must be replaced",
+    "legacy 'Install your AI Visibility Profile' headline must be replaced",
+  );
+  assert.ok(
+    !CTA.includes("Set up your AI Visibility Profile"),
+    "intermediate 'Set up your AI Visibility Profile' headline must be replaced",
   );
 });
 
-test("CTA lede includes 'Turn this audit into an AI-readable business profile'", () => {
+test("CTA eyebrow/label uses the new 'AI Visibility Foundation Fix' name", () => {
   assert.ok(
-    CTA.includes("Turn this audit into an AI-readable business profile"),
-    "expected the user-specified hook in the lede",
+    CTA.includes("AI Visibility Foundation Fix"),
+    "expected the renamed offer label in the CTA card",
+  );
+  // No remnant of the legacy name except where it might appear as
+  // legacy-context comments; ensure the customer-visible eyebrow
+  // text doesn't carry the old name.
+  assert.ok(
+    !/cta-card-eyebrow"\s*>\s*AI Visibility Profile Setup\s*<\/div>/.test(CTA),
+    "eyebrow tag must render the new Foundation Fix name",
   );
 });
 

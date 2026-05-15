@@ -171,11 +171,23 @@ export function parseReportScoreBreakdown(
   }
 
   const categories: ScoreCategory[] = CATEGORIES.map((cat) => {
-    const re = new RegExp(
+    // Two-stage match: first try the strict format (category name +
+    // optional separator + score/max), then fall back to a tolerant
+    // match that allows up to 40 chars on the same line between the
+    // category name and the score/max. The tolerant pattern catches
+    // model output like "Business Info AI Can Read (Structured
+    // Data): 14/25" where extra prose appears between the name and
+    // the score — which used to produce "— / 100" placeholders in
+    // customer reports.
+    const strict = new RegExp(
       `${cat.pattern.source}\\s*[:\\-—]?\\s*\\*?\\*?(\\d{1,3})\\s*/\\s*${cat.max}\\b`,
       "i",
     );
-    const m = re.exec(md);
+    const tolerant = new RegExp(
+      `${cat.pattern.source}[^\\n]{0,40}?(\\d{1,3})\\s*/\\s*${cat.max}\\b`,
+      "i",
+    );
+    const m = strict.exec(md) ?? tolerant.exec(md);
     return {
       key: cat.key,
       label: cat.label,
@@ -185,6 +197,45 @@ export function parseReportScoreBreakdown(
       score: m ? clamp(Number(m[1]), 0, cat.max) : null,
     };
   });
+
+  // Derive a single missing sub-score from the canonical overall
+  // when 5 of 6 categories parsed AND the model's overall header is
+  // present. Mathematically consistent — the only value that makes
+  // the sub-scores add up to the declared overall. Belt-and-
+  // suspenders against the customer-facing "— / 100" placeholder
+  // bug: any time we can derive a clean integer, prefer it.
+  //
+  // Why this is safe: rubric weights are fixed (Schema 25 + Crawler
+  // 20 + Trust 20 + Content 15 + Brand 10 + Tech 10 = 100). If five
+  // of six parsed cleanly, the sixth is `overall - sum(other five)`.
+  // We only fill when the derived value is in [0, that_category_max].
+  // Outside that range = the model arithmetic is too far off to
+  // safely guess; leave null and let the renderer fallback handle it.
+  const missingCount = categories.filter((c) => c.score === null).length;
+  if (missingCount === 1) {
+    const declaredHeaderMatch =
+      /Overall\s*Score\s*[:\-—]?\s*\*?\*?(\d{1,3})\s*\/\s*100/i.exec(md);
+    const declaredHeader = declaredHeaderMatch
+      ? clamp(Number(declaredHeaderMatch[1]), 0, 100)
+      : null;
+    if (declaredHeader !== null) {
+      const knownSum = categories
+        .filter((c) => typeof c.score === "number")
+        .reduce((s, c) => s + (c.score as number), 0);
+      const derived = declaredHeader - knownSum;
+      const missingIdx = categories.findIndex((c) => c.score === null);
+      if (missingIdx >= 0) {
+        const missing = categories[missingIdx]!;
+        if (derived >= 0 && derived <= missing.max) {
+          categories[missingIdx] = { ...missing, score: derived };
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[geo-score-consistency] derived missing sub-score key=${missing.key} value=${derived}/${missing.max} from overall=${declaredHeader} (5/6 parsed)`,
+          );
+        }
+      }
+    }
+  }
 
   const overallMatch =
     /Overall\s*Score\s*[:\-—]?\s*\*?\*?(\d{1,3})\s*\/\s*100/i.exec(md) ??
