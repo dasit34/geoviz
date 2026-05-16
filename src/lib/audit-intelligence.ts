@@ -23,6 +23,7 @@ import {
 } from "@/lib/intelligence/render/renderIntelligence";
 import { obscuraProvider } from "@/lib/intelligence/render/obscuraProvider";
 import type { RenderIntelligenceResult } from "@/lib/intelligence/render/renderProvider";
+import { runPreflight } from "@/lib/intelligence/preflight/runPreflight";
 
 /**
  * Prisma's nullable Json columns require the `Prisma.JsonNull`
@@ -187,6 +188,42 @@ export async function persistAuditIntelligence(args: {
       `[audit-intelligence] upsert failed orderId=${orderId} message="${message}"`,
     );
     return { ok: false, reason: "upsert_failed" };
+  }
+
+  // ─── V2 Preflight intelligence ──────────────────────────────────
+  // Runs AFTER the main upsert so a preflight failure cannot leave
+  // the base intelligence row unwritten. Fetches the homepage HTML
+  // once on the Node side, then dispatches to four analyzers
+  // (readability, schema validation, crawlability, entity
+  // consistency). The consolidated PreflightSignals JSON is
+  // persisted to AuditIntelligence.preflightSignals.
+  //
+  // Fail-soft: the orchestrator itself never throws, but we still
+  // wrap the awaited call in try/catch so a Prisma update failure
+  // doesn't propagate. Operational data only — not consumed by
+  // scoring, not shown to customers in V1.
+  try {
+    const preflight = await runPreflight(websiteUrl);
+    await prisma.auditIntelligence.update({
+      where: { auditOrderId: orderId },
+      data: {
+        preflightSignals: preflight as unknown as Prisma.InputJsonValue,
+      },
+    });
+    console.log(
+      `[preflight] ${preflight.ok ? "success" : "partial"} orderId=${orderId} url=${preflight.fetchedUrl ?? websiteUrl} ` +
+        `fetchOk=${preflight.fetchOk} ` +
+        `readability=${preflight.readability ? `wc${preflight.readability.wordCount}` : "-"} ` +
+        `schema=${preflight.schema ? `${preflight.schema.score}/100` : "-"} ` +
+        `crawl=${preflight.crawlability ? `${preflight.crawlability.score}/100` : "-"} ` +
+        `entity=${preflight.entityConsistency ? `${preflight.entityConsistency.score}/100` : "-"} ` +
+        `durMs=${preflight.runDurationMs}`,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[preflight] persistence failed orderId=${orderId} (non-fatal): ${message}`,
+    );
   }
 
   // ─── V2 Stage 2 — Optional render pass ──────────────────────────

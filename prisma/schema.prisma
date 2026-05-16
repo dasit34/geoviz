@@ -242,6 +242,17 @@ model AuditIntelligence {
   schemaDeltaDetected        Boolean? // true when renderedSchemaTypes ⊋ rawSchemaTypes
   contentDeltaDetected       Boolean? // true when renderedTextLength / rawTextLength > threshold
 
+  // ─── V2 Preflight intelligence ──────────────────────────────────
+  // Populated post-audit by `src/lib/intelligence/preflight/runPreflight.ts`
+  // in a fail-soft try/catch alongside the Stage 1 ingest. Captures
+  // Node-side structured signals that the Claude prompt can't reliably
+  // produce: parsed JSON-LD entity field validation, direct
+  // robots.txt / sitemap.xml / canonical / meta-robots inspection,
+  // and name/phone/address consistency across homepage + footer +
+  // schema. Not consumed by scoring, not shown to customers — V2
+  // research surface only. Pre-preflight rows stay null.
+  preflightSignals           Json?
+
   @@index([createdAt])
   @@index([websiteUrl])
 }

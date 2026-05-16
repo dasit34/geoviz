@@ -386,6 +386,11 @@ Important:
 - Prioritize understandable business value
 - Benchmarking must be statistically grounded before aggressive marketing claims
 
+V2 modules shipped so far:
+- `src/lib/intelligence/intelligenceIngest.ts` — Stage 1 ingest (readability heuristic, entity extraction, CMS/framework detection, score provenance). Runs post-audit, persists to `AuditIntelligence`.
+- `src/lib/intelligence/render/*` — Stage 2 optional headless render probe. Compares raw HTML vs post-render to detect blank-shell / hydration / client-only-content patterns.
+- `src/lib/intelligence/preflight/*` — Preflight intelligence stage. One Node-side HTML fetch fans out to four analyzers: `extractReadableContent` (Mozilla Readability via JSDOM), `validateSchema` (JSON-LD entity field validation), `auditCrawlability` (robots.txt + sitemap.xml + canonical + meta-robots), `checkEntityConsistency` (name/phone/address across schema + homepage + footer). Output persisted to `AuditIntelligence.preflightSignals` (Json?). Worker can OPTIONALLY inject a "validated preflight signals" context block into the audit prompt when `GEO_PREFLIGHT_PROMPT=on` — default off, prompt is byte-for-byte unchanged otherwise. **Never affects scoring** — operates as a separate V2 metric layer, not as rubric weights.
+
 ━━━━━━━━━━━━━━━━━━━━
 V3 — ACTION LAYER
 ━━━━━━━━━━━━━━━━━━━━
