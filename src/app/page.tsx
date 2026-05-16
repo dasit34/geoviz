@@ -83,6 +83,10 @@ export default function Page() {
             <p className="mt-6 text-xs text-white/65">
               Operator-reviewed before delivery.
             </p>
+            <p className="mt-2 text-xs text-white/55">
+              110+ AI visibility audits run across local businesses,
+              service companies, and niche brands.
+            </p>
           </div>
 
           <div className="relative flex items-center justify-center">
@@ -378,7 +382,7 @@ export default function Page() {
                 Normally $147 — currently $97 for early customers
               </p>
               <ul className="mt-6 space-y-3 text-sm text-white/80">
-                <PricingBullet>Full audit across 6 scoring categories</PricingBullet>
+                <PricingBullet>Full audit across 8 AI visibility dimensions</PricingBullet>
                 <PricingBullet>Visibility Score (0–100) with band</PricingBullet>
                 <PricingBullet>Top 3 issues with severity + impact</PricingBullet>
                 <PricingBullet>Top 3 fixes with priority + difficulty</PricingBullet>
@@ -482,12 +486,12 @@ export default function Page() {
               </SafetyLine>
             </ul>
 
-            <a
-              href="mailto:support@geoviz.ai?subject=AI%20Visibility%20Foundation%20Fix%20inquiry"
+            <Link
+              href="/foundation-fix"
               className="btn-primary mt-8 w-full justify-center text-base sm:w-auto"
             >
               Request AI Visibility Foundation Fix
-            </a>
+            </Link>
             <p className="mt-3 text-xs text-white/45">
               Available after your audit completes. We&rsquo;ll review
               your results and reply with a scoped setup plan within one

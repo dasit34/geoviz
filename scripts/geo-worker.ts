@@ -760,7 +760,7 @@ warranty, named service area) but weak technical signals (no
 schema, no llms.txt, thin content), include this exact sentence:**
 
   "Your real-world reputation is stronger than your website signals.
-  The fix is making that trust easier for Google and AI tools to
+  The fix is making that trust easier for AI tools to
   understand."
 
 Do NOT include that sentence when the evidence does not support it.
@@ -1381,7 +1381,7 @@ warranty, named service area) but weak technical signals (no
 schema, no llms.txt, thin content), include this exact sentence:**
 
   "Your real-world reputation is stronger than your website signals.
-  The fix is making that trust easier for Google and AI tools to
+  The fix is making that trust easier for AI tools to
   understand."
 
 Do NOT include that sentence when the evidence does not support it.

@@ -240,7 +240,7 @@ export function createDefaultRawFetcher(): RawFetcher {
             // don't serve us a bot-shaped fallback. Generic UA — not
             // pretending to be a specific Chrome version.
             "User-Agent":
-              "Mozilla/5.0 (compatible; GeoVizRenderProbe/1.0; +https://geoviz.app)",
+              "Mozilla/5.0 (compatible; GeoVizRenderProbe/1.0; +https://geoviz.ai)",
             Accept: "text/html,application/xhtml+xml",
           },
         });

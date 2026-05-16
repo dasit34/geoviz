@@ -1,6 +1,7 @@
 import {
   cleanScoreSectionBody,
   clipDriverText,
+  deriveBestCurrentSignals,
   deriveStrengths,
   extractFixMeta,
   inferFixPriority,
@@ -108,6 +109,10 @@ export function AuditReportContent({
     summaryFixes.length > 0;
 
   const strengths = deriveStrengths(score);
+  const bestSignals = strengths.length === 0
+    ? deriveBestCurrentSignals(score, 3)
+    : [];
+  const showBestSignalsFallback = strengths.length === 0 && bestSignals.length > 0;
 
   return (
     <div className="report-host bg-ink-950 text-white">
@@ -160,6 +165,7 @@ export function AuditReportContent({
             below, so the customer's first scoring touchpoint is the
             horizontal category bars (more readable for non-technical
             owners) instead of the radar shape. */}
+        <p className="section-eyebrow mt-12">Section 01 · Executive summary</p>
         {issueItems.length >= 2 || fixItems.length >= 2 ? (
           <ExecutiveAtAGlance issues={issueItems} fixes={fixItems} />
         ) : null}
@@ -205,26 +211,50 @@ export function AuditReportContent({
           </div>
         </section>
 
-        {/* Top strengths — derived from category scores ≥ 70% */}
+        {/* Top strengths (≥70%) when present; otherwise fall back to
+            "Best current signals" — the top-N highest scoring categories
+            with an honest caveat. The two surfaces are conditional on
+            strengths.length so customers never see a negative
+            "No category scored…" message in a section called Top
+            Strengths. */}
         <section className="report-section-card report-section-strengths mt-10">
           <div className="report-section-card-header">
-            <p className="section-eyebrow">Section 03 · Top strengths</p>
+            <p className="section-eyebrow">
+              {showBestSignalsFallback
+                ? "Section 03 · Best current signals"
+                : "Section 03 · Top strengths"}
+            </p>
             {strengths.length > 0 ? (
               <span className="pill">{strengths.length} surfaced</span>
             ) : null}
           </div>
-          <h2 className="h2 mt-3">What&rsquo;s working in your favor.</h2>
+          <h2 className="h2 mt-3">
+            {showBestSignalsFallback
+              ? "Your strongest current signals."
+              : "What's working in your favor."}
+          </h2>
           {strengths.length > 0 ? (
             <div className="strength-grid mt-6">
               {strengths.map((s) => (
                 <StrengthCard key={s.key} label={s.label} />
               ))}
             </div>
+          ) : showBestSignalsFallback ? (
+            <>
+              <p className="muted mt-5 text-sm">
+                These are the strongest current signals in the audit,
+                even if they still need improvement.
+              </p>
+              <div className="strength-grid mt-6">
+                {bestSignals.map((s) => (
+                  <StrengthCard key={s.key} label={s.label} />
+                ))}
+              </div>
+            </>
           ) : (
             <p className="muted mt-5 text-sm">
-              No category scored at least 70% of its maximum. Every
-              dimension has room to grow — see Top Issues and Quick Fixes
-              below.
+              Every dimension has room to grow — see Top Issues and
+              Quick Fixes below.
             </p>
           )}
         </section>
@@ -316,7 +346,7 @@ export function AuditReportContent({
         <footer className="report-footer">
           <div className="report-footer-brand">GeoViz</div>
           <div className="report-footer-meta">
-            AI Visibility Audits for local businesses · geoviz.app
+            AI Visibility Audits for local businesses · geoviz.ai
           </div>
           <div className="report-footer-id">Report ID: {orderId}</div>
         </footer>
@@ -326,9 +356,9 @@ export function AuditReportContent({
 }
 
 const SECTION_EYEBROWS: Record<string, string> = {
-  why: "Section 02 · Diagnosis",
-  "fix-first": "Section 03 · Action plan",
-  happens: "Section 04 · Business impact",
+  why: "Section 04 · Diagnosis",
+  "fix-first": "Section 05 · Action plan",
+  happens: "Section 06 · Business impact",
   "tech-details": "Appendix · Technical details",
   other: "Section",
 };
