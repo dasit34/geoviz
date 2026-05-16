@@ -1484,7 +1484,42 @@ async function runViaApi(
 
   try {
     const client = new Anthropic({ apiKey });
-    const prompt = buildAuditPrompt(websiteUrl, competitorUrl, options);
+    let prompt = buildAuditPrompt(websiteUrl, competitorUrl, options);
+
+    // ─── V2 Preflight prompt augmentation (feature-flagged) ──────────
+    // When GEO_PREFLIGHT_PROMPT=on, run the Node-side preflight stage
+    // BEFORE the Claude API call and inject a "Validated preflight
+    // signals" context block at the top of the user prompt. Default
+    // off — production behavior is byte-for-byte unchanged unless an
+    // operator explicitly enables this flag.
+    //
+    // Critically: this block is CONTEXT only. It does not introduce
+    // new rubric categories, new weights, or new band thresholds.
+    // Claude still scores per the frozen v1 rubric; preflight just
+    // gives it more reliable structured input to reason over.
+    if (process.env.GEO_PREFLIGHT_PROMPT === "on") {
+      try {
+        const { runPreflight } = await import(
+          "../src/lib/intelligence/preflight/runPreflight"
+        );
+        const preflight = await runPreflight(websiteUrl);
+        if (preflight.ok && preflight.fetchOk) {
+          const block = formatPreflightPromptBlock(preflight);
+          prompt = `${block}\n\n${prompt}`;
+          console.log(
+            `[preflight-prompt] injected url=${preflight.fetchedUrl ?? websiteUrl} bytes=${block.length}`,
+          );
+        } else {
+          console.warn(
+            `[preflight-prompt] skipped url=${websiteUrl} fetchOk=${preflight.fetchOk} fetchError="${preflight.fetchError ?? "-"}"`,
+          );
+        }
+      } catch (err) {
+        console.warn(
+          `[preflight-prompt] threw url=${websiteUrl} (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
 
     const response = await client.messages.create(
       {
@@ -2704,3 +2739,75 @@ main().catch((err) => {
   logErr("[geo-worker] fatal:", err);
   process.exit(1);
 });
+
+// ─── V2 Preflight prompt formatter ────────────────────────────────
+// Renders the preflight orchestrator's structured signals into a
+// terse markdown block that's prepended to the audit prompt when
+// GEO_PREFLIGHT_PROMPT=on. The block sits ABOVE the rubric — Claude
+// can use it as ground-truth context but the rubric itself is
+// untouched (frozen per CLAUDE.md scoring freeze).
+//
+// Why a terse markdown table instead of JSON: Claude reads loose
+// markdown more reliably than embedded JSON, and a small fixed-shape
+// table keeps the additional token count minimal.
+type PreflightLike = {
+  fetchedUrl: string | null;
+  readability: { wordCount: number; parsedByReadability: boolean; articleTitle: string | null } | null;
+  schema: { score: number; presentFields: string[]; missingFields: string[]; detectedTypes: string[] } | null;
+  crawlability: { score: number; passedChecks: string[]; failedChecks: string[] } | null;
+  entityConsistency: { score: number; inconsistencies: string[] } | null;
+};
+function formatPreflightPromptBlock(p: PreflightLike): string {
+  const lines: string[] = [
+    "### Validated preflight signals (Node-side, ground truth)",
+    "",
+    `Source URL: ${p.fetchedUrl ?? "(none)"}`,
+    "",
+  ];
+  if (p.readability) {
+    lines.push(
+      `- Readable content: ${p.readability.wordCount} words ` +
+        `(${p.readability.parsedByReadability ? "Readability OK" : "fallback extraction"})`,
+    );
+    if (p.readability.articleTitle) {
+      lines.push(`  - Title: ${p.readability.articleTitle}`);
+    }
+  }
+  if (p.schema) {
+    lines.push(
+      `- Structured data: ${p.schema.score}/100 ` +
+        `(present: ${p.schema.presentFields.join(", ") || "none"}; ` +
+        `missing: ${p.schema.missingFields.join(", ") || "none"})`,
+    );
+    if (p.schema.detectedTypes.length > 0) {
+      lines.push(`  - @type detected: ${p.schema.detectedTypes.join(", ")}`);
+    }
+  }
+  if (p.crawlability) {
+    lines.push(
+      `- Crawlability: ${p.crawlability.score}/100 ` +
+        `(passed: ${p.crawlability.passedChecks.length}; ` +
+        `failed: ${p.crawlability.failedChecks.length})`,
+    );
+    if (p.crawlability.failedChecks.length > 0) {
+      lines.push(
+        `  - Failed: ${p.crawlability.failedChecks.join(", ")}`,
+      );
+    }
+  }
+  if (p.entityConsistency) {
+    lines.push(
+      `- Entity consistency: ${p.entityConsistency.score}/100`,
+    );
+    if (p.entityConsistency.inconsistencies.length > 0) {
+      lines.push(
+        `  - Issues: ${p.entityConsistency.inconsistencies.slice(0, 3).join("; ")}`,
+      );
+    }
+  }
+  lines.push(
+    "",
+    "Treat these as ground-truth context (not new categories). Score per the rubric below.",
+  );
+  return lines.join("\n");
+}
