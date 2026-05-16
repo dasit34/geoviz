@@ -72,7 +72,7 @@ const CATEGORIES: Array<
   {
     key: "schema",
     label: "Structured Data / Schema",
-    short: "Recommendation Readiness",
+    short: "Recommendation Ready",
     tooltip:
       "How clearly AI systems can identify who you are and what you do.",
     max: 25,
@@ -81,7 +81,7 @@ const CATEGORIES: Array<
   {
     key: "crawler",
     label: "AI Crawler Readiness",
-    short: "Technical Accessibility",
+    short: "Technical Access",
     tooltip:
       "Whether AI systems can access and understand your website content.",
     max: 20,
@@ -393,6 +393,44 @@ export function deriveStrengths(score: ReportScore): CategoryStrength[] {
       score: c.score,
       max: c.max,
     }));
+}
+
+// Neutral, honest labels for the fallback "Best current signals"
+// surface. We can't call a sub-70% category a "strength" — but we
+// can identify which category is *relatively* strongest and describe
+// what it measures. The honesty comes from the section-level caveat
+// line ("even if they still need improvement"); these labels just
+// name the dimension neutrally.
+const BEST_SIGNAL_LABELS: Record<ScoreCategoryKey, string> = {
+  schema: "Structured business identity",
+  crawler: "AI crawler access",
+  trust: "Trust signals (reviews, citations, NAP)",
+  content: "Service and FAQ content",
+  brand: "Brand identity clarity",
+  tech: "AI-readable site structure",
+};
+
+// Returns the top-N categories by raw score/max ratio regardless of
+// threshold. Used when deriveStrengths() returns empty so the report
+// still gives the reader an honest "this is the strongest of what you
+// have" surface instead of the previous negative fallback message.
+export function deriveBestCurrentSignals(
+  score: ReportScore,
+  n = 3,
+): CategoryStrength[] {
+  return score.categories
+    .filter(
+      (c): c is ScoreCategory & { score: number } =>
+        typeof c.score === "number" && c.max > 0,
+    )
+    .map((c) => ({
+      key: c.key,
+      label: BEST_SIGNAL_LABELS[c.key] ?? c.label,
+      score: c.score,
+      max: c.max,
+    }))
+    .sort((a, b) => b.score / b.max - a.score / a.max)
+    .slice(0, n);
 }
 
 /**

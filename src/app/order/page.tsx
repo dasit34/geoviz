@@ -35,11 +35,10 @@ export default function OrderPage({
             <p className="mt-3 max-w-md text-sm text-white/70">
               Delivered by email — most audits are delivered within
               minutes. Each report is generated using AI-assisted analysis
-              across ChatGPT, Claude, Perplexity, and Gemini, then
-              reviewed for clarity before delivery.
+              across ChatGPT, Claude, Perplexity, and Gemini.
             </p>
             <p className="mt-3 text-xs italic text-white/50">
-              We run a limited number of audits per day to keep results accurate.
+              Each report is reviewed for clarity before delivery.
             </p>
 
             <ul className="mt-8 space-y-3 text-sm text-white/75">

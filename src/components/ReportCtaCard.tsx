@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * Sales-focused CTA card that REPLACES the markdown rendering of the
  * "Done-For-You Fix" section. The styled component lives in the same
@@ -8,6 +6,11 @@
  *
  * Uses light-theme colors with a heavy orange accent so it prints
  * cleanly on a white A4 page without looking like raw markdown.
+ *
+ * The CTA button used to mailto: a support address, which lost most
+ * customers between the click and an actual composed email. It now
+ * routes to the in-app /foundation-fix form which captures structured
+ * data + emails the operator via Resend.
  */
 export function ReportCtaCard({
   orderId,
@@ -16,15 +19,11 @@ export function ReportCtaCard({
   orderId: string;
   businessLabel: string;
 }) {
-  // Resolve at render-time, not module-load. Top-level `process.env`
-  // access in a module that gets bundled into the client chunk has
-  // been observed to break the webpack module factory after big
-  // server/client refactors (Next 14, App Router). Moving the lookup
-  // inside the function body keeps the module body side-effect-free.
-  const fixRequestEmail =
-    process.env.FIX_REQUEST_EMAIL ?? "fix@geoviz.app";
-  const subject = `Fix request — ${businessLabel} (${orderId.slice(-6)})`;
-  const mailto = `mailto:${fixRequestEmail}?subject=${encodeURIComponent(subject)}`;
+  const params = new URLSearchParams({ orderId });
+  if (businessLabel && businessLabel.length > 0) {
+    params.set("businessName", businessLabel);
+  }
+  const href = `/foundation-fix?${params.toString()}`;
 
   return (
     <section className="cta-card" aria-label="AI Visibility Foundation Fix offer">
@@ -51,41 +50,14 @@ export function ReportCtaCard({
           </span>
         </div>
 
-        <a className="cta-card-button" href={mailto}>
+        <a className="cta-card-button" href={href}>
           Request My AI Visibility Foundation Fix →
         </a>
         <p className="cta-card-fineprint">
-          Or reply to your delivery email — we&rsquo;ll send a scoped
-          setup plan within one business day. Complex websites may
-          require custom scoping.
+          We&rsquo;ll send a scoped setup plan within one business day.
+          Complex websites may require custom scoping.
         </p>
       </div>
     </section>
-  );
-}
-
-// `Check` icon was used by the bullet list that previously
-// duplicated the report's section-2/3 content. The new sharper
-// CTA copy drops the bullet list — Check is unreferenced.
-function _UnusedCheck() {
-  return (
-    <svg
-      className="cta-card-check"
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <circle cx="9" cy="9" r="9" fill="#ff7a18" />
-      <path
-        d="M5 9.4 L7.8 12 L13 6.5"
-        fill="none"
-        stroke="#ffffff"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

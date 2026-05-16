@@ -21,7 +21,7 @@ import { resolveAppBaseUrl } from "@/lib/app-url";
  */
 export type GeneratePdfArgs = {
   orderId: string;
-  /** Public-ish base URL the headless browser will fetch (e.g. https://geoviz.app) */
+  /** Public-ish base URL the headless browser will fetch (e.g. https://geoviz.ai) */
   baseUrl: string;
   /** Hard timeout for the whole PDF generation in ms (default 60s). */
   timeoutMs?: number;

@@ -501,7 +501,7 @@ function buildCustomerConfirmationHtml(args: {
             <tr>
               <td style="padding:18px 32px 26px;border-top:1px solid #eee;">
                 <p style="margin:14px 0 0;font-size:11.5px;line-height:1.5;color:#888;">
-                  GeoViz · AI Visibility Audits · geoviz.app
+                  GeoViz · AI Visibility Audits · geoviz.ai
                 </p>
               </td>
             </tr>
