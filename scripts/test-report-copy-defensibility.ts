@@ -343,6 +343,88 @@ test("CTA lede frames the offer as scoped infrastructure work, not magic", () =>
   }
 });
 
+// ─── 5. Public-CTA recipe abstraction (final-polish 2026-05-15) ──
+//
+// The Foundation Fix's implementation recipe ("schema, llms.txt,
+// entity signals, AI-readable summary") was leaking into public CTA
+// + offer surfaces. That recipe is what we DELIVER, not what we
+// sell. Marketing copy should describe OUTCOMES one abstraction
+// layer above the ingredients. The audit-finding prose (model-
+// generated inside Sections 2/3 of every report) keeps its
+// specificity — only the high-level sales/CTA surfaces abstract.
+console.log("\n[5] Public CTA + offer surfaces abstract recipe out of marketing copy");
+
+const HOMEPAGE = readFileSync(join(REPO, "src/app/page.tsx"), "utf-8");
+const HOMEPAGE_FLAT = HOMEPAGE.replace(/\s+/g, " ");
+
+test("public CTA surfaces do NOT list the implementation recipe together", () => {
+  // The recipe pattern: "schema" + "llms.txt" + "entity signals"
+  // appearing in close proximity (within ~120 chars). The CTA lede
+  // previously had all three in one sentence.
+  const recipeWindow = /schema[\s\S]{0,120}?llms\.txt[\s\S]{0,120}?entity signals/i;
+  assert.ok(
+    !recipeWindow.test(CTA),
+    "ReportCtaCard.tsx lede must not list schema + llms.txt + entity signals together",
+  );
+  // Same check on the homepage offer subtitle. The subtitle is the
+  // paragraph that lives inside the offer block — narrower scope to
+  // avoid catching unrelated mentions elsewhere on the page.
+  const offerBlock = HOMEPAGE.split("GeoViz AI Visibility Foundation Fix")[1] ?? "";
+  const offerSubtitle = offerBlock.slice(0, 800);
+  assert.ok(
+    !recipeWindow.test(offerSubtitle),
+    "homepage offer subtitle must not list schema + llms.txt + entity signals together",
+  );
+});
+
+test("public CTA surfaces use the new abstract framing", () => {
+  // Each surface should include EITHER the user's preferred
+  // "underlying technical, trust, and discoverability gaps" framing
+  // OR the alternate "AI discoverability, machine readability, and
+  // recommendation confidence" framing.
+  const ABSTRACT_FRAMINGS = [
+    /underlying technical, trust, and discoverability gaps/i,
+    /AI discoverability, machine readability, and recommendation confidence/i,
+  ];
+  const ctaHasAbstract = ABSTRACT_FRAMINGS.some((rx) => rx.test(CTA));
+  assert.ok(ctaHasAbstract, "ReportCtaCard.tsx must use abstract framing");
+  const homepageHasAbstract = ABSTRACT_FRAMINGS.some((rx) => rx.test(HOMEPAGE));
+  assert.ok(homepageHasAbstract, "homepage must use abstract framing");
+});
+
+test("preserved disclaimers still present (price, timeline, custom-scoping)", () => {
+  // The abstraction must NOT have stripped any of the structural
+  // disclaimer language the spec explicitly preserves.
+  assert.ok(CTA.includes("$497"), "CTA must keep $497 price");
+  assert.ok(CTA.includes("3–5 business days"), "CTA must keep 3–5 business days");
+  assert.match(
+    CTA_FLAT,
+    /complex websites may require custom scoping/i,
+    "CTA must keep custom-scoping disclaimer",
+  );
+  assert.ok(HOMEPAGE.includes("$497"), "homepage must keep $497 price");
+  assert.ok(HOMEPAGE.includes("3–5 business days"), "homepage must keep 3–5 business days");
+  assert.match(
+    HOMEPAGE_FLAT,
+    /complex sites may require custom scoping/i,
+    "homepage must keep custom-scoping disclaimer (existing copy uses 'complex sites')",
+  );
+});
+
+test("worker prompt still lists implementation specifics inside audit-finding territory", () => {
+  // The recipe should still appear in the WORKER PROMPT — that's
+  // where audit findings live and where specific fixes belong.
+  // Catches an over-correction that would scrub the recipe
+  // everywhere.
+  const concreteFixes = ["JSON-LD", "llms.txt", "FAQ"];
+  for (const phrase of concreteFixes) {
+    assert.ok(
+      WORKER_FLAT.includes(phrase),
+      `worker prompt should retain "${phrase}" (model needs to name concrete fixes in audit findings, even though CTA copy abstracts)`,
+    );
+  }
+});
+
 console.log(
   `\n[report-copy-defensibility] passed=${passed} failed=${failed} total=${passed + failed}`,
 );
