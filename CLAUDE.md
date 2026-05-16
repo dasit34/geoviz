@@ -13,6 +13,44 @@ We are building a lean MVP that sells paid AI Visibility Reports with manual ful
 ## Brand Name
 GeoViz
 
+## Tone & Positioning Language
+
+The voice of GeoViz across product, copy, prompt, and code comments
+is **intelligence-grade**: evidence-driven, serious, technically
+credible, machine-aware. Treat the language list below as binding
+across customer-facing surfaces, the worker prompt, internal
+comments, and any new docs.
+
+**Prefer:**
+- "AI visibility"
+- "AI readability"
+- "entity clarity"
+- "machine-readable trust signals"
+- "discoverability confidence"
+- "retrieval confidence"
+- "recommendation readiness"
+- "AI visibility intelligence"
+- "entity readiness analysis"
+- "machine-readable business infrastructure"
+
+**Avoid:**
+- generic startup language ("game-changing", "revolutionary",
+  "unlock", "supercharge")
+- fake AI hype ("magic", "AI-powered", "instant AI optimization")
+- fluffy SEO terminology ("rank higher", "boost rankings",
+  "dominate search", "10x your visibility")
+- overpromising ("guaranteed", "always works", "every time")
+
+**Never claim:**
+- guaranteed rankings
+- guaranteed AI recommendations
+- guaranteed indexing
+- direct platform-query results (e.g., "ChatGPT will say…")
+
+This list complements the existing customer-positioning rules in
+`## Positioning (CRITICAL)` below and the worker-prompt defensible-
+language block in `scripts/geo-worker.ts`.
+
 ## Positioning (CRITICAL)
 Do NOT lead with “GEO.”
 Do NOT assume users understand AI search.
@@ -24,6 +62,47 @@ Always frame as:
 
 Primary headline:
 “When customers ask ChatGPT who to hire, does your business show up?”
+
+## Strategic Direction — AI Visibility Infrastructure
+
+The MVP scope (`## MVP Scope (STRICT)` below) is intentionally lean —
+audits, manual fulfillment, no dashboards. But every product
+decision and every architectural choice should be evaluated against
+the longer arc GeoViz is building toward: **AI Visibility
+Infrastructure** for local businesses.
+
+**Business-model framing.** The pieces fit together as:
+- The **audit** is customer acquisition. Low-friction entry point,
+  delivers immediate intelligence value.
+- The **AI Visibility Layer** (Foundation Fix evolution — see
+  `## AI Visibility Layer Direction` below) is the platform. The
+  thing that actually changes a business's machine-readable
+  footprint.
+- **Monitoring** becomes recurring revenue. Once a business has
+  invested in the layer, ongoing visibility tracking + change
+  detection becomes a natural subscription.
+- **Telemetry** becomes the moat. Cohort data, before/after deltas,
+  industry benchmarks, AI-crawler behavior patterns — the
+  longitudinal dataset compounds into defensibility no one else has.
+
+**Phase evolution.** The product moves through four phases. Each
+phase strictly preserves the previous phase's working surface
+(scoring freeze, customer-facing report shape, delivery flow).
+
+| Phase | Focus | Status |
+|---|---|---|
+| 1 | AI visibility audits — directional reports, reviewed delivery | Current; v1 scoring frozen per `## Scoring Freeze`. |
+| 2 | AI Visibility Layer / Foundation Fix delivery | Active development; see `## AI Visibility Layer Direction`. |
+| 3 | Monitoring + telemetry — recurring scans, longitudinal tracking, change detection | Architected for in `## Monitoring & Intelligence Module (V2)` of the System Architecture. |
+| 4 | AI visibility infrastructure — automated entity optimization, plugin/snippet installs, persistent AI-readable layers | Long-term; see `## Automation & Action Module (V3)`. |
+
+**What this means for engineering decisions.** When a new feature is
+proposed, ask: "Does this strengthen the audit, the layer,
+monitoring, or telemetry — and does it stay additive across the
+phase boundary?" Avoid choices that lock the product into phase 1
+shape (e.g., schemas that can only describe one-time audits, UI that
+hides recurring data, prompts that fabricate signals that
+monitoring can't reproduce).
 
 ## Target Customers
 Local service businesses:
@@ -63,6 +142,49 @@ Includes:
 - service page clarity improvements
 - FAQ structure for AI readability
 - before/after comparison
+
+## AI Visibility Layer Direction
+
+The Foundation Fix is the on-ramp to a broader **AI Visibility
+Layer** product — a lightweight machine-readable infrastructure
+layer that businesses install once and benefit from across every AI
+retrieval system. The Fix delivers it manually today; the platform
+direction is to make that layer reproducible, monitorable, and
+incrementally automatable.
+
+**Capability evolution** (current → near → longer):
+- **Schema generation**: today, hand-crafted JSON-LD per business.
+  Near: templated generators per business archetype + entity-field
+  validation (already shipped — see preflight `schemaValidation`).
+  Longer: schema served dynamically from a small AI-readable
+  snippet the customer drops in.
+- **llms.txt generation**: today, hand-crafted. Near: a templated
+  generator using audit findings + business profile. Longer:
+  auto-regenerates when the customer's services/locations change.
+- **AI-readable business blocks**: lightweight machine-readable
+  context (services, service area, hours, trust signals)
+  pre-formatted for AI retrieval. Designed to coexist with — not
+  replace — the customer's existing site.
+- **Script / snippet installs**: a single tag the customer drops
+  in to bring the AI-readable layer onto their site. Mirrors the
+  installation pattern of analytics tags / Hotjar / similar.
+- **CMS plugins**: WordPress / Wix / Shopify plugins that drop
+  the layer in without a code change. Aligns with the most common
+  installations seen in V2 intelligence's `cmsDetected` field.
+- **Discoverability monitoring**: scheduled re-audits + change
+  detection on the AI-readable layer. The natural recurring-revenue
+  unit. Architected for in `## Monitoring & Intelligence Module
+  (V2)`.
+- **Automated entity optimization**: V3 territory — agents that
+  propose + (with approval) deploy changes to the layer based on
+  monitoring deltas. See `## Automation & Action Module (V3)`.
+
+**What this is NOT.** The AI Visibility Layer is **not** an attempt
+to rebuild customer websites. We are not a CMS. We are not a site
+builder. We're a thin, focused, machine-readable context layer that
+sits alongside whatever the customer already has. Keep proposals
+that drift into "rewrite the customer's homepage" territory out of
+scope.
 
 ## MVP Scope (STRICT)
 Build ONLY:
@@ -106,6 +228,51 @@ Manual fulfillment is allowed and expected.
 
 Do not introduce unnecessary libraries.
 
+## Intelligence Layer Vocabulary
+
+GeoViz analyzes a fixed set of dimensions across every audit. Use
+these names consistently in code, comments, prompts, and copy so
+queries / log greps / report parsers stay coherent.
+
+**Audit dimensions (the 6-category v1 rubric — frozen, see
+`## Scoring Freeze`):**
+- Schema / Structured Data
+- AI Crawler Readiness
+- Local Trust Signals
+- Content Depth + FAQ Quality
+- Brand / Entity Clarity
+- Technical Accessibility
+
+**Cross-cutting analysis themes** that show up in customer-facing
+prose, intelligence telemetry, and product copy:
+- **AI readability** — how easily an AI system can interpret the
+  site's content (cleaned text density, semantic structure).
+- **Schema / entity structure** — JSON-LD coverage of the
+  LocalBusiness-family entity fields (name, address, telephone,
+  url, geo, openingHours).
+- **Crawlability** — robots.txt, sitemap.xml, meta-robots,
+  canonical chain. Whether AI crawlers can actually reach the
+  business.
+- **Entity consistency** — alignment of name / phone / address
+  across schema, homepage prose, and footer.
+- **Technical accessibility** — page weight, JS hydration shape,
+  blank-shell risk (see V2 Stage 2 render intelligence).
+- **Recommendation readiness** — content depth + FAQ + service
+  clarity that determines whether an AI system has enough signal
+  to *name* the business when a customer asks.
+- **Discoverability signals** — the consolidated read across
+  schema + trust + crawl + content.
+- **Content clarity** — plain-English readability of customer-
+  answering content; how well an AI can quote the business when
+  answering "who should I hire?" queries.
+
+**Where preflight intelligence persists.** The Node-side V2
+preflight stage (added in PR #19) persists structured outputs from
+four analyzers — `extractReadableContent`, `validateSchema`,
+`auditCrawlability`, `checkEntityConsistency` — to
+`AuditIntelligence.preflightSignals` (Json). Detailed shape: see
+`src/lib/intelligence/preflight/types.ts`.
+
 ## Required Pages
 - `/` (landing page)
 - `/order`
@@ -132,6 +299,19 @@ Display:
 - Accent color: orange or electric blue
 - Mobile responsive
 - Looks like a real audit/analysis product
+- Intelligence-grade presentation, restrained animations
+- Reusable components, modular sections
+
+**Avoid:**
+- generic SaaS UI aesthetics
+- excessive gradients
+- `rounded-xl` on every container
+- dashboard clutter
+- startup illustration / mascot aesthetics
+
+See `CLAUDE_DESIGN.md` for the visual source of truth (visual
+identity, avoid-list, and concrete implementation pointers into
+Tailwind config + report print CSS).
 
 ## Conversion Rule
 Every section must reinforce:
@@ -147,6 +327,28 @@ Every section must reinforce:
 - No skipped error handling
 - No fake data in final output
 - Code must run
+
+**Prefer:**
+- incremental improvements over rewrites
+- additive systems (new modules, nullable columns) over edits to
+  load-bearing surfaces
+- modular architecture (see `## GeoViz System Architecture
+  Principles` for the 7-module breakdown)
+- graceful fallbacks (fail-soft contracts; logged warnings instead
+  of customer-visible errors)
+- typed interfaces — every module boundary has an explicit type
+- conservative migrations (nullable columns, no destructive ALTERs)
+
+**Avoid:**
+- overengineering / premature abstractions
+- giant rewrites
+- touching unrelated systems while shipping a focused change
+- premature microservices
+- breaking customer-facing reliability — Stripe checkout, Stripe
+  webhook handling, Resend delivery, and the report-generation
+  worker loop are load-bearing. Verify them against
+  `## Operational Verification (post-deploy)` before merging
+  changes that touch their code paths.
 
 ## Critical Constraint
 Do NOT overbuild.
