@@ -417,7 +417,7 @@ export default function Page() {
           were competing visually with the $97 anchor above. */}
       <section className="border-t border-white/5 bg-ink-950">
         <div className="container-page py-16">
-          <div className="rounded-2xl border border-accent/30 bg-ink-900/70 p-8 md:p-10 shadow-card transition duration-200 ease-out hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-glow">
+          <div className="rounded-lg border border-accent/30 bg-ink-900/70 p-8 md:p-10 shadow-card transition duration-200 ease-out hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-glow">
             {/* Brand row — surfaces the offer name at the top of the
                 card so the headline can lead with the value
                 proposition, not the label. */}
@@ -446,7 +446,7 @@ export default function Page() {
                 (bg-ink-950/50) and a thin border give it card-within-
                 card hierarchy without breaking the parent's accent
                 border. */}
-            <div className="mt-7 rounded-xl border border-white/5 bg-ink-950/50 px-6 py-5 max-w-2xl">
+            <div className="mt-7 rounded-lg border border-white/5 bg-ink-950/50 px-6 py-5 max-w-2xl">
               <div className="flex flex-wrap items-end gap-3">
                 <span className="text-5xl font-bold text-white">$497</span>
                 <span className="pb-1 text-sm text-white/55">

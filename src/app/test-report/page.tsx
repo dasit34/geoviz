@@ -98,7 +98,7 @@ export default async function TestReportPage() {
         <div className="container-page py-12">
           <p className="section-eyebrow">Markdown export</p>
           <h2 className="h3 mt-2">Copy this into Gmail, Google Docs, or your PDF tool.</h2>
-          <pre className="mt-6 max-h-[600px] overflow-auto rounded-xl border border-white/10 bg-ink-900/80 p-6 text-xs leading-relaxed text-white/85">
+          <pre className="mt-6 max-h-[600px] overflow-auto rounded-lg border border-white/10 bg-ink-900/80 p-6 text-xs leading-relaxed text-white/85">
 {markdown}
           </pre>
         </div>
@@ -112,7 +112,7 @@ export default async function TestReportPage() {
             Bracketed placeholders are filled by the consultant during
             fulfillment.
           </p>
-          <pre className="mt-6 max-h-[700px] overflow-auto rounded-xl border border-accent/30 bg-ink-900/80 p-6 text-xs leading-relaxed text-white/85">
+          <pre className="mt-6 max-h-[700px] overflow-auto rounded-lg border border-accent/30 bg-ink-900/80 p-6 text-xs leading-relaxed text-white/85">
 {fixPack}
           </pre>
         </div>
@@ -126,7 +126,7 @@ export default async function TestReportPage() {
             The exact <code>RawAuditJson</code> object passed into{" "}
             <code>generateVisibilityReport()</code>.
           </p>
-          <pre className="mt-6 max-h-[500px] overflow-auto rounded-xl border border-white/10 bg-ink-900/80 p-6 text-xs leading-relaxed text-white/70">
+          <pre className="mt-6 max-h-[500px] overflow-auto rounded-lg border border-white/10 bg-ink-900/80 p-6 text-xs leading-relaxed text-white/70">
 {JSON.stringify(audit, null, 2)}
           </pre>
         </div>

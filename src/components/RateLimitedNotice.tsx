@@ -20,7 +20,7 @@ export function RateLimitedNotice({
     <main>
       <Header />
       <section className="container-page py-24">
-        <div className="mx-auto max-w-md rounded-xl border border-amber-300/30 bg-amber-300/[0.06] p-8 text-center">
+        <div className="mx-auto max-w-md rounded-lg border border-amber-300/30 bg-amber-300/[0.06] p-8 text-center">
           <p className="pill border-amber-300/30 bg-amber-300/10 text-amber-200">
             429
           </p>

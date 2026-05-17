@@ -94,7 +94,7 @@ export function ReportViewerClient({
       </div>
 
       {showRaw ? (
-        <pre className="max-h-[700px] overflow-auto rounded-xl border border-white/10 bg-ink-900/80 p-6 text-xs leading-relaxed text-white/80 whitespace-pre-wrap">
+        <pre className="max-h-[700px] overflow-auto rounded-lg border border-white/10 bg-ink-900/80 p-6 text-xs leading-relaxed text-white/80 whitespace-pre-wrap">
 {markdown}
         </pre>
       ) : (

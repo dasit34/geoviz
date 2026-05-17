@@ -590,7 +590,7 @@ function StatusStrip({
 }) {
   const isPaused = pausedSecondsRemaining > 0;
   return (
-    <div className="rounded-xl border border-white/10 bg-ink-900/60 p-5 shadow-card backdrop-blur-sm">
+    <div className="rounded-lg border border-white/10 bg-ink-900/60 p-5 shadow-card backdrop-blur-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="section-eyebrow">Live queue</p>
         <div className="flex items-center gap-3">
@@ -657,7 +657,7 @@ function ProgressBar({ counts }: { counts: CountsByStatus }) {
   const total = counts.total;
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
   return (
-    <div className="rounded-xl border border-accent/30 bg-accent/[0.04] p-4">
+    <div className="rounded-lg border border-accent/30 bg-accent/[0.04] p-4">
       <div className="flex items-baseline justify-between">
         <p className="text-sm font-semibold text-white">
           Batch in progress · {done} of {total} done
@@ -1390,7 +1390,7 @@ function computeTodayStats(runs: CalibrationRun[]): TodayStats {
 
 function OperatorTodayStrip({ stats }: { stats: TodayStats }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-ink-900/60 p-5 shadow-card backdrop-blur-sm">
+    <div className="rounded-lg border border-white/10 bg-ink-900/60 p-5 shadow-card backdrop-blur-sm">
       <p className="section-eyebrow">
         Operational intelligence · today (since 00:00 UTC)
       </p>
@@ -1624,7 +1624,7 @@ function OperatorIntelligenceBlock({
     return null;
   }
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.015] p-4 text-xs leading-relaxed text-white/75">
+    <div className="rounded-lg border border-white/10 bg-white/[0.015] p-4 text-xs leading-relaxed text-white/75">
       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55">
         Operator intelligence
       </p>
@@ -1709,7 +1709,7 @@ function FailureIntelligenceBlock({ intel }: { intel: FailureIntel }) {
     .reduce((sum, r) => sum + r.count, 0);
 
   return (
-    <div className="rounded-xl border border-red-400/20 bg-red-500/[0.04] p-5 shadow-card backdrop-blur-sm">
+    <div className="rounded-lg border border-red-400/20 bg-red-500/[0.04] p-5 shadow-card backdrop-blur-sm">
       <p className="section-eyebrow text-red-200/85">Failure intelligence</p>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
         <TodayTile
@@ -1796,7 +1796,7 @@ function computeTopExpensive(
 function TopExpensiveAuditsBlock({ rows }: { rows: ExpensiveRow[] }) {
   if (rows.length === 0) return null;
   return (
-    <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-5 shadow-card backdrop-blur-sm">
+    <div className="rounded-lg border border-amber-300/20 bg-amber-300/[0.04] p-5 shadow-card backdrop-blur-sm">
       <p className="section-eyebrow text-amber-200/85">
         Top expensive audits
       </p>
@@ -1879,7 +1879,7 @@ const OPERATOR_GUIDANCE: ReadonlyArray<string> = [
 
 function OperatorGuidanceBlock() {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-5">
       <p className="section-eyebrow">Operator guidance</p>
       <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-white/65">
         {OPERATOR_GUIDANCE.map((line, i) => (
@@ -1905,7 +1905,7 @@ function CalibrationIntelligenceBlock({
   // one operator has tagged a row. Keeps the dashboard quiet.
   if (summary.taggedCount === 0) return null;
   return (
-    <div className="rounded-xl border border-accent/20 bg-accent/[0.04] p-4 text-xs leading-relaxed text-white/85">
+    <div className="rounded-lg border border-accent/20 bg-accent/[0.04] p-4 text-xs leading-relaxed text-white/85">
       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">
         Calibration intelligence
         <span className="ml-2 font-normal normal-case tracking-normal text-white/45">

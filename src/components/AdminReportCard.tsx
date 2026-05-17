@@ -545,7 +545,7 @@ export function AdminReportCard({
               : "border-white/15 bg-white/[0.03] text-white/70";
 
   return (
-    <article className="rounded-xl border border-white/10 bg-ink-900/60 shadow-card">
+    <article className="rounded-lg border border-white/10 bg-ink-900/60 shadow-card">
       {/* Header — single source of identity for the order. */}
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 p-5">
         <div className="min-w-0 flex-1">
@@ -969,7 +969,7 @@ export function AdminReportCard({
               ? ` · generated ${new Date(reportGeneratedAt).toLocaleString()}`
               : ""}
           </p>
-          <div className="mt-3 rounded-xl border border-white/10 bg-ink-900/80 p-6 md:p-8">
+          <div className="mt-3 rounded-lg border border-white/10 bg-ink-900/80 p-6 md:p-8">
             <ReportViewerClient
               markdown={markdown}
               orderId={order.id}
@@ -1157,7 +1157,7 @@ function ScoreBanner({
         ? "text-amber-300"
         : "text-accent";
   return (
-    <div className="grid gap-4 rounded-xl border border-white/10 bg-ink-900/60 p-6 sm:grid-cols-[auto_1fr] sm:items-center">
+    <div className="grid gap-4 rounded-lg border border-white/10 bg-ink-900/60 p-6 sm:grid-cols-[auto_1fr] sm:items-center">
       <div
         className={`flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-full border-2 ${ring}`}
       >
