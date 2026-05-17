@@ -15,6 +15,10 @@ const nextConfig = {
       "@sparticuz/chromium",
       "puppeteer-core",
     ],
+    // Enables `src/instrumentation.ts` to run at boot. We use it to
+    // fail loud on missing prod env vars (see that file's header).
+    // Next 14.2 requires this opt-in; Next 15+ makes it default-on.
+    instrumentationHook: true,
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
