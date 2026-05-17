@@ -132,6 +132,10 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(6px);
 }
+/* Header row: label left, status pill right. Renamed from `.score-card-top`
+   to `.score-card-header` in PR #26 to match the redesigned document-style
+   anatomy (header / main / caption / footer). Identical visual treatment. */
+.score-card-header,
 .score-card-top {
   display: flex;
   justify-content: space-between;
@@ -140,7 +144,7 @@
   text-transform: uppercase;
   letter-spacing: 0.22em;
   color: rgba(255, 255, 255, 0.45);
-  margin-bottom: 14px;
+  margin-bottom: 18px;
   font-weight: 600;
 }
 .score-card-top-status {
@@ -171,6 +175,17 @@
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.18);
 }
+/* Main score block — sits between the header row and the caption.
+   Stacked layout (number, then caption below) — previously this was
+   `.score-card-overall-row` with a side-by-side flex. PR #26 redesign
+   drops the flex so the 112px mono number is unambiguously the
+   visual anchor of the card. */
+.score-card-main {
+  margin-bottom: 16px;
+}
+/* Legacy `.score-card-overall-row` retained for backward compatibility
+   with any consumer that still references it; the redesigned component
+   uses `.score-card-main` instead. */
 .score-card-overall-row {
   display: flex;
   align-items: flex-start;
@@ -180,13 +195,18 @@
 .score-card-overall {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 8px;
   letter-spacing: -0.02em;
   line-height: 1;
 }
+/* The artifact. 112px mono — Bloomberg ticker scale. Tone class on
+   the parent `.score-card` paints the number; the denominator stays
+   muted to preserve the number's dominance. */
 .score-card-overall-num {
-  font-size: 64px;
-  font-weight: 800;
+  font-size: 112px;
+  font-weight: 700;
+  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: -0.03em;
   color: #ffffff;
 }
 .score-card-tone-ok .score-card-overall-num {
@@ -199,9 +219,29 @@
   color: #ff9a3c;
 }
 .score-card-overall-max {
-  font-size: 20px;
+  font-size: 28px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.4);
+}
+/* Tone-specific single-sentence caption sitting directly below the
+   number. Replaces the old `.score-card-explainer` + `.score-card-blurb`
+   pair. Bounded to 52ch so the line-length stays readable. */
+.score-card-caption {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.75);
+  max-width: 52ch;
+}
+/* Legacy single-line explainer — kept for any consumer not yet on
+   the redesigned ReportScoreCard. Visually identical to the legacy
+   shape; new component uses `.score-card-caption` instead. */
+.score-card-explainer {
+  margin: 4px 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 70ch;
 }
 .score-card-blurb {
   margin: 8px 0 0;
@@ -210,28 +250,49 @@
   color: rgba(255, 255, 255, 0.7);
   flex: 1;
 }
-/* One-line plain-English explainer that sits directly under the
-   "AI Visibility Score" header — frames what the score actually
-   measures without burying the number. */
-.score-card-explainer {
-  margin: 4px 0 18px;
-  font-size: 13px;
-  line-height: 1.55;
-  color: rgba(255, 255, 255, 0.6);
-  max-width: 70ch;
-}
-/* Subtle advisory rendered only when the audit indicates a heavily
-   JS-rendered / app-style site. Sits under the category bars. */
+/* Optional advisory note for JS-heavy sites. PR #26 redesign
+   demoted this from a bordered box to a footnote-style line so it
+   reads as context, not warning. The `*` prefix is rendered in the
+   component, not the CSS. */
 .score-card-advisory {
-  margin: 14px 0 0;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.02);
-  font-size: 12.5px;
+  margin: 18px 0 0;
+  font-size: 12px;
   line-height: 1.55;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.5);
   font-style: italic;
+}
+/* Document provenance footer — Audit Date + Report ID. Only renders
+   when the parent component supplies `orderId`. The mono Report ID
+   is the identity hook unique to GeoViz reports (borrowed from
+   Datadog trace IDs and Bloomberg report numbers). */
+.score-card-meta-footer {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 28px;
+}
+.score-card-meta-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.score-card-meta-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.35);
+}
+.score-card-meta-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+}
+.score-card-meta-value.mono-data {
+  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: -0.01em;
 }
 .score-card-bars {
   list-style: none;

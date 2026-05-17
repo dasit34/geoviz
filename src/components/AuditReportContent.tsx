@@ -172,7 +172,12 @@ export function AuditReportContent({
 
         {/* Overall score card */}
         <section className="mt-12">
-          <ReportScoreCard score={score} markdown={reportMarkdown} />
+          <ReportScoreCard
+            score={score}
+            markdown={reportMarkdown}
+            orderId={orderId}
+            reportGeneratedAt={reportGeneratedAt}
+          />
           {summaryHasContent ? (
             <ExecutiveSummaryBlock
               drivers={scoreDrivers}
