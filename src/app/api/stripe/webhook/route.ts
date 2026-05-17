@@ -108,11 +108,161 @@ export async function POST(req: Request) {
         console.error("[stripe-webhook] notifyAdmin error (non-fatal):", err);
       }
     }
+  } else if (event.type === "charge.refunded") {
+    // Pre-launch hardening (PR #23): the webhook used to silently
+    // ignore everything except `checkout.session.completed`. A refund
+    // issued via the Stripe dashboard would not reach the operator
+    // queue, so the operator could continue delivering or billing a
+    // refunded customer. This branch makes refunds operator-visible:
+    //   1. Append a structured timestamped note to `AuditOrder.adminNotes`
+    //      when we can match the charge to an order (via metadata or
+    //      payment_intent). The order then surfaces in admin queues
+    //      with the refund context inline.
+    //   2. Email the admin unconditionally with the charge ID, amount
+    //      refunded, customer email, and a link back to Stripe.
+    // We do NOT touch GeoViz-side payment state — the refund is
+    // already complete on Stripe; this just removes the blind spot.
+    try {
+      await handleChargeRefunded(req, event.data.object as Stripe.Charge);
+    } catch (err) {
+      // Log only — webhook always returns 200 so Stripe doesn't retry-loop.
+      console.error("[stripe-webhook] charge.refunded handler error (non-fatal):", err);
+    }
   } else {
     console.log(`[stripe-webhook] ignoring event type=${event.type}`);
   }
 
   return new Response("OK", { status: 200 });
+}
+
+async function handleChargeRefunded(
+  req: Request,
+  charge: Stripe.Charge,
+): Promise<void> {
+  const refunded = typeof charge.amount_refunded === "number" ? charge.amount_refunded : 0;
+  const total = typeof charge.amount === "number" ? charge.amount : 0;
+  const currency = (charge.currency ?? "usd").toUpperCase();
+  const isFull = refunded >= total && total > 0;
+  const customerEmail =
+    charge.billing_details?.email ??
+    charge.receipt_email ??
+    (typeof charge.customer === "string" ? charge.customer : null) ??
+    "(unknown)";
+
+  console.warn(
+    `[stripe-webhook] charge.refunded charge=${charge.id} ` +
+      `refunded=${refunded}/${total} ${currency} ` +
+      `full=${isFull} email=${customerEmail}`,
+  );
+
+  // Try to match the charge to an AuditOrder. Stripe checkout sessions
+  // store the session ID on AuditOrder.stripeSessionId — and the charge
+  // carries the payment_intent. We can match via Stripe's session list
+  // filtered by payment_intent, but to keep this handler lightweight we
+  // first try the cheap path: scan recent AuditOrder rows for one whose
+  // stripeSessionId resolves to this charge's payment_intent. If we
+  // can't find it, we still email the admin — they can look it up
+  // manually from the Stripe dashboard link.
+  let matchedOrder: AuditOrder | null = null;
+  try {
+    const paymentIntent = typeof charge.payment_intent === "string"
+      ? charge.payment_intent
+      : null;
+    if (paymentIntent) {
+      // Ask Stripe which session this PI belongs to. The list call is
+      // bounded to a single PI so it's a cheap targeted query.
+      const sessions = await getStripe().checkout.sessions.list({
+        payment_intent: paymentIntent,
+        limit: 1,
+      });
+      const sessionId = sessions.data[0]?.id ?? null;
+      if (sessionId) {
+        matchedOrder = await prisma.auditOrder.findUnique({
+          where: { stripeSessionId: sessionId },
+        });
+      }
+    }
+  } catch (err) {
+    console.warn(
+      "[stripe-webhook] charge.refunded — session lookup failed (non-fatal):",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  if (matchedOrder) {
+    try {
+      const stamp = new Date().toISOString();
+      const note = [
+        `[stripe-refund · ${stamp}]`,
+        `charge: ${charge.id}`,
+        `refunded: ${(refunded / 100).toFixed(2)} ${currency} of ${(total / 100).toFixed(2)} ${currency}`,
+        `full_refund: ${isFull}`,
+        `customer: ${customerEmail}`,
+      ].join("\n");
+      const appended = matchedOrder.adminNotes
+        ? `${matchedOrder.adminNotes}\n\n${note}`
+        : note;
+      await prisma.auditOrder.update({
+        where: { id: matchedOrder.id },
+        data: { adminNotes: appended },
+      });
+      console.log(
+        `[stripe-webhook] charge.refunded — appended adminNotes orderId=${matchedOrder.id}`,
+      );
+    } catch (err) {
+      console.warn(
+        "[stripe-webhook] charge.refunded — adminNotes update failed (non-fatal):",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  } else {
+    console.warn(
+      `[stripe-webhook] charge.refunded — no matching AuditOrder for charge=${charge.id}; admin email only`,
+    );
+  }
+
+  // Always email the admin — the refund deserves visibility even if we
+  // couldn't auto-link it to an AuditOrder. Reuses the existing Resend
+  // wrapper + the same FROM fallback as the rest of this webhook.
+  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL ?? process.env.EMAIL_TO;
+  if (!adminEmail) {
+    console.warn(
+      "[stripe-webhook] charge.refunded — no ADMIN_NOTIFY_EMAIL set; skipping admin email",
+    );
+    return;
+  }
+  try {
+    const adminReviewUrl = buildAdminReviewUrl(req);
+    const stripeUrl = `https://dashboard.stripe.com/payments/${charge.payment_intent ?? charge.id}`;
+    const subject = `Stripe refund — ${(refunded / 100).toFixed(2)} ${currency}${isFull ? " (full)" : " (partial)"}`;
+    const textBody = [
+      `Refund received from Stripe.`,
+      ``,
+      `Charge: ${charge.id}`,
+      `Amount refunded: ${(refunded / 100).toFixed(2)} ${currency} of ${(total / 100).toFixed(2)} ${currency}`,
+      `Full refund: ${isFull}`,
+      `Customer email: ${customerEmail}`,
+      `Stripe dashboard: ${stripeUrl}`,
+      matchedOrder ? `Matched order: ${matchedOrder.id}` : `Matched order: (none — look it up via Stripe)`,
+      `Admin queue: ${adminReviewUrl}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    await getResend().emails.send({
+      from: webhookFromEmail(),
+      to: adminEmail,
+      subject,
+      text: textBody,
+    });
+    console.log(
+      `[stripe-webhook] charge.refunded — admin email sent charge=${charge.id}`,
+    );
+  } catch (err) {
+    console.warn(
+      "[stripe-webhook] charge.refunded — admin email failed (non-fatal):",
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 async function persistOrder(

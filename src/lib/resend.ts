@@ -20,29 +20,35 @@ export function isResendConfigured(): boolean {
 }
 
 // Resolution order: canonical → legacy → env-validator-required → placeholder.
-// The placeholder is intentionally invalid (`geoviz.local`) so a misconfigured
-// environment fails loud at Resend rather than silently shipping from a
-// look-alike address. Production must set `RESEND_EMAIL_FROM` to a verified
-// domain sender (e.g., `GeoViz <reports@yourdomain>`); see LAUNCH_CHECKLIST.md.
-export const FROM_EMAIL =
+// The placeholder is intentionally invalid (`geoviz.local`) and is ONLY ever
+// resolved in non-production environments. Production deploys MUST set
+// `RESEND_EMAIL_FROM` (or one of the legacy fallbacks) to a verified domain
+// sender (e.g., `GeoViz <reports@yourdomain>`); see LAUNCH_CHECKLIST.md.
+//
+// Pre-launch hardening (PR #23): production with NO FROM env now throws at
+// module-load instead of warning-and-continuing. The previous warn-mode
+// silently shipped through and only surfaced when Resend rejected the
+// first delivery attempt — making the first paid customer the diagnostic
+// event. The throw moves the failure to module-load so Vercel surfaces it
+// during the deploy or the first request that exercises this module.
+const PLACEHOLDER_FROM = "GeoViz <orders@geoviz.local>";
+
+const _resolvedFromEnv =
   process.env.RESEND_EMAIL_FROM ??
   process.env.EMAIL_FROM ??
   process.env.RESEND_FROM_EMAIL ??
-  "GeoViz <orders@geoviz.local>";
+  null;
 
-if (
-  process.env.NODE_ENV === "production" &&
-  !process.env.RESEND_EMAIL_FROM &&
-  !process.env.EMAIL_FROM &&
-  !process.env.RESEND_FROM_EMAIL
-) {
-  // Surface the misconfig at module-load time so it shows up in the
-  // first request's log, not buried in an Resend "domain not verified"
-  // 422 ten requests later.
-  console.warn(
-    "[resend] WARNING — no FROM email env set in production. Falling back to placeholder; Resend will reject sends.",
+if (process.env.NODE_ENV === "production" && !_resolvedFromEnv) {
+  throw new Error(
+    "[resend] No FROM email configured in production. Set one of " +
+      "RESEND_EMAIL_FROM, EMAIL_FROM, or RESEND_FROM_EMAIL on the " +
+      "production deploy (e.g. `GeoViz <reports@yourdomain>`). See " +
+      ".env.example.",
   );
 }
+
+export const FROM_EMAIL = _resolvedFromEnv ?? PLACEHOLDER_FROM;
 
 export const ADMIN_NOTIFY_EMAIL =
   process.env.ADMIN_NOTIFY_EMAIL ?? process.env.EMAIL_TO;

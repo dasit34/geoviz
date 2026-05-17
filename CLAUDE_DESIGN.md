@@ -85,8 +85,8 @@ of them flagged in review is a blocker:
   the print-friendly stylesheet that drives both the screen view
   and PDF render.
 - **Existing reusable components**: `src/components/Header.tsx`,
-  `src/components/Footer.tsx`, `src/components/HeroForm.tsx`,
-  `src/components/OrderForm.tsx`, `src/components/ReportCtaCard.tsx`,
+  `src/components/Footer.tsx`, `src/components/OrderForm.tsx`,
+  `src/components/ReportCtaCard.tsx`,
   `src/components/CategoryScoreCard.tsx`,
   `src/components/StrengthCard.tsx`, `src/components/RadarChart.tsx`.
 
