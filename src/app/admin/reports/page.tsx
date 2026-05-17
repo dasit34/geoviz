@@ -318,7 +318,7 @@ export default async function AdminReportsPage({
         </details>
 
         {orders.length === 0 ? (
-          <div className="mt-10 rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-12 text-center">
+          <div className="mt-10 rounded-lg border border-dashed border-white/15 bg-white/[0.02] p-12 text-center">
             <p className="text-base font-semibold text-white">
               No paid orders yet.
             </p>
@@ -463,7 +463,7 @@ function UnauthorizedPage({
     <main>
       <Header />
       <section className="container-page py-24">
-        <div className="mx-auto max-w-md rounded-xl border border-red-400/30 bg-red-500/[0.06] p-8 text-center">
+        <div className="mx-auto max-w-md rounded-lg border border-red-400/30 bg-red-500/[0.06] p-8 text-center">
           <p className="pill border-red-400/30 bg-red-400/10 text-red-200">
             401
           </p>

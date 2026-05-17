@@ -20,10 +20,29 @@ const config: Config = {
           glow: "#ff9a3c",
           blue: "#2b8bff",
         },
+        // Semantic status tokens (UI polish Phase A — UI_POLISH_PLAN.md
+        // section 3.5). Defined but not yet applied in this PR — Phase E
+        // is where they replace the ad-hoc `bg-amber-300`,
+        // `border-red-400/30`, `bg-emerald-300/40` patterns sprinkled
+        // across error/warning/in-flight surfaces. Restrained palette
+        // that fits the dark data-terminal aesthetic without leaving the
+        // ink/accent visual family.
+        severity: {
+          critical: "#ff6b6b", // muted red — hard-block failure states
+          warning: "#ff9a3c",  // matches accent-glow — advisory states
+          info: "#6ce39a",     // soft green — safe / informational
+        },
       },
       fontFamily: {
         sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Inter", "sans-serif"],
         display: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Inter", "sans-serif"],
+        // Mono stack for data values — scores, IDs, percentages,
+        // timestamps, technical inputs. Defined but not yet applied in
+        // this PR — Phase C is where `font-mono` lands on actual
+        // surfaces. Aligns with the ad-hoc `ui-monospace` declarations
+        // already in print.css (lines 1301, 1502) so adoption is
+        // stylistically continuous.
+        mono: ["ui-monospace", "SFMono-Regular", "SF Mono", "Menlo", "Consolas", "monospace"],
       },
       boxShadow: {
         glow: "0 0 60px -10px rgba(255, 122, 24, 0.45)",

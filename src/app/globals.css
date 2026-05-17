@@ -36,7 +36,7 @@ body {
   }
 
   .card {
-    @apply rounded-xl border border-white/10 bg-ink-900/60 p-6 shadow-card backdrop-blur-sm;
+    @apply rounded-lg border border-white/10 bg-ink-900/60 p-6 shadow-card backdrop-blur-sm;
   }
 
   /* Subtle premium hover for homepage cards. Adds a 1px lift, an
@@ -69,6 +69,19 @@ body {
 
   .muted {
     @apply text-white/60;
+  }
+
+  /* Canonical data-cell treatment: mono font + tight line-height +
+     slight negative letter-spacing. Use anywhere a score, ID,
+     percentage, timestamp, or technical input renders — the
+     "Bloomberg cell" pattern. Defined in UI polish Phase A
+     (UI_POLISH_PLAN.md section 3.2); Phase C applies it to score
+     cards, report IDs, and form inputs that capture cuids. Not
+     applied to any surface in this PR. */
+  .mono-data {
+    @apply font-mono;
+    line-height: 1;
+    letter-spacing: -0.01em;
   }
 }
 

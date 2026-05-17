@@ -157,7 +157,7 @@ export default async function AdminPage({
           />
         </div>
 
-        <div className="mt-10 overflow-hidden rounded-xl border border-white/10 bg-ink-900/60">
+        <div className="mt-10 overflow-hidden rounded-lg border border-white/10 bg-ink-900/60">
           <table className="w-full text-sm">
             <thead className="bg-white/[0.03] text-left text-xs uppercase tracking-[0.18em] text-white/50">
               <tr>

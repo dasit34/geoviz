@@ -48,7 +48,7 @@ export default function OrderPage({
               <Bullet>Professional PDF report</Bullet>
             </ul>
 
-            <div className="mt-10 rounded-xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/70">
+            <div className="mt-10 rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/70">
               <p className="text-xs uppercase tracking-[0.2em] text-white/40">
                 Platforms analyzed
               </p>

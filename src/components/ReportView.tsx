@@ -64,7 +64,7 @@ export function ReportView({ report }: { report: VisibilityReport }) {
 
       {/* Top 3 reasons */}
       {report.top3Reasons.length > 0 ? (
-        <section className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+        <section className="rounded-lg border border-white/10 bg-white/[0.02] p-6">
           <p className="section-eyebrow">
             {report.overallScore < 70
               ? "Your score is low primarily because"
@@ -138,7 +138,7 @@ export function ReportView({ report }: { report: VisibilityReport }) {
       </p>
 
       {/* Upsell */}
-      <section className="rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/[0.10] via-ink-900/60 to-ink-900/60 p-8">
+      <section className="rounded-lg border border-accent/30 bg-gradient-to-br from-accent/[0.10] via-ink-900/60 to-ink-900/60 p-8">
         <p className="section-eyebrow">Done-for-you</p>
         <h3 className="mt-2 text-2xl font-semibold text-white">
           {report.upsellSection.title}
@@ -177,7 +177,7 @@ function ProblemCard({
   isPrimary?: boolean;
 }) {
   const articleClasses = isPrimary
-    ? "rounded-xl border-2 border-accent/50 bg-accent/[0.04] p-6 shadow-card"
+    ? "rounded-lg border-2 border-accent/50 bg-accent/[0.04] p-6 shadow-card"
     : "card";
   const numberClasses = isPrimary
     ? "mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-sm font-semibold text-ink-950"
@@ -331,7 +331,7 @@ function scoreTone(score: number): "ok" | "warn" | "bad" {
 
 function ScoreCapCallout({ cap }: { cap: ScoreCap }) {
   return (
-    <div className="mt-6 rounded-xl border border-accent/40 bg-accent/[0.08] p-5">
+    <div className="mt-6 rounded-lg border border-accent/40 bg-accent/[0.08] p-5">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/20 text-accent">
           <svg
@@ -371,7 +371,7 @@ function ScoreCapCallout({ cap }: { cap: ScoreCap }) {
 
 function TopFixCallout({ preview }: { preview: TopFixPreview }) {
   return (
-    <div className="rounded-xl border border-emerald-300/40 bg-emerald-300/[0.08] p-6">
+    <div className="rounded-lg border border-emerald-300/40 bg-emerald-300/[0.08] p-6">
       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
         Top fix
       </p>
@@ -397,7 +397,7 @@ function TopFixCallout({ preview }: { preview: TopFixPreview }) {
 
 function ScoringWeightsBlock({ weights }: { weights: ScoringWeight[] }) {
   return (
-    <section className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+    <section className="rounded-lg border border-white/10 bg-white/[0.02] p-6">
       <p className="section-eyebrow">Methodology</p>
       <h3 className="h3 mt-2">How your score is calculated.</h3>
       <p className="muted mt-2 text-sm">
