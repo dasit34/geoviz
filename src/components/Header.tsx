@@ -8,10 +8,10 @@ export function Header() {
         <Logo />
         <nav className="hidden items-center gap-7 text-sm text-white/70 lg:flex">
           <Link
-            href="/#what-is-geoviz"
+            href="/#what-we-audit"
             className="transition hover:text-white"
           >
-            What is GeoViz
+            What we audit
           </Link>
           <Link
             href="/#how-it-works"
