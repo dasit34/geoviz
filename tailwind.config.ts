@@ -32,6 +32,16 @@ const config: Config = {
           warning: "#ff9a3c",  // matches accent-glow — advisory states
           info: "#6ce39a",     // soft green — safe / informational
         },
+        // Restrained terminal-cyan. Reserved for radar + telemetry
+        // accents per CLAUDE_DESIGN.md ("Satellite visibility system
+        // meets Bloomberg Terminal"). NOT used for body color, CTAs,
+        // or score values — those stay in the ink/accent palette so
+        // the cyan reads as "this is telemetry signal," not as a
+        // second brand color.
+        cyan: {
+          DEFAULT: "#67e8f9",
+          dim: "#0e7490",
+        },
       },
       fontFamily: {
         sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Inter", "sans-serif"],
@@ -62,10 +72,19 @@ const config: Config = {
           "0%, 100%": { transform: "translateY(0px)" },
           "50%": { transform: "translateY(-6px)" },
         },
+        // Slow rotation for the hero radar's scanning sweep. 12s is
+        // intentionally on the slow side — operational, not flashy.
+        // The sweep tells the viewer "something is scanning" without
+        // screaming sci-fi.
+        radarSweep: {
+          "0%":   { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
       },
       animation: {
         pulseSoft: "pulseSoft 3s ease-in-out infinite",
         floatY: "floatY 6s ease-in-out infinite",
+        radarSweep: "radarSweep 12s linear infinite",
       },
     },
   },
