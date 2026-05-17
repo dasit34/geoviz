@@ -33,22 +33,20 @@ export default function Page() {
     <main>
       <Header />
 
-      {/* HERO */}
+      {/* HERO — redesigned in PR #26 (hero/score/preview redesign).
+          Anatomy: asymmetric 5fr_3fr grid; headline column carries the
+          weight, preview becomes a peek. One bg-radial-orange (no
+          duplicate, no grid-bg overlay). One primary CTA + one text
+          link. Mono-font ticker proof line replaces orphaned social
+          proof. Platforms strip consolidates with operator-review
+          trust signal on a single ticker line. No floatY — the
+          asymmetric grid does the work the animation used to do. */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10 bg-radial-orange" />
-        <div className="absolute inset-0 -z-10 grid-bg opacity-[0.35]" />
-        <div className="container-page grid gap-10 py-20 md:grid-cols-[1.15fr_1fr] md:py-28 md:gap-16">
+        <div className="container-page grid gap-12 py-20 md:grid-cols-[5fr_3fr] md:py-28 md:gap-20">
           <div>
-            <span className="pill animate-pulseSoft">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> AI
-              Visibility Intelligence
-            </span>
-            <h1 className="h1 mt-5">
-              Understand how{" "}
-              <span className="bg-gradient-to-r from-accent to-accent-glow bg-clip-text text-transparent">
-                AI
-              </span>{" "}
-              systems see your business.
+            <h1 className="h1">
+              Understand how AI systems see your business.
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/70">
               GeoViz audits whether modern AI systems can understand,
@@ -56,44 +54,47 @@ export default function Page() {
               visibility is breaking down.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            {/* Data-first proof line — Bloomberg-ticker pattern.
+                Pulls a real piece of cohort data into the first
+                viewport so the hero leads with evidence, not promise. */}
+            <p className="mono-data mt-6 text-xs uppercase tracking-[0.18em] text-white/55">
+              110+ audits run · operator-reviewed delivery · GEO-SAMPLE-001
+            </p>
+
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
               <Link href="/order" className="btn-primary text-base">
                 Request My AI Visibility Audit
               </Link>
-              <Link href="/sample-report" className="btn-ghost text-base">
-                View Sample Report
+              <Link
+                href="/sample-report"
+                className="mono-data text-xs uppercase tracking-[0.18em] text-white/55 hover:text-white/85"
+              >
+                view sample report →
               </Link>
             </div>
 
-            <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
-              <span className="text-xs uppercase tracking-[0.2em] text-white/40">
-                Platforms analyzed
+            {/* Platforms ticker — labels in mono so they read as data,
+                not decoration. Single visual unit; no orphan text
+                below. */}
+            <div className="mt-10 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="mono-data text-[10px] uppercase tracking-[0.2em] text-white/40">
+                Platforms
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 {PLATFORMS.map((p) => (
                   <span
                     key={p}
-                    className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70"
+                    className="mono-data rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.1em] text-white/70"
                   >
                     {p}
                   </span>
                 ))}
               </div>
             </div>
-            <p className="mt-6 text-xs text-white/65">
-              Operator-reviewed before delivery.
-            </p>
-            <p className="mt-2 text-xs text-white/55">
-              110+ AI visibility audits run across local businesses,
-              service companies, and niche brands.
-            </p>
           </div>
 
-          <div className="relative flex items-center justify-center">
-            <div className="absolute -inset-10 -z-10 bg-radial-orange opacity-60" />
-            <div className="animate-floatY">
-              <ReportPreview />
-            </div>
+          <div className="relative flex items-start justify-center md:items-center md:justify-end">
+            <ReportPreview />
           </div>
         </div>
       </section>
