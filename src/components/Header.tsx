@@ -30,7 +30,7 @@ export function Header() {
           </Link>
         </nav>
         <Link href="/order" className="btn-primary text-sm">
-          Request my audit
+          Get my visibility score
         </Link>
       </div>
     </header>
