@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { HeroRadar } from "@/components/HeroRadar";
+import { SampleAuditCard } from "@/components/SampleAuditCard";
 
 /**
  * Homepage — redesigned in PR #27 ("Satellite Visibility System ×
@@ -103,37 +104,94 @@ const FOUNDATION_SAFETY = [
   "Complex sites may require custom scoping — we’ll quote upfront.",
 ];
 
+// Per-platform retrieval profile band (PR #28). Honest framing of
+// the reference image's "LIVE · AI ACTIVITY" idea — we don't have
+// real-time per-platform telemetry, but we do test against each
+// platform's distinct retrieval mode. The descriptor is a factual
+// characterization, not a status claim.
+const RETRIEVAL_PROFILES = [
+  { name: "ChatGPT", profile: "Web search tools" },
+  { name: "Claude", profile: "Web search retrieval" },
+  { name: "Perplexity", profile: "Citation engine" },
+  { name: "Gemini", profile: "Knowledge graph" },
+  { name: "AI Overviews", profile: "AI Mode" },
+];
+
+// Trust signals strip below the retrieval profiles section. Each
+// claim is verifiable — no enterprise-grade marketing puffery.
+const TRUST_SIGNALS = [
+  "Real AI system testing",
+  "Operator-reviewed reports",
+  "Actionable recommendations",
+  "Stripe-secure checkout",
+];
+
+// FAQ content. Native <details>/<summary> accordion — no JS, full
+// keyboard + screen-reader support out of the box. Answers stay
+// factual and honor CLAUDE.md's "no guaranteed rankings" rule.
+const FAQS = [
+  {
+    q: "What does the audit actually measure?",
+    a: "Eight AI visibility dimensions: schema / structured data, entity clarity, crawlability, technical accessibility, AI readability, recommendation readiness, discoverability signals, and content depth. The full list is in the “What we audit” section above.",
+  },
+  {
+    q: "How long does delivery take?",
+    a: "Most audits are delivered by email within minutes. Each report is operator-reviewed before delivery, which can occasionally add a short queue during high-traffic periods.",
+  },
+  {
+    q: "Will this guarantee my business shows up in ChatGPT?",
+    a: "No, and we won’t claim it does. The audit identifies the structural reasons AI systems may or may not retrieve your business and gives you a prioritized fix list. AI recommendation behavior is non-deterministic — we measure readiness, not placement.",
+  },
+  {
+    q: "What’s the difference between the $97 audit and the $497 Foundation Fix?",
+    a: "The audit is a diagnostic — it tells you what’s broken. The Foundation Fix is a scoped engagement where we implement the AI-readable layer your audit identifies as missing.",
+  },
+  {
+    q: "What if my audit fails?",
+    a: "If our system can’t complete an audit for technical reasons (site unreachable, blocking AI crawlers, etc.) we either regenerate the report or refund your payment — your choice.",
+  },
+  {
+    q: "Can I see a sample report before I buy?",
+    a: "Yes — use the “see sample report” link in the hero, or the Sample Report link in the header.",
+  },
+];
+
 export default function Page() {
   return (
     <main>
       <Header />
 
       {/* ─────────────────────────────────────────────────────────
-          1. HERO — asymmetric 5fr:3fr grid. Headline left,
-             HeroRadar right. Single bg-radial-orange — no grid-bg
-             overlay, no duplicate glow. Single primary CTA + mono
-             text link (preserved from PR #26 hierarchy work).
+          1. HERO — asymmetric 4fr:6fr grid. Left = copy + CTAs +
+             pricing strip. Right = telemetry suite (HeroRadar +
+             SampleAuditCard side-by-side on lg+; stacked below
+             lg). Single bg-radial-orange — no grid-bg overlay, no
+             duplicate glow.
           ───────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10 bg-radial-orange" />
-        <div className="container-page grid gap-12 py-20 md:grid-cols-[5fr_3fr] md:py-28 md:gap-20">
+        <div className="container-page grid gap-12 py-20 md:grid-cols-[4fr_6fr] md:py-28 md:gap-16 lg:gap-20">
           <div>
-            <h1 className="text-3xl font-bold uppercase leading-[1.05] tracking-[-0.01em] text-white sm:text-4xl md:text-[44px] md:leading-[1.02]">
-              AI can&rsquo;t recommend what it can&rsquo;t understand.
+            <p className="mono-data text-[11px] uppercase tracking-[0.22em] text-cyan">
+              AI Visibility Intelligence
+            </p>
+            <h1 className="mt-5 text-3xl font-bold uppercase leading-[1.05] tracking-[-0.02em] text-white sm:text-4xl md:text-[44px] md:leading-[1.02] lg:text-[52px]">
+              See how AI sees{" "}
+              <span className="text-accent">your</span> business.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70">
-              GeoViz audits whether AI systems can read, understand,
-              and confidently retrieve your business across emerging
-              AI search experiences.
-            </p>
-
-            <p className="mono-data mt-6 text-xs uppercase tracking-[0.18em] text-white/55">
-              110+ audits run · operator-reviewed delivery · GEO-SAMPLE-001
+              GeoViz maps how AI systems read, understand, and
+              retrieve your business — so you can close visibility
+              gaps before customers choose someone else.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-              <Link href="/order" className="btn-primary text-base">
-                Run AI Visibility Audit
+              <Link
+                href="/order"
+                className="btn-primary inline-flex items-center gap-2 text-base"
+              >
+                Get my visibility score
+                <span aria-hidden>→</span>
               </Link>
               <Link
                 href="/sample-report"
@@ -143,25 +201,86 @@ export default function Page() {
               </Link>
             </div>
 
-            <div className="mt-10 flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className="mono-data text-[10px] uppercase tracking-[0.2em] text-white/40">
-                Platforms
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                {PLATFORMS.map((p) => (
-                  <span
-                    key={p}
-                    className="mono-data rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] uppercase tracking-[0.1em] text-white/70"
-                  >
-                    {p}
-                  </span>
-                ))}
-              </div>
-            </div>
+            {/* Pricing strip — mono, intentionally framed as
+                "early access" so the discount doesn't read as
+                permanently cheap. Matches the reference image. */}
+            <p className="mono-data mt-6 text-xs uppercase tracking-[0.18em] text-white/55">
+              Early access · <span className="text-white/85">$97</span>{" "}
+              <span className="ml-2 text-white/35 line-through">$147</span>
+            </p>
+
+            {/* Trust ticker — 110+ audits, operator-reviewed,
+                report ID. Bloomberg-ticker rhythm. */}
+            <p className="mono-data mt-3 text-[10px] uppercase tracking-[0.2em] text-white/40">
+              110+ audits run · operator-reviewed · GEO-SAMPLE-001
+            </p>
           </div>
 
-          <div className="relative flex items-start justify-center md:items-center md:justify-end">
-            <HeroRadar />
+          {/* Telemetry suite — radar + score panel side-by-side. */}
+          <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:gap-6 lg:items-center">
+            <div className="flex items-center justify-center">
+              <HeroRadar />
+            </div>
+            <div className="flex items-center justify-center lg:justify-start">
+              <SampleAuditCard className="w-full max-w-[280px]" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────
+          1.5. AI RETRIEVAL PROFILES — 5 platform cards in a
+               horizontal band. Each card shows platform name +
+               retrieval-mode descriptor + decorative sparkline.
+               Honest framing: NOT "live activity" telemetry; the
+               sparklines are decorative visual identity.
+          ───────────────────────────────────────────────────────── */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-12 md:py-16">
+          <div className="flex items-end justify-between gap-6">
+            <div>
+              <p className="section-eyebrow">
+                Platforms · AI retrieval profiles
+              </p>
+              <h2 className="h3 mt-3 max-w-2xl">
+                Five AI systems. Five retrieval profiles we test.
+              </h2>
+            </div>
+          </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {RETRIEVAL_PROFILES.map((p) => (
+              <RetrievalProfileCard
+                key={p.name}
+                name={p.name}
+                profile={p.profile}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────
+          1.6. BUILT FOR THE AI ERA — thin trust strip. Quiet
+               border-bordered band of 4 inline claims. NOT a
+               feature section — a status indicator.
+          ───────────────────────────────────────────────────────── */}
+      <section className="border-y border-white/5 bg-ink-950/60">
+        <div className="container-page py-5">
+          <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
+            <p className="mono-data text-[10px] uppercase tracking-[0.22em] text-white/40">
+              Built for the AI era
+            </p>
+            <ul className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              {TRUST_SIGNALS.map((t) => (
+                <li
+                  key={t}
+                  className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-white/65"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan" />
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
@@ -356,6 +475,24 @@ export default function Page() {
       </section>
 
       {/* ─────────────────────────────────────────────────────────
+          5.5. FAQ — native <details> accordion (no JS dependency).
+               Six factual answers. No overpromising — explicit
+               about non-deterministic AI behavior, refund path,
+               difference between audit and Foundation Fix.
+          ───────────────────────────────────────────────────────── */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-16 md:py-20">
+          <p className="section-eyebrow">FAQ · questions we get</p>
+          <h2 className="h2 mt-3 max-w-2xl">Quick answers.</h2>
+          <ul className="mt-10 max-w-3xl divide-y divide-white/5 border-y border-white/5">
+            {FAQS.map((item) => (
+              <FaqItem key={item.q} q={item.q} a={item.a} />
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────
           6. SOCIAL PROOF + FINAL CTA — tight closer. Single line
              of real proof, single primary action.
           ───────────────────────────────────────────────────────── */}
@@ -366,8 +503,12 @@ export default function Page() {
             service companies, and niche brands.
           </p>
           <div className="mt-8 flex justify-center">
-            <Link href="/order" className="btn-primary text-base">
-              Run AI Visibility Audit
+            <Link
+              href="/order"
+              className="btn-primary inline-flex items-center gap-2 text-base"
+            >
+              Get my visibility score
+              <span aria-hidden>→</span>
             </Link>
           </div>
         </div>
@@ -422,6 +563,89 @@ function PricingBullet({ children }: { children: React.ReactNode }) {
         </svg>
       </span>
       <span>{children}</span>
+    </li>
+  );
+}
+
+/**
+ * Per-platform card in the AI Retrieval Profiles band. Shows the
+ * platform name + its factual retrieval-mode descriptor + a tiny
+ * decorative sparkline (visual identity only — not real data).
+ */
+function RetrievalProfileCard({
+  name,
+  profile,
+}: {
+  name: string;
+  profile: string;
+}) {
+  return (
+    <article className="rounded-lg border border-white/10 bg-ink-900/40 p-4">
+      <div className="flex items-center justify-between">
+        <p className="mono-data text-xs uppercase tracking-[0.14em] text-white/85">
+          {name}
+        </p>
+        <span className="h-1.5 w-1.5 rounded-full bg-cyan" aria-hidden />
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-white/55">
+        {profile}
+      </p>
+      <ProfileSparkline className="mt-3" />
+    </article>
+  );
+}
+
+/**
+ * Tiny decorative sparkline. Fixed shape (not data-driven) —
+ * provides visual identity for the platform cards. aria-hidden
+ * because it carries no information; the platform name + profile
+ * descriptor do the communication work.
+ */
+function ProfileSparkline({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 80 22"
+      className={`block h-5 w-full ${className ?? ""}`}
+      aria-hidden
+      focusable="false"
+    >
+      <polyline
+        points="0,16 12,12 22,15 32,8 44,11 54,6 66,9 80,4"
+        fill="none"
+        stroke="rgba(103, 232, 249, 0.45)"
+        strokeWidth={1.25}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="80" cy="4" r="1.5" fill="rgba(103, 232, 249, 0.95)" />
+    </svg>
+  );
+}
+
+/**
+ * FAQ accordion item — native <details>/<summary>, no JS. The
+ * marker is hidden via list-style-none + custom +/× indicator
+ * driven by the open attribute.
+ */
+function FaqItem({ q, a }: { q: string; a: string }) {
+  return (
+    <li>
+      <details className="group py-5 [&_summary::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer items-start justify-between gap-6 list-none">
+          <span className="text-base font-medium leading-snug text-white">
+            {q}
+          </span>
+          <span
+            aria-hidden
+            className="mono-data shrink-0 text-xl leading-none text-white/45 transition group-open:rotate-45"
+          >
+            +
+          </span>
+        </summary>
+        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/70">
+          {a}
+        </p>
+      </details>
     </li>
   );
 }
