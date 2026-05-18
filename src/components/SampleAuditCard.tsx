@@ -70,10 +70,10 @@ export function SampleAuditCard({ className }: { className?: string }) {
         ))}
       </ul>
 
-      {/* Footer — audit-date stamp. */}
+      {/* Footer — plain, human note (no telemetry code). */}
       <footer className="mt-5 border-t border-white/5 pt-3">
-        <p className="mono-data text-[10px] uppercase tracking-[0.2em] text-white/35">
-          Audit · GEO-SAMPLE-001
+        <p className="text-[11px] text-white/40">
+          Sample audit · reviewed before delivery
         </p>
       </footer>
     </article>

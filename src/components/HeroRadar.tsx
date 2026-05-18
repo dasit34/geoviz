@@ -1,76 +1,63 @@
 /**
- * AI Visibility Radar — the brand identity artifact in the
- * homepage hero. Pure SVG; no data prop; decorative-but-intentional.
+ * AI Visibility Radar — the scanning instrument that anchors the
+ * homepage hero. Pure SVG; no data prop; decorative.
  *
- * PR #28 update: shifts from generic dimension labels to platform
- * names (ChatGPT, Claude, Perplexity, Gemini, AI Overviews) — these
- * are THE 5 AI systems GeoViz audits against, so putting them on
- * the radar perimeter makes the visual self-explanatory. Adds
- * scattered amber data dots inside the field (decorative "signals
- * detected" pattern), brighter center glow, slightly thicker
- * outermost ring boundary.
+ * Rebuilt (PR #29) against references/geoviz-radar-reference.png as
+ * the PRIMARY visual direction:
+ *   - WARM ORANGE is the dominant accent — rings, sweep, center
+ *     glow, signal dots. This is the GeoViz signature.
+ *   - Cyan usage is minimal — a single faint tick per platform
+ *     marker, nothing more.
+ *   - Five platform markers orbit the perimeter, each with a small
+ *     scanner-status verb (Crawling / Analyzing / …). These are
+ *     decorative scanner chrome — the radar is a visual identity,
+ *     not a live feed. All factual claims live in real copy
+ *     elsewhere on the page.
+ *   - Reads as a real scanning instrument, not a chart.
  *
- * Design direction (per CLAUDE_DESIGN.md "Satellite visibility
- * system meets Bloomberg Terminal" + the reference image at
- * references/geoviz-radar-reference.png):
- *   - Restrained scanning sweep (12s) — operational, not flashy.
- *   - Cyan-only chrome (rings, axes, telemetry labels). Cyan is
- *     reserved across the codebase for radar + telemetry — never
- *     for CTAs or score values.
- *   - Amber accent only on the center marker, sample polygon, and
- *     scattered data dots (the "your business" data points).
- *   - No bouncing dots, no glowing trails, no neon hum.
- *
- * Accessibility:
- *   - `aria-hidden` on the SVG — the headline + subhead carry the
- *     meaning; the radar is decorative.
- *   - Honors `prefers-reduced-motion` via the `motion-safe:` prefix
- *     on the sweep + pulse classes — reduced-motion users see the
- *     static radar without the sweep or center pulse.
+ * Accessibility: aria-hidden (the headline + copy carry meaning).
+ * Honors prefers-reduced-motion via motion-safe: on the sweep +
+ * center pulse.
  */
 
-const VIEWBOX = 320;
+const VIEWBOX = 360;
 const CENTER = VIEWBOX / 2;
-const MAX_RADIUS = 130; // leaves room for platform labels at ~150px.
+const MAX_RADIUS = 150;
 
-// The 5 AI systems GeoViz audits against. Ordered to distribute
-// evenly around the radar perimeter starting at top, clockwise.
+// The 5 AI systems GeoViz tests against, with a decorative scanner
+// verb each. Distributed clockwise from top.
 const PLATFORMS = [
-  "ChatGPT",
-  "Claude",
-  "Perplexity",
-  "Gemini",
-  "AI Overviews",
+  { name: "ChatGPT", status: "Crawling" },
+  { name: "Claude", status: "Analyzing" },
+  { name: "Perplexity", status: "Refreshing" },
+  { name: "Gemini", status: "Scanning" },
+  { name: "AI Overviews", status: "Indexing" },
 ] as const;
 
-// Sample data values (0..1 of max radius). Decorative — not real
-// scores. Chosen to look "plausibly mid-range" so the polygon reads
-// as a real reading shape without implying a specific customer's
-// data. One value per platform (5 vertices).
-const SAMPLE_VALUES = [0.55, 0.68, 0.45, 0.6, 0.5] as const;
+// Sample reading shape (0..1 of max radius), one value per platform.
+// Decorative — not a real score.
+const SAMPLE_VALUES = [0.58, 0.7, 0.46, 0.62, 0.52] as const;
 
 const RING_RADII = [
-  MAX_RADIUS * 0.25,
-  MAX_RADIUS * 0.5,
-  MAX_RADIUS * 0.75,
+  MAX_RADIUS * 0.28,
+  MAX_RADIUS * 0.52,
+  MAX_RADIUS * 0.76,
   MAX_RADIUS,
 ];
 
-// Scattered "signals detected" data dots — decorative amber pings
-// inside the radar field. Positions hand-tuned to feel natural
-// (not on a grid, not clumped). Each is {radius_pct, angle_deg}.
-// Placed to fill the field without colliding with the sample polygon.
-const DATA_DOTS = [
-  { r: 0.32, a: 22, opacity: 0.55 },
-  { r: 0.48, a: 76, opacity: 0.65 },
-  { r: 0.7, a: 110, opacity: 0.4 },
-  { r: 0.18, a: 145, opacity: 0.7 },
-  { r: 0.55, a: 168, opacity: 0.5 },
-  { r: 0.82, a: 200, opacity: 0.35 },
-  { r: 0.4, a: 232, opacity: 0.6 },
-  { r: 0.62, a: 268, opacity: 0.45 },
-  { r: 0.28, a: 295, opacity: 0.6 },
-  { r: 0.75, a: 332, opacity: 0.4 },
+// Scattered "signal" dots — warm orange pings inside the field.
+// Hand-tuned to feel natural (not gridded, not clumped).
+const SIGNAL_DOTS = [
+  { r: 0.34, a: 28, o: 0.55 },
+  { r: 0.5, a: 70, o: 0.7 },
+  { r: 0.72, a: 104, o: 0.4 },
+  { r: 0.2, a: 150, o: 0.75 },
+  { r: 0.58, a: 176, o: 0.5 },
+  { r: 0.8, a: 208, o: 0.38 },
+  { r: 0.42, a: 240, o: 0.62 },
+  { r: 0.64, a: 272, o: 0.46 },
+  { r: 0.3, a: 304, o: 0.6 },
+  { r: 0.76, a: 338, o: 0.42 },
 ];
 
 function polar(angleDeg: number, radius: number) {
@@ -82,12 +69,10 @@ function polar(angleDeg: number, radius: number) {
 }
 
 const axisAngles = PLATFORMS.map((_, i) => (i * 360) / PLATFORMS.length);
-const axisEnds = axisAngles.map((angle) => polar(angle, MAX_RADIUS));
-const labelPositions = axisAngles.map((angle) => polar(angle, MAX_RADIUS + 22));
 const samplePoints = SAMPLE_VALUES.map((v, i) =>
   polar(axisAngles[i], MAX_RADIUS * v),
 );
-const samplePolygonPath =
+const samplePath =
   samplePoints
     .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
     .join(" ") + " Z";
@@ -97,156 +82,168 @@ export function HeroRadar({ className }: { className?: string }) {
     <div className={className}>
       <svg
         viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
-        className="hero-radar-svg w-full max-w-[320px] mx-auto"
+        className="hero-radar-svg w-full max-w-[440px] mx-auto"
         aria-hidden
         focusable="false"
       >
         <defs>
-          <linearGradient id="hero-radar-sweep" x1="50%" y1="50%" x2="100%" y2="50%">
-            <stop offset="0%" stopColor="rgba(103, 232, 249, 0.18)" />
-            <stop offset="60%" stopColor="rgba(103, 232, 249, 0.05)" />
-            <stop offset="100%" stopColor="rgba(103, 232, 249, 0)" />
+          {/* Sweep wedge — warm orange fading to transparent. */}
+          <linearGradient id="radar-sweep" x1="50%" y1="50%" x2="100%" y2="50%">
+            <stop offset="0%" stopColor="rgba(255, 122, 24, 0.30)" />
+            <stop offset="55%" stopColor="rgba(255, 122, 24, 0.08)" />
+            <stop offset="100%" stopColor="rgba(255, 122, 24, 0)" />
           </linearGradient>
-          <radialGradient id="hero-radar-center-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(255, 154, 60, 0.45)" />
-            <stop offset="100%" stopColor="rgba(255, 154, 60, 0)" />
+          {/* Center glow — strong warm core. */}
+          <radialGradient id="radar-core" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(255, 154, 60, 0.55)" />
+            <stop offset="45%" stopColor="rgba(255, 122, 24, 0.22)" />
+            <stop offset="100%" stopColor="rgba(255, 122, 24, 0)" />
           </radialGradient>
         </defs>
 
-        {/* Concentric rings — cyan. Outer ring slightly stronger so
-            the radar has a defined boundary. */}
-        {RING_RADII.map((r, i) => (
-          <circle
-            key={`ring-${i}`}
-            cx={CENTER}
-            cy={CENTER}
-            r={r}
-            fill="none"
-            stroke={i === RING_RADII.length - 1
-              ? "rgba(103, 232, 249, 0.35)"
-              : "rgba(103, 232, 249, 0.15)"}
-            strokeWidth={1}
-          />
-        ))}
+        {/* Soft ambient core glow behind everything. */}
+        <circle cx={CENTER} cy={CENTER} r={MAX_RADIUS * 0.9} fill="url(#radar-core)" />
 
-        {/* Five radial axes — neutral white, lower opacity than
-            rings so the cyan rings dominate. */}
-        {axisEnds.map((end, i) => (
-          <line
-            key={`axis-${i}`}
-            x1={CENTER}
-            y1={CENTER}
-            x2={end.x}
-            y2={end.y}
-            stroke="rgba(255, 255, 255, 0.06)"
-            strokeWidth={1}
-          />
-        ))}
+        {/* Concentric rings — warm orange, graduated. Outer ring
+            strongest so the instrument has a defined edge. */}
+        {RING_RADII.map((r, i) => {
+          const last = i === RING_RADII.length - 1;
+          return (
+            <circle
+              key={`ring-${i}`}
+              cx={CENTER}
+              cy={CENTER}
+              r={r}
+              fill="none"
+              stroke={
+                last
+                  ? "rgba(255, 122, 24, 0.40)"
+                  : `rgba(255, 122, 24, ${0.1 + i * 0.05})`
+              }
+              strokeWidth={last ? 1.25 : 1}
+            />
+          );
+        })}
 
-        {/* Scanning sweep wedge — rotates over 12 seconds. */}
+        {/* Faint radial axes to each platform marker. */}
+        {axisAngles.map((angle, i) => {
+          const end = polar(angle, MAX_RADIUS);
+          return (
+            <line
+              key={`axis-${i}`}
+              x1={CENTER}
+              y1={CENTER}
+              x2={end.x}
+              y2={end.y}
+              stroke="rgba(255, 255, 255, 0.05)"
+              strokeWidth={1}
+            />
+          );
+        })}
+
+        {/* Scanning sweep — the signature motion. 12s, restrained. */}
         <g
-          className="hero-radar-sweep-wrap motion-safe:animate-radarSweep"
+          className="motion-safe:animate-radarSweep"
           style={{ transformOrigin: `${CENTER}px ${CENTER}px` }}
         >
           <path
             d={`M ${CENTER} ${CENTER}
                 L ${CENTER + MAX_RADIUS} ${CENTER}
                 A ${MAX_RADIUS} ${MAX_RADIUS} 0 0 0
-                  ${polar(-60, MAX_RADIUS).x.toFixed(2)}
-                  ${polar(-60, MAX_RADIUS).y.toFixed(2)}
+                  ${polar(-58, MAX_RADIUS).x.toFixed(2)}
+                  ${polar(-58, MAX_RADIUS).y.toFixed(2)}
                 Z`}
-            fill="url(#hero-radar-sweep)"
+            fill="url(#radar-sweep)"
           />
         </g>
 
-        {/* Scattered amber data dots — decorative "signals detected"
-            pattern. Rendered BEHIND the sample polygon so they read
-            as ambient field noise, not foreground data. */}
-        {DATA_DOTS.map((d, i) => {
+        {/* Scattered signal dots — ambient field noise behind the
+            reading shape. */}
+        {SIGNAL_DOTS.map((d, i) => {
           const p = polar(d.a, MAX_RADIUS * d.r);
           return (
             <circle
-              key={`data-${i}`}
+              key={`sig-${i}`}
               cx={p.x}
               cy={p.y}
-              r={1.5}
-              fill={`rgba(255, 154, 60, ${d.opacity})`}
+              r={1.6}
+              fill={`rgba(255, 154, 60, ${d.o})`}
             />
           );
         })}
 
-        {/* Sample data polygon — translucent amber connecting the
-            5 platform vertices. */}
+        {/* Reading shape — translucent warm polygon across the 5
+            platform vertices. */}
         <path
-          d={samplePolygonPath}
-          fill="rgba(255, 122, 24, 0.12)"
-          stroke="rgba(255, 122, 24, 0.4)"
-          strokeWidth={1}
+          d={samplePath}
+          fill="rgba(255, 122, 24, 0.13)"
+          stroke="rgba(255, 122, 24, 0.45)"
+          strokeWidth={1.25}
           strokeLinejoin="round"
         />
-
-        {/* Sample data vertex dots — small amber markers at each
-            sample value point. Bigger than data dots (3.5px vs 1.5px)
-            so the polygon's data shape reads stronger. */}
         {samplePoints.map((p, i) => (
           <circle
-            key={`dot-${i}`}
+            key={`vtx-${i}`}
             cx={p.x}
             cy={p.y}
             r={3.5}
-            fill="rgba(255, 154, 60, 0.95)"
-            stroke="rgba(5, 7, 13, 0.6)"
+            fill="#ff9a3c"
+            stroke="rgba(5, 7, 13, 0.65)"
             strokeWidth={1.5}
           />
         ))}
 
-        {/* Center marker — amber dot over a soft radial glow.
-            Subtle pulse via the existing pulseSoft keyframe. */}
-        <circle cx={CENTER} cy={CENTER} r={28} fill="url(#hero-radar-center-glow)" />
+        {/* Center marker — bright warm core + pulse. */}
         <circle
           cx={CENTER}
           cy={CENTER}
-          r={4.5}
-          fill="#ff9a3c"
+          r={5}
+          fill="#ffb15a"
           className="motion-safe:animate-pulseSoft"
         />
 
-        {/* Platform labels — uppercase mono, low opacity. One per
-            platform with a small cyan status dot prefix. The dot is
-            drawn separately as a <circle> + the label is the <text>;
-            anchor swings based on the vertex's clock position. */}
-        {PLATFORMS.map((label, i) => {
-          const pos = labelPositions[i];
+        {/* Platform markers around the perimeter — name + scanner
+            verb + a single faint cyan tick (the only cyan in the
+            instrument). */}
+        {PLATFORMS.map((p, i) => {
           const angle = axisAngles[i];
-          const anchor =
-            angle === 0 || Math.abs(angle - 180) < 1
-              ? "middle"
-              : angle > 180
-                ? "end"
-                : "start";
-          // Small cyan dot positioned just inside the label.
-          const dotOffsetX =
-            anchor === "middle" ? 0 : anchor === "end" ? 8 : -8;
+          const anchorPos = polar(angle, MAX_RADIUS + 14);
+          const isMid = angle === 0 || Math.abs(angle - 180) < 1;
+          const anchor = isMid ? "middle" : angle > 180 ? "end" : "start";
+          const nudge = anchor === "middle" ? 0 : anchor === "end" ? -6 : 6;
           return (
-            <g key={`label-${i}`}>
+            <g key={`pm-${i}`}>
+              {/* perimeter tick — the lone cyan accent */}
               <circle
-                cx={pos.x + dotOffsetX}
-                cy={pos.y}
-                r={2}
+                cx={polar(angle, MAX_RADIUS).x}
+                cy={polar(angle, MAX_RADIUS).y}
+                r={2.5}
                 fill="#67e8f9"
+                opacity={0.7}
               />
               <text
-                x={pos.x + (anchor === "middle" ? 0 : anchor === "end" ? -2 : 2)}
-                y={pos.y}
+                x={anchorPos.x + nudge}
+                y={anchorPos.y - 5}
                 textAnchor={anchor}
                 dominantBaseline="middle"
-                className="hero-radar-label"
-                fontSize={9.5}
-                fontFamily="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
-                fill="rgba(255, 255, 255, 0.6)"
-                letterSpacing="0.16em"
+                fontSize={12}
+                fontWeight={600}
+                fontFamily="ui-sans-serif, system-ui, sans-serif"
+                fill="rgba(255, 255, 255, 0.82)"
               >
-                {label.toUpperCase()}
+                {p.name}
+              </text>
+              <text
+                x={anchorPos.x + nudge}
+                y={anchorPos.y + 9}
+                textAnchor={anchor}
+                dominantBaseline="middle"
+                fontSize={9}
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+                fill="rgba(255, 154, 60, 0.7)"
+                letterSpacing="0.12em"
+              >
+                {p.status.toUpperCase()}
               </text>
             </g>
           );

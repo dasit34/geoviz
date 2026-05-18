@@ -8,12 +8,6 @@ export function Header() {
         <Logo />
         <nav className="hidden items-center gap-7 text-sm text-white/70 lg:flex">
           <Link
-            href="/#what-we-audit"
-            className="transition hover:text-white"
-          >
-            What we audit
-          </Link>
-          <Link
             href="/#how-it-works"
             className="transition hover:text-white"
           >
@@ -27,6 +21,9 @@ export function Header() {
           </Link>
           <Link href="/#pricing" className="transition hover:text-white">
             Pricing
+          </Link>
+          <Link href="/#faq" className="transition hover:text-white">
+            FAQ
           </Link>
         </nav>
         <Link href="/order" className="btn-primary text-sm">

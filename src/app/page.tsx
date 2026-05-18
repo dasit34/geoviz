@@ -5,154 +5,116 @@ import { HeroRadar } from "@/components/HeroRadar";
 import { SampleAuditCard } from "@/components/SampleAuditCard";
 
 /**
- * Homepage — redesigned in PR #27 ("Satellite Visibility System ×
- * Bloomberg Terminal"). 11 sections compressed to 6:
- *   1. Hero          — headline + HeroRadar (left/right asymmetric)
- *   2. Problem       — 4 evidence-style observations
- *   3. How it works  — CRAWL → ANALYZE → REPORT
- *   4. What we audit — 8 dimensions in a dense data-manifest list
- *   5. Pricing       — 2 cards (audit $97 + Foundation Fix $497)
- *   6. Final CTA     — social proof line + single primary button
+ * Homepage — rebuilt PR #29 against
+ * references/geoviz-radar-reference.png as the primary visual
+ * direction. Audience is real SMB owners (roofers, dentists,
+ * contractors), so the copy is plain English — no enterprise /
+ * dev-tooling / abstract-AI-jargon voice.
  *
- * Design constraints per CLAUDE_DESIGN.md:
- *   - Restrained motion (only HeroRadar moves; sweep at 12s, center
- *     pulse at 3s — both honor prefers-reduced-motion).
- *   - Cyan reserved for telemetry (HeroRadar + numbered prefixes).
- *   - Amber/accent reserved for scores + CTAs.
- *   - Mono for prices, IDs, dimension labels, numeric prefixes.
- *   - Sharp edges (PR #25 set the global rounding to rounded-lg).
- *   - No icon-card SaaS grids; data manifests instead.
+ * Composition principles:
+ *   - Orange radar is the emotional anchor of the hero. Cyan is
+ *     minimal. Obsidian background. Editorial spacing.
+ *   - Big confident typography; hierarchy from size + weight, not
+ *     from bordered boxes or telemetry numbering.
+ *   - No SaaS card grids, no fake dashboards, no [01]-style
+ *     section numbers, no mono labels sprinkled everywhere.
+ *   - Sections: Hero · Trust strip · How it works · Before/After ·
+ *     Sample report preview · FAQ · Pricing · Final CTA.
+ *
+ * Routes / backend / audit flow are untouched — landing page only.
  */
 
-const PLATFORMS = ["ChatGPT", "Claude", "Perplexity", "Gemini", "AI Overviews"];
-
-const PROBLEMS = [
-  "AI systems rely on structured, machine-readable business information.",
-  "Inconsistent business signals weaken retrieval confidence.",
-  "Most websites were built for Google search, not AI recommendation systems.",
-  "Missing schema and fragmented entity signals reduce discoverability.",
+const PLATFORMS = [
+  "ChatGPT",
+  "Claude",
+  "Perplexity",
+  "Gemini",
+  "Google AI Overviews",
 ];
 
 const STEPS = [
   {
-    name: "CRAWL",
-    body: "GeoViz reads your public website and machine-readable business signals.",
+    title: "We scan your business",
+    body: "We pull your public website and the signals AI systems actually read — your name, services, location, structured data, and trust markers.",
   },
   {
-    name: "ANALYZE",
-    body: "We inspect schema, entity clarity, crawlability, AI readability, and recommendation readiness.",
+    title: "We test AI visibility",
+    body: "We check how clearly ChatGPT, Claude, Gemini, and Perplexity can identify, trust, and retrieve your business when a customer asks for a recommendation.",
   },
   {
-    name: "REPORT",
-    body: "You receive a scored diagnostic with prioritized visibility fixes.",
+    title: "You get a report + fixes",
+    body: "A clear visibility score, the specific issues holding you back, and exactly what to fix first — reviewed by a human before it reaches you.",
   },
 ];
 
-const DIMENSIONS = [
+const BEFORE_POINTS = [
+  "Inconsistent business name, phone, and address across the web",
+  "No structured data AI can parse",
+  "Thin service pages with nothing AI can quote",
+  "Reviews and trust signals AI can’t connect to you",
+];
+
+const AFTER_POINTS = [
+  "One consistent business identity AI can verify",
+  "Structured details AI can read and retrieve",
+  "Clear service and answer content AI can quote",
+  "Trust signals tied directly to your business",
+];
+
+const SAMPLE_EVIDENCE = [
   {
-    name: "AI Readability",
-    body: "How clearly AI systems can parse your site content.",
+    tone: "ok" as const,
+    text: "Business name and location detected in structured data",
   },
   {
-    name: "Entity Clarity",
-    body: "Whether structured business data identifies you cleanly.",
+    tone: "warn" as const,
+    text: "Service descriptions are thin — AI has little it can quote",
   },
   {
-    name: "Schema / Structured Data",
-    body: "Coverage of LocalBusiness-family schema fields.",
+    tone: "bad" as const,
+    text: "No FAQ or pricing structure AI can retrieve",
   },
   {
-    name: "Crawlability",
-    body: "Whether AI crawlers can reach your pages.",
-  },
-  {
-    name: "Technical Accessibility",
-    body: "How a headless render compares to your source HTML.",
-  },
-  {
-    name: "Recommendation Readiness",
-    body: "Depth and clarity needed for AI to name you.",
-  },
-  {
-    name: "Discoverability Signals",
-    body: "Trust, citation, and NAP consistency across the web.",
-  },
-  {
-    name: "Content Depth & Context",
-    body: "Whether your site has the depth AI can quote.",
+    tone: "bad" as const,
+    text: "Reviews aren’t connected to your business entity",
   },
 ];
 
 const AUDIT_BULLETS = [
-  "AI Visibility Score (0–100) with band tier",
-  "Top 3 visibility issues with severity + impact",
-  "Top 3 fixes with priority + difficulty",
-  "Operator-reviewed before delivery",
+  "Your AI Visibility Score (0–100) with what it means",
+  "The top 3 issues making you invisible to AI",
+  "The top 3 fixes, ranked by impact",
+  "Reviewed by a human before delivery",
   "Professional PDF report",
 ];
 
 const FOUNDATION_BULLETS = [
-  "Machine-readability improvements for AI retrieval",
-  "Trust and verification signal strengthening",
-  "Cross-platform business identity alignment",
-  "Before/after GeoViz re-check (verification audit)",
+  "We make your business machine-readable for AI retrieval",
+  "We strengthen the trust and verification signals AI looks for",
+  "We align your business identity across platforms",
+  "Before/after GeoViz re-check so you can see the difference",
 ];
 
-const FOUNDATION_SAFETY = [
-  "Scoped engagement — not a website rebuild.",
-  "Implementation recommendations tailored to your platform.",
-  "Complex sites may require custom scoping — we’ll quote upfront.",
-];
-
-// Per-platform retrieval profile band (PR #28). Honest framing of
-// the reference image's "LIVE · AI ACTIVITY" idea — we don't have
-// real-time per-platform telemetry, but we do test against each
-// platform's distinct retrieval mode. The descriptor is a factual
-// characterization, not a status claim.
-const RETRIEVAL_PROFILES = [
-  { name: "ChatGPT", profile: "Web search tools" },
-  { name: "Claude", profile: "Web search retrieval" },
-  { name: "Perplexity", profile: "Citation engine" },
-  { name: "Gemini", profile: "Knowledge graph" },
-  { name: "AI Overviews", profile: "AI Mode" },
-];
-
-// Trust signals strip below the retrieval profiles section. Each
-// claim is verifiable — no enterprise-grade marketing puffery.
-const TRUST_SIGNALS = [
-  "Real AI system testing",
-  "Operator-reviewed reports",
-  "Actionable recommendations",
-  "Stripe-secure checkout",
-];
-
-// FAQ content. Native <details>/<summary> accordion — no JS, full
-// keyboard + screen-reader support out of the box. Answers stay
-// factual and honor CLAUDE.md's "no guaranteed rankings" rule.
 const FAQS = [
   {
-    q: "What does the audit actually measure?",
-    a: "Eight AI visibility dimensions: schema / structured data, entity clarity, crawlability, technical accessibility, AI readability, recommendation readiness, discoverability signals, and content depth. The full list is in the “What we audit” section above.",
+    q: "What is AI visibility?",
+    a: "Whether AI assistants like ChatGPT, Claude, and Gemini can find, understand, and recommend your business when a customer asks them for help. It’s separate from where you rank on Google.",
   },
   {
-    q: "How long does delivery take?",
-    a: "Most audits are delivered by email within minutes. Each report is operator-reviewed before delivery, which can occasionally add a short queue during high-traffic periods.",
+    q: "Why does this matter for my business?",
+    a: "More people now ask AI for a recommendation before they ever open a search engine. If AI can’t read your business clearly, it confidently recommends a competitor instead of you.",
   },
   {
-    q: "Will this guarantee my business shows up in ChatGPT?",
-    a: "No, and we won’t claim it does. The audit identifies the structural reasons AI systems may or may not retrieve your business and gives you a prioritized fix list. AI recommendation behavior is non-deterministic — we measure readiness, not placement.",
+    q: "Is this just SEO?",
+    a: "No. SEO is about ranking in Google’s search results. This is about whether AI systems can understand and trust your business enough to recommend it. They’re related, but they’re not the same checks.",
   },
   {
-    q: "What’s the difference between the $97 audit and the $497 Foundation Fix?",
-    a: "The audit is a diagnostic — it tells you what’s broken. The Foundation Fix is a scoped engagement where we implement the AI-readable layer your audit identifies as missing.",
+    q: "Can you fix the issues for me?",
+    a: "Yes. The audit shows you exactly what’s wrong. The optional Foundation Fix is a scoped engagement where we implement those fixes for you and re-check the result.",
   },
   {
-    q: "What if my audit fails?",
-    a: "If our system can’t complete an audit for technical reasons (site unreachable, blocking AI crawlers, etc.) we either regenerate the report or refund your payment — your choice.",
-  },
-  {
-    q: "Can I see a sample report before I buy?",
-    a: "Yes — use the “see sample report” link in the hero, or the Sample Report link in the header.",
+    q: "How long does it take?",
+    a: "Most audits are delivered by email within minutes. Every report is reviewed by a human before it’s sent, which can occasionally add a short wait during busy periods.",
   },
 ];
 
@@ -161,330 +123,247 @@ export default function Page() {
     <main>
       <Header />
 
-      {/* ─────────────────────────────────────────────────────────
-          1. HERO — asymmetric 4fr:6fr grid. Left = copy + CTAs +
-             pricing strip. Right = telemetry suite (HeroRadar +
-             SampleAuditCard side-by-side on lg+; stacked below
-             lg). Single bg-radial-orange — no grid-bg overlay, no
-             duplicate glow.
-          ───────────────────────────────────────────────────────── */}
+      {/* ── HERO ───────────────────────────────────────────────
+          Massive plain-English headline left; orange scanning
+          instrument + live score readout right. Asymmetric:
+          ~38% text, ~62% instrument. Generous editorial spacing.
+          ──────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10 bg-radial-orange" />
-        <div className="container-page grid gap-12 py-20 md:grid-cols-[4fr_6fr] md:py-28 md:gap-16 lg:gap-20">
+        <div className="container-page grid items-center gap-14 py-24 md:grid-cols-[minmax(0,38%)_minmax(0,62%)] md:py-32 md:gap-12 lg:gap-16">
           <div>
-            <p className="mono-data text-[11px] uppercase tracking-[0.22em] text-cyan">
-              AI Visibility Intelligence
+            <p className="text-sm font-medium uppercase tracking-[0.18em] text-accent">
+              AI Visibility Audit
             </p>
-            <h1 className="mt-5 text-3xl font-bold uppercase leading-[1.05] tracking-[-0.02em] text-white sm:text-4xl md:text-[44px] md:leading-[1.02] lg:text-[52px]">
-              See how AI sees{" "}
-              <span className="text-accent">your</span> business.
+            <h1 className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
+              Can AI actually find your business?
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70">
-              GeoViz maps how AI systems read, understand, and
-              retrieve your business — so you can close visibility
-              gaps before customers choose someone else.
+            <p className="mt-6 max-w-md text-lg leading-relaxed text-white/70">
+              When someone asks ChatGPT, Claude, or Gemini who to
+              hire, GeoViz checks whether AI can read, trust, and
+              recommend your business — before a competitor gets the
+              referral.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-4">
               <Link
                 href="/order"
                 className="btn-primary inline-flex items-center gap-2 text-base"
               >
-                Get my visibility score
+                Get my AI visibility score
                 <span aria-hidden>→</span>
               </Link>
               <Link
                 href="/sample-report"
-                className="mono-data text-xs uppercase tracking-[0.18em] text-white/55 hover:text-white/85"
+                className="text-sm font-medium text-white/70 underline-offset-4 hover:text-white hover:underline"
               >
-                see sample report →
+                View sample report
               </Link>
             </div>
 
-            {/* Pricing strip — mono, intentionally framed as
-                "early access" so the discount doesn't read as
-                permanently cheap. Matches the reference image. */}
-            <p className="mono-data mt-6 text-xs uppercase tracking-[0.18em] text-white/55">
-              Early access · <span className="text-white/85">$97</span>{" "}
-              <span className="ml-2 text-white/35 line-through">$147</span>
-            </p>
-
-            {/* Trust ticker — 110+ audits, operator-reviewed,
-                report ID. Bloomberg-ticker rhythm. */}
-            <p className="mono-data mt-3 text-[10px] uppercase tracking-[0.2em] text-white/40">
-              110+ audits run · operator-reviewed · GEO-SAMPLE-001
+            <p className="mt-7 text-sm text-white/50">
+              Early access —{" "}
+              <span className="font-semibold text-white/80">$97</span>{" "}
+              <span className="text-white/35">·</span> normally{" "}
+              <span className="line-through">$147</span>
             </p>
           </div>
 
-          {/* Telemetry suite — radar + score panel side-by-side. */}
-          <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:gap-6 lg:items-center">
+          {/* Scanning instrument + live readout. Stacks below lg. */}
+          <div className="grid items-center gap-8 lg:grid-cols-[1.5fr_1fr] lg:gap-8">
             <div className="flex items-center justify-center">
               <HeroRadar />
             </div>
             <div className="flex items-center justify-center lg:justify-start">
-              <SampleAuditCard className="w-full max-w-[280px]" />
+              <SampleAuditCard className="w-full max-w-[260px]" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────
-          1.5. AI RETRIEVAL PROFILES — 5 platform cards in a
-               horizontal band. Each card shows platform name +
-               retrieval-mode descriptor + decorative sparkline.
-               Honest framing: NOT "live activity" telemetry; the
-               sparklines are decorative visual identity.
-          ───────────────────────────────────────────────────────── */}
+      {/* ── TRUST STRIP ────────────────────────────────────────
+          No cards, no sparklines, no borders — just a quiet lead
+          line + the 5 platforms in a wide spaced row.
+          ──────────────────────────────────────────────────────── */}
       <section className="border-t border-white/5 bg-ink-950">
-        <div className="container-page py-12 md:py-16">
-          <div className="flex items-end justify-between gap-6">
-            <div>
-              <p className="section-eyebrow">
-                Platforms · AI retrieval profiles
-              </p>
-              <h2 className="h3 mt-3 max-w-2xl">
-                Five AI systems. Five retrieval profiles we test.
-              </h2>
-            </div>
-          </div>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {RETRIEVAL_PROFILES.map((p) => (
-              <RetrievalProfileCard
-                key={p.name}
-                name={p.name}
-                profile={p.profile}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────
-          1.6. BUILT FOR THE AI ERA — thin trust strip. Quiet
-               border-bordered band of 4 inline claims. NOT a
-               feature section — a status indicator.
-          ───────────────────────────────────────────────────────── */}
-      <section className="border-y border-white/5 bg-ink-950/60">
-        <div className="container-page py-5">
-          <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
-            <p className="mono-data text-[10px] uppercase tracking-[0.22em] text-white/40">
-              Built for the AI era
-            </p>
-            <ul className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              {TRUST_SIGNALS.map((t) => (
-                <li
-                  key={t}
-                  className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-white/65"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-cyan" />
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────
-          2. PROBLEM — 4 evidence-style observations. No cards,
-             no icons. Mono numbered prefixes in cyan (telemetry
-             accent). Bloomberg-ticker rhythm.
-          ───────────────────────────────────────────────────────── */}
-      <section className="border-t border-white/5 bg-ink-950">
-        <div className="container-page py-16 md:py-20">
-          <p className="section-eyebrow">
-            Problem · why AI readability matters
+        <div className="container-page py-12 text-center">
+          <p className="text-sm text-white/50">
+            Tested against the AI systems your customers already use
           </p>
-          <h2 className="h2 mt-3 max-w-3xl">
-            Most websites are unreadable to AI by default.
-          </h2>
-          <ul className="mt-10 grid gap-x-12 gap-y-5 md:grid-cols-2">
-            {PROBLEMS.map((body, i) => (
-              <li key={body} className="flex gap-4">
-                <span className="mono-data text-xs uppercase tracking-[0.18em] text-cyan">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="text-base leading-relaxed text-white/85">
-                  {body}
-                </span>
-              </li>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
+            {PLATFORMS.map((p) => (
+              <span
+                key={p}
+                className="text-base font-semibold tracking-tight text-white/75"
+              >
+                {p}
+              </span>
             ))}
-          </ul>
+          </div>
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────
-          3. HOW IT WORKS — 3 horizontal steps. CRAWL → ANALYZE →
-             REPORT. Arrow connectors on md+ only.
-          ───────────────────────────────────────────────────────── */}
+      {/* ── HOW IT WORKS ───────────────────────────────────────
+          3 steps. Large quiet numerals, no bordered boxes, no
+          telemetry codes. Editorial three-column rhythm.
+          ──────────────────────────────────────────────────────── */}
       <section
         id="how-it-works"
         className="border-t border-white/5 bg-ink-950 scroll-mt-20"
       >
-        <div className="container-page py-16 md:py-20">
-          <p className="section-eyebrow">Process · how it works</p>
-          <h2 className="h2 mt-3 max-w-2xl">
-            Three stages. One reviewed report.
+        <div className="container-page py-20 md:py-28">
+          <h2 className="max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            How it works
           </h2>
-          <div className="relative mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
+          <div className="mt-14 grid gap-12 md:grid-cols-3 md:gap-10">
             {STEPS.map((step, i) => (
-              <div key={step.name} className="relative">
-                <p className="mono-data text-[10px] uppercase tracking-[0.22em] text-cyan">
-                  Step {String(i + 1).padStart(2, "0")}
-                </p>
-                <h3 className="mono-data mt-3 text-xl uppercase tracking-[0.04em] text-white">
-                  {step.name}
+              <div key={step.title}>
+                <span className="text-4xl font-bold text-accent/40">
+                  {i + 1}
+                </span>
+                <h3 className="mt-4 text-xl font-semibold text-white">
+                  {step.title}
                 </h3>
-                <p className="mt-3 text-sm leading-relaxed text-white/65">
+                <p className="mt-3 text-base leading-relaxed text-white/65">
                   {step.body}
                 </p>
-                {/* Arrow connector — only between cards, not after
-                    the last one. Hidden on mobile (single column). */}
-                {i < STEPS.length - 1 ? (
-                  <span
-                    aria-hidden
-                    className="mono-data pointer-events-none absolute -right-4 top-1 hidden text-base text-white/20 md:block"
-                  >
-                    →
-                  </span>
-                ) : null}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────
-          4. WHAT WE AUDIT — 8 dimensions as dense data manifest.
-             Numbered rows with mono dimension names + descriptions.
-             Looks like a system spec, not a feature grid.
-          ───────────────────────────────────────────────────────── */}
-      <section
-        id="what-we-audit"
-        className="border-t border-white/5 bg-ink-950 scroll-mt-20"
-      >
-        <div className="container-page py-16 md:py-20">
-          <p className="section-eyebrow">Audit scope · 8 dimensions</p>
-          <h2 className="h2 mt-3 max-w-2xl">
-            What every GeoViz audit measures.
+      {/* ── BEFORE / AFTER ─────────────────────────────────────
+          Two columns split by a single divider — left dim
+          ("before"), right warm-accented ("after"). Minimal
+          chrome; contrast carries the meaning.
+          ──────────────────────────────────────────────────────── */}
+      <section className="border-t border-white/5 bg-ink-950">
+        <div className="container-page py-20 md:py-28">
+          <h2 className="max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            What changes when AI can read you.
           </h2>
-          <div className="mt-10 grid gap-x-12 md:grid-cols-2">
-            {DIMENSIONS.map((dim, i) => (
-              <DimensionRow key={dim.name} index={i + 1} {...dim} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────
-          5. PRICING — 2 cards: audit ($97 early access) + Foundation
-             Fix ($497). Same rhythm; card 1 is the primary
-             recommendation, card 2 is the deeper engagement.
-          ───────────────────────────────────────────────────────── */}
-      <section
-        id="pricing"
-        className="relative border-t border-white/5 bg-ink-950 scroll-mt-20"
-      >
-        <div className="absolute inset-0 -z-10 bg-radial-orange opacity-50" />
-        <div className="container-page py-16 md:py-24">
-          <p className="section-eyebrow">Pricing · two engagements</p>
-          <h2 className="h2 mt-3 max-w-2xl">
-            Diagnose first. Fix the foundation when you&rsquo;re ready.
-          </h2>
-
-          <div className="mt-12 grid gap-6 md:grid-cols-2 md:gap-8">
-            {/* CARD 1 — AI Visibility Audit */}
-            <article className="flex flex-col rounded-lg border border-white/10 bg-ink-900/60 p-8 shadow-card md:p-10">
-              <p className="mono-data text-[11px] uppercase tracking-[0.22em] text-cyan">
-                AI Visibility Audit
+          <div className="mt-14 grid gap-12 md:grid-cols-2 md:gap-0">
+            <div className="md:pr-14">
+              <p className="text-sm font-medium uppercase tracking-[0.16em] text-white/40">
+                Before GeoViz
               </p>
-              <div className="mt-6 flex items-baseline gap-3">
-                <span className="mono-data text-5xl font-bold text-white">
-                  $97
-                </span>
-                <span className="mono-data text-base text-white/35 line-through">
-                  $147
-                </span>
-              </div>
-              <p className="mono-data mt-3 text-xs uppercase tracking-[0.18em] text-white/55">
-                Early access pricing
+              <p className="mt-4 text-lg leading-relaxed text-white/55">
+                AI sees a blurry, fragmented business. There’s not
+                enough it can trust, so it recommends someone else.
               </p>
-              <ul className="mt-8 space-y-3 text-sm text-white/80">
-                {AUDIT_BULLETS.map((b) => (
-                  <PricingBullet key={b}>{b}</PricingBullet>
-                ))}
-              </ul>
-              <div className="mt-auto pt-8">
-                <Link
-                  href="/order"
-                  className="btn-primary w-full justify-center text-base"
-                >
-                  Request my audit
-                </Link>
-                <p className="mt-3 text-xs text-white/45">
-                  Reviewed report delivered by email, typically within
-                  minutes.
-                </p>
-              </div>
-            </article>
-
-            {/* CARD 2 — Foundation Fix */}
-            <article className="flex flex-col rounded-lg border border-white/10 bg-ink-900/40 p-8 shadow-card md:p-10">
-              <p className="mono-data text-[11px] uppercase tracking-[0.22em] text-white/55">
-                Foundation Fix
-              </p>
-              <div className="mt-6 flex items-baseline gap-3">
-                <span className="mono-data text-5xl font-bold text-white">
-                  $497
-                </span>
-              </div>
-              <p className="mono-data mt-3 text-xs uppercase tracking-[0.18em] text-white/55">
-                One-time engagement · 3–5 business days
-              </p>
-              <p className="mt-5 max-w-md text-sm leading-relaxed text-white/75">
-                Install the foundational AI-readable business layer
-                your website is missing — a scoped engagement that
-                {/* keep the abstract-framing phrase on one line so
-                    the report-copy-defensibility regex matches. */}
-                addresses the underlying technical, trust, and discoverability gaps surfaced in your audit.
-              </p>
-              <ul className="mt-6 space-y-3 text-sm text-white/80">
-                {FOUNDATION_BULLETS.map((b) => (
-                  <PricingBullet key={b}>{b}</PricingBullet>
-                ))}
-              </ul>
-              <ul className="mt-6 space-y-2 border-t border-white/5 pt-5 text-xs text-white/55">
-                {FOUNDATION_SAFETY.map((s) => (
-                  <li key={s} className="flex gap-2">
-                    <span className="text-white/30">·</span>
-                    <span>{s}</span>
+              <ul className="mt-7 space-y-3 text-sm text-white/55">
+                {BEFORE_POINTS.map((p) => (
+                  <li key={p} className="flex gap-3">
+                    <span className="text-white/25">—</span>
+                    <span>{p}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-auto pt-8">
-                <Link
-                  href="/foundation-fix"
-                  className="mono-data inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/70 hover:text-white"
-                >
-                  request foundation fix →
-                </Link>
-              </div>
-            </article>
+            </div>
+            <div className="md:border-l md:border-white/10 md:pl-14">
+              <p className="text-sm font-medium uppercase tracking-[0.16em] text-accent">
+                AI-readable business profile
+              </p>
+              <p className="mt-4 text-lg leading-relaxed text-white/80">
+                AI sees one clear, trusted business it can confidently
+                put in front of a customer.
+              </p>
+              <ul className="mt-7 space-y-3 text-sm text-white/80">
+                {AFTER_POINTS.map((p) => (
+                  <li key={p} className="flex gap-3">
+                    <span className="text-accent">→</span>
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────
-          5.5. FAQ — native <details> accordion (no JS dependency).
-               Six factual answers. No overpromising — explicit
-               about non-deterministic AI behavior, refund path,
-               difference between audit and Foundation Fix.
-          ───────────────────────────────────────────────────────── */}
+      {/* ── SAMPLE REPORT PREVIEW ──────────────────────────────
+          One premium panel. Evidence-based plain-English findings,
+          not metric soup. This is THE artifact — a single tasteful
+          border is allowed here.
+          ──────────────────────────────────────────────────────── */}
       <section className="border-t border-white/5 bg-ink-950">
-        <div className="container-page py-16 md:py-20">
-          <p className="section-eyebrow">FAQ · questions we get</p>
-          <h2 className="h2 mt-3 max-w-2xl">Quick answers.</h2>
-          <ul className="mt-10 max-w-3xl divide-y divide-white/5 border-y border-white/5">
+        <div className="container-page py-20 md:py-28">
+          <div className="grid gap-14 lg:grid-cols-[minmax(0,42%)_minmax(0,58%)] lg:items-center lg:gap-16">
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                A real report. Plain answers.
+              </h2>
+              <p className="mt-5 text-lg leading-relaxed text-white/65">
+                No dashboards to decode. You get a score, the exact
+                reasons AI can’t confidently recommend you, and the
+                fixes that matter most — written so you can act on
+                them.
+              </p>
+              <Link
+                href="/sample-report"
+                className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-accent hover:text-accent-glow"
+              >
+                View the full sample report
+                <span aria-hidden>→</span>
+              </Link>
+            </div>
+
+            <div className="rounded-lg border border-white/10 bg-ink-900/60 p-8 shadow-card md:p-10">
+              <div className="flex items-baseline justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-white/40">
+                    Sample report
+                  </p>
+                  <p className="mt-3 text-sm text-white/60">
+                    yourbusiness.com
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="mono-data text-5xl font-bold text-accent-glow">
+                    73
+                  </span>
+                  <span className="mono-data text-base text-white/40">
+                    /100
+                  </span>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent-glow">
+                    Needs work
+                  </p>
+                </div>
+              </div>
+
+              <ul className="mt-8 space-y-4 border-t border-white/5 pt-7 text-sm">
+                {SAMPLE_EVIDENCE.map((e) => (
+                  <li key={e.text} className="flex gap-3">
+                    <EvidenceMark tone={e.tone} />
+                    <span className="leading-relaxed text-white/75">
+                      {e.text}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="mt-7 border-t border-white/5 pt-5 text-xs text-white/40">
+                Every report is reviewed by a person before it’s
+                delivered.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ────────────────────────────────────────────────
+          Native <details> accordion. SMB objection-handling.
+          ──────────────────────────────────────────────────────── */}
+      <section
+        id="faq"
+        className="border-t border-white/5 bg-ink-950 scroll-mt-20"
+      >
+        <div className="container-page py-20 md:py-28">
+          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            Questions, answered.
+          </h2>
+          <ul className="mt-12 max-w-3xl divide-y divide-white/8 border-y border-white/8">
             {FAQS.map((item) => (
               <FaqItem key={item.q} q={item.q} a={item.a} />
             ))}
@@ -492,25 +371,111 @@ export default function Page() {
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────────────────
-          6. SOCIAL PROOF + FINAL CTA — tight closer. Single line
-             of real proof, single primary action.
-          ───────────────────────────────────────────────────────── */}
+      {/* ── PRICING ────────────────────────────────────────────
+          Two offers, restrained chrome — one shared panel split
+          by a divider instead of two heavy bordered cards.
+          ──────────────────────────────────────────────────────── */}
+      <section
+        id="pricing"
+        className="relative border-t border-white/5 bg-ink-950 scroll-mt-20"
+      >
+        <div className="absolute inset-0 -z-10 bg-radial-orange opacity-40" />
+        <div className="container-page py-20 md:py-28">
+          <h2 className="max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            Start with the audit. Fix it when you’re ready.
+          </h2>
+
+          <div className="mt-14 grid gap-14 md:grid-cols-2 md:gap-0">
+            {/* Audit */}
+            <div className="md:pr-16">
+              <p className="text-sm font-medium uppercase tracking-[0.16em] text-accent">
+                AI Visibility Audit
+              </p>
+              <div className="mt-5 flex items-baseline gap-3">
+                <span className="text-5xl font-bold text-white">$97</span>
+                <span className="text-base text-white/35 line-through">
+                  $147
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-white/55">
+                Early access pricing
+              </p>
+              <ul className="mt-8 space-y-3 text-sm text-white/80">
+                {AUDIT_BULLETS.map((b) => (
+                  <PricingBullet key={b}>{b}</PricingBullet>
+                ))}
+              </ul>
+              <Link
+                href="/order"
+                className="btn-primary mt-9 inline-flex w-full items-center justify-center gap-2 text-base sm:w-auto"
+              >
+                Get my AI visibility score
+                <span aria-hidden>→</span>
+              </Link>
+              <p className="mt-4 text-xs text-white/40">
+                Delivered by email, typically within minutes.
+              </p>
+            </div>
+
+            {/* Foundation Fix */}
+            <div className="md:border-l md:border-white/10 md:pl-16">
+              <p className="text-sm font-medium uppercase tracking-[0.16em] text-white/55">
+                Foundation Fix
+              </p>
+              <div className="mt-5 flex items-baseline gap-3">
+                <span className="text-5xl font-bold text-white">$497</span>
+              </div>
+              <p className="mt-2 text-sm text-white/55">
+                One-time · 3–5 business days
+              </p>
+              <p className="mt-5 max-w-md text-base leading-relaxed text-white/75">
+                Don’t want to fix it yourself? We install the
+                {/* keep the abstract-framing phrase on one line so
+                    the report-copy-defensibility regex matches. */}
+                AI-readable layer that addresses the underlying technical, trust, and discoverability gaps surfaced in your audit.
+              </p>
+              <ul className="mt-7 space-y-3 text-sm text-white/80">
+                {FOUNDATION_BULLETS.map((b) => (
+                  <PricingBullet key={b}>{b}</PricingBullet>
+                ))}
+              </ul>
+              <p className="mt-6 text-xs leading-relaxed text-white/45">
+                Scoped engagement — not a website rebuild. Complex
+                sites may require custom scoping; we’ll quote upfront.
+              </p>
+              <Link
+                href="/foundation-fix"
+                className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white"
+              >
+                Learn about the Foundation Fix
+                <span aria-hidden>→</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FINAL CTA ──────────────────────────────────────────
+          Confident closer + real social proof.
+          ──────────────────────────────────────────────────────── */}
       <section className="border-t border-white/5 bg-ink-950">
-        <div className="container-page py-20 text-center">
-          <p className="mx-auto max-w-2xl text-base leading-relaxed text-white/75">
-            110+ AI visibility audits run across local businesses,
-            service companies, and niche brands.
-          </p>
-          <div className="mt-8 flex justify-center">
+        <div className="container-page py-24 text-center">
+          <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            See what AI really thinks of your business.
+          </h2>
+          <div className="mt-9 flex justify-center">
             <Link
               href="/order"
               className="btn-primary inline-flex items-center gap-2 text-base"
             >
-              Get my visibility score
+              Get my AI visibility score
               <span aria-hidden>→</span>
             </Link>
           </div>
+          <p className="mx-auto mt-8 max-w-xl text-sm leading-relaxed text-white/50">
+            110+ AI visibility audits run across local businesses,
+            service companies, and niche brands.
+          </p>
         </div>
       </section>
 
@@ -519,29 +484,20 @@ export default function Page() {
   );
 }
 
-function DimensionRow({
-  index,
-  name,
-  body,
-}: {
-  index: number;
-  name: string;
-  body: string;
-}) {
+function EvidenceMark({ tone }: { tone: "ok" | "warn" | "bad" }) {
+  const map = {
+    ok: { glyph: "✓", cls: "text-emerald-300" },
+    warn: { glyph: "!", cls: "text-amber-300" },
+    bad: { glyph: "✕", cls: "text-accent-glow" },
+  } as const;
+  const { glyph, cls } = map[tone];
   return (
-    <div className="grid grid-cols-[auto_1fr] items-start gap-x-4 border-b border-white/5 py-5">
-      <span className="mono-data pt-[2px] text-xs uppercase tracking-[0.18em] text-cyan">
-        [{String(index).padStart(2, "0")}]
-      </span>
-      <div>
-        <p className="mono-data text-[13px] uppercase tracking-[0.1em] text-white">
-          {name}
-        </p>
-        <p className="mt-1.5 text-sm leading-relaxed text-white/65">
-          {body}
-        </p>
-      </div>
-    </div>
+    <span
+      aria-hidden
+      className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center text-xs font-bold ${cls}`}
+    >
+      {glyph}
+    </span>
   );
 }
 
@@ -567,82 +523,22 @@ function PricingBullet({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * Per-platform card in the AI Retrieval Profiles band. Shows the
- * platform name + its factual retrieval-mode descriptor + a tiny
- * decorative sparkline (visual identity only — not real data).
- */
-function RetrievalProfileCard({
-  name,
-  profile,
-}: {
-  name: string;
-  profile: string;
-}) {
-  return (
-    <article className="rounded-lg border border-white/10 bg-ink-900/40 p-4">
-      <div className="flex items-center justify-between">
-        <p className="mono-data text-xs uppercase tracking-[0.14em] text-white/85">
-          {name}
-        </p>
-        <span className="h-1.5 w-1.5 rounded-full bg-cyan" aria-hidden />
-      </div>
-      <p className="mt-2 text-xs leading-relaxed text-white/55">
-        {profile}
-      </p>
-      <ProfileSparkline className="mt-3" />
-    </article>
-  );
-}
-
-/**
- * Tiny decorative sparkline. Fixed shape (not data-driven) —
- * provides visual identity for the platform cards. aria-hidden
- * because it carries no information; the platform name + profile
- * descriptor do the communication work.
- */
-function ProfileSparkline({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 80 22"
-      className={`block h-5 w-full ${className ?? ""}`}
-      aria-hidden
-      focusable="false"
-    >
-      <polyline
-        points="0,16 12,12 22,15 32,8 44,11 54,6 66,9 80,4"
-        fill="none"
-        stroke="rgba(103, 232, 249, 0.45)"
-        strokeWidth={1.25}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="80" cy="4" r="1.5" fill="rgba(103, 232, 249, 0.95)" />
-    </svg>
-  );
-}
-
-/**
- * FAQ accordion item — native <details>/<summary>, no JS. The
- * marker is hidden via list-style-none + custom +/× indicator
- * driven by the open attribute.
- */
 function FaqItem({ q, a }: { q: string; a: string }) {
   return (
     <li>
-      <details className="group py-5 [&_summary::-webkit-details-marker]:hidden">
-        <summary className="flex cursor-pointer items-start justify-between gap-6 list-none">
-          <span className="text-base font-medium leading-snug text-white">
+      <details className="group py-6 [&_summary::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-6">
+          <span className="text-lg font-medium leading-snug text-white">
             {q}
           </span>
           <span
             aria-hidden
-            className="mono-data shrink-0 text-xl leading-none text-white/45 transition group-open:rotate-45"
+            className="shrink-0 text-2xl leading-none text-white/40 transition group-open:rotate-45"
           >
             +
           </span>
         </summary>
-        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/70">
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/65">
           {a}
         </p>
       </details>
