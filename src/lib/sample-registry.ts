@@ -126,6 +126,9 @@ export async function findSampleAudit(entry: SampleEntry) {
         reportMarkdown: { not: null },
       },
       orderBy: { reportGeneratedAt: "desc" },
+      include: {
+        intelligence: { select: { deterministicScore: true } },
+      },
     });
     if (row) return row;
 

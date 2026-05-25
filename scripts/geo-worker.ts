@@ -244,235 +244,39 @@ Paste it verbatim from the template below as section 5 — do not
 paraphrase, do not change wording, do not change pricing, do not
 drop bullets.
 
-**Scoring rubric — REQUIRED.** Score each category from the evidence
-you actually fetched. The total MUST equal the sum of the six
-category scores (no rounding, no fudging). Do NOT default to a
-preset score (e.g. 28/100) — every score must be tied to specific
-findings on this site. Score conservatively when evidence is
-missing and explain why in the relevant report section.
+__AUTHORITATIVE_SCORE_BLOCK__
 
-**Evidence rule.** Every sub-check below must be tied to something
-you actually saw on the homepage / robots.txt / llms.txt fetches.
-If you can't point to evidence, the sub-check fails — score it
-conservatively and say "no evidence found" in the report.
+**You are an analyst, not a scorer.** The audit score has already
+been computed deterministically by GeoViz's scoring engine
+(scoring@1.0.0) from structured evidence (preflight schema +
+crawlability + entity-consistency analysis, optional render
+probe). Your role is to **narrate** the score for the customer —
+not to compute it.
 
-**Calibration v2 — explicit ladder anchors with partial credit.**
-Each category uses a 0-to-max ladder of named rungs. Find the rung
-the site genuinely sits on and award the rung's points. Partial
-credit BETWEEN rungs is allowed (e.g. 11/25 if the site is between
-"basic readable HTML" and "decent JSON-LD"). The intent is to use
-the FULL range — do NOT cluster at the bottom because no schema
-markup exists. A small business with clear HTML identity, working
-site, and visible reviews is mid-tier, not "At Risk."
+You MUST NOT:
+  - Compute, recompute, alter, reconcile, or contradict any number
+  - Suggest alternative scores or "what the score should be"
+  - Assign or mention confidence values yourself
+  - Invent categories or weights
+  - Echo any rubric ladder, point math, or scoring rules in your prose
 
-Floors / ceilings remain only for fatal gaps: noindex on a
-customer-facing page, citation bots blocked, marketing-only
-homepage with no real content.
+You MAY ONLY:
+  - Explain the existing findings in plain English
+  - Expand each recommended fix into a paragraph
+  - Tie the score to the business's specific situation
+  - Quote the deterministic numbers verbatim where helpful
 
-  - Structured Data / Schema (a.k.a. "Business Info AI Can Read"): 0–25
-    This category was over-suppressing every small-business site by
-    requiring schema markup to clear mid-tier. v2.1 rebalance: a
-    site that's clearly understandable to a human reader IS
-    understandable to AI — schema unlocks the upper bands but is NOT
-    required for mid-tier credit.
+**Evidence rule.** Every claim in the report must be tied to a
+specific signal you actually fetched (homepage / robots.txt /
+llms.txt / preflight) or to an item from the authoritative score
+block above. Do not fabricate findings.
 
-    Ladder (use partial credit between rungs; do NOT clamp to 0):
-
-      0–3  : Broken, inaccessible, OR no clear business identity at
-             all (page won't render, completely empty, parked domain,
-             obvious spam).
-      4–7  : Minimal — only a business name is visible, no clear
-             services / no contact / no location info anywhere on
-             the page.
-      8–12 : **Default rung for any working small-business site.**
-             The page makes the business reasonably clear to a
-             reader: business name AND at least one of {what they
-             do (clear service name) / phone / city or service
-             area / address}. Clean HTML is enough — JSON-LD NOT
-             required to earn this band. Most local operators
-             without dev resources should land HERE, not at 4.
-      13–17: Strong human-readable structure. The page has a clear
-             service/location hierarchy: multiple service pages
-             AND/OR named service-area pages, crawlable nav between
-             them, consistent brand name across pages, an /about or
-             /contact page reachable from the homepage. Still no
-             JSON-LD required. **A site with 3+ distinct service
-             pages, an about page, AND a clear contact section
-             belongs at 15–17, not at 12.** When the entity comes
-             through clearly across multiple pages — even without
-             markup — that IS strong structure.
-      18–22: Machine-readable structure. Earned by EITHER path:
-             (a) JSON-LD schema is present — Organization,
-                 LocalBusiness, or Service, even partial. Treat
-                 LocalBusiness with at least name + telephone +
-                 address as 19; full LocalBusiness + areaServed +
-                 hours as 21.
-             (b) Strong semantic HTML5 layout WITHOUT JSON-LD —
-                 the page uses <address> for NAP, ContactPoint
-                 markup, rich Open Graph (og:title / og:type /
-                 og:locale + og:image), well-structured headings
-                 naming the entity, AND the site shows entity
-                 coherence (LocalBusiness + about-page + service
-                 hierarchy + FAQ section all reinforcing the same
-                 business). This path matters — many genuinely
-                 strong local operators have polished semantic HTML
-                 but no schema. They belong at 18–20, not capped at
-                 17.
-      23–25: Elite — full LocalBusiness or Service JSON-LD
-             (industry subtype like Plumber/Dentist/Roofer/
-             HVACBusiness preferred) WITH AggregateRating + FAQPage
-             schema AND sameAs links to GBP/BBB/Yelp/Facebook AND
-             the human-readable structure already at 17. Genuinely
-             rare and stays hard to earn — but when all five
-             signals line up, do not under-award.
-
-    Reward partial credit for each of: clear business name, visible
-    services, visible phone/contact, clear city or service area,
-    crawlable navigation, service/location page structure, consistent
-    brand/entity naming. Each adds confidence — accumulating five or
-    six of those signals on a clean HTML site is exactly what 8–12
-    is for.
-
-    **Structural Synergy Bonus (NEW — only fires when the site is
-    genuinely structured).** When ALL of the following are true,
-    add up to +3 to the Schema score (capped at 25 still):
-      • Content score ≥ 12 (multiple deep service pages + FAQ)
-      • Brand score ≥ 8 (consistent entity naming, clear identity)
-      • Tech score ≥ 7 (clean meta + sitemap + reachable)
-      • Crawler score ≥ 15 (citation bots reachable + sitemap)
-      • At least ONE of: LocalBusiness JSON-LD (any), strong
-        semantic HTML5 layout (<address>, ContactPoint), sameAs
-        links to authoritative profiles
-    This bonus rewards entity coherence — the site, the schema,
-    the about page, the service hierarchy, and the FAQ all point to
-    the same business. It will NEVER fire for a weak site because
-    Content + Brand + Tech + Crawler must already be strong before
-    the bonus engages. Genuinely elite sites can clear 80+; weak
-    sites cannot.
-
-  - AI Crawler Readiness: 0–20
-    Ladder:
-      0  : everything blocked OR fatal "User-agent: * / Disallow: /"
-      4  : most citation bots blocked / unclear robots.txt
-      8  : 2–3 citation bots reachable, no sitemap, no llms.txt
-      12 : all 5 citation bots reachable (OAI-SearchBot, ClaudeBot,
-           PerplexityBot, Bingbot, Google-Extended)
-      15 : above + sitemap.xml referenced from robots.txt + key
-           pages reachable from homepage (no JS-only nav)
-      18 : above + structured /llms.txt (H1 + blockquote + H2 sections)
-      20 : elite — full llms.txt suite + AI Discovery hints
-    Note: training-only bots (GPTBot, anthropic-ai, CCBot,
-    Bytespider) may be blocked — does NOT lower this score.
-    Note: missing llms.txt is NOT a ceiling. A site with citation
-    bots reachable + sitemap + crawlable can reach 15/20 — that's
-    "well-prepared without bleeding-edge."
-
-  - Local Trust Signals: 0–20  (stricter — no inflation)
-    Ladder. Each "signal" must be visible on the homepage or a
-    one-click-away page; mention without supporting evidence does
-    NOT count. Be evidence-based, not generous.
-      0  : zero visible trust signals
-      4  : ONE clear signal (e.g. "4.8 stars" alone, OR years in
-           business stated, OR a license number)
-      8  : TWO signals (reviews + years, or license + warranty)
-      12 : THREE signals (reviews + years + license, etc.)
-      16 : FOUR or more signals AND NAP consistency across pages
-      20 : elite — five+ signals INCLUDING verifiable third-party
-           proof (BBB rating page, Google reviews count visible)
-    Demote 2 pts for NAP mismatches (different phone numbers,
-    inconsistent business name). A bare "5 stars" claim with no
-    count or third-party source is worth +2, not +5.
-
-  - Content Depth + FAQ Quality: 0–15
-    Ladder:
-      0  : no real content — error / parked / spam
-      3  : marketing-only homepage, no separate service content
-      6  : 1–2 thin service pages, no FAQ
-      9  : 2+ service pages with real depth (>250 words each,
-           sub-headings) — OR — clear FAQ with answers (one or
-           the other)
-      12 : 2+ deep service pages AND FAQ section AND pricing /
-           service-expectation clarity ("starts at $X", "free
-           estimate", "typical 1–3 days")
-      15 : elite — all of the above + concrete numbers (turnaround,
-           warranty years, projects completed) + before/after proof
-           or case studies + location-specific landing pages
-    Bonus: real FAQPage schema markup that machines can extract
-    cleanly → +2 (already partially captured in Schema, but
-    double-rewarded here for content depth).
-
-  - Brand / Entity Clarity: 0–10
-    Ladder:
-      0  : confusing — multiple businesses, no clear identity
-      2  : bare business name visible, nothing else
-      4  : name + phone visible
-      6  : name + phone + service area + one-sentence what-we-do
-      8  : above + consistent across header/footer/title/schema
-      10 : elite — all above + clear /about + no conflicting claims
-           (no "30 years" alongside "Established 2018")
-    Demote 2 pts for any conflicting claim (years, founder, location).
-
-  - Technical Accessibility: 0–10
-    Ladder:
-      0  : home page broken (5xx) OR noindex on customer-facing pages
-      2  : loads but missing title/meta description, no h1
-      4  : basic — title + meta description + single h1 + reachable
-      6  : above + sitemap referenced from robots.txt
-      8  : above + mobile viewport tag + no broken homepage links +
-           reasonable page weight
-      10 : elite — all hygiene + structured headings + accessible
-           markup + fast (<2s LCP)
-
-  **Bonus multipliers — push strong implementations into the
-  upper bands.** Award after summing the six categories. Cap at 100.
-    +2  : entire site has consistent semantic heading hierarchy
-          (single h1 per page, ordered h2/h3, no skipped levels)
-    +2  : visible internal linking between service / location /
-          about / contact pages — a clear site graph
-    +2  : evidence the site renders without JavaScript (server-
-          rendered HTML, content visible in initial response)
-    +2  : multi-language signals (lang attribute, hreflang) — only
-          when relevant for the business's audience
-    +2  : real visible expertise (named professionals with bios,
-          dated case studies, recent project photos with locations)
-  These bonuses can lift a strong site from 70 → 78 — exactly the
-  spread the rubric should produce when implementation is genuinely
-  excellent.
-
-**Score bands — MANDATORY.** After summing the six category
-scores, classify the overall and explain WHY in the report:
-
-  • 0–25  → "Invisible"   — essentially absent from AI search.
-  • 26–45 → "At Risk"     — foundational signals missing.
-  • 46–65 → "Needs Work"  — partial visibility, real gaps.
-  • 66–80 → "Competitive" — solid foundation, room for polish.
-  • 81–100 → "AI-Ready"   — fully optimized for AI citation.
-
-**Calibration v1 targets — natural distribution across bands:**
-  • SPAMMY / abandoned (broken site, no real content,
-    blocked crawlers, no contact info)                   → **0–25 Invisible**.
-  • WEAK (basic site, almost no trust signals,
-    blocked or unclear crawler access)                   → **20–40 At Risk**.
-  • AVERAGE small biz (some reviews, basic content,
-    no schema or llms.txt, citation bots OK)             → **40–60 Needs Work**.
-  • STRONG local operator (LocalBusiness schema,
-    several trust pillars, FAQ, multiple service pages)  → **60–75 Competitive**.
-  • ELITE (full schema with reviews + FAQ + sameAs,
-    llms.txt, deep content, all signals present)         → **80+ AI-Ready**.
-
-  Real-world separation rules:
-  • A legitimate small business with visible contact info, some
-    reviews, and a working site should NOT score below 40 just
-    because they lack schema/llms.txt. Trust + clarity + tech
-    contribute meaningfully.
-  • A site with strong real-world fundamentals (reviews, license,
-    warranty, named service area, working site) should land at
-    50+ even with zero AI-specific signals.
-  • An 81+ AI-Ready score still must be earned across ALL six
-    categories — don't inflate.
-  • Anti-clustering: do NOT default to a familiar number. If two
-    different sites land within 3 points of each other, recheck
-    each sub-check independently — variance is a feature.
+**Calibration ladder removed.** The numeric ladder and band rules
+previously specified here were the LLM-side rubric. Scores are now
+computed deterministically (scoring@1.0.0) from preflight evidence.
+DO NOT reason about ladder positions or compute partial credit —
+that math has already been done. Treat the authoritative score
+block as ground truth.
 
 OUTPUT DISCIPLINE (mandatory — this is a paid customer report):
   • Output ONLY the final report markdown. NOTHING ELSE.
@@ -666,36 +470,42 @@ POSITIONING (mandatory — this report is one of:
 **Site:** ${websiteUrl}  ·  **Generated:** <GENERATED_DATE>
 
 ## 1. AI Visibility Score
-**Overall Score: <N>/100 — <Band>** (Band ∈ Invisible / At Risk /
-Needs Work / Competitive / AI-Ready, picked from the band rules above)
 
-Breakdown (every line MUST end with a one-sentence plain-English
-WHY tied to a specific finding from the page — name the actual
-evidence, not the rubric anchor; no jargon; do NOT repeat the same
-explanation across two lines):
+**Use the EXACT numbers from the authoritative score block above.**
+Copy the overall score, band, and each per-category score verbatim
+into the lines below. Do NOT compute, round, or alter any value.
 
-- Structured Data / Schema: <n>/25 — <why, plain English, evidence-based>
-- AI Crawler Readiness: <n>/20 — <why>
-- Local Trust Signals: <n>/20 — <why>
-- Content Depth + FAQ Quality: <n>/15 — <why>
-- Brand / Entity Clarity: <n>/10 — <why>
-- Technical Accessibility: <n>/10 — <why>
+**Overall Score: {overall_score}/100 — {band}**
+
+Breakdown (use the deterministic numbers from the authoritative
+score block; for each category, add a one-sentence plain-English
+WHY tied to a specific finding — name the actual evidence; no
+jargon; do NOT repeat the same explanation across two lines; do
+NOT echo the rubric anchors):
+
+- Structured Data / Schema: {category_scores.schema.score}/25 — <why, plain English, evidence-based>
+- AI Crawler Readiness: {category_scores.crawler.score}/20 — <why>
+- Local Trust Signals: {category_scores.trust.score}/20 — <why>
+- Content Depth + FAQ Quality: {category_scores.content.score}/15 — <why>
+- Brand / Entity Clarity: {category_scores.brand.score}/10 — <why>
+- Technical Accessibility: {category_scores.tech.score}/10 — <why>
 
 **Score drivers:**
 3–5 single-line bullets naming the specific findings that drove
-the overall score. Mix POSITIVE drivers (what's earning points)
-and NEGATIVE drivers (what's holding the score back). Each
-bullet is one short line tied to actual evidence — no paragraphs,
-no jargon. Examples:
+the score. Mix POSITIVE drivers (what's earning points, e.g.
+items the authoritative block lists as signals) and NEGATIVE
+drivers (what's holding the score back, e.g. items from
+top_findings). Each bullet is one short line tied to actual
+evidence — no paragraphs, no jargon. Examples:
 
 - Strong trust signals: 1,800+ reviews, BBB A+, licensed/insured
 - Missing machine-readable identity: no LocalBusiness JSON-LD
 - Weak AI navigation: no confirmed sitemap or llms.txt
 - Conflicting business age claims reduce trust
 
-Detailed scoring math (per-rubric sub-checks, point breakdowns,
-synergy-bonus details) lives in section 6 (Technical Appendix),
-NOT here. The Score drivers bullets are a glance for the customer.
+Do NOT show point-by-point math or synergy-bonus details — those
+have already been computed deterministically. The Score drivers
+bullets are a glance for the customer.
 
 ## 2. What's Holding You Back
 Top 3 issues only. Numbered. This section explains ONLY what's
@@ -865,235 +675,39 @@ Technical terms ("schema", "robots.txt", "llms.txt") may appear in
 the collapsed Section 6 (Technical Details), where the audience is
 the developer. Keep sections 1–5 jargon-free.
 
-**Scoring rubric — REQUIRED.** Score each category from the evidence
-you actually fetched. The overall score MUST equal the sum of the
-six category scores (no rounding, no fudging). Do NOT default to a
-preset score (e.g. 28/100) — every score must be tied to specific
-findings on this site. Score conservatively when evidence is
-missing and explain why in the relevant report section.
+__AUTHORITATIVE_SCORE_BLOCK__
 
-**Evidence rule.** Every sub-check below must be tied to something
-you actually saw on the homepage / robots.txt / llms.txt fetches.
-If you can't point to evidence, the sub-check fails — score it
-conservatively and say "no evidence found" in the report.
+**You are an analyst, not a scorer.** The audit score has already
+been computed deterministically by GeoViz's scoring engine
+(scoring@1.0.0) from structured evidence (preflight schema +
+crawlability + entity-consistency analysis, optional render
+probe). Your role is to **narrate** the score for the customer —
+not to compute it.
 
-**Calibration v2 — explicit ladder anchors with partial credit.**
-Each category uses a 0-to-max ladder of named rungs. Find the rung
-the site genuinely sits on and award the rung's points. Partial
-credit BETWEEN rungs is allowed (e.g. 11/25 if the site is between
-"basic readable HTML" and "decent JSON-LD"). The intent is to use
-the FULL range — do NOT cluster at the bottom because no schema
-markup exists. A small business with clear HTML identity, working
-site, and visible reviews is mid-tier, not "At Risk."
+You MUST NOT:
+  - Compute, recompute, alter, reconcile, or contradict any number
+  - Suggest alternative scores or "what the score should be"
+  - Assign or mention confidence values yourself
+  - Invent categories or weights
+  - Echo any rubric ladder, point math, or scoring rules in your prose
 
-Floors / ceilings remain only for fatal gaps: noindex on a
-customer-facing page, citation bots blocked, marketing-only
-homepage with no real content.
+You MAY ONLY:
+  - Explain the existing findings in plain English
+  - Expand each recommended fix into a paragraph
+  - Tie the score to the business's specific situation
+  - Quote the deterministic numbers verbatim where helpful
 
-  - Structured Data / Schema (a.k.a. "Business Info AI Can Read"): 0–25
-    This category was over-suppressing every small-business site by
-    requiring schema markup to clear mid-tier. v2.1 rebalance: a
-    site that's clearly understandable to a human reader IS
-    understandable to AI — schema unlocks the upper bands but is NOT
-    required for mid-tier credit.
+**Evidence rule.** Every claim in the report must be tied to a
+specific signal you actually fetched (homepage / robots.txt /
+llms.txt / preflight) or to an item from the authoritative score
+block above. Do not fabricate findings.
 
-    Ladder (use partial credit between rungs; do NOT clamp to 0):
-
-      0–3  : Broken, inaccessible, OR no clear business identity at
-             all (page won't render, completely empty, parked domain,
-             obvious spam).
-      4–7  : Minimal — only a business name is visible, no clear
-             services / no contact / no location info anywhere on
-             the page.
-      8–12 : **Default rung for any working small-business site.**
-             The page makes the business reasonably clear to a
-             reader: business name AND at least one of {what they
-             do (clear service name) / phone / city or service
-             area / address}. Clean HTML is enough — JSON-LD NOT
-             required to earn this band. Most local operators
-             without dev resources should land HERE, not at 4.
-      13–17: Strong human-readable structure. The page has a clear
-             service/location hierarchy: multiple service pages
-             AND/OR named service-area pages, crawlable nav between
-             them, consistent brand name across pages, an /about or
-             /contact page reachable from the homepage. Still no
-             JSON-LD required. **A site with 3+ distinct service
-             pages, an about page, AND a clear contact section
-             belongs at 15–17, not at 12.** When the entity comes
-             through clearly across multiple pages — even without
-             markup — that IS strong structure.
-      18–22: Machine-readable structure. Earned by EITHER path:
-             (a) JSON-LD schema is present — Organization,
-                 LocalBusiness, or Service, even partial. Treat
-                 LocalBusiness with at least name + telephone +
-                 address as 19; full LocalBusiness + areaServed +
-                 hours as 21.
-             (b) Strong semantic HTML5 layout WITHOUT JSON-LD —
-                 the page uses <address> for NAP, ContactPoint
-                 markup, rich Open Graph (og:title / og:type /
-                 og:locale + og:image), well-structured headings
-                 naming the entity, AND the site shows entity
-                 coherence (LocalBusiness + about-page + service
-                 hierarchy + FAQ section all reinforcing the same
-                 business). This path matters — many genuinely
-                 strong local operators have polished semantic HTML
-                 but no schema. They belong at 18–20, not capped at
-                 17.
-      23–25: Elite — full LocalBusiness or Service JSON-LD
-             (industry subtype like Plumber/Dentist/Roofer/
-             HVACBusiness preferred) WITH AggregateRating + FAQPage
-             schema AND sameAs links to GBP/BBB/Yelp/Facebook AND
-             the human-readable structure already at 17. Genuinely
-             rare and stays hard to earn — but when all five
-             signals line up, do not under-award.
-
-    Reward partial credit for each of: clear business name, visible
-    services, visible phone/contact, clear city or service area,
-    crawlable navigation, service/location page structure, consistent
-    brand/entity naming. Each adds confidence — accumulating five or
-    six of those signals on a clean HTML site is exactly what 8–12
-    is for.
-
-    **Structural Synergy Bonus (NEW — only fires when the site is
-    genuinely structured).** When ALL of the following are true,
-    add up to +3 to the Schema score (capped at 25 still):
-      • Content score ≥ 12 (multiple deep service pages + FAQ)
-      • Brand score ≥ 8 (consistent entity naming, clear identity)
-      • Tech score ≥ 7 (clean meta + sitemap + reachable)
-      • Crawler score ≥ 15 (citation bots reachable + sitemap)
-      • At least ONE of: LocalBusiness JSON-LD (any), strong
-        semantic HTML5 layout (<address>, ContactPoint), sameAs
-        links to authoritative profiles
-    This bonus rewards entity coherence — the site, the schema,
-    the about page, the service hierarchy, and the FAQ all point to
-    the same business. It will NEVER fire for a weak site because
-    Content + Brand + Tech + Crawler must already be strong before
-    the bonus engages. Genuinely elite sites can clear 80+; weak
-    sites cannot.
-
-  - AI Crawler Readiness: 0–20
-    Ladder:
-      0  : everything blocked OR fatal "User-agent: * / Disallow: /"
-      4  : most citation bots blocked / unclear robots.txt
-      8  : 2–3 citation bots reachable, no sitemap, no llms.txt
-      12 : all 5 citation bots reachable (OAI-SearchBot, ClaudeBot,
-           PerplexityBot, Bingbot, Google-Extended)
-      15 : above + sitemap.xml referenced from robots.txt + key
-           pages reachable from homepage (no JS-only nav)
-      18 : above + structured /llms.txt (H1 + blockquote + H2 sections)
-      20 : elite — full llms.txt suite + AI Discovery hints
-    Note: training-only bots (GPTBot, anthropic-ai, CCBot,
-    Bytespider) may be blocked — does NOT lower this score.
-    Note: missing llms.txt is NOT a ceiling. A site with citation
-    bots reachable + sitemap + crawlable can reach 15/20 — that's
-    "well-prepared without bleeding-edge."
-
-  - Local Trust Signals: 0–20  (stricter — no inflation)
-    Ladder. Each "signal" must be visible on the homepage or a
-    one-click-away page; mention without supporting evidence does
-    NOT count. Be evidence-based, not generous.
-      0  : zero visible trust signals
-      4  : ONE clear signal (e.g. "4.8 stars" alone, OR years in
-           business stated, OR a license number)
-      8  : TWO signals (reviews + years, or license + warranty)
-      12 : THREE signals (reviews + years + license, etc.)
-      16 : FOUR or more signals AND NAP consistency across pages
-      20 : elite — five+ signals INCLUDING verifiable third-party
-           proof (BBB rating page, Google reviews count visible)
-    Demote 2 pts for NAP mismatches (different phone numbers,
-    inconsistent business name). A bare "5 stars" claim with no
-    count or third-party source is worth +2, not +5.
-
-  - Content Depth + FAQ Quality: 0–15
-    Ladder:
-      0  : no real content — error / parked / spam
-      3  : marketing-only homepage, no separate service content
-      6  : 1–2 thin service pages, no FAQ
-      9  : 2+ service pages with real depth (>250 words each,
-           sub-headings) — OR — clear FAQ with answers (one or
-           the other)
-      12 : 2+ deep service pages AND FAQ section AND pricing /
-           service-expectation clarity ("starts at $X", "free
-           estimate", "typical 1–3 days")
-      15 : elite — all of the above + concrete numbers (turnaround,
-           warranty years, projects completed) + before/after proof
-           or case studies + location-specific landing pages
-    Bonus: real FAQPage schema markup that machines can extract
-    cleanly → +2 (already partially captured in Schema, but
-    double-rewarded here for content depth).
-
-  - Brand / Entity Clarity: 0–10
-    Ladder:
-      0  : confusing — multiple businesses, no clear identity
-      2  : bare business name visible, nothing else
-      4  : name + phone visible
-      6  : name + phone + service area + one-sentence what-we-do
-      8  : above + consistent across header/footer/title/schema
-      10 : elite — all above + clear /about + no conflicting claims
-           (no "30 years" alongside "Established 2018")
-    Demote 2 pts for any conflicting claim (years, founder, location).
-
-  - Technical Accessibility: 0–10
-    Ladder:
-      0  : home page broken (5xx) OR noindex on customer-facing pages
-      2  : loads but missing title/meta description, no h1
-      4  : basic — title + meta description + single h1 + reachable
-      6  : above + sitemap referenced from robots.txt
-      8  : above + mobile viewport tag + no broken homepage links +
-           reasonable page weight
-      10 : elite — all hygiene + structured headings + accessible
-           markup + fast (<2s LCP)
-
-  **Bonus multipliers — push strong implementations into the
-  upper bands.** Award after summing the six categories. Cap at 100.
-    +2  : entire site has consistent semantic heading hierarchy
-          (single h1 per page, ordered h2/h3, no skipped levels)
-    +2  : visible internal linking between service / location /
-          about / contact pages — a clear site graph
-    +2  : evidence the site renders without JavaScript (server-
-          rendered HTML, content visible in initial response)
-    +2  : multi-language signals (lang attribute, hreflang) — only
-          when relevant for the business's audience
-    +2  : real visible expertise (named professionals with bios,
-          dated case studies, recent project photos with locations)
-  These bonuses can lift a strong site from 70 → 78 — exactly the
-  spread the rubric should produce when implementation is genuinely
-  excellent.
-
-**Score bands — MANDATORY.** After summing the six category
-scores, classify the overall and explain WHY in the report:
-
-  • 0–25  → "Invisible"   — essentially absent from AI search.
-  • 26–45 → "At Risk"     — foundational signals missing.
-  • 46–65 → "Needs Work"  — partial visibility, real gaps.
-  • 66–80 → "Competitive" — solid foundation, room for polish.
-  • 81–100 → "AI-Ready"   — fully optimized for AI citation.
-
-**Calibration v1 targets — natural distribution across bands:**
-  • SPAMMY / abandoned (broken site, no real content,
-    blocked crawlers, no contact info)                   → **0–25 Invisible**.
-  • WEAK (basic site, almost no trust signals,
-    blocked or unclear crawler access)                   → **20–40 At Risk**.
-  • AVERAGE small biz (some reviews, basic content,
-    no schema or llms.txt, citation bots OK)             → **40–60 Needs Work**.
-  • STRONG local operator (LocalBusiness schema,
-    several trust pillars, FAQ, multiple service pages)  → **60–75 Competitive**.
-  • ELITE (full schema with reviews + FAQ + sameAs,
-    llms.txt, deep content, all signals present)         → **80+ AI-Ready**.
-
-  Real-world separation rules:
-  • A legitimate small business with visible contact info, some
-    reviews, and a working site should NOT score below 40 just
-    because they lack schema/llms.txt. Trust + clarity + tech
-    contribute meaningfully.
-  • A site with strong real-world fundamentals (reviews, license,
-    warranty, named service area, working site) should land at
-    50+ even with zero AI-specific signals.
-  • An 81+ AI-Ready score still must be earned across ALL six
-    categories — don't inflate.
-  • Anti-clustering: do NOT default to a familiar number. If two
-    different sites land within 3 points of each other, recheck
-    each sub-check independently — variance is a feature.
+**Calibration ladder removed.** The numeric ladder and band rules
+previously specified here were the LLM-side rubric. Scores are now
+computed deterministically (scoring@1.0.0) from preflight evidence.
+DO NOT reason about ladder positions or compute partial credit —
+that math has already been done. Treat the authoritative score
+block as ground truth.
 
 OUTPUT DISCIPLINE (mandatory — this is a paid customer report):
   • Output ONLY the final report markdown. NOTHING ELSE.
@@ -1287,36 +901,42 @@ POSITIONING (mandatory — this report is one of:
 **Site:** ${websiteUrl}  ·  **Generated:** <GENERATED_DATE>
 
 ## 1. AI Visibility Score
-**Overall Score: <N>/100 — <Band>** (Band ∈ Invisible / At Risk /
-Needs Work / Competitive / AI-Ready, picked from the band rules above)
 
-Breakdown (every line MUST end with a one-sentence plain-English
-WHY tied to a specific finding from the page — name the actual
-evidence, not the rubric anchor; no jargon; do NOT repeat the same
-explanation across two lines):
+**Use the EXACT numbers from the authoritative score block above.**
+Copy the overall score, band, and each per-category score verbatim
+into the lines below. Do NOT compute, round, or alter any value.
 
-- Structured Data / Schema: <n>/25 — <why, plain English, evidence-based>
-- AI Crawler Readiness: <n>/20 — <why>
-- Local Trust Signals: <n>/20 — <why>
-- Content Depth + FAQ Quality: <n>/15 — <why>
-- Brand / Entity Clarity: <n>/10 — <why>
-- Technical Accessibility: <n>/10 — <why>
+**Overall Score: {overall_score}/100 — {band}**
+
+Breakdown (use the deterministic numbers from the authoritative
+score block; for each category, add a one-sentence plain-English
+WHY tied to a specific finding — name the actual evidence; no
+jargon; do NOT repeat the same explanation across two lines; do
+NOT echo the rubric anchors):
+
+- Structured Data / Schema: {category_scores.schema.score}/25 — <why, plain English, evidence-based>
+- AI Crawler Readiness: {category_scores.crawler.score}/20 — <why>
+- Local Trust Signals: {category_scores.trust.score}/20 — <why>
+- Content Depth + FAQ Quality: {category_scores.content.score}/15 — <why>
+- Brand / Entity Clarity: {category_scores.brand.score}/10 — <why>
+- Technical Accessibility: {category_scores.tech.score}/10 — <why>
 
 **Score drivers:**
 3–5 single-line bullets naming the specific findings that drove
-the overall score. Mix POSITIVE drivers (what's earning points)
-and NEGATIVE drivers (what's holding the score back). Each
-bullet is one short line tied to actual evidence — no paragraphs,
-no jargon. Examples:
+the score. Mix POSITIVE drivers (what's earning points, e.g.
+items the authoritative block lists as signals) and NEGATIVE
+drivers (what's holding the score back, e.g. items from
+top_findings). Each bullet is one short line tied to actual
+evidence — no paragraphs, no jargon. Examples:
 
 - Strong trust signals: 1,800+ reviews, BBB A+, licensed/insured
 - Missing machine-readable identity: no LocalBusiness JSON-LD
 - Weak AI navigation: no confirmed sitemap or llms.txt
 - Conflicting business age claims reduce trust
 
-Detailed scoring math (per-rubric sub-checks, point breakdowns,
-synergy-bonus details) lives in section 6 (Technical Appendix),
-NOT here. The Score drivers bullets are a glance for the customer.
+Do NOT show point-by-point math or synergy-bonus details — those
+have already been computed deterministically. The Score drivers
+bullets are a glance for the customer.
 
 ## 2. What's Holding You Back
 Top 3 issues only. Numbered. This section explains ONLY what's
@@ -1486,39 +1106,54 @@ async function runViaApi(
     const client = new Anthropic({ apiKey });
     let prompt = buildAuditPrompt(websiteUrl, competitorUrl, options);
 
-    // ─── V2 Preflight prompt augmentation (feature-flagged) ──────────
-    // When GEO_PREFLIGHT_PROMPT=on, run the Node-side preflight stage
-    // BEFORE the Claude API call and inject a "Validated preflight
-    // signals" context block at the top of the user prompt. Default
-    // off — production behavior is byte-for-byte unchanged unless an
-    // operator explicitly enables this flag.
+    // ─── Deterministic scoring — authoritative context for the LLM ──
+    // Pre-LLM evidence pass: run preflight + render, compute the
+    // deterministic score (scoring@1.0.0), and inject the result as
+    // an authoritative context block. The prompt's
+    // `__AUTHORITATIVE_SCORE_BLOCK__` placeholder is replaced with
+    // the deterministic JSON + top findings + recommended fixes +
+    // public bucket scores. The LLM is instructed (in buildAuditPrompt)
+    // to treat these numbers as ground truth — it no longer
+    // generates, reconciles, or alters any score.
     //
-    // Critically: this block is CONTEXT only. It does not introduce
-    // new rubric categories, new weights, or new band thresholds.
-    // Claude still scores per the frozen v1 rubric; preflight just
-    // gives it more reliable structured input to reason over.
-    if (process.env.GEO_PREFLIGHT_PROMPT === "on") {
-      try {
-        const { runPreflight } = await import(
-          "../src/lib/intelligence/preflight/runPreflight"
-        );
-        const preflight = await runPreflight(websiteUrl);
-        if (preflight.ok && preflight.fetchOk) {
-          const block = formatPreflightPromptBlock(preflight);
-          prompt = `${block}\n\n${prompt}`;
-          console.log(
-            `[preflight-prompt] injected url=${preflight.fetchedUrl ?? websiteUrl} bytes=${block.length}`,
-          );
-        } else {
-          console.warn(
-            `[preflight-prompt] skipped url=${websiteUrl} fetchOk=${preflight.fetchOk} fetchError="${preflight.fetchError ?? "-"}"`,
-          );
-        }
-      } catch (err) {
-        console.warn(
-          `[preflight-prompt] threw url=${websiteUrl} (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+    // Fail-soft: if preflight throws or the scorer chokes on
+    // partial evidence, we fall back to a placeholder that tells
+    // the LLM "no authoritative score available — narrate the
+    // findings you observe, do NOT invent numbers". This case is
+    // rare and is logged for operator review.
+    try {
+      const { runPreflight } = await import(
+        "../src/lib/intelligence/preflight/runPreflight"
+      );
+      const { scoreAudit } = await import("../src/lib/scoring");
+      const preflight = await runPreflight(websiteUrl);
+      // Render is OFF here on purpose — keeps the pre-LLM path
+      // cheap. persistAuditIntelligence runs the full pipeline
+      // (preflight + ingest + render) and re-scores idempotently
+      // for the canonical persisted value.
+      const deterministic = scoreAudit({
+        preflightSignals: preflight,
+        intelligenceIngest: null,
+        renderResult: null,
+      });
+      const block = formatAuthoritativeScoreBlock(deterministic);
+      prompt = prompt.replace("__AUTHORITATIVE_SCORE_BLOCK__", block);
+      console.log(
+        `[authoritative-score] injected url=${preflight.fetchedUrl ?? websiteUrl} overall=${deterministic.overall_score} band=${deterministic.band} confidence=${deterministic.confidence_level}`,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[authoritative-score] failed url=${websiteUrl} (non-fatal): ${msg}`,
+      );
+      const fallback =
+        "**Authoritative score block — UNAVAILABLE.** The deterministic " +
+        "scoring engine could not run for this site (preflight or scorer " +
+        "errored). DO NOT invent numbers. Narrate only the findings you " +
+        "can verify from your own fetches. Use placeholder `--/100 — Pending` " +
+        "for the Overall Score line; persistAuditIntelligence will overwrite " +
+        "the persisted value once the scorer recovers.";
+      prompt = prompt.replace("__AUTHORITATIVE_SCORE_BLOCK__", fallback);
     }
 
     const response = await client.messages.create(
@@ -2739,6 +2374,79 @@ main().catch((err) => {
   logErr("[geo-worker] fatal:", err);
   process.exit(1);
 });
+
+// ─── Authoritative score block formatter ──────────────────────────
+// Renders the deterministic scoring result (scoring@1.0.0) into a
+// markdown block the LLM sees as ground truth. Replaces the
+// `__AUTHORITATIVE_SCORE_BLOCK__` placeholder in the audit prompt.
+// The LLM is instructed (inside buildAuditPrompt) to copy the
+// numeric values verbatim — never compute, alter, or reconcile.
+type DeterministicLike = {
+  scoring_version: string;
+  overall_score: number;
+  band: string;
+  category_scores: Record<
+    string,
+    { score: number; max: number; reason: string }
+  >;
+  public_bucket_scores: Record<
+    string,
+    { score: number; max: number; percentage: number }
+  >;
+  confidence_level: string;
+  confidence_score: number;
+  top_3_findings: Array<{ id: string; severity: string; category: string; message: string }>;
+  top_3_recommended_fixes: Array<{ id: string; action: string; impact: string }>;
+  synergy_bonus_applied: number;
+  synergy_bonus_tier: string;
+  synergy_bonus_reason: string | null;
+};
+
+function formatAuthoritativeScoreBlock(d: DeterministicLike): string {
+  const lines: string[] = [
+    "### AUTHORITATIVE SCORE (deterministic — DO NOT alter)",
+    "",
+    `Engine version: ${d.scoring_version}`,
+    `Overall score: ${d.overall_score}/100 — ${d.band}`,
+    `Confidence: ${d.confidence_level} (${d.confidence_score}/100)`,
+    "",
+    "Category scores (use these EXACT numbers in section 1):",
+    `  - Structured Data / Schema: ${d.category_scores.schema.score}/${d.category_scores.schema.max} — ${d.category_scores.schema.reason}`,
+    `  - AI Crawler Readiness:     ${d.category_scores.crawler.score}/${d.category_scores.crawler.max} — ${d.category_scores.crawler.reason}`,
+    `  - Local Trust Signals:      ${d.category_scores.trust.score}/${d.category_scores.trust.max} — ${d.category_scores.trust.reason}`,
+    `  - Content Depth + FAQ:      ${d.category_scores.content.score}/${d.category_scores.content.max} — ${d.category_scores.content.reason}`,
+    `  - Brand / Entity Clarity:   ${d.category_scores.brand.score}/${d.category_scores.brand.max} — ${d.category_scores.brand.reason}`,
+    `  - Technical Accessibility:  ${d.category_scores.tech.score}/${d.category_scores.tech.max} — ${d.category_scores.tech.reason}`,
+    "",
+    "Public bucket scores (customer-facing 4-dimension view):",
+    `  - Understanding:  ${d.public_bucket_scores.understanding.score}/${d.public_bucket_scores.understanding.max} (${d.public_bucket_scores.understanding.percentage}%)`,
+    `  - Retrieval:      ${d.public_bucket_scores.retrieval.score}/${d.public_bucket_scores.retrieval.max} (${d.public_bucket_scores.retrieval.percentage}%)`,
+    `  - Trust:          ${d.public_bucket_scores.trust.score}/${d.public_bucket_scores.trust.max} (${d.public_bucket_scores.trust.percentage}%)`,
+    `  - Recommendation: ${d.public_bucket_scores.recommendation.score}/${d.public_bucket_scores.recommendation.max} (${d.public_bucket_scores.recommendation.percentage}%)`,
+    "",
+    `Synergy bonus: +${d.synergy_bonus_applied} (${d.synergy_bonus_tier})${d.synergy_bonus_reason ? ` — ${d.synergy_bonus_reason}` : ""}`,
+    "",
+    "Top findings (use VERBATIM as section 2 issue anchors):",
+    ...d.top_3_findings.map(
+      (f, i) =>
+        `  ${i + 1}. [${f.severity}] [${f.category}] ${f.message}`,
+    ),
+    "",
+    "Recommended fixes (use VERBATIM as section 3 fix anchors — 1:1 with findings):",
+    ...d.top_3_recommended_fixes.map(
+      (fx, i) => `  ${i + 1}. [${fx.impact}] ${fx.action}`,
+    ),
+    "",
+    "Rules:",
+    "  - Copy every number above into the report VERBATIM.",
+    "  - Do NOT compute, alter, reconcile, or contradict any value.",
+    "  - Do NOT mention confidence levels you assign yourself.",
+    "  - Do NOT echo rubric ladders or scoring math anywhere in your prose.",
+    "  - Section 2 (Top 3 Issues) MUST use the top_findings above, in order.",
+    "  - Section 3 (Top 3 Fixes) MUST use the recommended_fixes above, in order, 1:1 with findings.",
+  ];
+  return lines.join("\n");
+}
 
 // ─── V2 Preflight prompt formatter ────────────────────────────────
 // Renders the preflight orchestrator's structured signals into a

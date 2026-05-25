@@ -24,20 +24,29 @@ export default function OrderPage({
 
       <section className="relative">
         <div className="absolute inset-0 -z-10 bg-radial-orange opacity-60" />
-        <div className="container-page grid gap-12 py-16 md:grid-cols-[1fr_1.05fr] md:py-24">
+        <div className="absolute inset-0 -z-10 grid-bg opacity-50" />
+        <div className="container-page grid gap-14 py-20 md:grid-cols-[1fr_1.05fr] md:py-28 lg:gap-20">
           <div>
-            <p className="section-eyebrow">Step 1 of 2</p>
-            <h1 className="h2 mt-3">Tell us where to look.</h1>
-            <p className="muted mt-4 max-w-md">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/40">
+              Step 1 of 2
+            </p>
+            <h1 className="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Tell us where to look.
+            </h1>
+            <p className="mt-5 max-w-md font-serif text-xl italic leading-relaxed text-white/65">
+              The audit that shows you what AI sees before your customers
+              ask it.
+            </p>
+            <p className="mt-5 max-w-md text-base leading-relaxed text-white/65">
               Give us your website and email. Next step is a secure Stripe
               checkout — $97 one-time (normally $147).
             </p>
-            <p className="mt-3 max-w-md text-sm text-white/70">
+            <p className="mt-3 max-w-md text-sm text-white/55">
               Delivered by email — most audits are delivered within
               minutes. Each report is generated using AI-assisted analysis
               across ChatGPT, Claude, Perplexity, and Gemini.
             </p>
-            <p className="mt-3 text-xs italic text-white/50">
+            <p className="mt-3 text-xs italic text-white/45">
               Each report is reviewed for clarity before delivery.
             </p>
 
@@ -48,7 +57,7 @@ export default function OrderPage({
               <Bullet>Professional PDF report</Bullet>
             </ul>
 
-            <div className="mt-10 rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/70">
+            <div className="mt-10 rounded-lg border border-white/10 bg-ink-900/50 p-5 text-sm text-white/65">
               <p className="text-xs uppercase tracking-[0.2em] text-white/40">
                 Platforms analyzed
               </p>

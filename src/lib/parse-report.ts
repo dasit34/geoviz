@@ -154,6 +154,16 @@ export function splitReportLayout(md: string | null | undefined): ReportLayout {
   return { before, after, hasCta: true };
 }
 
+/**
+ * @deprecated **LEGACY-ONLY** — regex-based score extraction from LLM
+ * prose. Retained as a fallback inside
+ * `src/lib/scoring/getCanonicalScore.ts` for audits that predate
+ * `scoring@1.0.0`. New canonical scores come from
+ * `src/lib/scoring/scoreAudit()` and are persisted to
+ * `AuditIntelligence.deterministicScore`. Do not extend this regex,
+ * do not call this from new code, and do not rely on its output as a
+ * source of truth.
+ */
 export function parseReportScoreBreakdown(
   md: string | null | undefined,
 ): ReportScore {

@@ -81,8 +81,46 @@ model AuditOrder {
   updatedAt                  DateTime      @updatedAt
 
   intelligence AuditIntelligence?
+  // Append-only history of observation runs for this audit.
+  // Multi-row (re-audits add rows) — distinct from the 1:1
+  // `intelligence` relation. See `src/lib/observations/history/`.
+  observationHistory ObservationHistory[]
 
   @@index([email])
+  @@index([createdAt])
+}
+
+/// Append-only history of observation-layer runs.
+///
+/// One row per `executeObservation()` invocation that landed
+/// through the gate. NEVER updated, NEVER overwritten — to revise,
+/// insert a new row. Stamps the deterministic scoring hashes
+/// (`weightHash` + `categoryHash`) at write time so an analyst can
+/// prove scoring was unchanged when this row was written.
+///
+/// Foreign key to `AuditOrder` with `ON DELETE CASCADE` — if the
+/// audit row is purged, its observation history goes with it.
+model ObservationHistory {
+  id                String     @id @default(cuid())
+  auditId           String
+  auditOrder        AuditOrder @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  providerCount     Int
+  agreementScore    Int        // 0..100 from computeAgreement
+  variance          Float      // max stdev across the 4 signal dimensions
+  observationStatus String     // "OK" | "DISAGREE" | "SUPPRESSED" | "SINGLE_PROVIDER"
+  providerNames     Json       // string[] of ObservationProviderIds, stable order
+  estimatedCost     Decimal    @db.Decimal(10, 6)
+  avgLatency        Int        // ms — round(mean(success.latency_ms))
+
+  // Freeze-contract evidence copied from frozen.ts at write time.
+  scoringVersion    String     // "scoring@1.0.0"
+  weightHash        String     // frozen.WEIGHT_HASH
+  categoryHash      String     // frozen.CATEGORY_HASH
+
+  createdAt         DateTime   @default(now())
+
+  @@index([auditId])
   @@index([createdAt])
 }
 
@@ -252,6 +290,28 @@ model AuditIntelligence {
   // schema. Not consumed by scoring, not shown to customers — V2
   // research surface only. Pre-preflight rows stay null.
   preflightSignals           Json?
+
+  // ─── V2 Deterministic scoring (scoring@1.0.0) ───────────────────
+  // Populated by `src/lib/scoring/scoreAudit()` from preflight +
+  // ingest + render evidence. The single source of truth for the
+  // overall score on new audits — the LLM no longer produces or
+  // reconciles numbers. Shape: `DeterministicScore` from
+  // `src/lib/scoring/types.ts`. Legacy rows (pre-`scoring@1.0.0`)
+  // stay null and the resolver in
+  // `src/lib/scoring/getCanonicalScore.ts` falls back to
+  // `parseReportScoreBreakdown(reportMarkdown)`.
+  deterministicScore         Json?
+
+  // Self-contained replay snapshot per audit. Populated by the
+  // deterministic scoring block in `src/lib/audit-intelligence.ts`
+  // alongside `deterministicScore`. Holds the inputs (preflight +
+  // ingest + render + history), the gathered `Evidence`, the full
+  // `DeterministicScore` output, the freeze hashes, and a
+  // `computed_at` timestamp — enough to call `scoreAudit()` again
+  // and recover the same score byte-equal. Shape: `ReplayBundle`
+  // from `src/lib/scoring/replay-bundle.ts`. Historical rows stay
+  // null — no backfill.
+  replayBundle               Json?
 
   @@index([createdAt])
   @@index([websiteUrl])

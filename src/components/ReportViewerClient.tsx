@@ -10,12 +10,12 @@ import {
   inferIssueSeverity,
   parseEnumeratedItems,
   parseLabeledFields,
-  parseReportScoreBreakdown,
   parseReportSections,
   parseScoreDrivers,
   stripScoreMath,
   type ScoreDrivers,
 } from "@/lib/parse-report";
+import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
 import { Prose, InlineProse } from "./Prose";
 import { ReportScoreCard } from "./ReportScoreCard";
 import { ReportCtaCard } from "./ReportCtaCard";
@@ -35,13 +35,20 @@ export function ReportViewerClient({
   markdown,
   orderId,
   businessLabel,
+  deterministicScore = null,
 }: {
   markdown: string;
   orderId?: string;
   businessLabel?: string;
+  /** When present, drives the canonical-resolver read path. Falls back
+   *  to legacy markdown parsing when null (pre-`scoring@1.0.0` rows). */
+  deterministicScore?: unknown;
 }) {
   const [showRaw, setShowRaw] = useState(false);
-  const score = parseReportScoreBreakdown(markdown);
+  const score = getCanonicalScore({
+    reportMarkdown: markdown,
+    intelligence: deterministicScore ? { deterministicScore } : null,
+  });
   const layout = parseReportSections(markdown);
 
   const scoreSection = layout.sections.find((s) => s.slug === "score");

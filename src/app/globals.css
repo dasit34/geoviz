@@ -1,21 +1,80 @@
+/* Hallmark · macrostructure: H1 (2-col editorial hero · terrain map) · tone: atmospheric-editorial · anchor hue: cool */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: dark;
+
+  /* OKLCH-based palette used by the landing page. Coexists with
+   * the legacy `ink-*` and `accent` Tailwind tokens used elsewhere
+   * in the codebase. */
+  --bg-deep: oklch(0.07 0.012 248);
+  --bg-mist: oklch(0.10 0.014 235 / 0.45);
+  --bg-plate: oklch(0.095 0.014 246 / 0.55);
+  --bg-rise: oklch(0.14 0.018 250);
+  --bg-card: oklch(0.115 0.016 246 / 0.65);
+  --bg-card-2: oklch(0.18 0.020 250);
+  --glass-border: oklch(0.32 0.025 230 / 0.18);
+  --glass-inset: oklch(0.55 0.045 230 / 0.10);
+  --ink: oklch(0.96 0.005 250);
+  --ink-dim: oklch(0.78 0.010 250);
+  --ink-low: oklch(0.55 0.012 250);
+  --ink-faint: oklch(0.38 0.015 250);
+  --rule: oklch(0.27 0.015 250);
+  --rule-soft: oklch(0.22 0.013 250);
+  --d-accent: oklch(0.88 0.09 230);
+  --d-accent-strong: oklch(0.82 0.15 235);
+  --d-accent-warm: oklch(0.82 0.12 70);
+  --d-accent-warn: oklch(0.78 0.12 35);
+  --d-accent-good: oklch(0.80 0.10 155);
+
+  /* Font aliases. Geist isn't in Next.js 14.2's
+   * next/font/google catalog; alias to Inter (similar humanist-
+   * grotesk family) + system mono. */
+  --font-geist: var(--font-inter);
+  --font-geist-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    monospace;
 }
 
-html,
-body {
+/* Page surface — solid dark navy/graphite at the body level.
+ * No fixed-position atmosphere components anymore; the
+ * background lives directly on the body. */
+html {
   background-color: #05070d;
   color: #e8ecf6;
 }
-
 body {
+  background: var(--bg-deep);
   font-feature-settings: "ss01", "cv11";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Eyebrow pulse — used elsewhere in the app (admin / reports);
+ * the landing-page hero no longer uses it. */
+@keyframes geovizEyebrowPulse {
+  0%   { box-shadow: 0 0 0 0 oklch(0.85 0.10 215 / 0.6); }
+  70%  { box-shadow: 0 0 0 8px oklch(0.85 0.10 215 / 0); }
+  100% { box-shadow: 0 0 0 0 oklch(0.85 0.10 215 / 0); }
+}
+
+/* HeroVisual route illumination — each path fades in briefly
+ * then back out. 12s cycle, staggered per path (animationDelay
+ * inline) so only one path is lit at a time. */
+@keyframes pathPulse {
+  0%, 100% { opacity: 0; }
+  20%      { opacity: 0.85; }
+  40%      { opacity: 0; }
+}
+.hero-path-pulse {
+  animation: pathPulse 12s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-path-pulse {
+    animation: none;
+    opacity: 0.20; /* visible but static */
+  }
 }
 
 @layer components {
@@ -23,65 +82,978 @@ body {
     @apply mx-auto w-full max-w-6xl px-6;
   }
 
+  /* 1440px shell for landing-page sections. */
+  .container-shell {
+    @apply mx-auto w-full px-6 md:px-16;
+    max-width: 1440px;
+  }
+
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-md bg-accent px-5 py-3 font-semibold text-ink-950 shadow-glow transition hover:bg-accent-glow focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent;
   }
-
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-5 py-3 font-medium text-white/85 transition hover:border-white/25 hover:bg-white/[0.05];
   }
-
   .input-field {
     @apply w-full rounded-md border border-white/10 bg-ink-900/80 px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/30;
   }
-
   .card {
     @apply rounded-lg border border-white/10 bg-ink-900/60 p-6 shadow-card backdrop-blur-sm;
   }
-
-  /* Subtle premium hover for homepage cards. Adds a 1px lift, an
-     orange-tinted border, and the existing accent glow — opt-in via
-     the `card-hover` className so info-dense admin cards (which
-     contain interactive action buttons) don't pick up the lift. */
   .card-hover {
     @apply transition duration-200 ease-out hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-glow;
   }
-
   .pill {
     @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs uppercase tracking-[0.18em] text-white/60;
   }
-
   .section-eyebrow {
     @apply text-xs font-semibold uppercase tracking-[0.22em] text-accent;
   }
-
-  .h1 {
-    @apply text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl md:text-6xl;
-  }
-
-  .h2 {
-    @apply text-3xl font-bold tracking-tight text-white sm:text-4xl;
-  }
-
-  .h3 {
-    @apply text-xl font-semibold tracking-tight text-white;
-  }
-
-  .muted {
-    @apply text-white/60;
-  }
-
-  /* Canonical data-cell treatment: mono font + tight line-height +
-     slight negative letter-spacing. Use anywhere a score, ID,
-     percentage, timestamp, or technical input renders — the
-     "Bloomberg cell" pattern. Defined in UI polish Phase A
-     (UI_POLISH_PLAN.md section 3.2); Phase C applies it to score
-     cards, report IDs, and form inputs that capture cuids. Not
-     applied to any surface in this PR. */
+  .h1 { @apply text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl md:text-6xl; }
+  .h2 { @apply text-3xl font-bold tracking-tight text-white sm:text-4xl; }
+  .h3 { @apply text-xl font-semibold tracking-tight text-white; }
+  .muted { @apply text-white/60; }
   .mono-data {
     @apply font-mono;
     line-height: 1;
     letter-spacing: -0.01em;
+  }
+
+  /* Editorial display headline. */
+  .h-display {
+    font-family: var(--font-instrument), "Cormorant Garamond",
+      "Times New Roman", serif;
+    font-weight: 400;
+    font-size: clamp(48px, 6.4vw, 88px);
+    line-height: 0.96;
+    letter-spacing: -0.025em;
+    color: var(--ink);
+  }
+  .h-display em {
+    font-style: italic;
+    color: var(--ink-dim);
+    letter-spacing: -0.032em;
+  }
+
+  /* Section-level serif headline. */
+  .h-section {
+    font-family: var(--font-instrument), "Cormorant Garamond",
+      "Times New Roman", serif;
+    font-weight: 400;
+    font-size: clamp(36px, 4.4vw, 60px);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .h-section em {
+    font-style: italic;
+    color: var(--ink-dim);
+    letter-spacing: -0.032em;
+  }
+
+  /* Lede paragraph beneath section headlines · Geist. */
+  .lede {
+    font-family: var(--font-geist), system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink-dim);
+    max-width: 52ch;
+    font-weight: 400;
+  }
+
+  /* Eyebrow pill — kept for admin / report pages that still use
+   * it. The new landing-page hero uses a calmer mono line. */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px 6px 10px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    background: oklch(0.13 0.015 250 / 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .eyebrow-pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--d-accent);
+    box-shadow: 0 0 0 0 oklch(0.85 0.10 215 / 0.6);
+    animation: geovizEyebrowPulse 2.4s infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .eyebrow-pulse { animation: none; }
+  }
+
+  /* ─────────────────────────────────────────────────────────
+   * Editorial section tag — replaces the old SectionLabel pill.
+   * Reads as a typographic ledger line, not a UI badge:
+   *
+   *   [02] · MAPPED · WHY VISIBILITY MATTERS
+   *   ─────────────────
+   * ──────────────────────────────────────────────────────── */
+  .section-tag {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+  .section-tag-text {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-low);
+  }
+  .section-tag-name {
+    color: var(--ink-dim);
+  }
+  .section-tag-rule {
+    display: block;
+    width: 120px;
+    height: 1px;
+    background: var(--rule-soft);
+  }
+
+  /* Landing-page CTAs (kept). */
+  .l-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 22px;
+    border-radius: 2px;
+    font-family: var(--font-geist), system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: transform 180ms ease, background 180ms ease,
+      box-shadow 180ms ease, border-color 180ms ease;
+    text-decoration: none;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .l-btn-primary {
+    background: var(--ink);
+    color: var(--bg-deep);
+    border-color: var(--ink);
+  }
+  .l-btn-primary:hover {
+    background: oklch(0.92 0.005 250);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 28px -10px oklch(0.95 0.005 250 / 0.28);
+  }
+  .l-btn-primary:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+  .l-btn-ghost {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--rule);
+  }
+  .l-btn-ghost:hover {
+    border-color: var(--ink-dim);
+    background: oklch(0.16 0.02 250 / 0.5);
+    box-shadow: 0 0 0 4px oklch(0.65 0.05 230 / 0.10);
+  }
+  .l-btn-ghost:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+  /* Trailing arrow micro-shift. */
+  .l-btn svg {
+    transition: transform 180ms ease;
+  }
+  .l-btn:hover svg {
+    transform: translateX(2px);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+   * Editorial pricing treatment — magazine-style frame with
+   * two tiers separated by a single hairline rule. NO glass,
+   * NO gradients, NO backdrop-blur. Flat editorial layout.
+   * ──────────────────────────────────────────────────────── */
+  .pricing-frame {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    max-width: 1140px;
+    margin: 0 auto;
+  }
+  @media (max-width: 1024px) {
+    .pricing-frame {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (max-width: 768px) {
+    .pricing-frame {
+      grid-template-columns: 1fr;
+    }
+  }
+  .pricing-tier {
+    padding: 56px 48px 56px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .pricing-tier + .pricing-tier {
+    border-left: 1px solid var(--rule);
+  }
+  @media (max-width: 768px) {
+    .pricing-tier + .pricing-tier {
+      border-left: 0;
+      border-top: 1px solid var(--rule);
+    }
+    .pricing-tier {
+      padding: 40px 32px 44px;
+    }
+  }
+  .pricing-eyebrow {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 14px;
+  }
+  .pricing-tier-name {
+    font-family: var(--font-instrument), serif;
+    font-size: 30px;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin: 0 0 26px;
+  }
+  .pricing-price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .pricing-price {
+    font-family: var(--font-instrument), serif;
+    font-size: clamp(56px, 7vw, 72px);
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .pricing-price-strike {
+    font-family: var(--font-instrument), serif;
+    font-size: 28px;
+    letter-spacing: -0.02em;
+    color: var(--ink-faint);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+  .pricing-price-suf {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-low);
+  }
+  .pricing-tagline {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-low);
+    margin: 14px 0 0;
+  }
+  .pricing-features {
+    margin: 32px 0 36px;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .pricing-feature {
+    display: grid;
+    grid-template-columns: 12px 1fr;
+    gap: 10px;
+    align-items: baseline;
+    font-family: var(--font-geist), system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--ink-dim);
+  }
+  .pricing-feature-bullet {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--ink-low);
+    transform: translateY(6px);
+  }
+  .pricing-note {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 20px 0 0;
+  }
+
+  /* ─────────────────────────────────────────────────────────
+   * Premium delivery pass — utilities introduced for the
+   * warmer palette, glass panels, amber accents, pipeline rail
+   * and severity dots. All built from existing OKLCH tokens.
+   * ──────────────────────────────────────────────────────── */
+
+  /* Stake strap — single mono line for distinction copy
+   * ("Not SEO rankings. AI visibility.") */
+  .section-strap {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-low);
+    padding: 14px 0 0;
+    border-top: 1px solid var(--rule-soft);
+    margin-top: 28px;
+    max-width: 32ch;
+  }
+
+  /* Hero eyebrow — three-segment mono strap above headline */
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink-low);
+    margin-bottom: 22px;
+  }
+  .hero-eyebrow-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--d-accent);
+    box-shadow: 0 0 8px var(--d-accent);
+  }
+  .hero-eyebrow-sep {
+    width: 6px;
+    height: 1px;
+    background: var(--rule);
+  }
+
+  /* Glass panel — used by SnapshotCard. Subtle cyan-tinted
+   * border + soft inset top glow (animated unless reduced-motion). */
+  .glass-panel {
+    background: oklch(0.10 0.018 248 / 0.62);
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    box-shadow:
+      0 1px 0 var(--glass-inset) inset,
+      0 30px 80px oklch(0.03 0.01 250 / 0.45);
+  }
+  .glass-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--d-accent) 50%,
+      transparent 100%
+    );
+    opacity: 0.4;
+    animation: panelGlow 16s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .glass-panel::before { animation: none; opacity: 0.4; }
+  }
+
+  /* Amber left-edge accent — Features rows. Subtle, restrained,
+   * 3px stripe in the existing warm-accent token. */
+  .amber-edge {
+    position: relative;
+  }
+  .amber-edge::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 18px;
+    bottom: 18px;
+    width: 2px;
+    background: var(--d-accent-warm);
+    opacity: 0.55;
+    border-radius: 1px;
+  }
+
+  /* Pipeline rail — How It Works horizontal hairline + nodes.
+   * Only renders on lg+; mobile uses vertical stacked steps. */
+  .pipeline-rail {
+    display: none;
+  }
+  @media (min-width: 1024px) {
+    .pipeline-rail {
+      display: block;
+      position: relative;
+      height: 1px;
+      background: var(--rule-soft);
+      margin: 0 8% 56px;
+    }
+    .pipeline-node {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--d-accent);
+      box-shadow:
+        0 0 0 4px oklch(0.10 0.018 248),
+        0 0 0 5px oklch(0.32 0.025 230 / 0.30);
+    }
+    .pipeline-node-label {
+      position: absolute;
+      top: -34px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-geist-mono), ui-monospace, monospace;
+      font-size: 10.5px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-low);
+      white-space: nowrap;
+    }
+  }
+
+  /* Pricing — Audit tier is the dominant front-door offer. */
+  .pricing-tier[data-tier="audit"] {
+    background: linear-gradient(
+      180deg,
+      oklch(0.10 0.012 60 / 0.14) 0%,
+      transparent 70%
+    );
+    border-top: 3px solid var(--d-accent-warm);
+    margin-top: -1px;
+    padding-top: 50px;
+  }
+  .pricing-tier[data-tier="audit"] .pricing-price {
+    font-size: clamp(64px, 8vw, 84px);
+  }
+  .pricing-tier[data-tier="audit"] .pricing-tier-name {
+    color: var(--ink);
+  }
+
+  /* Pricing — Foundation Fix is the secondary upsell. Slightly muted. */
+  .pricing-tier[data-tier="fix"] {
+    background: linear-gradient(
+      180deg,
+      oklch(0.085 0.014 246 / 0.30) 0%,
+      transparent 70%
+    );
+  }
+  .pricing-tier[data-tier="fix"] .pricing-tier-name {
+    color: var(--ink-dim);
+  }
+  .pricing-tier[data-tier="fix"] .pricing-price {
+    color: var(--ink-dim);
+  }
+  .pricing-tier[data-tier="fix"] .pricing-feature {
+    color: var(--ink-low);
+  }
+
+  /* MOST CHOSEN · START HERE small banner — top of Audit tier. */
+  .pricing-most-chosen {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--d-accent-warm);
+    margin: 0 0 16px;
+    padding: 6px 10px;
+    border: 1px solid oklch(0.82 0.12 70 / 0.35);
+    border-radius: 2px;
+    display: inline-block;
+    background: oklch(0.10 0.012 60 / 0.30);
+  }
+
+  .pricing-included-eyebrow {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--d-accent-warm);
+    margin: 8px 0 18px;
+    opacity: 0.75;
+  }
+
+  /* Severity dots — used by SnapshotCard findings tags.
+   * Reuses existing severity tokens from tailwind.config.ts. */
+  .severity-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 7px;
+  }
+  .severity-dot--critical { background: #ff6b6b; box-shadow: 0 0 6px oklch(0.70 0.18 25 / 0.5); }
+  .severity-dot--warning  { background: var(--d-accent-warm); box-shadow: 0 0 6px oklch(0.82 0.12 70 / 0.4); }
+  .severity-dot--info     { background: var(--d-accent); box-shadow: 0 0 6px oklch(0.88 0.09 230 / 0.4); }
+
+  /* Single-bar confidence indicator — replaces 3-button strip. */
+  .confidence-bar {
+    position: relative;
+    height: 8px;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      oklch(0.30 0.04 25 / 0.45) 0%,
+      oklch(0.55 0.10 70 / 0.55) 50%,
+      oklch(0.55 0.10 155 / 0.55) 100%
+    );
+    border: 1px solid var(--rule-soft);
+    overflow: visible;
+  }
+  .confidence-bar-cursor {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow:
+      0 0 0 3px oklch(0.10 0.018 248),
+      0 0 12px oklch(0.82 0.12 70 / 0.5);
+  }
+  .confidence-bar-labels {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    margin-top: 12px;
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .confidence-bar-labels > span:nth-child(2) {
+    text-align: center;
+    color: var(--ink-dim);
+  }
+  .confidence-bar-labels > span:nth-child(3) { text-align: right; }
+
+  /* ─────────────────────────────────────────────────────────
+   * Section plate — subtle raised surface used by
+   * WhatIsGeoViz / HowItWorks / Pricing. Gradient lifts the
+   * background gently and tapers to transparent at the bottom
+   * so the plate reads as a contained editorial spread, not a box.
+   * ──────────────────────────────────────────────────────── */
+  .section-plate {
+    background: linear-gradient(
+      180deg,
+      var(--bg-plate) 0%,
+      oklch(0.08 0.012 248 / 0.30) 60%,
+      transparent 100%
+    );
+    border-top: 1px solid var(--rule-soft);
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  /* Next-steps strip — used in FinalCTA. Three short mono lines
+   * answering "what happens next" so the customer knows what
+   * they're buying. Hairline separators between lines. */
+  .next-steps-strip {
+    margin-top: 36px;
+    border-top: 1px solid var(--rule-soft);
+    padding-top: 18px;
+    display: grid;
+    gap: 0;
+  }
+  .next-steps-strip > div {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 14px;
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .next-steps-strip > div:last-child { border-bottom: 0; }
+  .next-steps-strip-num {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
+    color: var(--d-accent-warm);
+    opacity: 0.85;
+  }
+  .next-steps-strip-text {
+    font-family: var(--font-geist), system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--ink-dim);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+   * HeroVisualization — "How AI sees your business" dossier.
+   * 95% graphite, white typography, soft cyan + warm amber
+   * status accents. Bloomberg-dossier composition; no abstract
+   * decoration. Motion limited to existing pulseSoft (status
+   * pips) and pathPulse (connection lines).
+   * ──────────────────────────────────────────────────────── */
+  .hero-viz {
+    width: 100%;
+    max-width: 540px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    color: var(--ink);
+  }
+  .hero-viz-title {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink-low);
+  }
+  .hero-viz-frame {
+    position: relative;
+    padding: 28px 18px;
+    border: 1px solid var(--rule-soft);
+    border-radius: 4px;
+    background:
+      linear-gradient(
+        180deg,
+        oklch(0.10 0.014 248 / 0.55) 0%,
+        oklch(0.08 0.012 248 / 0.45) 60%,
+        oklch(0.075 0.012 248 / 0.40) 100%
+      );
+    box-shadow:
+      0 1px 0 oklch(0.30 0.025 230 / 0.10) inset,
+      0 30px 60px oklch(0.04 0.01 250 / 0.40);
+    overflow: hidden;
+  }
+
+  /* Corner reference ticks — measurement-instrument feel.
+   * Pseudo-element ticks would be cleaner but we want explicit
+   * spans for alignment. */
+  .hero-viz-corner {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+  }
+  .hero-viz-corner::before,
+  .hero-viz-corner::after {
+    content: "";
+    position: absolute;
+    background: oklch(0.50 0.018 245 / 0.4);
+  }
+  .hero-viz-corner::before { width: 8px; height: 1px; }
+  .hero-viz-corner::after  { width: 1px; height: 8px; }
+  .hero-viz-corner--tl { top: 8px;    left: 8px;  }
+  .hero-viz-corner--tr { top: 8px;    right: 8px; }
+  .hero-viz-corner--tr::before { right: 0; }
+  .hero-viz-corner--tr::after  { right: 0; }
+  .hero-viz-corner--bl { bottom: 8px; left: 8px;  }
+  .hero-viz-corner--bl::before { bottom: 0; }
+  .hero-viz-corner--bl::after  { bottom: 0; }
+  .hero-viz-corner--br { bottom: 8px; right: 8px; }
+  .hero-viz-corner--br::before { bottom: 0; right: 0; }
+  .hero-viz-corner--br::after  { bottom: 0; right: 0; }
+
+  /* SVG connection-lines underlay. Hidden on small screens
+   * (the layout collapses there and the lines would cross the
+   * card oddly). */
+  .hero-viz-lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    display: none;
+  }
+  @media (min-width: 768px) {
+    .hero-viz-lines { display: block; }
+  }
+
+  .hero-viz-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    align-items: stretch;
+  }
+  @media (min-width: 768px) {
+    .hero-viz-grid {
+      grid-template-columns: 130px 1fr 130px;
+      gap: 18px;
+      align-items: center;
+    }
+  }
+
+  .hero-viz-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  @media (min-width: 768px) {
+    .hero-viz-side {
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+  }
+
+  /* Layer chip — INTERPRET / TRUST / RETRIEVE / RECOMMEND */
+  .hero-viz-chip {
+    padding: 12px 12px 14px;
+    border: 1px solid var(--rule-soft);
+    background: oklch(0.085 0.014 248 / 0.55);
+    border-radius: 3px;
+    transition: transform 180ms ease, border-color 180ms ease,
+      background 180ms ease;
+    cursor: default;
+  }
+  .hero-viz-chip:hover {
+    transform: translateY(-1px);
+    border-color: oklch(0.30 0.025 230 / 0.35);
+    background: oklch(0.10 0.016 248 / 0.65);
+  }
+  .hero-viz-chip[data-status="ok"]   { border-left: 2px solid oklch(0.82 0.10 220 / 0.55); }
+  .hero-viz-chip[data-status="warn"] { border-left: 2px solid var(--d-accent-warm); }
+  .hero-viz-chip[data-status="miss"] { border-left: 2px solid oklch(0.65 0.16 25 / 0.65); }
+  .hero-viz-chip-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 6px;
+  }
+  .hero-viz-chip-label {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .hero-viz-chip-desc {
+    font-family: var(--font-geist), system-ui, sans-serif;
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--ink-dim);
+  }
+
+  /* Business profile card — central artifact */
+  .hero-viz-card {
+    position: relative;
+    z-index: 2;
+    border: 1px solid var(--glass-border);
+    border-radius: 3px;
+    background: oklch(0.10 0.016 248 / 0.85);
+    box-shadow:
+      0 1px 0 oklch(0.55 0.045 230 / 0.10) inset,
+      0 18px 40px oklch(0.03 0.01 250 / 0.45);
+    overflow: hidden;
+  }
+  .hero-viz-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px;
+    background: oklch(0.16 0.020 248 / 0.55);
+    border-bottom: 1px solid var(--rule-soft);
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-low);
+  }
+  .hero-viz-card-head-sample {
+    color: var(--d-accent-warm);
+  }
+  .hero-viz-card-body {
+    padding: 8px 0;
+  }
+  .hero-viz-row {
+    display: grid;
+    grid-template-columns: 78px 1fr 18px;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    border-bottom: 1px solid oklch(0.20 0.014 248 / 0.45);
+    transition: background 160ms ease;
+  }
+  .hero-viz-row:last-child { border-bottom: 0; }
+  .hero-viz-row:hover { background: oklch(0.14 0.018 248 / 0.40); }
+  .hero-viz-row-label {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-low);
+  }
+  .hero-viz-row-value {
+    font-family: var(--font-geist), system-ui, sans-serif;
+    font-size: 13px;
+    color: var(--ink);
+    text-align: left;
+  }
+  .hero-viz-row[data-status="warn"] .hero-viz-row-value { color: var(--d-accent-warm); }
+  .hero-viz-row[data-status="miss"] .hero-viz-row-value { color: oklch(0.78 0.10 25); }
+
+  /* Status pip — circular badge with a small inline-SVG glyph */
+  .hero-viz-pip {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .hero-viz-pip--ok {
+    background: oklch(0.20 0.04 220 / 0.55);
+    color: oklch(0.85 0.10 220);
+    border: 1px solid oklch(0.55 0.06 220 / 0.45);
+  }
+  .hero-viz-pip--warn {
+    background: oklch(0.20 0.06 70 / 0.45);
+    color: var(--d-accent-warm);
+    border: 1px solid oklch(0.55 0.10 70 / 0.45);
+    animation: pulseSoft 3.4s ease-in-out infinite;
+  }
+  .hero-viz-pip--miss {
+    background: oklch(0.20 0.08 25 / 0.45);
+    color: oklch(0.82 0.14 25);
+    border: 1px solid oklch(0.55 0.14 25 / 0.45);
+    animation: pulseSoft 3.4s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-viz-pip--warn,
+    .hero-viz-pip--miss { animation: none; }
+  }
+
+  /* Footer-cap — small editorial mono cap at the bottom of the page */
+  .footer-cap {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    text-align: center;
+    padding: 28px 0 24px;
+    border-top: 1px solid var(--rule-soft);
+  }
+
+  /* Definition-strip glyph cell (WhatIsGeoViz) */
+  .def-cell {
+    padding: 28px 24px 30px;
+    border-top: 1px solid var(--rule-soft);
+    border-right: 1px solid var(--rule-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 168px;
+    transition: background 200ms ease;
+  }
+  .def-cell:hover { background: oklch(0.10 0.018 248 / 0.45); }
+  .def-cell:last-child { border-right: 0; }
+  @media (max-width: 1024px) {
+    .def-cell { border-right: 0; border-bottom: 1px solid var(--rule-soft); }
+    .def-cell:last-child { border-bottom: 0; }
+  }
+
+  /* ─── Light-section utilities (homepage middle sections) ─────────
+   * These wrap the hybrid-palette homepage's cream-surface sections.
+   * Never used on the report PDF, never used on the dark hero / final
+   * CTA. Additive — no existing dark surface is altered. */
+  .section-light {
+    background-color: theme('colors.cream.50');
+    color: theme('colors.graphite.700');
+  }
+  .card-light {
+    border: 1px solid theme('colors.cream.200');
+    background-color: theme('colors.cream.100');
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02), 0 24px 60px -40px rgba(14, 18, 24, 0.18);
+  }
+  .h2-light { color: theme('colors.graphite.900'); }
+  .h3-light { color: theme('colors.graphite.900'); }
+  .lede-light {
+    color: theme('colors.graphite.700');
+    max-width: 56ch;
+  }
+  .muted-light { color: theme('colors.graphite.500'); }
+  .eyebrow-light {
+    color: theme('colors.graphite.400');
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+  }
+  /* Status chips — used in DiagnosticPanel + SampleReportPreview. */
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .status-chip-clear   { color: #6ce39a; background: rgba(108, 227, 154, 0.10); }
+  .status-chip-strong  { color: #6ce39a; background: rgba(108, 227, 154, 0.10); }
+  .status-chip-weak    { color: #ff9a3c; background: rgba(255, 154, 60, 0.10); }
+  .status-chip-missing { color: #ff6b6b; background: rgba(255, 107, 107, 0.10); }
+  .status-chip-review  { color: #67e8f9; background: rgba(103, 232, 249, 0.08); }
+}
+
+/* panelGlow keyframe — slow inset top-glow pulse on glass panels.
+ * 16s cycle. Compositor-only (opacity). */
+@keyframes panelGlow {
+  0%, 100% { opacity: 0.30; }
+  50%      { opacity: 0.60; }
+}
+
+/* Amber spine — editorial vertical column rule at the page's
+ * left margin. Fixed position, runs full viewport height,
+ * sits behind all content. Gated to lg+ only — invisible on
+ * mobile/tablet so narrow viewports stay clean. Reduced-motion
+ * users see the same static gradient. */
+.amber-spine {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .amber-spine {
+    display: block;
+    position: fixed;
+    left: 5vw;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      oklch(0.82 0.12 70 / 0.12) 18%,
+      oklch(0.82 0.12 70 / 0.18) 50%,
+      oklch(0.82 0.12 70 / 0.10) 82%,
+      transparent 100%
+    );
   }
 }
 
@@ -99,9 +1071,8 @@ body {
   mask-image: radial-gradient(ellipse at top, black 30%, transparent 75%);
 }
 
-/* Rendered-markdown report styling — used by /admin/orders/[id] and any
-   future customer-facing report viewer. Keeps the GeoViz dark aesthetic
-   while making the markdown readable like a real client deliverable. */
+/* Rendered-markdown report styling — admin/orders + customer
+ * report viewer. Untouched by the landing-page rewrite. */
 .report-prose {
   color: rgba(232, 236, 246, 0.88);
   font-size: 0.95rem;
@@ -135,40 +1106,21 @@ body {
   color: rgba(255, 255, 255, 0.92);
   margin: 1.4rem 0 0.5rem;
 }
-.report-prose p {
-  margin: 0 0 1rem;
-}
-.report-prose strong {
-  color: #ffffff;
-  font-weight: 600;
-}
-.report-prose em {
-  color: rgba(255, 255, 255, 0.85);
-}
+.report-prose p { margin: 0 0 1rem; }
+.report-prose strong { color: #ffffff; font-weight: 600; }
+.report-prose em { color: rgba(255, 255, 255, 0.85); }
 .report-prose a {
   color: #ff7a18;
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-color: rgba(255, 122, 24, 0.4);
 }
-.report-prose a:hover {
-  text-decoration-color: rgba(255, 122, 24, 0.9);
-}
+.report-prose a:hover { text-decoration-color: rgba(255, 122, 24, 0.9); }
 .report-prose ul,
-.report-prose ol {
-  margin: 0 0 1.1rem;
-  padding-left: 1.4rem;
-}
-.report-prose li {
-  margin: 0.35rem 0;
-}
-.report-prose ul li::marker {
-  color: rgba(255, 122, 24, 0.7);
-}
-.report-prose ol li::marker {
-  color: rgba(255, 122, 24, 0.7);
-  font-weight: 600;
-}
+.report-prose ol { margin: 0 0 1.1rem; padding-left: 1.4rem; }
+.report-prose li { margin: 0.35rem 0; }
+.report-prose ul li::marker { color: rgba(255, 122, 24, 0.7); }
+.report-prose ol li::marker { color: rgba(255, 122, 24, 0.7); font-weight: 600; }
 .report-prose blockquote {
   margin: 1.25rem 0;
   padding: 0.6rem 1rem;
@@ -195,16 +1147,8 @@ body {
   line-height: 1.55;
   margin: 1rem 0 1.25rem;
 }
-.report-prose pre code {
-  background: transparent;
-  border: none;
-  padding: 0;
-}
-.report-prose hr {
-  border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin: 2.25rem 0;
-}
+.report-prose pre code { background: transparent; border: none; padding: 0; }
+.report-prose hr { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 2.25rem 0; }
 .report-prose table {
   width: 100%;
   border-collapse: collapse;
@@ -229,6 +1173,77 @@ body {
   letter-spacing: 0.12em;
   font-weight: 600;
 }
-.report-prose tr:last-child td {
-  border-bottom: 0;
+.report-prose tr:last-child td { border-bottom: 0; }
+
+/* Editorial section reveal — RevealOnView flips
+ * data-revealed="true" via IntersectionObserver. Gentle 600ms
+ * fade-in + 12px upward translate. Reduced-motion users skip
+ * the animation entirely. */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 600ms ease 50ms, transform 600ms ease 50ms;
+  will-change: opacity, transform;
+}
+[data-reveal][data-revealed="true"] {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal],
+  [data-reveal][data-revealed="true"] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * WHY STAGES ROW — 4-stage retrieval flow that replaces the
+ * previous 3-card Why grid. Single row on desktop, 2×2 on
+ * tablet, single column on mobile.
+ * ──────────────────────────────────────────────────────────── */
+.why-stage-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+}
+@media (max-width: 1024px) {
+  .why-stage-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* Reset right borders on the last cell of each row */
+  .why-stage-row > .why-stage:nth-child(2n) {
+    border-right: 0 !important;
+  }
+  /* Bottom border between the two rows */
+  .why-stage-row > .why-stage:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--rule-soft);
+  }
+}
+@media (max-width: 640px) {
+  .why-stage-row {
+    grid-template-columns: 1fr;
+  }
+  .why-stage-row > .why-stage {
+    border-right: 0 !important;
+  }
+  .why-stage-row > .why-stage:not(:last-child) {
+    border-bottom: 1px solid var(--rule-soft);
+  }
+}
+.why-stage {
+  padding: 40px 32px 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 240px;
+}
+
+/* Retrieval-routes layer container — fixed, full-viewport.
+ * Reduced-motion users still see the static route lines but
+ * no packets. */
+.retrieval-route-layer {
+  /* All positioning is set inline by the component. */
 }

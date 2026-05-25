@@ -144,6 +144,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (err) {
     console.error("[checkout] Stripe session error", err);
+
+    // Detect the specific Stripe failure mode where STRIPE_PRICE_ID
+    // points to a price that doesn't exist in the configured account
+    // (test/live mode mismatch, archived price, or typo in env).
+    // Without this branch the operator only sees the generic 500
+    // message and can't self-diagnose from the form's red error row.
+    const e = err as { code?: unknown; message?: unknown };
+    const code = typeof e.code === "string" ? e.code : "";
+    const message = typeof e.message === "string" ? e.message : "";
+    if (code === "resource_missing" && /price/i.test(message)) {
+      return NextResponse.json(
+        {
+          error:
+            "Stripe price ID is invalid or missing. Check STRIPE_PRICE_ID on the server.",
+        },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
       { error: "Could not start checkout. Please try again." },
       { status: 500 },

@@ -22,21 +22,23 @@
  * canonical pipeline.
  */
 
-import {
-  bandLabelForOverall,
-  parseReportScoreBreakdown,
-} from "@/lib/parse-report";
+import { bandLabelForOverall } from "@/lib/parse-report";
+import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
 
 export function parseReportScore(
   md: string | null | undefined,
+  intelligence?: { deterministicScore?: unknown } | null,
 ): { score: number; status: string | null } | null {
-  if (!md) return null;
-  // Single canonical pipeline: same parser the PDF/print/email
-  // surfaces use. Returns rubric-sum-derived overall when all six
-  // categories parsed (with 5-of-6 derived-fill fallback added in
-  // PR #14), or the model's declared header as a last-resort
-  // fallback when sub-scores can't be reconstructed.
-  const breakdown = parseReportScoreBreakdown(md);
+  if (!md && !intelligence?.deterministicScore) return null;
+  // Single canonical pipeline: getCanonicalScore prefers the
+  // deterministic JSON when present (scoring@1.0.0+) and falls
+  // back to the legacy regex parser for pre-deterministic rows.
+  // Admin / PDF / print / email surfaces all route through this
+  // wrapper so they see the same number.
+  const breakdown = getCanonicalScore({
+    reportMarkdown: md ?? null,
+    intelligence: intelligence ?? null,
+  });
   if (typeof breakdown.overall !== "number") return null;
 
   // Emit a single greppable consistency line whenever the model's

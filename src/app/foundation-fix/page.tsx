@@ -25,13 +25,20 @@ export default function FoundationFixPage({
 
       <section className="relative">
         <div className="absolute inset-0 -z-10 bg-radial-orange opacity-60" />
-        <div className="container-page grid gap-12 py-16 md:grid-cols-[1fr_1.05fr] md:py-24">
+        <div className="absolute inset-0 -z-10 grid-bg opacity-50" />
+        <div className="container-page grid gap-14 py-20 md:grid-cols-[1fr_1.05fr] md:py-28 lg:gap-20">
           <div>
-            <p className="section-eyebrow">AI Visibility Foundation Fix</p>
-            <h1 className="h2 mt-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/40">
+              The Foundation Fix
+            </p>
+            <h1 className="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl">
               Request your scoped Foundation Fix.
             </h1>
-            <p className="muted mt-4 max-w-md">
+            <p className="mt-5 max-w-md font-serif text-xl italic leading-relaxed text-white/65">
+              We install the AI-readable layer; you see the before and
+              after.
+            </p>
+            <p className="mt-5 max-w-md text-base leading-relaxed text-white/65">
               Tell us about your business and we&rsquo;ll reply within one
               business day with a scoped setup plan that addresses the
               gaps your audit surfaced.
@@ -45,7 +52,7 @@ export default function FoundationFixPage({
               <Bullet>Before/after GeoViz re-check (verification audit)</Bullet>
             </ul>
 
-            <div className="mt-10 rounded-lg border border-white/10 bg-white/[0.02] p-5 text-sm text-white/70">
+            <div className="mt-10 rounded-lg border border-white/10 bg-ink-900/50 p-5 text-sm text-white/65">
               <p className="text-xs uppercase tracking-[0.2em] text-white/40">
                 Pricing
               </p>

@@ -202,8 +202,14 @@ export async function persistAuditIntelligence(args: {
   // wrap the awaited call in try/catch so a Prisma update failure
   // doesn't propagate. Operational data only — not consumed by
   // scoring, not shown to customers in V1.
+  //
+  // Hoisted to function scope so the deterministic-scoring block at
+  // the end of this function can read both preflight + renderResult.
+  let preflightForScoring: Awaited<ReturnType<typeof runPreflight>> | null = null;
+  let renderResultForScoring: RenderIntelligenceResult | null = null;
   try {
     const preflight = await runPreflight(websiteUrl);
+    preflightForScoring = preflight;
     await prisma.auditIntelligence.update({
       where: { auditOrderId: orderId },
       data: {
@@ -249,6 +255,7 @@ export async function persistAuditIntelligence(args: {
       provider: obscuraProvider,
       rawFetcher: createDefaultRawFetcher(),
     });
+    renderResultForScoring = renderResult;
 
     // Only update if render produced at least one populated field —
     // skip writes that would only persist nulls.
@@ -290,6 +297,150 @@ export async function persistAuditIntelligence(args: {
     // null on this audit.
     console.warn(
       `[geo-render] orchestrator threw orderId=${orderId} (non-fatal): ${message}`,
+    );
+  }
+
+  // ─── V2 Deterministic scoring (scoring@1.0.0) ───────────────────
+  // Pure-TypeScript score computed from preflight + ingest + render
+  // evidence. The LLM no longer produces or reconciles numbers —
+  // this block is the canonical source of truth for `overallScore`,
+  // `scoringVersion`, and the new `deterministicScore` JSON column
+  // on new audits. Legacy rows stay as they were; the read-path
+  // resolver (`src/lib/scoring/getCanonicalScore.ts`) handles both.
+  //
+  // Fail-soft: any throw is logged and the audit row keeps its
+  // legacy markdown-parsed scores. Never blocks customer delivery.
+  try {
+    const { runIntelligenceIngest } = await import(
+      "@/lib/intelligence/intelligenceIngest"
+    );
+    const { scoreAudit, SCORING_VERSION: DETERMINISTIC_VERSION, gatherEvidence } = await import(
+      "@/lib/scoring"
+    );
+    const { buildReplayBundle } = await import(
+      "@/lib/scoring/replay-bundle"
+    );
+
+    // Re-run ingest (pure / fast / deterministic) so we have a
+    // typed `IntelligenceIngestResult` to feed the scorer. Same
+    // inputs as the one inside `buildIntelligencePayload`, so the
+    // output is identical.
+    const ingestForScoring = runIntelligenceIngest({
+      reportMarkdown,
+      businessName,
+      websiteUrl,
+      score: parseReportScoreBreakdown(reportMarkdown),
+      orderId,
+    });
+
+    // Fetch up to 5 prior deterministic audits for the same website so
+    // the scorer can compute `score_stability_index`. Fail-soft —
+    // any Prisma error leaves history undefined and the scorer
+    // returns null for the stability fields.
+    let history: Array<{ computed_at: string; overall_score: number }> | undefined;
+    try {
+      const prior = await prisma.auditIntelligence.findMany({
+        where: {
+          websiteUrl,
+          NOT: { deterministicScore: { equals: Prisma.JsonNull } },
+          // Skip the row we just upserted — its deterministicScore is
+          // about to be written in the update below, so it's not in
+          // history yet.
+          auditOrderId: { not: orderId },
+          overallScore: { not: null },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { createdAt: true, overallScore: true },
+      });
+      history = prior
+        .filter(
+          (r): r is { createdAt: Date; overallScore: number } =>
+            typeof r.overallScore === "number",
+        )
+        .map((r) => ({
+          computed_at: r.createdAt.toISOString(),
+          overall_score: r.overallScore,
+        }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[scoring] history fetch failed orderId=${orderId} (non-fatal): ${msg}`,
+      );
+    }
+
+    const deterministic = scoreAudit({
+      preflightSignals: preflightForScoring,
+      intelligenceIngest: ingestForScoring,
+      renderResult: renderResultForScoring,
+      history,
+    });
+
+    // Capture the same `Evidence` the rubric scorers consumed + bundle
+    // it with the inputs/outputs/freeze-hashes/timestamp so this audit
+    // is fully replayable through `scoreAudit()` later — even if any
+    // input column shape later migrates. Pure builders; can't throw.
+    const evidence = gatherEvidence({
+      preflightSignals: preflightForScoring,
+      intelligenceIngest: ingestForScoring,
+      renderResult: renderResultForScoring,
+    });
+    const replayBundle = buildReplayBundle({
+      preflightSignals: preflightForScoring,
+      intelligenceIngest: ingestForScoring,
+      renderResult: renderResultForScoring,
+      history,
+      evidence,
+      deterministic,
+      computedAt: new Date(),
+    });
+
+    await prisma.auditIntelligence.update({
+      where: { auditOrderId: orderId },
+      data: {
+        deterministicScore: deterministic as unknown as Prisma.InputJsonValue,
+        scoringVersion: DETERMINISTIC_VERSION,
+        overallScore: deterministic.overall_score,
+        // Overwrite the legacy populated-count heuristic with the
+        // deterministic confidence so admin queries on the column
+        // agree with `deterministicScore.confidence_level`. The
+        // column accepts any string; values are now strictly
+        // "low" | "moderate" | "high" from `scoring@1.0.0`.
+        confidenceLevel: deterministic.confidence_level,
+        replayBundle: replayBundle as unknown as Prisma.InputJsonValue,
+      },
+    });
+    console.log(
+      `[scoring] success orderId=${orderId} version=${DETERMINISTIC_VERSION} overall=${deterministic.overall_score} band=${deterministic.band} synergy=${deterministic.synergy_bonus_applied} confidence=${deterministic.confidence_level} findings=${deterministic.top_3_findings.length}`,
+    );
+
+    // ─── Observation execution (ENABLE_OBSERVATION-gated) ────────────
+    // Runs AFTER scoring has been persisted so a) the deterministic
+    // score is durable before observations attempt to read it, and
+    // b) any observation failure cannot affect the scoring write.
+    // Default behavior is byte-equal to pre-integration because
+    // isObservationEnabled() returns false unless ENABLE_OBSERVATION=true.
+    try {
+      const { runObservationExecution } = await import(
+        "@/lib/observations/runObservationExecution"
+      );
+      await runObservationExecution({
+        prisma,
+        auditId: orderId,
+        businessName,
+        websiteUrl,
+        deterministicScore: deterministic,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[observation] orchestrator threw orderId=${orderId} (non-fatal): ${msg}`,
+      );
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[scoring] deterministic scoring failed orderId=${orderId} (non-fatal): ${message}`,
     );
   }
 

@@ -17,6 +17,187 @@
   overflow-x: hidden;
 }
 
+/* ---- report cover (premium intelligence-brief sheet) ----
+ * Additive + presentation-only. Renders as the first block; in PDF it
+ * is forced to its own page via page-break-after in @media print.
+ * Built entirely from already-parsed data — no fabrication, no new
+ * scoring. Token language matches the rest of the stylesheet. */
+.report-cover {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 80% at 82% 0%, rgba(255, 122, 24, 0.1), transparent 60%),
+    linear-gradient(180deg, rgba(13, 16, 24, 0.92), rgba(8, 10, 16, 0.96));
+  padding: 56px 48px;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.report-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(ellipse at 70% 0%, #000 22%, transparent 70%);
+  mask-image: radial-gradient(ellipse at 70% 0%, #000 22%, transparent 70%);
+  pointer-events: none;
+}
+.report-cover > * {
+  position: relative;
+}
+.report-cover-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.report-cover-brand {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+.report-cover-brand span {
+  color: #ff7a18;
+}
+.report-cover-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+.report-cover-headline {
+  margin-top: 60px;
+}
+.report-cover-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #ff7a18;
+}
+.report-cover-business {
+  margin: 14px 0 0;
+  font-size: 40px;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  max-width: 18ch;
+}
+.report-cover-url {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+}
+.report-cover-scorerow {
+  display: flex;
+  align-items: flex-end;
+  gap: 28px;
+  margin-top: 52px;
+}
+.report-cover-score {
+  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 96px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+.report-cover-score-ok {
+  color: #6ce39a;
+}
+.report-cover-score-warn {
+  color: #ffc46b;
+}
+.report-cover-score-bad {
+  color: #ff9a3c;
+}
+.report-cover-score-muted {
+  color: rgba(255, 255, 255, 0.7);
+}
+.report-cover-score-max {
+  font-size: 26px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.35);
+  margin-left: 6px;
+}
+.report-cover-bandwrap {
+  padding-bottom: 12px;
+}
+.report-cover-assessment {
+  margin: 34px 0 0;
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.72);
+  max-width: 64ch;
+}
+.report-cover-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin: 54px 0 0;
+  padding-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.report-cover-meta div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.report-cover-meta dt {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+.report-cover-meta dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  word-break: break-word;
+}
+.report-cover-meta dd.mono-data {
+  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: -0.01em;
+}
+.report-cover-disclaimer {
+  margin: 22px 0 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.38);
+  font-style: italic;
+}
+@media (max-width: 640px) {
+  .report-cover {
+    padding: 34px 22px;
+  }
+  .report-cover-headline {
+    margin-top: 40px;
+  }
+  .report-cover-business {
+    font-size: 29px;
+  }
+  .report-cover-scorerow {
+    margin-top: 38px;
+  }
+  .report-cover-score {
+    font-size: 68px;
+  }
+  .report-cover-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
 /* ---- hero ----
  * Horizontal padding intentionally matches the inset of `.score-card`
  * (32px) directly below the hero so the eyebrow, business name, status
@@ -481,6 +662,15 @@
   display: flex;
   flex-direction: column;
   gap: 22px;
+}
+/* Evidence-panel header — hairline-separated analytical label so the
+   block reads as a signal-evidence section, not a loose callout. */
+.report-summary-head {
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.report-summary-head .section-eyebrow {
+  display: block;
 }
 .report-summary-group {
   display: flex;
@@ -1390,22 +1580,22 @@
   position: relative;
   margin: 56px 0 8px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 122, 24, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   background: #0d1018;
   color: #f4f5f7;
   overflow: hidden;
   page-break-inside: avoid;
   break-inside: avoid;
-  /* Crisp 1px orange ring only — the heavy 80px orange box-shadow
-     read as a "blob" behind the bullets / CTA. Border + accent bar +
-     button are enough to mark this as a premium offer. */
-  box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.18);
+  /* Restrained: a single hairline border + a thin accent rule + the
+     one action button carry the accent. Reads as a scoped
+     infrastructure engagement, not a marketing banner. */
+  box-shadow: none;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 .cta-card-accent {
-  height: 6px;
-  background: linear-gradient(90deg, #ff7a18 0%, #ff9a3c 50%, #ff7a18 100%);
+  height: 2px;
+  background: #ff7a18;
 }
 .cta-card-body {
   padding: 30px 32px 32px;
@@ -1420,10 +1610,10 @@
 }
 .cta-card-headline {
   margin: 0 0 12px;
-  font-size: 30px;
-  line-height: 1.15;
-  font-weight: 800;
-  letter-spacing: -0.015em;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: #ffffff;
 }
 .cta-card-lede {
@@ -1450,11 +1640,11 @@
   print-color-adjust: exact;
 }
 .cta-card-badge-price {
-  padding: 9px 20px;
-  background: #ff7a18;
-  color: #ffffff;
-  font-size: 19px;
-  border: 1px solid #ff7a18;
+  padding: 8px 18px;
+  background: rgba(255, 122, 24, 0.12);
+  color: #ff9a3c;
+  font-size: 16px;
+  border: 1px solid rgba(255, 154, 60, 0.5);
 }
 .cta-card-badge-meta {
   padding: 9px 16px;
@@ -1488,8 +1678,8 @@
   background: #ff7a18;
   color: #05070d !important;
   font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   text-decoration: none !important;
   border: none;
   -webkit-print-color-adjust: exact;
@@ -1669,6 +1859,7 @@
     grid-template-columns: 1fr !important;
     gap: 10px !important;
   }
+  .report-cover,
   .report-section-card,
   .score-card,
   .cta-card,
@@ -1716,6 +1907,7 @@
    *     allowed to split naturally so they fill empty space rather
    *     than create new whitespace.
    */
+  .report-cover,
   .report-hero,
   .score-card,
   .report-item-card,
@@ -1724,6 +1916,12 @@
   .cta-card-body {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+  /* Cover is its own page — the report body starts on page 2. */
+  .report-cover {
+    page-break-after: always;
+    break-after: page;
+    min-height: calc(297mm - 32mm);
   }
   /* Outer section card MAY split between its inner item-cards —
      overrides the screen rule that kept the whole section atomic. */

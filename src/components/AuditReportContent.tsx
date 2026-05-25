@@ -8,7 +8,6 @@ import {
   inferIssueSeverity,
   parseEnumeratedItems,
   parseLabeledFields,
-  parseReportScoreBreakdown,
   parseReportSections,
   parseScoreDrivers,
   pickCleanHeroSentence,
@@ -18,6 +17,7 @@ import {
   type ReportSection,
   type ScoreDrivers,
 } from "@/lib/parse-report";
+import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
 import { Prose, InlineProse } from "@/components/Prose";
 import { ReportScoreCard } from "@/components/ReportScoreCard";
 import { ReportCtaCard } from "@/components/ReportCtaCard";
@@ -50,19 +50,30 @@ export function AuditReportContent({
   websiteUrl,
   reportMarkdown,
   reportGeneratedAt,
+  deterministicScore = null,
 }: {
   orderId: string;
   businessLabel: string;
   websiteUrl: string;
   reportMarkdown: string;
   reportGeneratedAt: Date | null;
+  /**
+   * Optional — when present, the canonical resolver reads scores from
+   * this `DeterministicScore` JSON (scoring@1.0.0). When absent, the
+   * resolver falls back to the legacy regex parser for pre-`scoring@1.0.0`
+   * rows.
+   */
+  deterministicScore?: unknown;
 }) {
   const dateLabel = (reportGeneratedAt ?? new Date()).toLocaleDateString(
     undefined,
     { year: "numeric", month: "long", day: "numeric" },
   );
 
-  const score = parseReportScoreBreakdown(reportMarkdown);
+  const score = getCanonicalScore({
+    reportMarkdown,
+    intelligence: deterministicScore ? { deterministicScore } : null,
+  });
   const layout = parseReportSections(reportMarkdown);
   const tone = scoreToneFromOverall(score.overall);
   const band =
@@ -114,11 +125,33 @@ export function AuditReportContent({
     : [];
   const showBestSignalsFallback = strengths.length === 0 && bestSignals.length > 0;
 
+  // Dimensions AI cannot yet verify — REAL weak categories only
+  // (parsed sub-score present AND ratio < 0.4). Surfaced as analytical
+  // evidence; never fabricated, never invented when a sub-score is
+  // missing (null is excluded so we don't assert a gap we can't prove).
+  const unverifiedDimensions = score.categories
+    .filter((c) => c.score !== null && c.score / c.max < 0.4)
+    .map((c) => c.short);
+
   return (
     <div className="report-host bg-ink-950 text-white">
       <div className="bg-radial-orange pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] opacity-60" />
 
       <div className="container-page py-14 md:py-20">
+        {/* Cover — premium intelligence-brief sheet. Additive; its own
+            page in the PDF (page-break-after in print.css). Built only
+            from already-parsed data. */}
+        <ReportCover
+          businessLabel={businessLabel}
+          websiteUrl={websiteUrl}
+          overall={score.overall}
+          band={band}
+          tone={tone}
+          dateLabel={dateLabel}
+          assessment={heroAssessment}
+          reportRef={`GEO-${orderId.slice(-8).toUpperCase()}`}
+        />
+
         {/* Hero */}
         <header className="report-hero">
           <p className="section-eyebrow">GeoViz · GEO Audit Report</p>
@@ -165,7 +198,6 @@ export function AuditReportContent({
             below, so the customer's first scoring touchpoint is the
             horizontal category bars (more readable for non-technical
             owners) instead of the radar shape. */}
-        <p className="section-eyebrow mt-12">Section 01 · Executive summary</p>
         {issueItems.length >= 2 || fixItems.length >= 2 ? (
           <ExecutiveAtAGlance issues={issueItems} fixes={fixItems} />
         ) : null}
@@ -182,6 +214,7 @@ export function AuditReportContent({
             <ExecutiveSummaryBlock
               drivers={scoreDrivers}
               fixes={summaryFixes}
+              unverified={unverifiedDimensions}
             />
           ) : null}
           <p className="report-score-consistency-note">
@@ -360,6 +393,93 @@ export function AuditReportContent({
   );
 }
 
+/**
+ * Premium cover sheet. Pure presentation, no fabrication — every
+ * value is already-parsed report data the body also uses. In the PDF
+ * this is forced onto its own page (.report-cover page-break-after in
+ * print.css), so the brief opens like an intelligence document.
+ */
+function ReportCover({
+  businessLabel,
+  websiteUrl,
+  overall,
+  band,
+  tone,
+  dateLabel,
+  assessment,
+  reportRef,
+}: {
+  businessLabel: string;
+  websiteUrl: string;
+  overall: number | null;
+  band: string;
+  tone: "ok" | "warn" | "bad" | "muted";
+  dateLabel: string;
+  assessment: string | null;
+  reportRef: string;
+}) {
+  const scoreLabel = typeof overall === "number" ? overall : "—";
+  const displayUrl = prettifyUrlForDisplay(websiteUrl);
+  return (
+    <section className="report-cover" aria-label="AI visibility report cover">
+      <div className="report-cover-topbar">
+        <div className="report-cover-brand">
+          Geo<span>Viz</span>
+        </div>
+        <div className="report-cover-kicker">AI Visibility Intelligence</div>
+      </div>
+
+      <div className="report-cover-headline">
+        <p className="report-cover-eyebrow">AI Visibility Intelligence Report</p>
+        <h1 className="report-cover-business">{businessLabel}</h1>
+        <p className="report-cover-url">{displayUrl}</p>
+      </div>
+
+      <div className="report-cover-scorerow">
+        <div>
+          <span className={`report-cover-score report-cover-score-${tone}`}>
+            {scoreLabel}
+          </span>
+          <span className="report-cover-score-max">/ 100</span>
+        </div>
+        <div className="report-cover-bandwrap">
+          <span className={`report-band-pill report-band-pill-${tone}`}>
+            {band}
+          </span>
+        </div>
+      </div>
+
+      {assessment ? (
+        <p className="report-cover-assessment">{assessment}</p>
+      ) : null}
+
+      <dl className="report-cover-meta">
+        <div>
+          <dt>Generated</dt>
+          <dd>{dateLabel}</dd>
+        </div>
+        <div>
+          <dt>Website audited</dt>
+          <dd>{displayUrl}</dd>
+        </div>
+        <div>
+          <dt>Report ID</dt>
+          <dd className="mono-data">{reportRef}</dd>
+        </div>
+        <div>
+          <dt>Delivery</dt>
+          <dd>Human-reviewed</dd>
+        </div>
+      </dl>
+
+      <p className="report-cover-disclaimer">
+        Directional assessment based on publicly accessible website and
+        trust signals. Not a ranking guarantee.
+      </p>
+    </section>
+  );
+}
+
 const SECTION_EYEBROWS: Record<string, string> = {
   why: "Section 04 · Diagnosis",
   "fix-first": "Section 05 · Action plan",
@@ -370,19 +490,36 @@ const SECTION_EYEBROWS: Record<string, string> = {
 
 type EnumeratedItem = { title: string; body: string };
 
+/**
+ * Signal Evidence panel. Reframes the score-driver data into an
+ * analytical intelligence read — what AI can use, what's missing,
+ * which scored dimensions it cannot yet verify, and the recommended
+ * remediation. Every item is REAL parsed data (model score drivers +
+ * weak rubric categories); nothing is fabricated. This replaces — not
+ * duplicates — the old executive-summary block.
+ */
 function ExecutiveSummaryBlock({
   drivers,
   fixes,
+  unverified,
 }: {
   drivers: ScoreDrivers;
   fixes: string[];
+  unverified: string[];
 }) {
   return (
     <div className="report-band-explainer report-summary">
+      <div className="report-summary-head">
+        <p className="section-eyebrow">Signal evidence</p>
+        <p className="muted mt-1 text-xs">
+          Derived from this audit&rsquo;s scored signals — directional,
+          not fabricated telemetry.
+        </p>
+      </div>
       {drivers.positive.length > 0 ? (
         <div className="report-summary-group">
           <p className="report-summary-label report-summary-label-positive">
-            Strong signals
+            Signals AI can use
           </p>
           <ul className="report-summary-list">
             {drivers.positive.map((item, i) => (
@@ -401,7 +538,7 @@ function ExecutiveSummaryBlock({
       {drivers.negative.length > 0 ? (
         <div className="report-summary-group">
           <p className="report-summary-label report-summary-label-negative">
-            Biggest visibility gaps
+            Missing retrieval signals
           </p>
           <ul className="report-summary-list">
             {drivers.negative.map((item, i) => (
@@ -417,10 +554,27 @@ function ExecutiveSummaryBlock({
           </ul>
         </div>
       ) : null}
+      {unverified.length > 0 ? (
+        <div className="report-summary-group">
+          <p className="report-summary-label report-summary-label-negative">
+            Dimensions AI can&rsquo;t yet verify
+          </p>
+          <ul className="report-summary-list">
+            {unverified.map((label, i) => (
+              <li key={`unv-${i}`} className="report-summary-item">
+                <span className="report-summary-marker report-summary-marker-negative">
+                  ✕
+                </span>
+                <span className="report-summary-text">{label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {fixes.length > 0 ? (
         <div className="report-summary-group">
           <p className="report-summary-label report-summary-label-fix">
-            Fastest recommended fixes
+            Recommended remediation
           </p>
           <ul className="report-summary-list">
             {fixes.map((title, i) => (
@@ -451,7 +605,7 @@ function ExecutiveAtAGlance({
   const topFixes = fixes.slice(0, 3);
   return (
     <section className="report-glance mt-10">
-      <p className="section-eyebrow">At a glance</p>
+      <p className="section-eyebrow">Section 01 · Executive summary</p>
       <h2 className="h3 mt-2">The headlines from this audit.</h2>
       <div className="report-glance-grid mt-5">
         {topIssues.length > 0 ? (

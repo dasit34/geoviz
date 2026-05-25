@@ -55,6 +55,9 @@ export default async function PrintPage({
 
   const order = await prisma.auditOrder.findUnique({
     where: { id: params.id },
+    include: {
+      intelligence: { select: { deterministicScore: true } },
+    },
   });
 
   // True 404 — no order row for this ID. The only outcome that
@@ -102,6 +105,7 @@ export default async function PrintPage({
       websiteUrl={order.websiteUrl}
       reportMarkdown={order.reportMarkdown}
       reportGeneratedAt={order.reportGeneratedAt}
+      deterministicScore={order.intelligence?.deterministicScore ?? null}
     />
   );
 }

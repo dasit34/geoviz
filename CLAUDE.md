@@ -313,6 +313,12 @@ See `CLAUDE_DESIGN.md` for the visual source of truth (visual
 identity, avoid-list, and concrete implementation pointers into
 Tailwind config + report print CSS).
 
+For any Figma-driven UI work, the design-system rules (Figma MCP
+flow, token mapping, component conventions, brand/scope guardrails)
+are in `.claude/rules/figma-design-system.md`:
+
+@.claude/rules/figma-design-system.md
+
 ## Conversion Rule
 Every section must reinforce:
 

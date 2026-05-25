@@ -1,9 +1,7 @@
 /* eslint-disable no-console */
 import { getResend } from "@/lib/resend";
-import {
-  parseReportScoreBreakdown,
-  plainEnglishBandLabel,
-} from "@/lib/parse-report";
+import { plainEnglishBandLabel } from "@/lib/parse-report";
+import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
 import { resolveAppBaseUrl, buildAdminReviewUrl } from "@/lib/app-url";
 
 /**
@@ -59,6 +57,8 @@ export async function notifyOperatorReportReady(args: {
   websiteUrl: string;
   reportMarkdown: string;
   reportGeneratedAt: Date;
+  /** Optional deterministic score JSON for the canonical resolver. */
+  deterministicScore?: unknown;
 }): Promise<boolean> {
   const {
     orderId,
@@ -67,6 +67,7 @@ export async function notifyOperatorReportReady(args: {
     websiteUrl,
     reportMarkdown,
     reportGeneratedAt,
+    deterministicScore,
   } = args;
 
   if (!process.env.RESEND_API_KEY) {
@@ -84,7 +85,10 @@ export async function notifyOperatorReportReady(args: {
   const adminUrl = buildAdminReviewUrl();
 
   const businessLabel = businessName?.trim() || websiteUrl;
-  const score = parseReportScoreBreakdown(reportMarkdown);
+  const score = getCanonicalScore({
+    reportMarkdown,
+    intelligence: deterministicScore ? { deterministicScore } : null,
+  });
   const overall =
     typeof score.overall === "number" ? `${score.overall}/100` : "—";
   const band =
