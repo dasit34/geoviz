@@ -45,10 +45,18 @@ export async function register() {
   console.error(
     "\n  Fix the env (see .env.example), then retry the deploy.\n",
   );
-  // Throw — Next.js surfaces this as a deploy / server boot failure
-  // instead of letting the first customer request hit a half-configured
-  // runtime.
-  throw new Error(
-    `Invalid environment at boot: ${result.errors.join("; ")}`,
-  );
+  // Soft-fail: log loudly above (Vercel renders console.error red in
+  // Function logs) but let boot continue. The throw added in `01168c9`
+  // (2026-05-16 "Phase 1 launch hardening") was a pre-launch safety
+  // net that turned any missing/invalid required key into HTTP 500
+  // for every dynamic route — including public pages like `/order`
+  // that don't actually need the missing key. Each module that
+  // consumes a required env keeps its own guard at the point of use:
+  //   - Stripe → src/lib/stripe.ts + /api/checkout returns 503
+  //   - Resend → src/lib/resend.ts getResend() throws on demand
+  //   - Anthropic → audit worker validates before invoking
+  //   - Admin secret → admin / internal routes verify per request
+  // The validator stays useful as a launch-checklist diagnostic; it
+  // just stops crashing customers on dynamic routes that don't need
+  // the missing value.
 }
