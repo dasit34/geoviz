@@ -18,6 +18,7 @@ import {
   type ScoreDrivers,
 } from "@/lib/parse-report";
 import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
+import { SECTION_EYEBROWS } from "@/lib/report-sections";
 import { Prose, InlineProse } from "@/components/Prose";
 import { ReportScoreCard } from "@/components/ReportScoreCard";
 import { ReportCtaCard } from "@/components/ReportCtaCard";
@@ -232,7 +233,7 @@ export function AuditReportContent({
             they've read the bars. */}
         <section className="report-section-card report-section-impact mt-10">
           <div className="report-section-card-header">
-            <p className="section-eyebrow">Section 02 · Category breakdown</p>
+            <p className="section-eyebrow">{SECTION_EYEBROWS.categoryBreakdown}</p>
             <span className="pill">6 dimensions scored</span>
           </div>
           <h2 className="h2 mt-3">Where the score comes from.</h2>
@@ -259,8 +260,8 @@ export function AuditReportContent({
           <div className="report-section-card-header">
             <p className="section-eyebrow">
               {showBestSignalsFallback
-                ? "Section 03 · Best current signals"
-                : "Section 03 · Top strengths"}
+                ? SECTION_EYEBROWS.bestCurrentSignals
+                : SECTION_EYEBROWS.topStrengths}
             </p>
             {strengths.length > 0 ? (
               <span className="pill">{strengths.length} surfaced</span>
@@ -480,12 +481,16 @@ function ReportCover({
   );
 }
 
-const SECTION_EYEBROWS: Record<string, string> = {
-  why: "Section 04 · Diagnosis",
-  "fix-first": "Section 05 · Action plan",
-  happens: "Section 06 · Business impact",
-  "tech-details": "Appendix · Technical details",
-  other: "Section",
+// Map parsed report section types to canonical eyebrow strings.
+// Source of truth: `@/lib/report-sections` — shared with
+// `ReportViewerClient.tsx` so admin preview and customer PDF render
+// identical section numbering.
+const SECTION_EYEBROWS_BY_TYPE: Record<string, string> = {
+  why: SECTION_EYEBROWS.diagnosis,
+  "fix-first": SECTION_EYEBROWS.actionPlan,
+  happens: SECTION_EYEBROWS.businessImpact,
+  "tech-details": SECTION_EYEBROWS.technicalDetails,
+  other: SECTION_EYEBROWS.other,
 };
 
 type EnumeratedItem = { title: string; body: string };
@@ -605,7 +610,7 @@ function ExecutiveAtAGlance({
   const topFixes = fixes.slice(0, 3);
   return (
     <section className="report-glance mt-10">
-      <p className="section-eyebrow">Section 01 · Executive summary</p>
+      <p className="section-eyebrow">{SECTION_EYEBROWS.executiveSummary}</p>
       <h2 className="h3 mt-2">The headlines from this audit.</h2>
       <div className="report-glance-grid mt-5">
         {topIssues.length > 0 ? (
@@ -677,7 +682,7 @@ function ItemListSection({
   itemKind: "issue" | "fix";
 }) {
   const eyebrowKey = tone === "diagnosis" ? "why" : "fix-first";
-  const eyebrow = SECTION_EYEBROWS[eyebrowKey] ?? `Section ${number}`;
+  const eyebrow = SECTION_EYEBROWS_BY_TYPE[eyebrowKey] ?? `Section ${number}`;
   return (
     <section className={`report-section-card report-section-${tone}`}>
       <div className="report-section-card-header">
@@ -807,8 +812,8 @@ function SectionCard({
   const eyebrowKey =
     tone === "diagnosis" ? "why" : tone === "action" ? "fix-first" : "happens";
   const eyebrow = number
-    ? SECTION_EYEBROWS[eyebrowKey] ?? `Section ${number}`
-    : SECTION_EYEBROWS.other;
+    ? SECTION_EYEBROWS_BY_TYPE[eyebrowKey] ?? `Section ${number}`
+    : SECTION_EYEBROWS_BY_TYPE.other;
   return (
     <section className={`report-section-card report-section-${tone}`}>
       <div className="report-section-card-header">

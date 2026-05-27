@@ -127,8 +127,13 @@ export function scoreTrust(evidence: Evidence): CategoryScoreInternal {
   }
 
   // Sanity-cap against the analyzer's own consistency score.
+  // Continuous (dropped Math.round) so an analyzer score shifting by 1
+  // unit doesn't flip the ceiling by a full point. Anchor preserved:
+  // analyzer=100 → ceiling=max+2. NOTE: the inconsistency hard-floor at
+  // count≥3 and the agreement-tier ladder (0.7/0.9) are deliberately NOT
+  // smoothed in this stage — they're Stage 2 work.
   if (typeof e.analyzer_score === "number") {
-    const ceiling = Math.round((e.analyzer_score / 100) * max) + 2;
+    const ceiling = (e.analyzer_score / 100) * max + 2;
     if (score > ceiling) score = ceiling;
   }
 

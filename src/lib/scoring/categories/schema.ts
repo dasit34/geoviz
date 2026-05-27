@@ -130,7 +130,11 @@ export function scoreSchema(evidence: Evidence): CategoryScoreInternal {
 
   // Required-field coverage moves us through the 8–12 band.
   const fieldCoverage = requiredCovered / requiredMax; // 0..1
-  score += Math.round(fieldCoverage * 4); // up to +4 → 12 baseline
+  // Continuous (dropped Math.round) so a 1-field-coverage shift at a
+  // quartile boundary (0.24→0.25, 0.49→0.50, 0.74→0.75) doesn't jump a
+  // full point. Outer clamp + final category clamp handle bounds.
+  // Anchors preserved: coverage=0 → +0, coverage=1.0 → +4.
+  score += fieldCoverage * 4; // up to +4 → 12 baseline
 
   if (s.missing_fields.length > 0) {
     signals.push(`Missing fields: ${s.missing_fields.join(", ")}`);

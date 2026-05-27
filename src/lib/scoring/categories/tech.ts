@@ -122,9 +122,18 @@ export function scoreTech(evidence: Evidence): CategoryScoreInternal {
 
   // Healthy text length reward (tech-accessibility is partly a content
   // proxy — a tiny body suggests structural issues even without a shell).
-  if (typeof c.text_length === "number" && c.text_length >= 4_000) {
-    score += 1;
-    signals.push("Robust text length in raw HTML");
+  // Ramps from text_length=1000 (bonus 0) to text_length=4000 (bonus +1).
+  // Previously a binary +1 at >= 4000, which created a 1-pt cliff at one
+  // byte of difference. Anchor preserved at text_length=4000 → +1. Signal
+  // text is gated at the same threshold so the audit trail still reflects
+  // "robust" only when the page genuinely crosses the original mark.
+  if (typeof c.text_length === "number") {
+    const textLengthBonus = Math.max(
+      0,
+      Math.min(1, (c.text_length - 1_000) / 3_000),
+    );
+    score += textLengthBonus;
+    if (c.text_length >= 4_000) signals.push("Robust text length in raw HTML");
   }
 
   score = clamp(score, 0, max);

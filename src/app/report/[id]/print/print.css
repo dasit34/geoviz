@@ -9,6 +9,18 @@
  *   3. Markdown-prose typography inside dark cards.
  *   4. @media print overrides so the same surface still produces a
  *      readable PDF (PDF is secondary, but should not be broken).
+ *
+ * Regression notes — load-bearing rules elsewhere in this file:
+ *   - iPhone polish (430px breakpoint, ~line 1059): tightens
+ *     category-score-label font + max-width so the score column
+ *     never gets pushed off the right edge on iPhone SE / Mini.
+ *   - PDF word-break hardening (~line 2111): forces word-boundary
+ *     breaks and disables hyphens on .category-score-label inside
+ *     the @media print block. Added 2026-05-15 after a PDF render
+ *     was splitting "Recommendation Ready" mid-word as
+ *     "Recommendati / on Readiness". Do not remove without testing
+ *     PDF generation for the longest short label
+ *     ("Recommendation Ready") at 3-column print width.
  */
 
 .report-host {

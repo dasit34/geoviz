@@ -142,9 +142,12 @@ export function scoreCrawler(evidence: Evidence): CategoryScoreInternal {
   }
 
   // Honor the analyzer's own composite score as a sanity ceiling.
+  // Continuous (dropped Math.round) so an analyzer score shifting by 1
+  // unit doesn't flip the ceiling by a full point. Outer clamp + final
+  // category clamp handle bounds. Anchor preserved: analyzer=100 → ceiling=max+2.
   if (typeof c.analyzer_score === "number") {
     const ratio = c.analyzer_score / 100;
-    const ceiling = Math.round(ratio * max);
+    const ceiling = ratio * max;
     if (score > ceiling + 2) score = ceiling + 2;
   }
 

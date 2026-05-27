@@ -16,6 +16,7 @@ import {
   type ScoreDrivers,
 } from "@/lib/parse-report";
 import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
+import { SECTION_EYEBROWS } from "@/lib/report-sections";
 import { Prose, InlineProse } from "./Prose";
 import { ReportScoreCard } from "./ReportScoreCard";
 import { ReportCtaCard } from "./ReportCtaCard";
@@ -128,7 +129,7 @@ export function ReportViewerClient({
           <section className="report-section-card report-section-impact mt-10">
             <div className="report-section-card-header">
               <p className="section-eyebrow">
-                Section 02 · Category breakdown
+                {SECTION_EYEBROWS.categoryBreakdown}
               </p>
               <span className="pill">6 dimensions scored</span>
             </div>
@@ -149,7 +150,7 @@ export function ReportViewerClient({
           {/* Top strengths — derived from category scores ≥ 70% */}
           <section className="report-section-card report-section-strengths mt-10">
             <div className="report-section-card-header">
-              <p className="section-eyebrow">Section 03 · Top strengths</p>
+              <p className="section-eyebrow">{SECTION_EYEBROWS.topStrengths}</p>
               {strengths.length > 0 ? (
                 <span className="pill">{strengths.length} surfaced</span>
               ) : null}
@@ -182,7 +183,7 @@ export function ReportViewerClient({
               fallbackBody={whySection.body}
               tone="diagnosis"
               badge="Top 3 issues"
-              eyebrow="Section 02 · Diagnosis"
+              eyebrow={SECTION_EYEBROWS.diagnosis}
               itemKind="issue"
             />
           ) : null}
@@ -201,7 +202,7 @@ export function ReportViewerClient({
               fallbackBody={fixSection.body}
               tone="action"
               badge="Top 3 fixes"
-              eyebrow="Section 03 · Action plan"
+              eyebrow={SECTION_EYEBROWS.actionPlan}
               itemKind="fix"
             />
           ) : null}
@@ -212,7 +213,7 @@ export function ReportViewerClient({
               body={happensSection.body}
               tone="impact"
               badge="Business outcome"
-              eyebrow="Section 04 · Business impact"
+              eyebrow={SECTION_EYEBROWS.businessImpact}
             />
           ) : null}
 
@@ -223,7 +224,7 @@ export function ReportViewerClient({
               body={s.body}
               tone="impact"
               badge=""
-              eyebrow="Section"
+              eyebrow={SECTION_EYEBROWS.other}
             />
           ))}
 

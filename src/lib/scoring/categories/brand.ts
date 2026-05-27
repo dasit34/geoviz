@@ -118,14 +118,16 @@ export function scoreBrand(evidence: Evidence): CategoryScoreInternal {
     });
   }
 
-  // Surface-agreement confidence ceiling — give the strong band one
-  // last lift when the analyzer reports tight agreement.
-  if (
-    typeof e.surface_agreement === "number" &&
-    e.surface_agreement >= 0.95 &&
-    score < max
-  ) {
-    score += 1;
+  // Surface-agreement confidence lift — ramps from agreement=0.8 (bonus 0)
+  // to agreement=1.0 (bonus +1). Previously a binary +1 at >= 0.95, which
+  // created a 1-pt cliff at 0.94→0.95 on small analyzer drift. Anchor
+  // preserved at agreement=1.0 → +1; anti-double-bonus guard preserved.
+  if (typeof e.surface_agreement === "number" && score < max) {
+    const agreementBonus = Math.max(
+      0,
+      Math.min(1, (e.surface_agreement - 0.8) / 0.2),
+    );
+    score = Math.min(max, score + agreementBonus);
   }
 
   score = clamp(score, 0, max);
