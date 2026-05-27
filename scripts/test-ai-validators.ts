@@ -34,6 +34,9 @@ const ENV_KEYS = [
   "GEMINI_API_KEY",
   "PERPLEXITY_API_KEY",
   "ANTHROPIC_API_KEY",
+  // Test-only fixture-mode env consumed by openai.ts. Snapshot +
+  // restore so the test suite is hermetic and idempotent.
+  "OPENAI_VALIDATOR_FIXTURE",
 ] as const;
 const envSnapshot: Record<string, string | undefined> = {};
 for (const k of ENV_KEYS) envSnapshot[k] = process.env[k];
@@ -115,6 +118,10 @@ async function scenario3EnabledAllKeys(): Promise<void> {
   process.env.OPENAI_API_KEY = "mock-key";
   process.env.GEMINI_API_KEY = "mock-key";
   process.env.PERPLEXITY_API_KEY = "mock-key";
+  // OpenAI provider is now LIVE-wired — fixture-mode keeps the test
+  // hermetic by short-circuiting the real fetch and returning the
+  // legacy MOCK_RESPONSE. Other providers remain mocked at source.
+  process.env.OPENAI_VALIDATOR_FIXTURE = "true";
   const c = await ClaudeValidator.validateBusiness(sampleInput);
   check("Claude → passed (mock)", c.status === "passed");
   check("Claude raw_summary contains [MOCK]", c.raw_summary.includes("[MOCK]"));
@@ -137,6 +144,9 @@ async function scenario4OrchestratorOrdering(): Promise<void> {
   process.env.OPENAI_API_KEY = "mock-key";
   process.env.GEMINI_API_KEY = "mock-key";
   process.env.PERPLEXITY_API_KEY = "mock-key";
+  // Fixture mode for the live-wired OpenAI provider; keeps the
+  // orchestrator path hermetic during testing.
+  process.env.OPENAI_VALIDATOR_FIXTURE = "true";
   // Mute the dev console.log so test output stays clean. The result is
   // still returned to the caller — we're only suppressing the log side
   // effect for this assertion run.
@@ -226,15 +236,18 @@ async function scenario7MockValidatorPassthrough(): Promise<void> {
 }
 
 function scenario8NoForbiddenImports(): void {
-  console.log("[ai-validators-test] Scenario 8: validators directory has no network / SDK imports");
-  const validatorFiles = [
+  console.log("[ai-validators-test] Scenario 8: network/SDK imports scoped to openai.ts only");
+  // openai.ts is LIVE-wired and is the single file allowed to contain
+  // `fetch(` and an OpenAI endpoint URL. Every other validator file
+  // must stay free of network primitives + provider SDKs.
+  const LIVE_WIRED = "src/lib/validators/providers/openai.ts";
+  const mockOnlyFiles = [
     "src/lib/validators/index.ts",
     "src/lib/validators/types.ts",
     "src/lib/validators/registry.ts",
     "src/lib/validators/runAiValidationLayer.ts",
     "src/lib/validators/devLog.ts",
     "src/lib/validators/providers/claude.ts",
-    "src/lib/validators/providers/openai.ts",
     "src/lib/validators/providers/gemini.ts",
     "src/lib/validators/providers/perplexity.ts",
     "src/lib/validators/providers/googleAiOverview.ts",
@@ -250,18 +263,51 @@ function scenario8NoForbiddenImports(): void {
     'require("openai")',
     'require("@anthropic-ai/sdk")',
   ];
-  let any = false;
-  for (const path of validatorFiles) {
+  let anyForbiddenInMockFiles = false;
+  for (const path of mockOnlyFiles) {
     const abs = join(process.cwd(), path);
     const text = readFileSync(abs, "utf8");
     for (const needle of forbidden) {
       if (text.includes(needle)) {
         console.log(`    ⚠ found "${needle}" in ${path}`);
-        any = true;
+        anyForbiddenInMockFiles = true;
       }
     }
   }
-  check("no fetch / API SDK imports anywhere in src/lib/validators/", !any);
+  check(
+    "no fetch / API SDK imports in mock-only validator files",
+    !anyForbiddenInMockFiles,
+  );
+
+  // Positive assertion for the live-wired file: openai.ts MUST contain
+  // exactly the OpenAI endpoint + a fetch call. Catches accidental
+  // reversion to a mock-only state.
+  const liveAbs = join(process.cwd(), LIVE_WIRED);
+  const liveText = readFileSync(liveAbs, "utf8");
+  check(
+    "openai.ts targets the OpenAI Chat Completions endpoint",
+    liveText.includes("https://api.openai.com/v1/chat/completions"),
+  );
+  check("openai.ts contains a fetch( call", liveText.includes("fetch("));
+  check(
+    "openai.ts does NOT import the openai SDK (raw fetch only)",
+    !liveText.includes('from "openai"') && !liveText.includes('require("openai")'),
+  );
+  // Structured-outputs upgrade: openai.ts must use the json_schema
+  // response_format with strict mode (server-enforced shape) — NOT the
+  // older json_object mode. Catches accidental regression back to
+  // free-form JSON parsing.
+  check(
+    "openai.ts uses json_schema response_format (strict structured outputs)",
+    liveText.includes('"json_schema"') && liveText.includes("strict: true"),
+  );
+  // Safety: openai.ts must handle the structured-outputs `message.refusal`
+  // path so a safety refusal becomes status:"failed" rather than being
+  // mis-classified as "empty content".
+  check(
+    "openai.ts handles message.refusal (safety-refusal path)",
+    liveText.includes("refusal") && liveText.includes("OpenAI safety refusal"),
+  );
 }
 
 async function main(): Promise<void> {
