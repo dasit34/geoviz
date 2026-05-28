@@ -41,7 +41,7 @@ export default function CheckoutSuccessPage() {
               <ol className="mt-4 space-y-3 text-sm text-white/80">
                 <Step n={1}>
                   Our team runs the full audit across ChatGPT, Claude,
-                  Perplexity, Gemini, and Google AI Overviews.
+                  Gemini, and Perplexity.
                 </Step>
                 <Step n={2}>
                   We compile your AI Visibility Score, issues, and ranked fixes

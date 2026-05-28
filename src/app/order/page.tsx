@@ -62,7 +62,7 @@ export default function OrderPage({
                 Platforms analyzed
               </p>
               <p className="mt-2">
-                ChatGPT · Claude · Perplexity · Gemini · Google AI Overviews
+                ChatGPT · Claude · Gemini · Perplexity
               </p>
             </div>
           </div>

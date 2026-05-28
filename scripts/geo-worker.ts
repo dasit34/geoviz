@@ -186,8 +186,8 @@ They want to know what is broken, why it costs them leads, and what to
 fix first. They are NOT a developer.
 
 **Target URL**: ${websiteUrl}${competitorClause}
-**AI visibility** = whether AI tools (ChatGPT, Claude, Perplexity,
-Gemini, Google AI Overviews) can confidently understand, trust,
+**AI visibility** = whether AI tools (ChatGPT, Claude, Gemini, and
+Perplexity) can confidently understand, trust,
 and recommend the business when a local customer asks "who
 should I hire near me?" This phrase — *AI visibility* — is the
 front-of-house framing throughout the customer-facing report
@@ -608,8 +608,8 @@ They want to know what is broken, why it costs them leads, and what to
 fix first. They are NOT a developer.
 
 **Target URL**: ${websiteUrl}${competitorClause}
-**AI visibility** = whether AI tools (ChatGPT, Claude, Perplexity,
-Gemini, Google AI Overviews) can confidently understand, trust,
+**AI visibility** = whether AI tools (ChatGPT, Claude, Gemini, and
+Perplexity) can confidently understand, trust,
 and recommend the business when a local customer asks "who
 should I hire near me?" This phrase — *AI visibility* — is the
 front-of-house framing throughout the customer-facing report
