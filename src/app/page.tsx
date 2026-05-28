@@ -79,7 +79,7 @@ const FOUNDATION_BULLETS = [
 const FAQS = [
   {
     q: "What is AI visibility?",
-    a: "Whether AI assistants like ChatGPT, Claude, and Gemini can find, understand, and recommend your business when a customer asks them for help. It’s separate from where you rank on Google.",
+    a: "Whether AI assistants like ChatGPT, Claude, Gemini, and Perplexity can find, understand, and recommend your business when a customer asks them for help. It’s separate from where you rank on Google.",
   },
   {
     q: "Why does this matter for my business?",
@@ -114,7 +114,7 @@ export default function Page() {
         <div className="absolute inset-0 -z-10 grid-bg opacity-60" />
 
         <div className="container-page">
-          <div className="flex items-center justify-between gap-4 border-b border-white/[0.06] py-3.5">
+          <div className="hidden items-center justify-between gap-4 border-b border-white/[0.06] py-3.5 md:flex">
             <span className="mono-data text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40">
               GeoViz · AI Visibility Intelligence
             </span>
@@ -128,23 +128,23 @@ export default function Page() {
           </div>
         </div>
 
-        <div className="container-page grid items-center gap-12 py-20 md:py-28 lg:grid-cols-[minmax(0,46%)_minmax(0,54%)] lg:gap-16">
+        <div className="container-page grid items-center gap-8 py-12 sm:gap-12 sm:py-20 md:py-28 lg:grid-cols-[minmax(0,46%)_minmax(0,54%)] lg:gap-16">
           <div>
-            <p className="mono-data mb-6 max-w-md border-l border-accent/40 pl-4 text-[11px] uppercase leading-[1.6] tracking-[0.22em] text-white/55">
+            <p className="mono-data mb-4 max-w-md border-l border-accent/40 pl-4 text-[11px] uppercase leading-[1.6] tracking-[0.22em] text-white/55 sm:mb-6">
               Visibility is no longer just ranking. It’s interpretation.
             </p>
-            <Thesis className="text-4xl sm:text-5xl lg:text-[3.6rem]">
+            <Thesis className="text-[2rem] leading-[1.1] sm:text-5xl sm:leading-[1.12] lg:text-[3.6rem]">
               Search is shifting from links to answers. We measure
               whether AI recommends your business.
             </Thesis>
-            <p className="mt-7 max-w-lg text-lg leading-[1.6] text-white/75">
+            <p className="mt-5 max-w-lg text-base leading-[1.55] text-white/75 sm:mt-7 sm:text-lg sm:leading-[1.6]">
               We measure how clearly four AI systems — ChatGPT,
               Claude, Gemini, and Perplexity — can understand, trust,
               and surface your business when a customer asks for a
               recommendation.
             </p>
 
-            <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-4">
+            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 sm:mt-9 sm:gap-x-6 sm:gap-y-4">
               <Link href="/order" className="btn-primary text-base">
                 Run AI Visibility Audit
                 <span aria-hidden>→</span>
@@ -196,13 +196,13 @@ export default function Page() {
           </p>
         </div>
         <div className="mt-10 max-w-3xl border-t border-graphite-400/25 pt-5">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-graphite-500">
-            <span>Google</span>
-            <span aria-hidden className="text-graphite-400/60">·</span>
-            <span>OpenAI</span>
-            <span aria-hidden className="text-graphite-400/60">·</span>
-            <span>Anthropic</span>
-            <span aria-hidden className="text-graphite-400/60">·</span>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-graphite-500 sm:flex sm:flex-wrap sm:items-center">
+            <span>ChatGPT</span>
+            <span aria-hidden className="hidden text-graphite-400/60 sm:inline">·</span>
+            <span>Claude</span>
+            <span aria-hidden className="hidden text-graphite-400/60 sm:inline">·</span>
+            <span>Gemini</span>
+            <span aria-hidden className="hidden text-graphite-400/60 sm:inline">·</span>
             <span>Perplexity</span>
           </div>
           <p className="mt-2 text-sm leading-relaxed text-graphite-500">
