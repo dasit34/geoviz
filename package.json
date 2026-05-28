@@ -42,6 +42,9 @@
     "observation:execute-test": "tsx scripts/observation-execute-test.ts",
     "observation:stress-test": "tsx scripts/observation-stress-test.ts",
     "audit:replay-test": "tsx scripts/audit-replay-test.ts",
+    "replay:audits": "tsx scripts/replay-audits.ts",
+    "benchmark:performers": "tsx scripts/benchmark-performers.ts",
+    "benchmark:intelligence": "tsx scripts/benchmark-intelligence.ts",
     "geo-worker": "tsx scripts/geo-worker.ts",
     "geo-worker:dev": "tsx scripts/geo-worker.ts --loop",
     "geo-worker:start": "tsx scripts/geo-worker.ts --loop"

@@ -85,6 +85,10 @@ model AuditOrder {
   // Multi-row (re-audits add rows) — distinct from the 1:1
   // `intelligence` relation. See `src/lib/observations/history/`.
   observationHistory ObservationHistory[]
+  // Append-only history of calibration replay runs. Each row is one
+  // operator-triggered replay; we never mutate or overwrite. See
+  // `src/lib/calibration/replays.ts`.
+  calibrationReplays CalibrationReplay[]
 
   @@index([email])
   @@index([createdAt])
@@ -122,6 +126,58 @@ model ObservationHistory {
 
   @@index([auditId])
   @@index([createdAt])
+}
+
+/// Append-only history of calibration replay runs.
+///
+/// Each row is one `scripts/replay-audits.ts --persist` execution
+/// against a stored audit. NEVER updated, NEVER overwritten — to
+/// revise, insert a new row. Records the headline delta + drift
+/// status plus optional drill-down payload (per-category deltas,
+/// changed findings) so operators can audit calibration over time
+/// without re-running the (expensive) audit pipeline.
+///
+/// Mirrors the ObservationHistory pattern: cuid PK, indexed auditId
+/// + createdAt, foreign-key cascade. Adds a third index on
+/// replayStatus for the cockpit's filter pills.
+model CalibrationReplay {
+  id                  String     @id @default(cuid())
+  auditId             String
+  auditOrder          AuditOrder @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  // Headline fields surfaced in the cockpit table.
+  originalScore       Int?
+  recalculatedScore   Int?
+  delta               Int?
+  previousBand        String?    // e.g. "Needs Work"
+  currentBand         String?
+  bandChanged         Boolean    @default(false)
+  replayStatus        String     // "stable" | "minor_drift" | "major_drift" | "band_moved" | "hash_mismatch" | "partial_replay" | "unreplayable"
+  runtimeMs           Int
+  replayMode          String     // "stored" | "skip" | "live"
+
+  // Freeze-contract evidence (matches ObservationHistory pattern).
+  scoringVersion      String?    // "scoring@1.0.0" stamp from the original audit run
+  weightHashMatch     Boolean?   // null when no replayBundle was available (partial_replay)
+  categoryHashMatch   Boolean?
+  // Actual hash values stamped at the original audit time. Lets
+  // analysts query lineage patterns ("all drift from rows stamped
+  // with weight_hash=abc123") without re-running anything. Null
+  // for replays whose source row predates the replayBundle column
+  // OR for partial_replay fallback rows.
+  weightHashOriginal  String?
+  categoryHashOriginal String?
+
+  // Drill-down payload (optional, lazy-loaded by the inline panel).
+  // Shape per src/lib/calibration/replays.ts CategoryDeltas + ChangedFindings types.
+  categoryDeltas      Json?
+  changedFindings     Json?
+
+  createdAt           DateTime   @default(now())
+
+  @@index([auditId])
+  @@index([createdAt])
+  @@index([replayStatus])
 }
 
 /// V2 data foundation — normalized intelligence row written once per

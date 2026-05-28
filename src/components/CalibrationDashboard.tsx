@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { costTone, type CostTone } from "@/lib/pricing";
+import { OperatorInsightsPanel } from "@/components/OperatorInsightsPanel";
+import { ReplayHistoryPanel } from "@/components/ReplayHistoryPanel";
 import {
   BENCHMARK_TAG_OPTIONS,
   OPERATOR_CONFIDENCE_OPTIONS,
@@ -276,6 +278,15 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
           today, queued+running, failed, avg cost, avg runtime.
           Mobile 2x3 grid; desktop 6x1. */}
       <OperatorTodayStrip stats={todayStats} />
+
+      {/* Deterministic operator insights — pure telemetry templates;
+          no LLM, no consultant prose. Polls every 60s. */}
+      <OperatorInsightsPanel adminKey={adminKey} />
+
+      {/* Replay history — append-only calibration telemetry from
+          scripts/replay-audits.ts --persist. Pure read; polls every
+          30s. See src/components/ReplayHistoryPanel.tsx. */}
+      <ReplayHistoryPanel adminKey={adminKey} />
 
       {/* Lightweight intelligence — text-only insights. No charts.
           Surfaces the highest-cost / highest-runtime / penalty-

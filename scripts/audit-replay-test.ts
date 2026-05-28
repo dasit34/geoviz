@@ -29,6 +29,7 @@ import type {
   DeterministicScore,
   Evidence,
 } from "../src/lib/scoring/types";
+import { stableStringify } from "../src/lib/utils/stable-stringify";
 
 function shortId(id: string): string {
   return id.length > 16 ? id.slice(0, 16) : id;
@@ -109,9 +110,12 @@ async function main(): Promise<void> {
     const { computed_at: _ignored, ...rest } = s;
     return rest;
   };
-  const recomputedJson = JSON.stringify(normalize(recomputed));
-  const bundleOutputJson = JSON.stringify(normalize(bundle.output));
-  const storedScoreJson = JSON.stringify(normalize(storedScore));
+  // Stable-stringify (recursive key sort) prevents false negatives
+  // from key-insertion-order differences across construction paths.
+  // See src/lib/utils/stable-stringify.ts.
+  const recomputedJson = stableStringify(normalize(recomputed));
+  const bundleOutputJson = stableStringify(normalize(bundle.output));
+  const storedScoreJson = stableStringify(normalize(storedScore));
 
   const scoreUnchangedVsBundle = recomputedJson === bundleOutputJson;
   const scoreUnchangedVsStored = bundleOutputJson === storedScoreJson;
@@ -122,7 +126,7 @@ async function main(): Promise<void> {
     recomputed.category_hash === CATEGORY_HASH &&
     bundle.category_hash === CATEGORY_HASH;
   const evidenceShapeOk =
-    JSON.stringify(recomputedEvidence) === JSON.stringify(bundle.evidence);
+    stableStringify(recomputedEvidence) === stableStringify(bundle.evidence);
 
   console.log(
     `  bundle_version (replay@1):          ${ok(bundleVersionOk)}   (${bundle.bundle_version})`,
