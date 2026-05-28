@@ -34,9 +34,12 @@ const ENV_KEYS = [
   "GEMINI_API_KEY",
   "PERPLEXITY_API_KEY",
   "ANTHROPIC_API_KEY",
-  // Test-only fixture-mode env consumed by openai.ts. Snapshot +
-  // restore so the test suite is hermetic and idempotent.
+  // Test-only fixture-mode envs consumed by live-wired providers.
+  // Snapshot + restore so the test suite is hermetic and idempotent.
   "OPENAI_VALIDATOR_FIXTURE",
+  "CLAUDE_VALIDATOR_FIXTURE",
+  "GEMINI_VALIDATOR_FIXTURE",
+  "PERPLEXITY_VALIDATOR_FIXTURE",
 ] as const;
 const envSnapshot: Record<string, string | undefined> = {};
 for (const k of ENV_KEYS) envSnapshot[k] = process.env[k];
@@ -118,10 +121,13 @@ async function scenario3EnabledAllKeys(): Promise<void> {
   process.env.OPENAI_API_KEY = "mock-key";
   process.env.GEMINI_API_KEY = "mock-key";
   process.env.PERPLEXITY_API_KEY = "mock-key";
-  // OpenAI provider is now LIVE-wired — fixture-mode keeps the test
-  // hermetic by short-circuiting the real fetch and returning the
-  // legacy MOCK_RESPONSE. Other providers remain mocked at source.
+  // OpenAI + Claude + Gemini + Perplexity providers are now LIVE-wired —
+  // fixture-mode keeps the test hermetic by short-circuiting the real call
+  // and returning the legacy MOCK_RESPONSE.
   process.env.OPENAI_VALIDATOR_FIXTURE = "true";
+  process.env.CLAUDE_VALIDATOR_FIXTURE = "true";
+  process.env.GEMINI_VALIDATOR_FIXTURE = "true";
+  process.env.PERPLEXITY_VALIDATOR_FIXTURE = "true";
   const c = await ClaudeValidator.validateBusiness(sampleInput);
   check("Claude → passed (mock)", c.status === "passed");
   check("Claude raw_summary contains [MOCK]", c.raw_summary.includes("[MOCK]"));
@@ -144,9 +150,12 @@ async function scenario4OrchestratorOrdering(): Promise<void> {
   process.env.OPENAI_API_KEY = "mock-key";
   process.env.GEMINI_API_KEY = "mock-key";
   process.env.PERPLEXITY_API_KEY = "mock-key";
-  // Fixture mode for the live-wired OpenAI provider; keeps the
-  // orchestrator path hermetic during testing.
+  // Fixture mode for the live-wired OpenAI + Claude + Gemini + Perplexity
+  // providers; keeps the orchestrator path hermetic during testing.
   process.env.OPENAI_VALIDATOR_FIXTURE = "true";
+  process.env.CLAUDE_VALIDATOR_FIXTURE = "true";
+  process.env.GEMINI_VALIDATOR_FIXTURE = "true";
+  process.env.PERPLEXITY_VALIDATOR_FIXTURE = "true";
   // Mute the dev console.log so test output stays clean. The result is
   // still returned to the caller — we're only suppressing the log side
   // effect for this assertion run.
@@ -236,20 +245,20 @@ async function scenario7MockValidatorPassthrough(): Promise<void> {
 }
 
 function scenario8NoForbiddenImports(): void {
-  console.log("[ai-validators-test] Scenario 8: network/SDK imports scoped to openai.ts only");
-  // openai.ts is LIVE-wired and is the single file allowed to contain
-  // `fetch(` and an OpenAI endpoint URL. Every other validator file
-  // must stay free of network primitives + provider SDKs.
-  const LIVE_WIRED = "src/lib/validators/providers/openai.ts";
+  console.log("[ai-validators-test] Scenario 8: network/SDK imports scoped to live-wired files only");
+  // Live-wired files are allowed to contain `fetch(` and/or provider
+  // SDK imports. Every other validator file must stay free of network
+  // primitives and provider SDKs.
+  const LIVE_WIRED_OPENAI = "src/lib/validators/providers/openai.ts";
+  const LIVE_WIRED_CLAUDE = "src/lib/validators/providers/claude.ts";
+  const LIVE_WIRED_GEMINI = "src/lib/validators/providers/gemini.ts";
+  const LIVE_WIRED_PERPLEXITY = "src/lib/validators/providers/perplexity.ts";
   const mockOnlyFiles = [
     "src/lib/validators/index.ts",
     "src/lib/validators/types.ts",
     "src/lib/validators/registry.ts",
     "src/lib/validators/runAiValidationLayer.ts",
     "src/lib/validators/devLog.ts",
-    "src/lib/validators/providers/claude.ts",
-    "src/lib/validators/providers/gemini.ts",
-    "src/lib/validators/providers/perplexity.ts",
     "src/lib/validators/providers/googleAiOverview.ts",
     "src/lib/validators/testing/mockValidator.ts",
   ];
@@ -279,34 +288,116 @@ function scenario8NoForbiddenImports(): void {
     !anyForbiddenInMockFiles,
   );
 
-  // Positive assertion for the live-wired file: openai.ts MUST contain
-  // exactly the OpenAI endpoint + a fetch call. Catches accidental
-  // reversion to a mock-only state.
-  const liveAbs = join(process.cwd(), LIVE_WIRED);
-  const liveText = readFileSync(liveAbs, "utf8");
+  // ── openai.ts positive assertions ────────────────────────────────
+  const openaiText = readFileSync(
+    join(process.cwd(), LIVE_WIRED_OPENAI),
+    "utf8",
+  );
   check(
     "openai.ts targets the OpenAI Chat Completions endpoint",
-    liveText.includes("https://api.openai.com/v1/chat/completions"),
+    openaiText.includes("https://api.openai.com/v1/chat/completions"),
   );
-  check("openai.ts contains a fetch( call", liveText.includes("fetch("));
+  check("openai.ts contains a fetch( call", openaiText.includes("fetch("));
   check(
     "openai.ts does NOT import the openai SDK (raw fetch only)",
-    !liveText.includes('from "openai"') && !liveText.includes('require("openai")'),
+    !openaiText.includes('from "openai"') &&
+      !openaiText.includes('require("openai")'),
   );
-  // Structured-outputs upgrade: openai.ts must use the json_schema
-  // response_format with strict mode (server-enforced shape) — NOT the
-  // older json_object mode. Catches accidental regression back to
-  // free-form JSON parsing.
   check(
     "openai.ts uses json_schema response_format (strict structured outputs)",
-    liveText.includes('"json_schema"') && liveText.includes("strict: true"),
+    openaiText.includes('"json_schema"') && openaiText.includes("strict: true"),
   );
-  // Safety: openai.ts must handle the structured-outputs `message.refusal`
-  // path so a safety refusal becomes status:"failed" rather than being
-  // mis-classified as "empty content".
   check(
     "openai.ts handles message.refusal (safety-refusal path)",
-    liveText.includes("refusal") && liveText.includes("OpenAI safety refusal"),
+    openaiText.includes("refusal") &&
+      openaiText.includes("OpenAI safety refusal"),
+  );
+
+  // ── claude.ts positive assertions ────────────────────────────────
+  const claudeText = readFileSync(
+    join(process.cwd(), LIVE_WIRED_CLAUDE),
+    "utf8",
+  );
+  check(
+    "claude.ts imports @anthropic-ai/sdk",
+    claudeText.includes('from "@anthropic-ai/sdk"'),
+  );
+  check(
+    "claude.ts uses tool-use with input_schema (strict structured output)",
+    claudeText.includes("input_schema") && claudeText.includes("tool_choice"),
+  );
+  check(
+    "claude.ts forces tool_choice to a specific tool (not auto)",
+    claudeText.includes('type: "tool"'),
+  );
+  check(
+    "claude.ts handles tool_use absence (refusal-equivalent path)",
+    claudeText.includes("did not return a tool_use block"),
+  );
+
+  // ── gemini.ts positive assertions ────────────────────────────────
+  const geminiText = readFileSync(
+    join(process.cwd(), LIVE_WIRED_GEMINI),
+    "utf8",
+  );
+  check(
+    "gemini.ts targets the Generative Language API endpoint",
+    geminiText.includes(
+      "https://generativelanguage.googleapis.com/v1beta/models/",
+    ),
+  );
+  check("gemini.ts contains a fetch( call", geminiText.includes("fetch("));
+  check(
+    "gemini.ts uses responseSchema (strict structured outputs)",
+    geminiText.includes("responseSchema") &&
+      geminiText.includes('responseMimeType: "application/json"'),
+  );
+  check(
+    "gemini.ts handles candidate.finishReason (safety/recitation path)",
+    geminiText.includes("finishReason"),
+  );
+  check(
+    "gemini.ts handles promptFeedback.blockReason (prompt-level safety)",
+    geminiText.includes("promptFeedback") &&
+      geminiText.includes("blockReason"),
+  );
+  check(
+    "gemini.ts does NOT import a provider SDK (raw fetch only)",
+    !geminiText.includes('from "@google/generative-ai"') &&
+      !geminiText.includes('require("@google/generative-ai")'),
+  );
+
+  // ── perplexity.ts positive assertions ────────────────────────────
+  const perplexityText = readFileSync(
+    join(process.cwd(), LIVE_WIRED_PERPLEXITY),
+    "utf8",
+  );
+  check(
+    "perplexity.ts targets api.perplexity.ai chat completions endpoint",
+    perplexityText.includes("https://api.perplexity.ai/chat/completions"),
+  );
+  check(
+    "perplexity.ts contains a fetch( call",
+    perplexityText.includes("fetch("),
+  );
+  check(
+    "perplexity.ts uses json_schema response_format (structured outputs)",
+    perplexityText.includes('"json_schema"') &&
+      perplexityText.includes("response_format"),
+  );
+  check(
+    "perplexity.ts merges data.citations into cited_sources",
+    perplexityText.includes("data.citations") &&
+      perplexityText.includes("mergeCitedSources"),
+  );
+  check(
+    "perplexity.ts handles finish_reason (refusal-equivalent path)",
+    perplexityText.includes("finish_reason"),
+  );
+  check(
+    "perplexity.ts does NOT import a Perplexity SDK (raw fetch only)",
+    !perplexityText.includes('from "perplexity') &&
+      !perplexityText.includes('require("perplexity'),
   );
 }
 

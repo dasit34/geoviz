@@ -364,6 +364,151 @@ This MVP exists for one goal:
 
 Everything else is secondary.
 
+## GeoViz Scoring Constitution (LOCKED)
+
+Status: ACTIVE
+Last Updated: 2026-05
+
+### Product Identity
+GeoViz is an AI Visibility Intelligence platform.
+
+GeoViz measures whether a business can be:
+- Understood
+- Retrieved
+- Trusted
+- Cited
+- Recommended
+
+GeoViz is NOT:
+- Traditional SEO
+- Rank prediction
+- Search position estimation
+- AI ranking guarantees
+
+---
+
+### Canonical Score Rule
+
+There is ONE canonical GeoViz score.
+
+Source:
+Deterministic evidence only.
+
+Pipeline:
+Collect → Analyze → Score → Narrate
+
+Allowed inputs:
+- Crawlability
+- Structured data quality
+- Trust signals
+- Content depth
+- Recommendation readiness
+- AI readability
+- Entity consistency
+- Machine-readable identity
+
+Forbidden:
+- LLM-generated scores
+- Averaging model outputs
+- Silent score mutation
+- Model-only judgments
+
+Same input data MUST produce the same score.
+
+---
+
+### Validator Layer (LLMs)
+
+Providers:
+- OpenAI
+- Claude
+- Gemini
+- Perplexity (optional)
+
+LLMs are validators.
+LLMs are NOT score authors.
+
+Validators may:
+- Interpret evidence
+- Estimate confidence
+- Detect missing facts
+- Generate summaries
+- Surface disagreement
+- Provide citations
+
+Validators may NOT:
+- Change canonical score
+- Override deterministic results
+- Invent metrics
+
+---
+
+### Consensus / Confidence Layer
+
+Purpose:
+Measure agreement between models.
+
+Output:
+GeoViz Confidence Index (secondary metric)
+
+Rules:
+- Never replace GeoViz score
+- Never average scores
+- Display only when N >= 2 providers
+- Fail-soft on timeout
+- Missing providers do not break audits
+
+Store:
+aiValidations[]
+consensusIndex{}
+
+---
+
+### Report Rules
+
+Customer sees:
+1. GeoViz Score (primary)
+2. Confidence Layer (secondary)
+3. Supporting evidence
+
+Section 04:
+Cross-Model Intelligence
+
+Do NOT redesign Sections 01–06 until after launch.
+
+---
+
+### Score / Consensus Naming Rules
+
+- GeoViz Score = outcome score
+- AI Visibility Consensus = interpretation consistency across models
+- Never show competing primary scores
+
+---
+
+### Engineering Rules
+
+No silent rescoring.
+Keep audit snapshots.
+Replay old audits deterministically.
+Telemetry is retained.
+Report output must remain explainable.
+
+Score changes require explicit versioning.
+
+---
+
+### Audit Intelligence & Telemetry Rules
+
+- Validator outputs are historical intelligence assets and must remain queryable for future calibration.
+- Consensus data may be used for benchmarking, telemetry, calibration, and replay analysis.
+- Historical audit outputs must remain reproducible.
+- Consensus computations must be versioned.
+- Future scoring upgrades must never silently rewrite historical reports.
+- New intelligence layers must be additive and feature-flagged before rollout.
+- Cross-model disagreement is a diagnostic signal, not automatically an error condition.
+- Customer-facing labels may evolve, but underlying historical telemetry must remain preserved.
+
 ## Scoring Freeze (v1 — DO NOT silently change)
 
 **The GEO scoring rubric is frozen for v1.** As of `2c0d762`

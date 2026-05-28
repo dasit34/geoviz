@@ -313,6 +313,24 @@ model AuditIntelligence {
   // null — no backfill.
   replayBundle               Json?
 
+  // ─── Cross-Model Consensus layer (consensus@1.0.0) ──────────────
+  // Raw validator outputs preserved internally. Shape:
+  // `ValidationLayerResult` from `src/lib/validators/types.ts`.
+  // Populated only when `ENABLE_CONSENSUS_PIPELINE=true` and at
+  // least one validator returned. `null` when the validator step
+  // failed entirely (fail-soft) or the feature flag is off.
+  aiValidations              Json?
+
+  // Customer-facing intelligence synthesis. Shape: `ConsensusIndex`
+  // from `src/lib/consensus/types.ts`. SECONDARY to
+  // `deterministicScore` — the deterministic score with its frozen
+  // bands stays primary. Computed deterministically from
+  // `deterministicScore.category_scores` (dimension roll-ups) plus
+  // cross-model agreement metrics from `aiValidations`. Validator
+  // outputs DO NOT enter the confidence_index number — only the
+  // model_agreement + consensus_confidence labels.
+  consensusIndex             Json?
+
   @@index([createdAt])
   @@index([websiteUrl])
 }
