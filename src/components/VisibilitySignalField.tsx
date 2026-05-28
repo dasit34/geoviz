@@ -14,9 +14,11 @@
  *  - all values are SAMPLE_ consts and the artifact renders a visible
  *    "Sample · directional" label (no unlabeled fake data).
  *  - aria-hidden (meaning lives in the hero headline/copy).
- *  - only motion is the one-shot `signalDraw` reveal + the sanctioned
- *    `pulseSoft`, both motion-safe-gated; reduced-motion users get the
- *    fully-drawn static state.
+ *  - continuous flow via the `hero-path-pulse` utility (12s staggered
+ *    fade across the five signal lines) + sanctioned `pulseSoft` on
+ *    the central emit dot and the three strongest endpoint dots; all
+ *    motion-safe-gated. Reduced-motion users get a static 0.20-opacity
+ *    state per the `prefers-reduced-motion` rule in globals.css.
  */
 
 type Endpoint = {
@@ -33,8 +35,6 @@ const SAMPLE_ENDPOINTS: Endpoint[] = [
   { label: "Gemini", confidence: 0.24, y: 268 },
   { label: "AI Overviews", confidence: 0.16, y: 336 },
 ];
-
-const SAMPLE_SCORE = 73;
 
 // entity emission anchor + endpoint geometry
 const EMIT_X = 170;
@@ -112,19 +112,21 @@ export function VisibilitySignalField({
           pathLength={1}
           strokeDasharray="1"
         >
-          {SAMPLE_ENDPOINTS.map((e) => (
+          {SAMPLE_ENDPOINTS.map((e, i) => (
             <path
               key={e.label}
               d={`M${EMIT_X} ${EMIT_Y} Q 300 ${EMIT_Y} ${TRACK_X - 14} ${e.y}`}
               stroke="currentColor"
-              className={`${opacityClass(e.confidence)} motion-safe:animate-signalDraw`}
+              className={`${opacityClass(e.confidence)} hero-path-pulse`}
+              style={{ animationDelay: `${i * 2.4}s` }}
             />
           ))}
         </g>
 
         {/* ── endpoints (right) + telemetry confidence ──────────── */}
-        {SAMPLE_ENDPOINTS.map((e) => {
+        {SAMPLE_ENDPOINTS.map((e, i) => {
           const fillW = Math.max(4, Math.round(TRACK_W * e.confidence));
+          const isStrong = e.confidence >= 0.45;
           return (
             <g key={e.label}>
               <circle
@@ -132,7 +134,12 @@ export function VisibilitySignalField({
                 cy={e.y}
                 r="2.5"
                 className={
-                  e.confidence >= 0.45 ? "fill-cyan" : "fill-white/15"
+                  isStrong
+                    ? "fill-cyan motion-safe:animate-pulseSoft"
+                    : "fill-white/15"
+                }
+                style={
+                  isStrong ? { animationDelay: `${i * 0.7}s` } : undefined
                 }
               />
               <text
@@ -165,25 +172,6 @@ export function VisibilitySignalField({
           );
         })}
       </svg>
-
-      {/* composite readout — absorbs the old SampleAuditCard role.
-          Explicitly labeled sample / directional (no fake data). */}
-      <div className="flex items-end justify-between border-t border-white/[0.06] px-5 py-4">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-white/35">
-            Composite visibility
-          </p>
-          <p className="mt-1 text-xs text-white/45">
-            Sample readout — not your score
-          </p>
-        </div>
-        <p className="mono-data text-3xl font-bold text-white">
-          {SAMPLE_SCORE}
-          <span className="ml-1 text-base font-medium text-white/35">
-            / 100
-          </span>
-        </p>
-      </div>
     </figure>
   );
 }

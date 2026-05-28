@@ -61,7 +61,13 @@ Always frame as:
 - “Showing up when customers ask AI who to hire”
 
 Primary headline:
-“When customers ask ChatGPT who to hire, does your business show up?”
+“Search is shifting from links to answers. We measure whether AI recommends your business.”
+
+Strap above the headline (intelligence-grade framing beat):
+“Visibility is no longer just ranking. It’s interpretation.”
+
+Subhead (names the four-model platform so the specifics still land):
+“Modern AI systems like ChatGPT, Claude, Gemini, and Perplexity increasingly shape how customers discover businesses. GeoViz measures how clearly your business can be understood, trusted, and surfaced inside AI-generated answers.”
 
 ## Strategic Direction — AI Visibility Infrastructure
 

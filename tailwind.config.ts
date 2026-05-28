@@ -42,6 +42,24 @@ const config: Config = {
           DEFAULT: "#67e8f9",
           dim: "#0e7490",
         },
+        // Hybrid-palette light surfaces — used by .section-light /
+        // .card-light / .h2-light utilities in globals.css for the
+        // homepage's editorial rhythm-break sections (§01 + §05).
+        // Cream is intentionally warm (same hue family as the
+        // orange accent at high luminance) so light sections stay
+        // brand-coherent. Graphite-900 is soft near-black, not
+        // pure black — matches the editorial intelligence voice.
+        cream: {
+          50:  "#f8f6f1",
+          100: "#f1ede5",
+          200: "#e6e0d5",
+        },
+        graphite: {
+          900: "#1a1d24",
+          700: "#2e333d",
+          500: "#5b6271",
+          400: "#8a92a3",
+        },
       },
       fontFamily: {
         sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Inter", "sans-serif"],

@@ -1,13 +1,13 @@
 /**
- * ScoringExamplePanel — marketing-only "how AI evaluates a business"
- * artifact for the homepage AI-scoring-example section.
- *
- * Shows a directional sample readout: composite score + band + the
- * kind of evidence findings an audit surfaces, plus a few dimension
- * bars. ALL values are SAMPLE_ consts and the panel renders a
- * prominent "Sample · directional — not your score" label (no
- * unlabeled fake data). Uses the `severity` status tokens for the
- * finding markers; no scoring logic lives here.
+ * ScoringExamplePanel — the "live visibility diagnostic snapshot"
+ * card. The analytical surface on the homepage report-row: composite
+ * score + band + the kind of evidence findings an audit surfaces,
+ * plus a few dimension bars. ALL values are SAMPLE_ consts; the card
+ * carries the "Live visibility diagnostic snapshot" eyebrow + sample
+ * business identity (North Coast Roofing). Uses the `severity` status
+ * tokens for the finding markers; no scoring logic lives here. This
+ * card owns the score; its right-side counterpart (PrintedCoverSample)
+ * communicates the deliverable instead.
  */
 
 type Tone = "ok" | "warn" | "bad";
@@ -72,9 +72,14 @@ export function ScoringExamplePanel({
     >
       <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] px-6 py-5">
         <div>
-          <p className="text-sm text-white/55">yourbusiness.com</p>
-          <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-white/35">
-            Sample · directional — not your score
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+            Live visibility diagnostic snapshot
+          </p>
+          <p className="mt-2 text-base font-semibold text-white/85">
+            North Coast Roofing
+          </p>
+          <p className="mt-0.5 text-sm text-white/45">
+            northcoastroofing.com
           </p>
         </div>
         <div className="text-right">
