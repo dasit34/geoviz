@@ -217,6 +217,25 @@ export function AuditReportContent({
           </dl>
         </header>
 
+        {/* "Search is shifting" thesis — hardcoded so the premise is
+            byte-stable across every delivered audit. Sits immediately
+            after the hero so the customer reads the buying premise
+            before the diagnostic blocks. NOT LLM-generated; never
+            drifts. */}
+        <aside
+          className="report-section-card mt-10"
+          aria-label="Why this audit exists"
+        >
+          <p className="section-eyebrow">Why this audit exists</p>
+          <p className="mt-4 text-base leading-relaxed text-white/80">
+            Customer discovery is shifting from search results to AI
+            answers. When ChatGPT, Claude, Gemini, or Perplexity
+            recommends a local business, it can only cite what it
+            can read, trust, and verify. This audit measures how
+            clearly your business shows up inside that layer.
+          </p>
+        </aside>
+
         {/* Executive headlines — top issues + top fixes at a glance.
             The radar chart that previously lived alongside this block
             now sits as a secondary visual under the category cards
@@ -259,6 +278,30 @@ export function AuditReportContent({
             signals. Directional — not a ranking guarantee.
           </p>
         </section>
+
+        {/* Methodology disclosure — discloses the frozen v1 rubric
+            (weights), the signals fetched, and the operator-review
+            step. Hardcoded React (not LLM-generated) so the values
+            stay byte-stable across audits and match the frozen
+            scoring constitution. Category weights mirror
+            src/lib/scoring/getCanonicalScore.ts and are public-safe
+            per CLAUDE.md "Scoring Freeze". */}
+        <aside
+          className="report-section-card mt-10"
+          aria-label="How this score was built"
+        >
+          <p className="section-eyebrow">How this score was built</p>
+          <p className="mt-4 text-sm leading-relaxed text-white/80">
+            GeoViz fetched and analyzed your homepage HTML,
+            robots.txt, sitemap.xml, schema JSON-LD, and llms.txt.
+            The composite score weights six categories: Schema (25),
+            Crawler Readiness (20), Trust Signals (20), Content
+            Depth (15), Brand / Entity Clarity (10), Technical
+            Accessibility (10). Each report is reviewed before
+            delivery. Directional analysis based on publicly
+            accessible signals — not a ranking guarantee.
+          </p>
+        </aside>
 
         {/* Category breakdown — primary score visualization. The six
             horizontal score bars are the executive-readable layer. The
@@ -505,8 +548,12 @@ function ReportCover({
           <dd className="mono-data">{reportRef}</dd>
         </div>
         <div>
-          <dt>Delivery</dt>
-          <dd>Human-reviewed</dd>
+          <dt>Review Status</dt>
+          <dd>Human Reviewed</dd>
+        </div>
+        <div>
+          <dt>Reviewed By</dt>
+          <dd>GeoViz Intelligence Team</dd>
         </div>
         {cohortCellValue ? (
           <div>
