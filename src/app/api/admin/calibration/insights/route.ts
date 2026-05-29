@@ -10,6 +10,7 @@ import {
 } from "@/lib/intelligence/benchmarks";
 import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { applyApiRateLimit } from "@/lib/rate-limit";
+import { MIN_CUSTOMER_COHORT } from "@/lib/intelligence/audit-percentile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,12 +44,20 @@ type CohortWeakness = {
   asOf: string;            // ISO timestamp
 };
 
+type CohortCoverage = {
+  totalIndustriesWithData: number;
+  industriesWithCustomerCohort: number;
+  qualifyingIndustries: string[];
+  threshold: number;
+};
+
 type InsightsResponse = {
   weakestCategoryFinding: CategoryWeaknessFrequency | null;
   cohortWeakness: CohortWeakness | null;
   mostUnstableCategory: UnstableCategoryFinding | null;
   largestPositiveDrift: DriftExtreme | null;
   largestNegativeDrift: DriftExtreme | null;
+  cohortCoverage: CohortCoverage;
 };
 
 const MIN_COHORT_SIZE = 5;
@@ -140,6 +149,33 @@ async function findDriftExtremes(): Promise<{
   return { positive: toExtreme(topPos), negative: toExtreme(topNeg) };
 }
 
+async function findCohortCoverage(): Promise<CohortCoverage> {
+  // groupBy industry → count rows with overallScore. Count both
+  // "industries with any data" and "industries with >= 15 audits".
+  const industries = await prisma.auditIntelligence.groupBy({
+    by: ["industryCategoryNormalized"],
+    _count: { _all: true },
+    where: {
+      industryCategoryNormalized: { not: null },
+      overallScore: { not: null },
+    },
+  });
+  const qualifying: string[] = [];
+  for (const ind of industries) {
+    if (!ind.industryCategoryNormalized) continue;
+    if (ind._count._all >= MIN_CUSTOMER_COHORT) {
+      qualifying.push(ind.industryCategoryNormalized);
+    }
+  }
+  qualifying.sort();
+  return {
+    totalIndustriesWithData: industries.length,
+    industriesWithCustomerCohort: qualifying.length,
+    qualifyingIndustries: qualifying,
+    threshold: MIN_CUSTOMER_COHORT,
+  };
+}
+
 export async function GET(req: Request) {
   const limited = applyApiRateLimit({
     req,
@@ -154,13 +190,19 @@ export async function GET(req: Request) {
   }
 
   try {
-    const [weaknessFrequency, drift, mostUnstable, cohortWeakness] =
-      await Promise.all([
-        getCategoryWeaknessFrequency(),
-        findDriftExtremes(),
-        getMostUnstableCategory({ sinceDays: 7, minObservations: 5 }),
-        findCohortWeakness(),
-      ]);
+    const [
+      weaknessFrequency,
+      drift,
+      mostUnstable,
+      cohortWeakness,
+      cohortCoverage,
+    ] = await Promise.all([
+      getCategoryWeaknessFrequency(),
+      findDriftExtremes(),
+      getMostUnstableCategory({ sinceDays: 7, minObservations: 5 }),
+      findCohortWeakness(),
+      findCohortCoverage(),
+    ]);
 
     const weakestCategoryFinding =
       weaknessFrequency.length > 0 ? weaknessFrequency[0] : null;
@@ -171,6 +213,7 @@ export async function GET(req: Request) {
       mostUnstableCategory: mostUnstable,
       largestPositiveDrift: drift.positive,
       largestNegativeDrift: drift.negative,
+      cohortCoverage,
     };
     return NextResponse.json(body);
   } catch (err) {

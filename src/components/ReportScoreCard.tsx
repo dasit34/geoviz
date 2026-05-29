@@ -36,16 +36,29 @@ import {
  * footer — sample/preview render paths can omit it and the footer
  * simply doesn't render (graceful degradation).
  */
+export type ReportScoreCardContext = {
+  /** Customer-facing percentile copy from getAuditPercentile().copy */
+  percentileCopy?: string | null;
+  /** Customer-facing confidence label from formatCustomerConfidence() */
+  confidenceLabel?: string | null;
+  /** Single-sentence reason from formatCustomerConfidence() */
+  confidenceReason?: string | null;
+  /** Optional weakest-category watch line (only when materially weak) */
+  weakestCategoryCopy?: string | null;
+};
+
 export function ReportScoreCard({
   score,
   markdown,
   orderId,
   reportGeneratedAt,
+  context,
 }: {
   score: ReportScore;
   markdown?: string | null;
   orderId?: string;
   reportGeneratedAt?: Date | null;
+  context?: ReportScoreCardContext;
 }) {
   const tone = scoreToneFromOverall(score.overall);
   const overallLabel = typeof score.overall === "number" ? score.overall : "—";
@@ -83,6 +96,36 @@ export function ReportScoreCard({
       </div>
 
       <p className="score-card-caption">{captionForTone(tone)}</p>
+
+      {context && (context.percentileCopy || context.confidenceLabel) ? (
+        <div className="score-card-context-strip">
+          {context.percentileCopy ? (
+            <span className="score-card-context-pill">
+              {context.percentileCopy}
+            </span>
+          ) : null}
+          {context.confidenceLabel ? (
+            <span className="score-card-context-pill">
+              {context.confidenceLabel}
+              {context.confidenceReason ? (
+                <span className="score-card-context-pill-sep"> · </span>
+              ) : null}
+              {context.confidenceReason ? (
+                <span className="score-card-context-pill-reason">
+                  {context.confidenceReason}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {context?.weakestCategoryCopy ? (
+        <p className="score-card-watch">
+          <span className="score-card-watch-label">Watch:</span>{" "}
+          {context.weakestCategoryCopy}
+        </p>
+      ) : null}
 
       {isJsHeavy ? (
         <p className="score-card-advisory">

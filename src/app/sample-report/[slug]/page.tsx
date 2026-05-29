@@ -2,7 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { AuditReportContent } from "@/components/AuditReportContent";
+import {
+  AuditReportContent,
+  type AuditReportContext,
+} from "@/components/AuditReportContent";
 import {
   SAMPLE_REGISTRY,
   findAvailableSamples,
@@ -10,6 +13,12 @@ import {
   findSampleEntryBySlug,
   type SampleEntry,
 } from "@/lib/sample-registry";
+import {
+  getAuditPercentileBundle,
+  type AuditScoreSnapshot,
+} from "@/lib/intelligence/audit-percentile";
+import { formatCustomerConfidence } from "@/lib/intelligence/confidence-display";
+import type { DeterministicScore } from "@/lib/scoring/types";
 import "@/app/report/[id]/print/print.css";
 
 /**
@@ -78,6 +87,7 @@ export default async function SampleReportSlugPage({
           reportMarkdown={audit.reportMarkdown}
           reportGeneratedAt={audit.reportGeneratedAt}
           deterministicScore={audit.intelligence?.deterministicScore ?? null}
+          context={await buildSampleContext(audit.intelligence ?? null)}
           otherAvailable={otherAvailable}
         />
       ) : (
@@ -95,6 +105,7 @@ function RealSample({
   reportMarkdown,
   reportGeneratedAt,
   deterministicScore,
+  context,
   otherAvailable,
 }: {
   entry: SampleEntry;
@@ -102,6 +113,7 @@ function RealSample({
   reportMarkdown: string;
   reportGeneratedAt: Date | null;
   deterministicScore: unknown;
+  context?: AuditReportContext;
   otherAvailable: SampleEntry[];
 }) {
   return (
@@ -129,6 +141,7 @@ function RealSample({
         reportMarkdown={reportMarkdown}
         reportGeneratedAt={reportGeneratedAt}
         deterministicScore={deterministicScore}
+        context={context}
       />
 
       {/* Additional sample audits — moved here from the old
@@ -240,4 +253,76 @@ function PendingSample({ entry }: { entry: SampleEntry }) {
       </section>
     </>
   );
+}
+
+/**
+ * Phase L: compute benchmark + confidence context for the sample
+ * report. Mirrors the helper in `/report/[id]/print/page.tsx`.
+ * Fail-soft — returns undefined on any failure so the sample
+ * renders unchanged when intelligence data is missing.
+ */
+async function buildSampleContext(
+  intelligence: {
+    deterministicScore: unknown;
+    industryCategoryNormalized: string | null;
+    overallScore: number | null;
+    semanticClarityScore: number | null;
+    crawlerAccessibilityScore: number | null;
+    trustSignalScore: number | null;
+    structuredIdentityScore: number | null;
+    recommendationReadinessScore: number | null;
+  } | null,
+): Promise<AuditReportContext | undefined> {
+  if (!intelligence) return undefined;
+  if (intelligence.overallScore === null) return undefined;
+  try {
+    const snapshot: AuditScoreSnapshot = {
+      industrySlug: intelligence.industryCategoryNormalized,
+      overallScore: intelligence.overallScore,
+      semanticClarityScore: intelligence.semanticClarityScore,
+      crawlerAccessibilityScore: intelligence.crawlerAccessibilityScore,
+      trustSignalScore: intelligence.trustSignalScore,
+      structuredIdentityScore: intelligence.structuredIdentityScore,
+      recommendationReadinessScore: intelligence.recommendationReadinessScore,
+    };
+    const bundle = await getAuditPercentileBundle(snapshot);
+    const cohortCellValue =
+      bundle.overall.bucket === "insufficient"
+        ? "Calibrating"
+        : `${bundle.overall.bucket}${
+            intelligence.industryCategoryNormalized
+              ? ` (${intelligence.industryCategoryNormalized})`
+              : ""
+          }`;
+
+    let confidenceLabel: string | null = null;
+    let confidenceReason: string | null = null;
+    const deterministic = intelligence.deterministicScore as
+      | DeterministicScore
+      | null;
+    if (
+      deterministic &&
+      typeof deterministic === "object" &&
+      "confidence_level" in deterministic &&
+      "confidence_inputs" in deterministic
+    ) {
+      const framing = formatCustomerConfidence(deterministic);
+      confidenceLabel = framing.label;
+      confidenceReason = framing.reason;
+    }
+
+    return {
+      percentileCopy: bundle.overall.copy,
+      cohortCellValue,
+      confidenceLabel,
+      confidenceReason,
+      weakestCategoryCopy: bundle.weakestCategory?.data.copy ?? null,
+    };
+  } catch (err) {
+    console.error(
+      "[sample-report/slug] buildSampleContext failed:",
+      (err as Error).message?.slice(0, 200),
+    );
+    return undefined;
+  }
 }

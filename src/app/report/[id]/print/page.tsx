@@ -2,12 +2,18 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
-import { AuditReportContent } from "@/components/AuditReportContent";
+import { AuditReportContent, type AuditReportContext } from "@/components/AuditReportContent";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { logReportAccessAttempt } from "@/lib/report-access";
 import { checkPageRateLimit } from "@/lib/rate-limit";
 import { RateLimitedNotice } from "@/components/RateLimitedNotice";
+import {
+  getAuditPercentileBundle,
+  type AuditScoreSnapshot,
+} from "@/lib/intelligence/audit-percentile";
+import { formatCustomerConfidence } from "@/lib/intelligence/confidence-display";
+import type { DeterministicScore } from "@/lib/scoring/types";
 import "./print.css";
 
 /**
@@ -56,7 +62,18 @@ export default async function PrintPage({
   const order = await prisma.auditOrder.findUnique({
     where: { id: params.id },
     include: {
-      intelligence: { select: { deterministicScore: true } },
+      intelligence: {
+        select: {
+          deterministicScore: true,
+          industryCategoryNormalized: true,
+          overallScore: true,
+          semanticClarityScore: true,
+          crawlerAccessibilityScore: true,
+          trustSignalScore: true,
+          structuredIdentityScore: true,
+          recommendationReadinessScore: true,
+        },
+      },
     },
   });
 
@@ -98,6 +115,11 @@ export default async function PrintPage({
 
   const businessLabel = order.businessName ?? order.email;
 
+  // Phase L: compute customer-facing benchmark + confidence context.
+  // Pure DB reads; null-safe; fully fail-soft (any error → no
+  // context, report renders as it did pre-Phase L).
+  const reportContext = await buildReportContext(order.intelligence ?? null);
+
   return (
     <AuditReportContent
       orderId={order.id}
@@ -106,8 +128,85 @@ export default async function PrintPage({
       reportMarkdown={order.reportMarkdown}
       reportGeneratedAt={order.reportGeneratedAt}
       deterministicScore={order.intelligence?.deterministicScore ?? null}
+      context={reportContext}
     />
   );
+}
+
+/**
+ * Phase L: compute percentile + confidence context server-side.
+ * Returns `undefined` (rather than throwing) on any failure path so
+ * the report renders unchanged when intelligence data is missing or
+ * the cohort lookup hits an edge case.
+ */
+async function buildReportContext(
+  intelligence: {
+    deterministicScore: unknown;
+    industryCategoryNormalized: string | null;
+    overallScore: number | null;
+    semanticClarityScore: number | null;
+    crawlerAccessibilityScore: number | null;
+    trustSignalScore: number | null;
+    structuredIdentityScore: number | null;
+    recommendationReadinessScore: number | null;
+  } | null,
+): Promise<AuditReportContext | undefined> {
+  if (!intelligence) return undefined;
+  if (intelligence.overallScore === null) return undefined;
+  try {
+    const snapshot: AuditScoreSnapshot = {
+      industrySlug: intelligence.industryCategoryNormalized,
+      overallScore: intelligence.overallScore,
+      semanticClarityScore: intelligence.semanticClarityScore,
+      crawlerAccessibilityScore: intelligence.crawlerAccessibilityScore,
+      trustSignalScore: intelligence.trustSignalScore,
+      structuredIdentityScore: intelligence.structuredIdentityScore,
+      recommendationReadinessScore: intelligence.recommendationReadinessScore,
+    };
+    const bundle = await getAuditPercentileBundle(snapshot);
+
+    // Build the cover-page "Cohort" cell value. Friendly short
+    // form, never speculative.
+    const cohortCellValue =
+      bundle.overall.bucket === "insufficient"
+        ? "Calibrating"
+        : `${bundle.overall.bucket}${
+            intelligence.industryCategoryNormalized
+              ? ` (${intelligence.industryCategoryNormalized})`
+              : ""
+          }`;
+
+    // Confidence framing from the deterministic engine output.
+    let confidenceLabel: string | null = null;
+    let confidenceReason: string | null = null;
+    const deterministic = intelligence.deterministicScore as
+      | DeterministicScore
+      | null;
+    if (
+      deterministic &&
+      typeof deterministic === "object" &&
+      "confidence_level" in deterministic &&
+      "confidence_inputs" in deterministic
+    ) {
+      const framing = formatCustomerConfidence(deterministic);
+      confidenceLabel = framing.label;
+      confidenceReason = framing.reason;
+    }
+
+    return {
+      percentileCopy: bundle.overall.copy,
+      cohortCellValue,
+      confidenceLabel,
+      confidenceReason,
+      weakestCategoryCopy: bundle.weakestCategory?.data.copy ?? null,
+    };
+  } catch (err) {
+    console.error(
+      "[report/print] buildReportContext failed:",
+      (err as Error).message?.slice(0, 200),
+    );
+    return undefined;
+  }
 }
 
 /**

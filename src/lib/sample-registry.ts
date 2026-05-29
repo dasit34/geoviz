@@ -127,7 +127,18 @@ export async function findSampleAudit(entry: SampleEntry) {
       },
       orderBy: { reportGeneratedAt: "desc" },
       include: {
-        intelligence: { select: { deterministicScore: true } },
+        intelligence: {
+          select: {
+            deterministicScore: true,
+            industryCategoryNormalized: true,
+            overallScore: true,
+            semanticClarityScore: true,
+            crawlerAccessibilityScore: true,
+            trustSignalScore: true,
+            structuredIdentityScore: true,
+            recommendationReadinessScore: true,
+          },
+        },
       },
     });
     if (row) return row;

@@ -426,6 +426,46 @@
   color: rgba(255, 255, 255, 0.75);
   max-width: 52ch;
 }
+/* Phase L: percentile + confidence context strip rendered below
+   the score caption. Two pill-shaped chips, soft border, mono-
+   neutral so the score number stays the focal point. Wraps to a
+   second row on narrow viewports without crowding the score. */
+.score-card-context-strip {
+  margin: 14px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.score-card-context-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.78);
+}
+.score-card-context-pill-sep {
+  color: rgba(255, 255, 255, 0.3);
+}
+.score-card-context-pill-reason {
+  color: rgba(255, 255, 255, 0.55);
+}
+/* Optional weakest-category watch line under the score card. Small
+   typographic note — never alarmist, just an evidence-grade
+   pointer. */
+.score-card-watch {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.6);
+}
+.score-card-watch-label {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
+}
 /* Legacy single-line explainer — kept for any consumer not yet on
    the redesigned ReportScoreCard. Visually identical to the legacy
    shape; new component uses `.score-card-caption` instead. */

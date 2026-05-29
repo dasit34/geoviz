@@ -45,6 +45,26 @@ import { RadarChart } from "@/components/RadarChart";
  * print page renders it standalone, the sample page renders it
  * between the marketing Header/Footer.
  */
+/**
+ * Optional benchmark + confidence context (Phase L). When provided,
+ * `<ReportScoreCard />` renders a percentile + confidence pill strip
+ * below the score caption, the cover page shows a cohort metadata
+ * cell, and a weakest-category watch line may appear. When absent,
+ * the report renders exactly as it did pre-Phase L.
+ */
+export type AuditReportContext = {
+  /** Customer-facing percentile copy ("Top 24% among roofing audits (n=42).") */
+  percentileCopy?: string | null;
+  /** Cover-page cohort cell ("Top 25% (roofing)" or "Calibrating") */
+  cohortCellValue?: string | null;
+  /** Customer-facing confidence label ("High confidence" / "Moderate confidence" / "Limited confidence") */
+  confidenceLabel?: string | null;
+  /** Single-sentence reason from formatCustomerConfidence() */
+  confidenceReason?: string | null;
+  /** Optional "Watch:" line about the weakest category */
+  weakestCategoryCopy?: string | null;
+};
+
 export function AuditReportContent({
   orderId,
   businessLabel,
@@ -52,6 +72,7 @@ export function AuditReportContent({
   reportMarkdown,
   reportGeneratedAt,
   deterministicScore = null,
+  context,
 }: {
   orderId: string;
   businessLabel: string;
@@ -65,6 +86,8 @@ export function AuditReportContent({
    * rows.
    */
   deterministicScore?: unknown;
+  /** Optional benchmark + confidence intelligence (Phase L). */
+  context?: AuditReportContext;
 }) {
   const dateLabel = (reportGeneratedAt ?? new Date()).toLocaleDateString(
     undefined,
@@ -151,6 +174,7 @@ export function AuditReportContent({
           dateLabel={dateLabel}
           assessment={heroAssessment}
           reportRef={`GEO-${orderId.slice(-8).toUpperCase()}`}
+          cohortCellValue={context?.cohortCellValue ?? null}
         />
 
         {/* Hero */}
@@ -210,6 +234,16 @@ export function AuditReportContent({
             markdown={reportMarkdown}
             orderId={orderId}
             reportGeneratedAt={reportGeneratedAt}
+            context={
+              context
+                ? {
+                    percentileCopy: context.percentileCopy,
+                    confidenceLabel: context.confidenceLabel,
+                    confidenceReason: context.confidenceReason,
+                    weakestCategoryCopy: context.weakestCategoryCopy,
+                  }
+                : undefined
+            }
           />
           {summaryHasContent ? (
             <ExecutiveSummaryBlock
@@ -409,6 +443,7 @@ function ReportCover({
   dateLabel,
   assessment,
   reportRef,
+  cohortCellValue,
 }: {
   businessLabel: string;
   websiteUrl: string;
@@ -418,6 +453,8 @@ function ReportCover({
   dateLabel: string;
   assessment: string | null;
   reportRef: string;
+  /** Optional cohort cell — "Top 25% (roofing)" or "Calibrating" */
+  cohortCellValue?: string | null;
 }) {
   const scoreLabel = typeof overall === "number" ? overall : "—";
   const displayUrl = prettifyUrlForDisplay(websiteUrl);
@@ -471,6 +508,12 @@ function ReportCover({
           <dt>Delivery</dt>
           <dd>Human-reviewed</dd>
         </div>
+        {cohortCellValue ? (
+          <div>
+            <dt>Cohort</dt>
+            <dd>{cohortCellValue}</dd>
+          </div>
+        ) : null}
       </dl>
 
       <p className="report-cover-disclaimer">

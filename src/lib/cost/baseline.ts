@@ -15,6 +15,8 @@
 
 import { PrismaClient } from "@prisma/client";
 
+import { percentile as percentileShared } from "@/lib/utils/percentile";
+
 export type CostBreakdown = {
   /** Preflight HTML fetch — $0 today (Node fetch on the worker). */
   crawl_cost: number;
@@ -40,14 +42,10 @@ export type CostBaselineReport = {
   computed_at: string;
 };
 
+// Cost-baseline callers want 0 on empty arrays, not null. Wrap the
+// shared utility (which returns number | null) to preserve that.
 function percentile(values: number[], p: number): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const idx = Math.min(
-    sorted.length - 1,
-    Math.max(0, Math.floor(p * (sorted.length - 1))),
-  );
-  return sorted[idx];
+  return percentileShared(values, p) ?? 0;
 }
 
 function mean(values: number[]): number {

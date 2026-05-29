@@ -46,12 +46,20 @@ type DriftExtreme = {
   currentBand: string | null;
 };
 
+type CohortCoverage = {
+  totalIndustriesWithData: number;
+  industriesWithCustomerCohort: number;
+  qualifyingIndustries: string[];
+  threshold: number;
+};
+
 type InsightsResponse = {
   weakestCategoryFinding: CategoryWeakness | null;
   cohortWeakness: CohortWeakness | null;
   mostUnstableCategory: UnstableCategory | null;
   largestPositiveDrift: DriftExtreme | null;
   largestNegativeDrift: DriftExtreme | null;
+  cohortCoverage: CohortCoverage | null;
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -88,6 +96,16 @@ function cohortWeaknessBody(c: CohortWeakness): string {
 
 function unstableCategoryBody(u: UnstableCategory): string {
   return `${labelOf(u.category)} has the highest replay variance this week (σ=${u.stdevDelta.toFixed(2)}, mean|delta|=${u.meanAbsDelta.toFixed(2)}, n=${u.observationCount}).`;
+}
+
+function cohortCoverageBody(c: CohortCoverage): string {
+  if (c.totalIndustriesWithData === 0) {
+    return "No industries with audit data yet.";
+  }
+  if (c.industriesWithCustomerCohort === 0) {
+    return `0 of ${c.totalIndustriesWithData} industries have ≥${c.threshold} audits — customer percentile claims showing "Benchmark data still calibrating".`;
+  }
+  return `${c.industriesWithCustomerCohort} of ${c.totalIndustriesWithData} industries have ≥${c.threshold} audits — customer percentile claims active for: ${c.qualifyingIndustries.join(", ")}.`;
 }
 
 function driftExtremeBody(d: DriftExtreme, sign: "positive" | "negative"): string {
@@ -189,6 +207,15 @@ export function OperatorInsightsPanel({ adminKey }: { adminKey: string }) {
               .filter((s): s is string => s !== null)
               .join(" ") || "Insufficient data (no signed-delta replays yet)."}
             meta="Source: CalibrationReplay"
+          />
+          <Card
+            eyebrow="Cohort coverage"
+            body={
+              data.cohortCoverage
+                ? cohortCoverageBody(data.cohortCoverage)
+                : "Insufficient data (no industries with audit data yet)."
+            }
+            meta="Source: AuditIntelligence groupBy industry"
           />
         </div>
       ) : null}

@@ -36,6 +36,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { percentile } from "@/lib/utils/percentile";
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -466,21 +467,10 @@ export async function getBottomPerformers(
 // ────────────────────────────────────────────────────────────
 // 6. Percentile + distribution helpers
 //
-// Internal percentile helper mirrors the private function in
-// src/lib/cost/baseline.ts:43-51. Kept inline (not extracted into
-// src/lib/utils/) to avoid module proliferation; if a third caller
-// appears, extract.
+// `percentile()` is shared with src/lib/cost/baseline.ts and
+// src/lib/intelligence/audit-percentile.ts via the extracted
+// utility at src/lib/utils/percentile.ts.
 // ────────────────────────────────────────────────────────────
-
-function percentile(values: number[], p: number): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const idx = Math.min(
-    sorted.length - 1,
-    Math.max(0, Math.floor(p * (sorted.length - 1))),
-  );
-  return sorted[idx];
-}
 
 function stdev(values: number[]): number {
   if (values.length < 2) return 0;

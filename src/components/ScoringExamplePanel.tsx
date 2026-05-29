@@ -95,6 +95,25 @@ export function ScoringExamplePanel({
         </div>
       </div>
 
+      {/* Phase L sample pills — hardcoded values consistent with
+          SAMPLE_SCORE=61 + "Needs Work" band. Mirror the live
+          report's <ReportScoreCard /> context strip so the
+          homepage sample shows what real audits will render. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-white/[0.06] px-6 py-3 text-[11px] text-white/55">
+        <span className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-0.5">
+          Top 38% among roofing audits (n=42)
+        </span>
+        <span className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-0.5">
+          Moderate confidence
+          <span aria-hidden className="mx-1 text-white/30">·</span>
+          <span className="text-white/45">schema markup partially detected</span>
+        </span>
+      </div>
+      <p className="px-6 pt-2 text-[11px] text-white/45">
+        <span className="font-semibold text-white/65">Watch:</span>{" "}
+        Recommendation Readiness trails 62% of roofing peers (n=42).
+      </p>
+
       <ul className="space-y-3.5 px-6 py-6 text-sm">
         {SAMPLE_FINDINGS.map((f) => (
           <li key={f.text} className="flex gap-3">
