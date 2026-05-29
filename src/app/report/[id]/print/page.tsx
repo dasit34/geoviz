@@ -72,6 +72,12 @@ export default async function PrintPage({
           trustSignalScore: true,
           structuredIdentityScore: true,
           recommendationReadinessScore: true,
+          // Cross-Model Intelligence (ENABLE_CONSENSUS_PIPELINE-gated).
+          // Both fields are JSON?; null when the gate is off or
+          // validators didn't run. The report renderer fail-soft hides
+          // the section when both are null.
+          aiValidations: true,
+          consensusIndex: true,
         },
       },
     },
@@ -149,6 +155,8 @@ async function buildReportContext(
     trustSignalScore: number | null;
     structuredIdentityScore: number | null;
     recommendationReadinessScore: number | null;
+    aiValidations?: unknown;
+    consensusIndex?: unknown;
   } | null,
 ): Promise<AuditReportContext | undefined> {
   if (!intelligence) return undefined;
@@ -199,6 +207,8 @@ async function buildReportContext(
       confidenceLabel,
       confidenceReason,
       weakestCategoryCopy: bundle.weakestCategory?.data.copy ?? null,
+      aiValidations: intelligence.aiValidations ?? null,
+      consensusIndex: intelligence.consensusIndex ?? null,
     };
   } catch (err) {
     console.error(

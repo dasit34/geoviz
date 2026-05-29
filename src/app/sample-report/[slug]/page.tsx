@@ -271,6 +271,8 @@ async function buildSampleContext(
     trustSignalScore: number | null;
     structuredIdentityScore: number | null;
     recommendationReadinessScore: number | null;
+    aiValidations?: unknown;
+    consensusIndex?: unknown;
   } | null,
 ): Promise<AuditReportContext | undefined> {
   if (!intelligence) return undefined;
@@ -317,6 +319,8 @@ async function buildSampleContext(
       confidenceLabel,
       confidenceReason,
       weakestCategoryCopy: bundle.weakestCategory?.data.copy ?? null,
+      aiValidations: intelligence.aiValidations ?? null,
+      consensusIndex: intelligence.consensusIndex ?? null,
     };
   } catch (err) {
     console.error(

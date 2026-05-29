@@ -63,6 +63,17 @@ export type AuditReportContext = {
   confidenceReason?: string | null;
   /** Optional "Watch:" line about the weakest category */
   weakestCategoryCopy?: string | null;
+  /**
+   * Cross-Model Intelligence — `AuditIntelligence.aiValidations`
+   * JSON payload (ValidationLayerResult shape) and
+   * `AuditIntelligence.consensusIndex` JSON payload (ConsensusIndex
+   * shape). Both are null when the gate is off or validators
+   * didn't run. The renderer fail-soft hides the section when both
+   * are null. Typed as `unknown` because they're Prisma Json
+   * columns — narrowed at render time in `<CrossModelIntelligence>`.
+   */
+  aiValidations?: unknown;
+  consensusIndex?: unknown;
 };
 
 export function AuditReportContent({
@@ -325,6 +336,16 @@ export function AuditReportContent({
             <RadarChart categories={score.categories} />
           </div>
         </section>
+
+        {/* Cross-Model Intelligence — renders only when validator
+            data is present (gate ON + at least one provider passed).
+            Reads from context.aiValidations + context.consensusIndex.
+            Fail-soft hidden when both are null so the report stays
+            identical to its pre-gate shape for older audits. */}
+        <CrossModelIntelligence
+          aiValidations={context?.aiValidations ?? null}
+          consensusIndex={context?.consensusIndex ?? null}
+        />
 
         {/* Top strengths (≥70%) when present; otherwise fall back to
             "Best current signals" — the top-N highest scoring categories
@@ -964,5 +985,233 @@ function WrenchIcon() {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Cross-Model Intelligence — Section 03
+//
+// Renders per-provider validator outputs and the consensus strip.
+// Reads from context.aiValidations (ValidationLayerResult shape)
+// and context.consensusIndex (ConsensusIndex shape). Both are
+// optional unknown; the component narrows defensively and renders
+// nothing when no validator data exists (gate off, or all providers
+// failed catastrophically). Never throws.
+//
+// Status-mapping rule (locked):
+//   passed + score >= 70  → Clear
+//   passed + score 40-69  → Partial
+//   passed + score <  40  → Weak
+//   passed + score null   → Partial (default)
+//   failed | unavailable | skipped → Unavailable
+// ────────────────────────────────────────────────────────────
+
+type ValidatorOutputShape = {
+  provider: string;
+  status: string;
+  business_understanding_score: number | null;
+  category_confidence: string | null;
+  service_area_confidence: string | null;
+  recommendation_confidence: string | null;
+  missing_facts?: string[];
+  cited_sources?: string[];
+  raw_summary?: string;
+  error?: string | null;
+};
+
+type ConsensusShape = {
+  verdict?: string;
+  consensus_confidence?: string;
+  model_agreement?: string;
+  confidence_index?: number;
+  confidence_band?: string;
+};
+
+const CROSS_MODEL_PROVIDER_DISPLAY: Record<string, string> = {
+  openai: "ChatGPT",
+  anthropic: "Claude",
+  gemini: "Gemini",
+  perplexity: "Perplexity",
+  "google-ai-overview": "Google AI Overview",
+};
+
+const CROSS_MODEL_PROVIDER_ORDER = [
+  "openai",
+  "anthropic",
+  "gemini",
+  "perplexity",
+] as const;
+
+type CardStatus = "Clear" | "Partial" | "Weak" | "Unavailable";
+
+function crossModelCardStatus(o: ValidatorOutputShape): CardStatus {
+  if (o.status !== "passed") return "Unavailable";
+  const score = o.business_understanding_score;
+  if (typeof score !== "number") return "Partial";
+  if (score >= 70) return "Clear";
+  if (score >= 40) return "Partial";
+  return "Weak";
+}
+
+function crossModelStatusToneClass(s: CardStatus): string {
+  switch (s) {
+    case "Clear":
+      return "text-severity-info";
+    case "Partial":
+      return "text-severity-warning";
+    case "Weak":
+      return "text-severity-critical";
+    case "Unavailable":
+      return "text-white/40";
+  }
+}
+
+function crossModelFinding(o: ValidatorOutputShape): string {
+  if (o.status !== "passed") {
+    return o.error
+      ? `Did not respond — ${clipDriverText(o.error, 60)}`
+      : "Did not respond in time.";
+  }
+  const summary = (o.raw_summary ?? "").trim();
+  return summary ? clipDriverText(summary, 110) : "Returned without a summary.";
+}
+
+function crossModelImplication(o: ValidatorOutputShape): string {
+  if (o.status !== "passed") {
+    return "Cross-model agreement not available for this provider.";
+  }
+  const confidences = [
+    o.category_confidence,
+    o.service_area_confidence,
+    o.recommendation_confidence,
+  ];
+  const highs = confidences.filter((c) => c === "high").length;
+  const lows = confidences.filter((c) => c === "low").length;
+  if (highs >= 2) return "Can confidently identify and recommend this business.";
+  if (lows >= 2)
+    return "Cannot reliably recommend this business without more signal.";
+  return "Can identify the business but may miss key context when recommending.";
+}
+
+function CrossModelIntelligence({
+  aiValidations,
+  consensusIndex,
+}: {
+  aiValidations: unknown;
+  consensusIndex: unknown;
+}) {
+  // Narrow the unknown payloads defensively. Either may be null when
+  // the gate is off or the providers all failed. Fail-soft: hide
+  // entirely if no validator data exists.
+  const layer = aiValidations as {
+    outputs?: ValidatorOutputShape[];
+  } | null;
+  if (!layer || !Array.isArray(layer.outputs) || layer.outputs.length === 0) {
+    return null;
+  }
+
+  // Index by provider name and emit in canonical display order so
+  // the four cards always render ChatGPT → Claude → Gemini →
+  // Perplexity left-to-right. Unknown providers are dropped (we
+  // never invent a card for a name we don't recognize).
+  const byProvider: Record<string, ValidatorOutputShape> = {};
+  for (const o of layer.outputs) {
+    if (o && typeof o.provider === "string") byProvider[o.provider] = o;
+  }
+  const ordered = CROSS_MODEL_PROVIDER_ORDER.map((p) => byProvider[p]).filter(
+    (o): o is ValidatorOutputShape => o !== undefined,
+  );
+  if (ordered.length === 0) return null;
+
+  const consensus = consensusIndex as ConsensusShape | null;
+  const hasConsensus =
+    consensus !== null &&
+    typeof consensus === "object" &&
+    typeof consensus.confidence_index === "number";
+
+  return (
+    <section className="report-section-card mt-10">
+      <div className="report-section-card-header">
+        <p className="section-eyebrow">
+          {SECTION_EYEBROWS.crossModelIntelligence}
+        </p>
+        <span className="pill">{ordered.length} models</span>
+      </div>
+      <h2 className="h2 mt-3">How four AI systems interpret your business.</h2>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        {ordered.map((o) => {
+          const status = crossModelCardStatus(o);
+          const display = CROSS_MODEL_PROVIDER_DISPLAY[o.provider] ?? o.provider;
+          return (
+            <div
+              key={o.provider}
+              className="rounded-md border border-white/[0.08] bg-white/[0.02] p-4"
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-sm font-semibold text-white/85">{display}</p>
+                <span
+                  className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${crossModelStatusToneClass(status)}`}
+                >
+                  {status}
+                </span>
+              </div>
+              <p className="mt-3 text-[13px] leading-relaxed text-white/75">
+                {crossModelFinding(o)}
+              </p>
+              <p className="mt-2 text-[12px] leading-relaxed text-white/55">
+                {crossModelImplication(o)}
+              </p>
+              {Array.isArray(o.cited_sources) && o.cited_sources.length > 0 ? (
+                <p className="mt-3 inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-cyan-dim">
+                  {o.cited_sources.length} source
+                  {o.cited_sources.length === 1 ? "" : "s"} cited
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {hasConsensus && consensus ? (
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-white/[0.08] bg-ink-900/40 px-4 py-3 text-[12px] text-white/65">
+          {consensus.verdict ? (
+            <span>
+              <span className="text-white/45">Verdict:</span>{" "}
+              <span className="font-semibold text-white/85">
+                {consensus.verdict}
+              </span>
+            </span>
+          ) : null}
+          {consensus.model_agreement ? (
+            <>
+              <span aria-hidden className="text-white/20">
+                ·
+              </span>
+              <span>
+                <span className="text-white/45">Cross-model agreement:</span>{" "}
+                <span className="text-white/80">
+                  {consensus.model_agreement}
+                </span>
+              </span>
+            </>
+          ) : null}
+          {typeof consensus.confidence_index === "number" ? (
+            <>
+              <span aria-hidden className="text-white/20">
+                ·
+              </span>
+              <span className="mono-data inline-flex items-center rounded-full bg-white/[0.05] px-2 py-0.5 text-white/85">
+                Confidence Index: {consensus.confidence_index}/100
+              </span>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      <p className="mt-5 text-[11px] leading-relaxed text-white/45">
+        The GeoViz score is deterministic. Cross-model intelligence is
+        used as supporting evidence, not as the score itself.
+      </p>
+    </section>
   );
 }

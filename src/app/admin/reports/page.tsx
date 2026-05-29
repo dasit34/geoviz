@@ -89,6 +89,17 @@ export default async function AdminReportsPage({
     },
     orderBy: { createdAt: "desc" },
     take: 200,
+    include: {
+      // Cross-Model Intelligence telemetry — surfaces in the admin
+      // card so the operator can see per-provider validator status +
+      // whether consensus was computed for each order. Read-only.
+      intelligence: {
+        select: {
+          aiValidations: true,
+          consensusIndex: true,
+        },
+      },
+    },
   });
 
   // ---- Today's cost & runtime summary (operator-facing) ----
@@ -330,10 +341,32 @@ export default async function AdminReportsPage({
           </div>
         ) : (
           <div className="mt-10 space-y-6">
-            {orders.map((o) => (
+            {orders.map((o) => {
+              // Derive a flat validator-telemetry shape from the
+              // intelligence row (when present). Read-only summary of
+              // per-provider status + whether consensus was computed.
+              // Null when the consensus gate is off for this order's
+              // worker run.
+              const aiLayer = o.intelligence?.aiValidations as
+                | { outputs?: Array<{ provider: string; status: string }> }
+                | null;
+              const validatorTelemetry =
+                aiLayer && Array.isArray(aiLayer.outputs)
+                  ? {
+                      providers: aiLayer.outputs.map((x) => ({
+                        name: x.provider,
+                        status: x.status,
+                      })),
+                      consensusComputed:
+                        o.intelligence?.consensusIndex !== null &&
+                        o.intelligence?.consensusIndex !== undefined,
+                    }
+                  : null;
+              return (
               <AdminReportCard
                 key={o.id}
                 adminKey={key!}
+                validatorTelemetry={validatorTelemetry}
                 order={{
                   id: o.id,
                   email: o.email,
@@ -376,7 +409,8 @@ export default async function AdminReportsPage({
                   createdAt: o.createdAt.toISOString(),
                 }}
               />
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

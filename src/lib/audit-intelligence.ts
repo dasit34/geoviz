@@ -423,6 +423,27 @@ export async function persistAuditIntelligence(args: {
     // pre-integration runs (this block reads from `deterministic`, never
     // writes to it). Default behavior is byte-equal to pre-integration
     // because the env flag is off unless ENABLE_CONSENSUS_PIPELINE=true.
+    //
+    // Boot log — emits once per audit so the operator can confirm
+    // gate state + provider key presence from worker logs. Cheap.
+    {
+      const gateOn = process.env.ENABLE_CONSENSUS_PIPELINE === "true";
+      const detectedKeys = [
+        process.env.OPENAI_API_KEY ? "openai" : null,
+        process.env.ANTHROPIC_API_KEY ? "anthropic" : null,
+        process.env.GEMINI_API_KEY ? "gemini" : null,
+        process.env.PERPLEXITY_API_KEY ? "perplexity" : null,
+      ].filter((s): s is string => s !== null);
+      if (gateOn) {
+        console.log(
+          `[consensus] orderId=${orderId} gate=ON providers=${detectedKeys.join(",") || "(none detected)"}`,
+        );
+      } else {
+        console.log(
+          `[consensus] orderId=${orderId} gate=OFF (set ENABLE_CONSENSUS_PIPELINE=true to enable cross-model intelligence; detected keys: ${detectedKeys.join(",") || "(none)"})`,
+        );
+      }
+    }
     if (process.env.ENABLE_CONSENSUS_PIPELINE === "true") {
       try {
         const { runAiValidationLayer } = await import("@/lib/validators");

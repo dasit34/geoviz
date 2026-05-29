@@ -61,12 +61,26 @@ const LAUNCH_QA_ITEMS: Array<{ key: string; label: string }> = [
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+/**
+ * Cross-Model Intelligence telemetry summary for the admin card.
+ * Null when the consensus gate was off for this order's run (or
+ * intelligence row not yet written). Read-only — surfaced as small
+ * pills so the operator can see which providers ran without
+ * opening the DB.
+ */
+export type ValidatorTelemetry = {
+  providers: Array<{ name: string; status: string }>;
+  consensusComputed: boolean;
+} | null;
+
 export function AdminReportCard({
   adminKey,
   order,
+  validatorTelemetry = null,
 }: {
   adminKey: string;
   order: Order;
+  validatorTelemetry?: ValidatorTelemetry;
 }) {
   const [reportStatus, setReportStatus] = useState(order.reportStatus);
   const [markdown, setMarkdown] = useState<string | null>(order.reportMarkdown);
@@ -593,6 +607,11 @@ export function AdminReportCard({
       <div className={`border-b ${bannerClass} px-5 py-3`}>
         <p className="text-sm font-semibold">{banner.text}</p>
       </div>
+
+      {/* Cross-Model Intelligence telemetry — per-provider validator
+          status pills + consensus-computed badge. Null when the
+          consensus gate was off for this order's worker run. Read-only. */}
+      <ValidatorTelemetryStrip telemetry={validatorTelemetry} />
 
       {/* Action row — strict logical order:
           Run GEO Audit → View Report → Mark Reviewed → Send Report. */}
@@ -1278,4 +1297,86 @@ function formatRuntime(ms: number | null): string {
   const minutes = Math.floor(seconds / 60);
   const remSeconds = Math.round(seconds - minutes * 60);
   return `${minutes}m ${remSeconds}s`;
+}
+
+// ────────────────────────────────────────────────────────────
+// Validator telemetry strip — operator-facing one-line summary of
+// per-provider status + whether consensus was computed.
+// ────────────────────────────────────────────────────────────
+
+const PROVIDER_DISPLAY: Record<string, string> = {
+  openai: "ChatGPT",
+  anthropic: "Claude",
+  gemini: "Gemini",
+  perplexity: "Perplexity",
+  "google-ai-overview": "Google AI Overview",
+};
+
+const PROVIDER_ORDER = ["openai", "anthropic", "gemini", "perplexity"] as const;
+
+function ValidatorTelemetryStrip({ telemetry }: { telemetry: ValidatorTelemetry }) {
+  if (!telemetry) {
+    return (
+      <div className="border-b border-white/[0.06] px-5 py-2 text-[11px] text-white/40">
+        Cross-Model Intelligence:{" "}
+        <span className="text-white/55">
+          gate OFF (no validator data for this order)
+        </span>
+      </div>
+    );
+  }
+  const byProvider: Record<string, string> = {};
+  for (const p of telemetry.providers) {
+    if (typeof p.name === "string") byProvider[p.name] = p.status;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-white/[0.06] px-5 py-2 text-[11px] text-white/55">
+      <span className="text-white/40">Validators:</span>
+      {PROVIDER_ORDER.map((p) => {
+        const status = byProvider[p] ?? "—";
+        const display = PROVIDER_DISPLAY[p] ?? p;
+        const mark =
+          status === "passed"
+            ? "✓"
+            : status === "failed"
+              ? "✗"
+              : status === "unavailable"
+                ? "—"
+                : status === "skipped"
+                  ? "·"
+                  : "?";
+        const toneClass =
+          status === "passed"
+            ? "text-severity-info"
+            : status === "failed"
+              ? "text-severity-critical"
+              : "text-white/40";
+        return (
+          <span
+            key={p}
+            className="inline-flex items-baseline gap-1"
+            title={`${display}: ${status}`}
+          >
+            <span className={`font-mono ${toneClass}`}>{mark}</span>
+            <span>{display}</span>
+          </span>
+        );
+      })}
+      <span aria-hidden className="text-white/20">
+        ·
+      </span>
+      <span>
+        Consensus:{" "}
+        <span
+          className={
+            telemetry.consensusComputed
+              ? "text-severity-info"
+              : "text-white/40"
+          }
+        >
+          {telemetry.consensusComputed ? "computed" : "not computed"}
+        </span>
+      </span>
+    </div>
+  );
 }

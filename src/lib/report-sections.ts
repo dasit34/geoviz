@@ -24,6 +24,14 @@ export const SECTION_EYEBROWS = {
   executiveSummary: "Section 01 · Executive summary",
   /** Section 02 — Six-category breakdown grid. */
   categoryBreakdown: "Section 02 · Category breakdown",
+  /**
+   * Cross-model intelligence (per-provider validator cards +
+   * consensus strip). Intentionally UNNUMBERED so the surrounding
+   * numbered sections stay continuous regardless of whether the
+   * validator gate is ON (section appears) or OFF (section hidden).
+   * Sits between Category Breakdown and Top Strengths when present.
+   */
+  crossModelIntelligence: "Cross-Model Intelligence",
   /** Section 03 — Top-strengths card grid (high-score variant). */
   topStrengths: "Section 03 · Top strengths",
   /** Section 03 — Top-strengths card grid (low-score variant; same slot, gentler phrasing). */

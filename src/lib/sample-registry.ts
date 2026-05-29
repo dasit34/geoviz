@@ -137,6 +137,11 @@ export async function findSampleAudit(entry: SampleEntry) {
             trustSignalScore: true,
             structuredIdentityScore: true,
             recommendationReadinessScore: true,
+            // Cross-Model Intelligence (Phase: 4-provider validator
+            // stack). Null when gate off; renderer hides the section
+            // when both are null.
+            aiValidations: true,
+            consensusIndex: true,
           },
         },
       },
