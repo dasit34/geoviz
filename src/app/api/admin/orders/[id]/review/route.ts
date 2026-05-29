@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { applyApiRateLimit } from "@/lib/rate-limit";
+import { sendCustomerSuccessEmail } from "@/lib/customer-emails";
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,6 +91,47 @@ export async function POST(
   console.log(
     `[admin-review] saved orderId=${order.id} status=${updated.reviewStatus} score=${updated.qualityScore ?? "—"}`,
   );
+
+  // Auto-send the customer "Report ready" email on the moment of
+  // approval transition. Single-fire is enforced by the pre-update
+  // reviewStatus check (must have been non-approved) plus the
+  // !reportSentToCustomerAt guard. Failures here are non-fatal —
+  // the operator can still hit the manual Send Report button.
+  const shouldAutoSend =
+    reviewStatus === "approved" &&
+    order.reviewStatus !== "approved" &&
+    order.reportStatus === "generated" &&
+    !order.reportSentToCustomerAt &&
+    EMAIL_RE.test(order.email);
+
+  if (shouldAutoSend) {
+    try {
+      const ok = await sendCustomerSuccessEmail({
+        orderId: order.id,
+        businessName: order.businessName,
+        customerEmail: order.email,
+        websiteUrl: order.websiteUrl,
+      });
+      if (ok) {
+        await prisma.auditOrder.update({
+          where: { id: order.id },
+          data: {
+            reportSentToCustomerAt: new Date(),
+            sentTo: order.email,
+            auditStatus: "completed",
+          },
+        });
+        console.log(
+          `[admin-review] auto-sent success email orderId=${order.id} to=${order.email}`,
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[admin-review] auto-send error (non-fatal) orderId=${order.id}: ${message.slice(0, 200)}`,
+      );
+    }
+  }
 
   return NextResponse.json({
     status: "saved",

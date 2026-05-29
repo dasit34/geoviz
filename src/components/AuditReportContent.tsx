@@ -55,7 +55,7 @@ import { RadarChart } from "@/components/RadarChart";
 export type AuditReportContext = {
   /** Customer-facing percentile copy ("Top 24% among roofing audits (n=42).") */
   percentileCopy?: string | null;
-  /** Cover-page cohort cell ("Top 25% (roofing)" or "Calibrating") */
+  /** Cover-page cohort cell ("Top 25% (roofing)" or "Industry benchmark forming") */
   cohortCellValue?: string | null;
   /** Customer-facing confidence label ("High confidence" / "Moderate confidence" / "Limited confidence") */
   confidenceLabel?: string | null;
@@ -298,8 +298,7 @@ export function AuditReportContent({
             Crawler Readiness (20), Trust Signals (20), Content
             Depth (15), Brand / Entity Clarity (10), Technical
             Accessibility (10). Each report is reviewed before
-            delivery. Directional analysis based on publicly
-            accessible signals — not a ranking guarantee.
+            delivery.
           </p>
         </aside>
 
@@ -496,7 +495,7 @@ function ReportCover({
   dateLabel: string;
   assessment: string | null;
   reportRef: string;
-  /** Optional cohort cell — "Top 25% (roofing)" or "Calibrating" */
+  /** Optional cohort cell — "Top 25% (roofing)" or "Industry benchmark forming" */
   cohortCellValue?: string | null;
 }) {
   const scoreLabel = typeof overall === "number" ? overall : "—";

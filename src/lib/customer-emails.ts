@@ -32,6 +32,9 @@ import {
   CUSTOMER_STATUS_LABEL,
   type CustomerStatus,
 } from "@/lib/customer-failure-mapping";
+import { resolveAppBaseUrl } from "@/lib/app-url";
+
+export const CUSTOMER_SUCCESS_SUBJECT = "Your AI Visibility Report is ready";
 
 /**
  * Reply-to address customers see on the delayed/failed email. Replies
@@ -200,4 +203,142 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+// ────────────────────────────────────────────────────────────
+// Customer "report ready" success-delivery email
+//
+// Fires from the admin review route the moment the operator marks
+// reviewStatus="approved" (transition guard there enforces single-
+// fire). Link-only — no PDF attachment, no score chip in the
+// subject, no scoring leakage in the body. Same dark-branded shell
+// as the failure template for visual consistency.
+// ────────────────────────────────────────────────────────────
+
+export function buildCustomerSuccessTexts(args: {
+  businessLabel: string;
+  websiteUrl: string;
+  reportUrl: string;
+}): { text: string; html: string } {
+  return {
+    text: buildSuccessPlainText(args),
+    html: buildSuccessHtml(args),
+  };
+}
+
+export async function sendCustomerSuccessEmail(args: {
+  orderId: string;
+  businessName: string | null;
+  customerEmail: string;
+  websiteUrl: string;
+}): Promise<boolean> {
+  const { orderId, businessName, customerEmail, websiteUrl } = args;
+
+  if (!process.env.RESEND_API_KEY) {
+    console.warn(
+      `[customer-email] skipped success — RESEND_API_KEY not set (orderId=${orderId})`,
+    );
+    return false;
+  }
+
+  const businessLabel = businessName?.trim() || websiteUrl;
+  const reportUrl = `${resolveAppBaseUrl()}/report/${encodeURIComponent(orderId)}/print`;
+  const { text: textBody, html: htmlBody } = buildCustomerSuccessTexts({
+    businessLabel,
+    websiteUrl,
+    reportUrl,
+  });
+
+  console.log(
+    `[customer-email] sending success orderId=${orderId} to=${customerEmail} subject="${CUSTOMER_SUCCESS_SUBJECT}"`,
+  );
+
+  try {
+    const result = await getResend().emails.send({
+      from: FROM_EMAIL,
+      to: customerEmail,
+      replyTo: customerSupportEmail(),
+      subject: CUSTOMER_SUCCESS_SUBJECT,
+      text: textBody,
+      html: htmlBody,
+    });
+    if (result.error) {
+      console.error(
+        `[customer-email] SUCCESS_FAILED orderId=${orderId} to=${customerEmail} resendError="${result.error.name}: ${result.error.message}"`,
+      );
+      return false;
+    }
+    console.log(
+      `[customer-email] SUCCESS_SENT orderId=${orderId} to=${customerEmail} resendId=${result.data?.id ?? "unknown"}`,
+    );
+    return true;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[customer-email] SUCCESS_FAILED orderId=${orderId} to=${customerEmail} threwException="${message}"`,
+    );
+    return false;
+  }
+}
+
+function buildSuccessPlainText(args: {
+  businessLabel: string;
+  websiteUrl: string;
+  reportUrl: string;
+}): string {
+  const { businessLabel, websiteUrl, reportUrl } = args;
+  return [
+    `Hi —`,
+    "",
+    `Your GeoViz AI Visibility Report for ${businessLabel} (${websiteUrl}) is ready to review.`,
+    "",
+    `Open the report:`,
+    reportUrl,
+    "",
+    `The link is private to you — no login required. You can return to it any time.`,
+    "",
+    `If you have any questions, just reply to this email.`,
+    "",
+    `— GeoViz`,
+  ].join("\n");
+}
+
+function buildSuccessHtml(args: {
+  businessLabel: string;
+  websiteUrl: string;
+  reportUrl: string;
+}): string {
+  const { businessLabel, websiteUrl, reportUrl } = args;
+  const sb = escapeHtml(businessLabel);
+  const sw = escapeHtml(websiteUrl);
+  const sr = escapeHtml(reportUrl);
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#0b0d14;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e8eaf0;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#0b0d14;padding:32px 16px;">
+      <tr><td align="center">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="560" style="max-width:560px;background:#10131c;border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:hidden;">
+          <tr><td style="padding:28px 32px 8px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#ff7a18;">Report ready</div>
+            <h1 style="margin:14px 0 0;font-size:22px;font-weight:700;letter-spacing:-0.01em;color:#ffffff;">Your AI Visibility Report is ready.</h1>
+            <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.55);">${sb} · ${sw}</p>
+          </td></tr>
+          <tr><td style="padding:20px 32px 8px;font-size:15px;line-height:1.65;color:rgba(255,255,255,0.85);">
+            Your report is ready to review.
+          </td></tr>
+          <tr><td style="padding:8px 32px 8px;">
+            <a href="${sr}" style="display:inline-block;background:#ff7a18;color:#ffffff;text-decoration:none;font-size:14.5px;font-weight:600;letter-spacing:0.01em;padding:12px 22px;border-radius:6px;">Open the report →</a>
+          </td></tr>
+          <tr><td style="padding:14px 32px 28px;font-size:14px;line-height:1.6;color:rgba(255,255,255,0.6);">
+            The link is private to you — no login required. You can return to it any time.
+          </td></tr>
+          <tr><td style="padding:0 32px 28px;font-size:13px;color:rgba(255,255,255,0.5);border-top:1px solid rgba(255,255,255,0.06);padding-top:18px;">
+            Questions? Just reply to this email and we&#39;ll get back to you within one business day.
+          </td></tr>
+        </table>
+        <p style="margin:18px 0 0;font-size:11.5px;color:rgba(255,255,255,0.35);">— GeoViz</p>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
 }

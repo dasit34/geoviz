@@ -288,7 +288,7 @@ async function buildSampleContext(
     const bundle = await getAuditPercentileBundle(snapshot);
     const cohortCellValue =
       bundle.overall.bucket === "insufficient"
-        ? "Calibrating"
+        ? "Industry benchmark forming"
         : `${bundle.overall.bucket}${
             intelligence.industryCategoryNormalized
               ? ` (${intelligence.industryCategoryNormalized})`

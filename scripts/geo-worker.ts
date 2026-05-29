@@ -541,6 +541,17 @@ impact as a clean two-row grid.
   what to install, what to write, what to update. Plain words.
 - **Expected impact** — one short sentence on what visibly changes
   when this fix lands.
+- **Unlocks** — one line naming 1–3 specific AI platforms this fix
+  most strengthens, each followed by a short outcome phrase. Pick
+  the platforms with the LOWEST readiness scores from the
+  authoritative-score block (where this fix's category sits weakest).
+  Format: "{Platform} {outcome}, {Platform} {outcome}" — comma-
+  separated, no headers, no bullets, max 3 platforms. Outcome words
+  should match the platform's typical strength: ChatGPT citations,
+  Claude reasoning, Gemini understanding, Perplexity sourcing.
+  Example: "ChatGPT citations, Gemini understanding, Perplexity
+  sourcing". Only the four platforms ChatGPT / Claude / Gemini /
+  Perplexity are allowed here.
 
 Voice rules for sections 2 and 3:
 - No repeated phrasing across items.
@@ -972,6 +983,17 @@ impact as a clean two-row grid.
   what to install, what to write, what to update. Plain words.
 - **Expected impact** — one short sentence on what visibly changes
   when this fix lands.
+- **Unlocks** — one line naming 1–3 specific AI platforms this fix
+  most strengthens, each followed by a short outcome phrase. Pick
+  the platforms with the LOWEST readiness scores from the
+  authoritative-score block (where this fix's category sits weakest).
+  Format: "{Platform} {outcome}, {Platform} {outcome}" — comma-
+  separated, no headers, no bullets, max 3 platforms. Outcome words
+  should match the platform's typical strength: ChatGPT citations,
+  Claude reasoning, Gemini understanding, Perplexity sourcing.
+  Example: "ChatGPT citations, Gemini understanding, Perplexity
+  sourcing". Only the four platforms ChatGPT / Claude / Gemini /
+  Perplexity are allowed here.
 
 Voice rules for sections 2 and 3:
 - No repeated phrasing across items.
@@ -1032,11 +1054,16 @@ Reply to this email or click the link below to request your fix.
 
 ## 6. Technical Appendix
 <details>
-<summary>Crawler details, robots.txt findings, sitemap, raw schema analysis — implementation notes for your developer</summary>
+<summary>Crawler details, robots.txt findings, sitemap, schema gap analysis — diagnostic notes for your developer</summary>
 
-**Schema (JSON-LD)** — one paste-ready code block for the single most
-impactful missing schema (LocalBusiness preferred). Skip anything you
-can't substantiate from the page. No commentary outside the code block.
+**Schema (JSON-LD)** — describe the single most impactful missing or
+broken schema in PLAIN ENGLISH (one short paragraph), then list 4–6
+key fields the corrected block should include as a bulleted gap
+list (e.g. "- name", "- telephone", "- address", "- sameAs (7+
+platforms)"). Do NOT emit a complete paste-ready JSON-LD block. Do
+NOT fill in the customer's actual phone/address/URLs. End with one
+line: "Foundation Fix delivers the validated block tuned to your
+business."
 
 **robots.txt findings** — short bullet list. One line per AI crawler
 that's blocked or partially allowed. Group into TWO buckets so the
@@ -1051,10 +1078,15 @@ developer can apply the right strategy:
   anthropic-ai, CCBot, Bytespider.
 
 Skip the ones that are fully allowed. If a citation bot is blocked,
-flag it as a high-priority robots.txt fix.
+flag it as a high-priority robots.txt finding. Do NOT write a
+replacement robots.txt. The diagnosis is the deliverable here.
 
-**llms.txt** — one sentence on whether it exists. If missing, ONE
-paste-ready block (≤25 lines) tailored to this business.
+**llms.txt** — one sentence on whether it exists. If missing, name
+4–6 section headings the file should contain for this business
+(e.g. "# Business", "# Services", "# Service Area", "# Hours",
+"# Trust signals") — as a short bullet list, NOT a paste-ready file.
+End with one line: "Foundation Fix generates and installs the
+tuned llms.txt for your business."
 
 **Metadata + crawlability** — one or two short bullets on title, meta
 description, H1 structure, and any obvious crawlability blockers.
