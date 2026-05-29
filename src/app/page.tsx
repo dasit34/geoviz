@@ -114,10 +114,7 @@ export default function Page() {
         <div className="absolute inset-0 -z-10 grid-bg opacity-60" />
 
         <div className="container-page">
-          <div className="hidden items-center justify-between gap-4 border-b border-white/[0.06] py-3.5 md:flex">
-            <span className="mono-data text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40">
-              GeoViz · AI Visibility Intelligence
-            </span>
+          <div className="hidden items-center justify-end gap-4 border-b border-white/[0.06] py-3.5 md:flex">
             <span className="mono-data flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/40">
               <span
                 aria-hidden
@@ -138,10 +135,9 @@ export default function Page() {
               whether AI recommends your business.
             </Thesis>
             <p className="mt-5 max-w-lg text-base leading-[1.55] text-white/75 sm:mt-7 sm:text-lg sm:leading-[1.6]">
-              We measure how clearly four AI systems — ChatGPT,
-              Claude, Gemini, and Perplexity — can understand, trust,
-              and surface your business when a customer asks for a
-              recommendation.
+              ChatGPT, Claude, Gemini, and Perplexity each read your
+              business differently. Our audit shows how clearly they
+              can understand, trust, and surface you to a customer.
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 sm:mt-9 sm:gap-x-6 sm:gap-y-4">
