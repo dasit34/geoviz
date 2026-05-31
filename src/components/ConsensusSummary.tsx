@@ -15,9 +15,11 @@ import { SECTION_EYEBROWS } from "@/lib/report-sections";
  *     confidence labels per axis (category, service area,
  *     recommendation).
  *
- * Fail-soft: when consensusIndex is null or fewer than 2 providers
- * passed, the section renders nothing — the existing Cross-Model
- * card already fail-softs and the customer never sees an empty box.
+ * Fail-soft: when aiValidations or consensusIndex is null/empty, or
+ * fewer than 2 providers passed (preserving the N>=2 rule from the
+ * Scoring Constitution), the section renders an "AI model analysis
+ * unavailable for this audit." panel — the customer always sees
+ * the heading + the explicit absence rather than a silent omission.
  *
  * The "Overall AI Recommendation Confidence" label is a CONFIDENCE
  * LABEL, not a score. It's derived from passed-count + majority
@@ -93,6 +95,23 @@ function countConfidence(
   ).length;
 }
 
+function UnavailablePanel() {
+  return (
+    <section
+      className="report-section-card mt-10"
+      aria-label="AI consensus summary — unavailable"
+    >
+      <div className="report-section-card-header">
+        <p className="section-eyebrow">{SECTION_EYEBROWS.aiConsensusSummary}</p>
+      </div>
+      <h2 className="h2 mt-3">Where all the AI systems agree.</h2>
+      <p className="muted mt-3 text-sm leading-relaxed">
+        AI model analysis unavailable for this audit.
+      </p>
+    </section>
+  );
+}
+
 export function ConsensusSummary({
   aiValidations,
   consensusIndex,
@@ -103,10 +122,10 @@ export function ConsensusSummary({
   const layer = aiValidations as ValidatorLayer;
   const consensus = consensusIndex as ConsensusShape | null;
   if (!layer || !Array.isArray(layer.outputs) || layer.outputs.length === 0) {
-    return null;
+    return <UnavailablePanel />;
   }
   if (!consensus || typeof consensus !== "object") {
-    return null;
+    return <UnavailablePanel />;
   }
   const metrics = consensus.agreement_metrics ?? {};
   const passedOutputs = layer.outputs.filter((o) => o.status === "passed");
@@ -114,7 +133,7 @@ export function ConsensusSummary({
     typeof metrics.providers_passed === "number"
       ? metrics.providers_passed
       : passedOutputs.length;
-  if (passedCount < 2) return null;
+  if (passedCount < 2) return <UnavailablePanel />;
 
   // Build the three plain-English lines.
   const lines: string[] = [];

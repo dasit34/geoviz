@@ -17,8 +17,10 @@ import { clipDriverText } from "@/lib/parse-report";
  * language read; the existing card carries the technical consensus
  * strip.
  *
- * Fail-soft: when aiValidations is null or all providers failed, the
- * section renders nothing.
+ * Fail-soft: when aiValidations is null, empty, or contains no
+ * recognized providers, the section renders an "AI model analysis
+ * unavailable for this audit." panel instead of hiding silently —
+ * the customer always sees the heading + the explicit absence.
  */
 
 type ValidatorOutputShape = {
@@ -120,6 +122,25 @@ function dimensionsFor(o: ValidatorOutputShape): DimensionRow[] | null {
   ];
 }
 
+function UnavailablePanel() {
+  return (
+    <section
+      className="report-section-card mt-10"
+      aria-label="How AI currently understands your business — unavailable"
+    >
+      <div className="report-section-card-header">
+        <p className="section-eyebrow">{SECTION_EYEBROWS.howAiUnderstands}</p>
+      </div>
+      <h2 className="h2 mt-3">
+        What each AI system can — and can&rsquo;t — tell about you.
+      </h2>
+      <p className="muted mt-3 text-sm leading-relaxed">
+        AI model analysis unavailable for this audit.
+      </p>
+    </section>
+  );
+}
+
 export function FourModelGrid({
   aiValidations,
 }: {
@@ -127,7 +148,7 @@ export function FourModelGrid({
 }) {
   const layer = aiValidations as ValidatorLayer;
   if (!layer || !Array.isArray(layer.outputs) || layer.outputs.length === 0) {
-    return null;
+    return <UnavailablePanel />;
   }
 
   // Index by provider name, emit in canonical display order. Unknown
@@ -139,7 +160,7 @@ export function FourModelGrid({
   const ordered = PROVIDER_ORDER.map((p) => byProvider[p]).filter(
     (o): o is ValidatorOutputShape => o !== undefined,
   );
-  if (ordered.length === 0) return null;
+  if (ordered.length === 0) return <UnavailablePanel />;
 
   return (
     <section className="report-section-card mt-10">

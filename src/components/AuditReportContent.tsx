@@ -237,12 +237,6 @@ export function AuditReportContent({
               <dt>Generated</dt>
               <dd>{dateLabel}</dd>
             </div>
-            <div>
-              <dt>Status</dt>
-              <dd className={`report-band-pill report-band-pill-${tone}`}>
-                {band}
-              </dd>
-            </div>
           </dl>
         </header>
 

@@ -19,11 +19,12 @@ import {
  *
  * Anatomy (top → bottom):
  *   1. Header row — label left, status pill right.
- *   2. Main score block — 112px mono number + `/ 100` denominator,
- *      tone-colored via the existing `.score-card-tone-{ok|warn|bad}`
- *      classes.
- *   3. Caption — one tone-specific sentence (replaces the previous
- *      explainer + blurb paragraph pair).
+ *   2. Inline score reference — single sentence "Your AI Visibility
+ *      Score is {N}/100 — {band}." Body-prose typography, NOT a
+ *      hero-style jumbo number. The cover page is the single source
+ *      of the big visual score; the body card now reads as a
+ *      contextual strip carrying the operational supporting signals.
+ *   3. Caption — one tone-specific sentence.
  *   4. Optional advisory footnote — JS-heavy-site note, demoted
  *      from a bordered box to a small footnote line.
  *   5. Provenance footer — Audit Date + Report ID grid. Only renders
@@ -88,12 +89,13 @@ export function ReportScoreCard({
         <div className="score-card-top-status">{status}</div>
       </header>
 
-      <div className="score-card-main">
-        <div className="score-card-overall">
-          <span className="score-card-overall-num">{overallLabel}</span>
-          <span className="score-card-overall-max">/ 100</span>
-        </div>
-      </div>
+      <p className="score-card-inline-ref">
+        Your AI Visibility Score is{" "}
+        <span className="mono-data score-card-inline-ref-num">
+          {overallLabel}
+        </span>
+        <span className="score-card-inline-ref-max">/100</span> — {status}.
+      </p>
 
       <p className="score-card-caption">{captionForTone(tone)}</p>
 

@@ -398,53 +398,33 @@ a,
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.18);
 }
-/* Main score block — sits between the header row and the caption.
-   Stacked layout (number, then caption below) — previously this was
-   `.score-card-overall-row` with a side-by-side flex. PR #26 redesign
-   drops the flex so the 112px mono number is unambiguously the
-   visual anchor of the card. */
-.score-card-main {
-  margin-bottom: 16px;
+/* Inline score reference — single body-prose sentence carrying the
+   numeric score + band as a text reference, NOT a hero-style block.
+   The cover page (`.report-cover-score`) is the single big visual
+   score in the report; the body score card now reads as a
+   contextual strip. Tone class on the parent `.score-card` paints
+   the number to keep the band signal visible without re-scaling. */
+.score-card-inline-ref {
+  margin: 0 0 12px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.78);
 }
-/* Legacy `.score-card-overall-row` retained for backward compatibility
-   with any consumer that still references it; the redesigned component
-   uses `.score-card-main` instead. */
-.score-card-overall-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 24px;
-  margin-bottom: 22px;
-}
-.score-card-overall {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-/* The artifact. 112px mono — Bloomberg ticker scale. Tone class on
-   the parent `.score-card` paints the number; the denominator stays
-   muted to preserve the number's dominance. */
-.score-card-overall-num {
-  font-size: 112px;
+.score-card-inline-ref-num {
   font-weight: 700;
-  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
-  letter-spacing: -0.03em;
   color: #ffffff;
 }
-.score-card-tone-ok .score-card-overall-num {
+.score-card-tone-ok .score-card-inline-ref-num {
   color: #6ce39a;
 }
-.score-card-tone-warn .score-card-overall-num {
+.score-card-tone-warn .score-card-inline-ref-num {
   color: #ffc46b;
 }
-.score-card-tone-bad .score-card-overall-num {
+.score-card-tone-bad .score-card-inline-ref-num {
   color: #ff9a3c;
 }
-.score-card-overall-max {
-  font-size: 28px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.4);
+.score-card-inline-ref-max {
+  color: rgba(255, 255, 255, 0.45);
 }
 /* Tone-specific single-sentence caption sitting directly below the
    number. Replaces the old `.score-card-explainer` + `.score-card-blurb`
@@ -1890,12 +1870,8 @@ a,
     grid-template-columns: 1fr;
     gap: 12px;
   }
-  .score-card-overall-row {
-    flex-direction: column;
-    gap: 10px;
-  }
-  .score-card-overall-num {
-    font-size: 56px;
+  .score-card-inline-ref {
+    font-size: 14px;
   }
   .report-section-card {
     padding: 24px 20px 26px;
@@ -2293,5 +2269,61 @@ a,
   }
   .category-score-radar-wrap .radar-chart {
     max-width: 220px !important;
+  }
+
+  /* === Report-v2 print-context layout fixes ============================ */
+
+  /* "Recommendati on" fix + URL splits.
+     `.report-prose` sets `hyphens: manual` for prose readability, which
+     Chromium uses to break long words at fallback hyphenation points
+     when the printable width is narrow. Suppress on labels and links
+     where the break is never welcome. */
+  .report-prose a,
+  .category-score-label,
+  .category-score-label *,
+  [class*="finding-label"],
+  .score-card-inline-ref,
+  .pill {
+    hyphens: none !important;
+    -webkit-hyphens: none !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+  .report-prose a {
+    overflow-wrap: anywhere !important;
+  }
+
+  /* "AI Inputs Analyzed 12 Inputs" fix — flex `gap` is unreliable in
+     print at narrow widths; reassert + add belt-and-suspenders margin. */
+  .report-section-card-header {
+    display: flex !important;
+    gap: 10px !important;
+    justify-content: space-between !important;
+    align-items: baseline !important;
+    margin-bottom: 10px !important;
+  }
+  .report-section-card-header > * + * {
+    margin-left: 8px !important;
+  }
+
+  /* "AI Visibility Score Needs Work" fix — same gap reassertion for
+     the score-card header (still has eyebrow + status pill after the
+     jumbo-number removal). */
+  .score-card-header {
+    display: flex !important;
+    gap: 10px !important;
+    justify-content: space-between !important;
+    align-items: baseline !important;
+    margin-bottom: 12px !important;
+  }
+  .score-card-header > * + * {
+    margin-left: 8px !important;
+  }
+
+  /* Section h2 breathing room inside `.report-section-card` — Tailwind
+     `mt-3` margins are unreliable in print. */
+  .report-section-card h2 {
+    margin-top: 12px !important;
+    margin-bottom: 8px !important;
   }
 }
