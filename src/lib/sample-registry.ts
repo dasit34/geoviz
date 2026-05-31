@@ -142,6 +142,9 @@ export async function findSampleAudit(entry: SampleEntry) {
             // when both are null.
             aiValidations: true,
             consensusIndex: true,
+            // V2 preflight signals — consumed by the report v2
+            // "AI Inputs Analyzed" section. Null on older audits.
+            preflightSignals: true,
           },
         },
       },

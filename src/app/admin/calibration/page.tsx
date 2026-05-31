@@ -50,6 +50,15 @@ export default function AdminCalibrationPage({
             worker queue customers hit. Calibration batch workflow is
             preserved end-to-end.
           </p>
+          <p className="mt-3 text-xs text-white/55">
+            Reviewing a paid customer order?{" "}
+            <a
+              href={`/admin/reports?key=${encodeURIComponent(key!)}`}
+              className="text-accent hover:underline"
+            >
+              Open the customer reports dashboard →
+            </a>
+          </p>
         </header>
         <CalibrationDashboard adminKey={key!} />
       </section>

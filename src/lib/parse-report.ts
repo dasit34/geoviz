@@ -1355,3 +1355,206 @@ export function stripScoreMath(body: string): string {
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
+
+// ─────────────────────────────────────────────────────────────
+// Evidence-based finding helper (report v2 — additive)
+//
+// Maps the open-ended labeled fields emitted by the model under each
+// issue / fix card onto a fixed four-block schema:
+//   1. What We Found
+//   2. Why It Matters
+//   3. Business Impact
+//   4. Recommended Fix
+//
+// The model is free to emit any subset of these labels (and variants
+// like "What to do", "Expected impact", "Recommendation"). We do
+// label-keyword matching first; when nothing matches a block, we
+// leave it empty so the renderer can fall back to a single "What We
+// Found" block with the raw body. Never fabricates content — only
+// rearranges already-parsed fields. Does NOT touch scoring.
+// ─────────────────────────────────────────────────────────────
+
+export type EvidenceBlockKey =
+  | "found"
+  | "matters"
+  | "impact"
+  | "fix";
+
+export type EvidenceBlock = {
+  key: EvidenceBlockKey;
+  label: string;
+  content: string;
+};
+
+export type EvidenceFinding = {
+  /** When at least one block has content, the renderer should use
+   *  the structured grid. When false, the renderer should fall back
+   *  to the original ItemCard / Prose rendering. */
+  hasStructured: boolean;
+  blocks: EvidenceBlock[];
+  /** Leftover labeled fields that didn't map to any of the four
+   *  blocks — exposed so the renderer can still surface them under
+   *  a "Detail" section without dropping copy. */
+  rest: LabeledField[];
+};
+
+const EVIDENCE_BLOCK_LABELS: Record<EvidenceBlockKey, string> = {
+  found: "What We Found",
+  matters: "Why It Matters",
+  impact: "Business Impact",
+  fix: "Recommended Fix",
+};
+
+// Label-keyword matchers. Ordered most-specific first so e.g.
+// "business impact" maps to `impact`, not the "what to do" branch.
+const EVIDENCE_BLOCK_MATCHERS: Array<{
+  key: EvidenceBlockKey;
+  re: RegExp;
+}> = [
+  // "Business Impact" / "Expected business impact" / "Impact on revenue"
+  {
+    key: "impact",
+    re: /(business\s+impact|impact\s+on|expected\s+(?:business\s+)?impact|revenue\s+impact|customer\s+impact|risk\s+to\s+the\s+business)/i,
+  },
+  // "Why it matters" / "Why this matters" / "Why this is important"
+  {
+    key: "matters",
+    re: /(why\s+(?:it|this)\s+(?:matters|is\s+important)|the\s+stakes|so\s+what)/i,
+  },
+  // "Recommended fix" / "What to do" / "Recommendation" / "Action" / "Next step"
+  {
+    key: "fix",
+    re: /(recommended\s+fix|recommendation|what\s+to\s+do|fix(?:\s+approach)?|action|next\s+step|how\s+to\s+(?:fix|resolve|address))/i,
+  },
+  // "What we found" / "What we observed" / "Finding" / "Evidence"
+  {
+    key: "found",
+    re: /(what\s+we\s+(?:found|observed|saw)|finding|the\s+finding|observation|evidence|what\s+is\s+happening|the\s+issue)/i,
+  },
+];
+
+/**
+ * Take the labeled fields under an issue / fix item body and project
+ * them onto the four canonical evidence blocks. When at least one
+ * canonical block matches, returns `hasStructured: true` and the
+ * renderer can present the four-block grid. When nothing matches,
+ * returns `hasStructured: false` and the caller falls back to the
+ * existing render path. Pure helper — no scoring side effects.
+ */
+export function toEvidenceFinding(
+  fields: LabeledField[],
+  fallbackBody?: string,
+): EvidenceFinding {
+  const blocks: Record<EvidenceBlockKey, string> = {
+    found: "",
+    matters: "",
+    impact: "",
+    fix: "",
+  };
+  const rest: LabeledField[] = [];
+
+  for (const f of fields) {
+    const label = f.label.trim();
+    let matched: EvidenceBlockKey | null = null;
+    for (const m of EVIDENCE_BLOCK_MATCHERS) {
+      if (m.re.test(label)) {
+        matched = m.key;
+        break;
+      }
+    }
+    if (matched && !blocks[matched]) {
+      blocks[matched] = f.content.trim();
+    } else if (matched) {
+      // Same block matched twice — keep the longer (more informative) one.
+      if (f.content.trim().length > blocks[matched].length) {
+        blocks[matched] = f.content.trim();
+      }
+    } else {
+      rest.push(f);
+    }
+  }
+
+  // If we found at least one structured block, also drop a fallback
+  // "What We Found" so the card never opens with an empty box.
+  let hasStructured =
+    blocks.found.length > 0 ||
+    blocks.matters.length > 0 ||
+    blocks.impact.length > 0 ||
+    blocks.fix.length > 0;
+
+  if (hasStructured && !blocks.found && fallbackBody) {
+    const stripped = fallbackBody
+      .replace(/^\s*[-*]\s+\*\*[^*]+\*\*[^\n]*$/gm, "")
+      .trim();
+    if (stripped.length > 0 && stripped.length < 320) {
+      blocks.found = stripped;
+    }
+  }
+
+  const orderedBlocks: EvidenceBlock[] = (
+    ["found", "matters", "impact", "fix"] as const
+  ).map((key) => ({
+    key,
+    label: EVIDENCE_BLOCK_LABELS[key],
+    content: blocks[key],
+  }));
+
+  return {
+    hasStructured,
+    blocks: orderedBlocks,
+    rest,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Customer-language category heading mapping (report v2 — additive)
+//
+// Maps the rubric's internal category labels (Schema / Crawler
+// Readiness / Trust Signals / Brand Entity Clarity / Technical
+// Accessibility / Content Depth) to customer-facing display
+// headings. RENDER-LAYER ONLY — does NOT touch worker prompts,
+// scoring categories in `CATEGORIES`, telemetry labels, or DB
+// columns. The canonical category names stay byte-stable for
+// queryability.
+// ─────────────────────────────────────────────────────────────
+
+const CUSTOMER_HEADING_PAIRS: Array<{ re: RegExp; label: string }> = [
+  {
+    re: /^\s*(?:Schema(?:\s*\/\s*Structured\s*Data)?|Structured\s*Data(?:\s*\/\s*Schema)?)\s*$/i,
+    label: "How AI Verifies Your Business",
+  },
+  {
+    re: /^\s*(?:AI\s+)?Crawler\s+Readiness\s*$/i,
+    label: "Can AI Read Your Website?",
+  },
+  {
+    re: /^\s*Brand(?:\s*\/?\s*Entity)?\s+Clarity\s*$/i,
+    label: "How Clearly AI Understands Your Business",
+  },
+  {
+    re: /^\s*(?:Local\s+)?Trust\s+Signals\s*$/i,
+    label: "Reasons AI Would Trust Your Business",
+  },
+  {
+    re: /^\s*Technical\s+Accessibility\s*$/i,
+    label: "Can AI Access Your Information?",
+  },
+  {
+    re: /^\s*Content\s+Depth(?:\s*\+\s*FAQ(?:\s*Quality)?)?\s*$/i,
+    label: "How Well Your Content Answers Customer Questions",
+  },
+];
+
+/**
+ * Map a technical category heading to its customer-facing label.
+ * Returns the original input when no mapping matches so untracked
+ * headings pass through unchanged. Pure string mapping — no side
+ * effects, no scoring impact.
+ */
+export function toCustomerHeading(heading: string): string {
+  if (!heading) return heading;
+  for (const { re, label } of CUSTOMER_HEADING_PAIRS) {
+    if (re.test(heading)) return label;
+  }
+  return heading;
+}

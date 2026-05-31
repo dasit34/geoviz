@@ -75,12 +75,48 @@ export async function generateAuditPdf(args: GeneratePdfArgs): Promise<Buffer> {
       timeout: timeoutMs,
     });
 
+    // Post-render URL truncation check. The PDF rendering pipeline
+    // has historically sheared the protocol prefix off long URLs
+    // ("https://" → "ttps://") when print.css used a non-standard
+    // word-break value. The print.css fix routes the break through
+    // overflow-wrap: anywhere instead, but we keep a soft check in
+    // place so any future regression surfaces in the logs without
+    // blocking customer delivery.
+    try {
+      const renderedHtml = await page.content();
+      const truncationPatterns = [
+        /(?<![\w-])ttps:\/\//, // "ttps://" — missing leading "h"
+        /(?<![\w-])ttp:\/\//, // "ttp://"  — missing leading "h"
+      ];
+      const hits = truncationPatterns
+        .map((re) => re.exec(renderedHtml)?.[0])
+        .filter((m): m is string => Boolean(m));
+      if (hits.length > 0) {
+        console.warn(
+          `[generate-pdf] orderId=${orderId} URL_TRUNCATION_DETECTED hits=${JSON.stringify(
+            hits,
+          )} — soft warning; PDF still rendered. Check print.css URL hardening rules.`,
+        );
+      }
+    } catch (checkErr) {
+      // Soft check — never let it block the PDF emission.
+      console.warn(
+        `[generate-pdf] orderId=${orderId} url-truncation-check failed: ${
+          checkErr instanceof Error ? checkErr.message : String(checkErr)
+        }`,
+      );
+    }
+
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
+      // Margins kept in sync with the CSS @page rule (print.css).
+      // preferCSSPageSize: true means the CSS wins when both are
+      // present — these values are the JS-side fallback for
+      // environments where preferCSSPageSize is ignored.
       margin: {
-        top: "16mm",
-        bottom: "20mm",
+        top: "18mm",
+        bottom: "18mm",
         left: "16mm",
         right: "16mm",
       },

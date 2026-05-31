@@ -20,6 +20,33 @@
  */
 
 export const SECTION_EYEBROWS = {
+  /**
+   * Report v2 — appears at the very top of the report, BEFORE Section
+   * 01. Lists the AI-readable signals GeoViz looked at and whether
+   * each was found, partially found, or not found. Intentionally
+   * UNNUMBERED so it doesn't shift the existing 01–06 sequence.
+   */
+  aiInputsAnalyzed: "AI Inputs Analyzed",
+  /**
+   * Report v2 — descriptive "why this score" breakdown that sits
+   * between the score card and Section 02. Intentionally UNNUMBERED
+   * so it doesn't disrupt the frozen 01–06 numbering.
+   */
+  whyYouReceivedThisScore: "Why You Received This Score",
+  /**
+   * Report v2 — plain-English distillation of the cross-model
+   * consensus data. Sits between the four-model grid and the
+   * existing technical Cross-Model Intelligence read. Intentionally
+   * UNNUMBERED.
+   */
+  aiConsensusSummary: "AI Consensus Summary",
+  /**
+   * Report v2 — four-model interpretation grid (ChatGPT, Claude,
+   * Gemini, Perplexity). Sits BEFORE the existing Cross-Model
+   * Intelligence card. Intentionally UNNUMBERED so the validator
+   * gate ON/OFF state never shifts Section 01–06 numbering.
+   */
+  howAiUnderstands: "How AI Currently Understands Your Business",
   /** Section 01 — Executive summary block at the top of the report. */
   executiveSummary: "Section 01 · Executive summary",
   /** Section 02 — Six-category breakdown grid. */

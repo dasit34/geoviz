@@ -78,6 +78,10 @@ export default async function PrintPage({
           // the section when both are null.
           aiValidations: true,
           consensusIndex: true,
+          // V2 preflight signals — consumed by the report v2
+          // "AI Inputs Analyzed" section. Null on older audits;
+          // renderer falls back to "Not analyzed" rows.
+          preflightSignals: true,
         },
       },
     },
@@ -157,6 +161,7 @@ async function buildReportContext(
     recommendationReadinessScore: number | null;
     aiValidations?: unknown;
     consensusIndex?: unknown;
+    preflightSignals?: unknown;
   } | null,
 ): Promise<AuditReportContext | undefined> {
   if (!intelligence) return undefined;
@@ -209,6 +214,7 @@ async function buildReportContext(
       weakestCategoryCopy: bundle.weakestCategory?.data.copy ?? null,
       aiValidations: intelligence.aiValidations ?? null,
       consensusIndex: intelligence.consensusIndex ?? null,
+      preflightSignals: intelligence.preflightSignals ?? null,
     };
   } catch (err) {
     console.error(

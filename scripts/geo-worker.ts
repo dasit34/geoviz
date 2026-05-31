@@ -364,6 +364,79 @@ sharp; do NOT repeat the same finding across sections):
     AI systems CAN likely understand, what they CANNOT confidently
     verify, what SIGNAL is missing, and WHY confidence is low.
 
+CUSTOMER-FACING NARRATION (mandatory — applies to all prose in
+sections 1–5, including per-category "why" lines, finding
+headlines, finding bodies, and fix descriptions):
+
+  The categories above (Structured Data / Schema, AI Crawler
+  Readiness, Local Trust Signals, Content Depth + FAQ Quality,
+  Brand / Entity Clarity, Technical Accessibility) are the
+  scoring-rubric names and MUST appear EXACTLY as written in
+  the Section 1 breakdown bullets so the score parser keeps
+  working. They are the ONLY place these technical terms may
+  appear in customer-facing prose.
+
+  Everywhere else (the per-category "why" sentence, all finding
+  prose, all fix prose, business impact, score drivers), use
+  plain business language. The customer is a roofer, dentist,
+  contractor, or HVAC owner. They do not know what JSON-LD,
+  schema.org, robots.txt, sitemap.xml, llms.txt, "crawler", or
+  "structured data" mean — and they should not have to.
+
+  Replacement framings (use phrasings of this shape in finding
+  prose and "why" lines):
+    - INSTEAD OF "no LocalBusiness JSON-LD" / "missing schema
+      markup" / "no schema.org structured data":
+      → "AI cannot easily verify your business" / "AI tools
+         can't confirm what your business does or where you
+         serve" / "AI has no machine-readable way to identify
+         this business"
+    - INSTEAD OF "GPTBot is disallowed in robots.txt" / "crawler
+      access blocked" / "no AI crawler access":
+      → "AI cannot read your website" / "ChatGPT and Claude
+         can't reach your site to read what you offer"
+    - INSTEAD OF "no sitemap.xml" / "missing llms.txt":
+      → "AI has no map of your services to follow" / "AI tools
+         have no guide to the most important pages on your site"
+    - INSTEAD OF "weak entity consistency" / "inconsistent NAP":
+      → "Your business name, address, and phone don't match
+         across the web" / "AI sees conflicting information
+         about where you're located"
+    - INSTEAD OF "thin FAQ schema" / "no FAQPage markup":
+      → "AI can't find clear answers to the questions customers
+         actually ask"
+
+  Where the prose introduces a sub-heading for a category-themed
+  block (NOT the Section 1 breakdown bullets — those stay
+  rubric-named), prefer these plain-English descriptors. They
+  match the labels the customer-facing report renderer uses, so
+  the prose and the rendered section headings stay coherent:
+    - Schema / Structured Data → "How AI Verifies Your Business"
+    - AI Crawler Readiness → "Can AI Access Your Information?"
+    - Local Trust Signals → "Reasons AI Would Trust Your Business"
+    - Content Depth + FAQ Quality → "How Well Your Content Answers Customer Questions"
+    - Brand / Entity Clarity → "How Clearly AI Understands Your Business"
+    - Technical Accessibility → "Can AI Read Your Website?"
+
+  These descriptors are for prose / sub-headings ONLY. Do NOT
+  use them in the Section 1 breakdown bullets — those must keep
+  the rubric names so the score parser keeps matching.
+
+CROSS-MODEL NARRATION (mandatory — applies whenever any prose
+references how individual AI systems interpret the business):
+
+  If a provider returned null, an error, or no result in the
+  aiValidations[] block of the authoritative score context, the
+  prose for that provider MUST say "Analysis unavailable" (or
+  equivalent) for that provider. NEVER invent findings, scores,
+  or claims about a provider that did not return data. NEVER
+  paper over a missing provider with phrases like "ChatGPT also
+  agreed" / "Claude saw similar issues" when that provider
+  returned null. The customer report must accurately reflect
+  which providers actually contributed signal and which did not.
+  When in doubt, omit the per-provider claim entirely rather
+  than fabricate participation.
+
 SCORE FRAMING (mandatory — one short clarifying line near the
 top of Section 1 OR in Business Impact):
   These scores estimate how clearly AI systems can understand
@@ -805,6 +878,79 @@ sharp; do NOT repeat the same finding across sections):
     signals, AI systems may struggle to…" Identify what
     AI systems CAN likely understand, what they CANNOT confidently
     verify, what SIGNAL is missing, and WHY confidence is low.
+
+CUSTOMER-FACING NARRATION (mandatory — applies to all prose in
+sections 1–5, including per-category "why" lines, finding
+headlines, finding bodies, and fix descriptions):
+
+  The categories above (Structured Data / Schema, AI Crawler
+  Readiness, Local Trust Signals, Content Depth + FAQ Quality,
+  Brand / Entity Clarity, Technical Accessibility) are the
+  scoring-rubric names and MUST appear EXACTLY as written in
+  the Section 1 breakdown bullets so the score parser keeps
+  working. They are the ONLY place these technical terms may
+  appear in customer-facing prose.
+
+  Everywhere else (the per-category "why" sentence, all finding
+  prose, all fix prose, business impact, score drivers), use
+  plain business language. The customer is a roofer, dentist,
+  contractor, or HVAC owner. They do not know what JSON-LD,
+  schema.org, robots.txt, sitemap.xml, llms.txt, "crawler", or
+  "structured data" mean — and they should not have to.
+
+  Replacement framings (use phrasings of this shape in finding
+  prose and "why" lines):
+    - INSTEAD OF "no LocalBusiness JSON-LD" / "missing schema
+      markup" / "no schema.org structured data":
+      → "AI cannot easily verify your business" / "AI tools
+         can't confirm what your business does or where you
+         serve" / "AI has no machine-readable way to identify
+         this business"
+    - INSTEAD OF "GPTBot is disallowed in robots.txt" / "crawler
+      access blocked" / "no AI crawler access":
+      → "AI cannot read your website" / "ChatGPT and Claude
+         can't reach your site to read what you offer"
+    - INSTEAD OF "no sitemap.xml" / "missing llms.txt":
+      → "AI has no map of your services to follow" / "AI tools
+         have no guide to the most important pages on your site"
+    - INSTEAD OF "weak entity consistency" / "inconsistent NAP":
+      → "Your business name, address, and phone don't match
+         across the web" / "AI sees conflicting information
+         about where you're located"
+    - INSTEAD OF "thin FAQ schema" / "no FAQPage markup":
+      → "AI can't find clear answers to the questions customers
+         actually ask"
+
+  Where the prose introduces a sub-heading for a category-themed
+  block (NOT the Section 1 breakdown bullets — those stay
+  rubric-named), prefer these plain-English descriptors. They
+  match the labels the customer-facing report renderer uses, so
+  the prose and the rendered section headings stay coherent:
+    - Schema / Structured Data → "How AI Verifies Your Business"
+    - AI Crawler Readiness → "Can AI Access Your Information?"
+    - Local Trust Signals → "Reasons AI Would Trust Your Business"
+    - Content Depth + FAQ Quality → "How Well Your Content Answers Customer Questions"
+    - Brand / Entity Clarity → "How Clearly AI Understands Your Business"
+    - Technical Accessibility → "Can AI Read Your Website?"
+
+  These descriptors are for prose / sub-headings ONLY. Do NOT
+  use them in the Section 1 breakdown bullets — those must keep
+  the rubric names so the score parser keeps matching.
+
+CROSS-MODEL NARRATION (mandatory — applies whenever any prose
+references how individual AI systems interpret the business):
+
+  If a provider returned null, an error, or no result in the
+  aiValidations[] block of the authoritative score context, the
+  prose for that provider MUST say "Analysis unavailable" (or
+  equivalent) for that provider. NEVER invent findings, scores,
+  or claims about a provider that did not return data. NEVER
+  paper over a missing provider with phrases like "ChatGPT also
+  agreed" / "Claude saw similar issues" when that provider
+  returned null. The customer report must accurately reflect
+  which providers actually contributed signal and which did not.
+  When in doubt, omit the per-provider claim entirely rather
+  than fabricate participation.
 
 SCORE FRAMING (mandatory — one short clarifying line near the
 top of Section 1 OR in Business Impact):

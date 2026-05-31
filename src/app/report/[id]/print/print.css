@@ -29,6 +29,27 @@
   overflow-x: hidden;
 }
 
+/* ---- universal long-token / URL hardening ----
+ * Customer reports embed full https:// URLs in prose ("**Site:**
+ * https://example.com"), anchor href text, and mono-data IDs.
+ * Chromium's PDF renderer historically sheared the protocol prefix
+ * off long URLs ("https://" rendering as "ttps://") when paired with
+ * a non-standard word-break value. The spec-correct cure is:
+ *   overflow-wrap: anywhere — strong break when the line cannot fit
+ *   word-break: break-word — additive fallback for older engines
+ *   hyphens: none — Chromium must NOT insert a soft-hyphen break in
+ *                   the middle of a URL or mono-data identifier
+ * Applied to anchors, the explicit .url-text utility, and any
+ * .mono-data span. Headings and pills are guarded separately.  */
+a,
+.url-text,
+.mono-data {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: none;
+  -webkit-hyphens: none;
+}
+
 /* ---- report cover (premium intelligence-brief sheet) ----
  * Additive + presentation-only. Renders as the first block; in PDF it
  * is forced to its own page via page-break-after in @media print.
@@ -107,6 +128,15 @@
   margin: 12px 0 0;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.5);
+  /* PDF hardening: long hostnames must never get shattered mid-token
+     by Chromium's PDF renderer (the historical "ttps://" loss). Use
+     overflow-wrap: anywhere (the spec-correct strong-break property)
+     instead of the non-standard word-break: break-all/break-word so
+     the protocol prefix stays intact. Disable hyphens explicitly. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 .report-cover-scorerow {
   display: flex;
@@ -1347,6 +1377,8 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  /* Pill text never wraps mid-label — the row itself wraps if needed. */
+  white-space: nowrap;
   border: 1px solid;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -1516,9 +1548,31 @@
   font-size: 14.5px;
   line-height: 1.7;
   color: rgba(255, 255, 255, 0.85);
-  /* Defensive: long URLs / unbroken tokens never overflow the card. */
-  overflow-wrap: break-word;
+  /* Defensive: long URLs / unbroken tokens never overflow the card.
+     overflow-wrap: anywhere is the spec-correct strong-break (lets
+     Chromium break the URL mid-token only when no fit exists).
+     word-break: break-word is left as an additive fallback. */
+  overflow-wrap: anywhere;
   word-break: break-word;
+  /* Manual hyphenation in long prose, suppressed on URLs / headings
+     (see overrides below). orphans/widows keep last-line / first-
+     line splits readable in the PDF. */
+  hyphens: manual;
+  -webkit-hyphens: manual;
+  orphans: 3;
+  widows: 3;
+}
+/* Headings, URLs, and mono identifiers MUST NOT get soft-hyphen
+   breaks. Headings in particular shed an "h" when Chromium inserts
+   a hyphen break mid-word at the end of a print page. */
+.report-prose h2,
+.report-prose h3,
+.report-prose h4,
+.report-prose a,
+.report-prose code,
+.report-prose .mono-data {
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 /* Defensive image rendering — model rarely emits images, but if it
    does we cap them so they never overflow the card width. */
@@ -1571,7 +1625,13 @@
   color: #ff9a3c;
   text-decoration: underline;
   text-underline-offset: 2px;
+  /* Match the universal anchor hardening at top of file — long
+     hrefs ("https://...") must break only when forced and never
+     hyphenate. */
   word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 .report-prose ul,
 .report-prose ol {
@@ -1887,7 +1947,13 @@
        but it should still be readable). ---- */
 @page {
   size: A4;
-  margin: 14mm 14mm 18mm 14mm;
+  /* 18mm top/bottom (was 14mm/18mm) — prevents the CTA card from
+     hanging off the bottom of a page when the previous section
+     packs tight, and gives headings extra clearance from the
+     page edge so h2/h3 never touch the cut line.
+     16mm left/right (was 14mm) — keeps inner content column
+     consistent with the JS-side Puppeteer margins. */
+  margin: 18mm 16mm 18mm 16mm;
 }
 
 @media print {
@@ -2033,12 +2099,49 @@
     break-inside: avoid !important;
   }
   /* Avoid orphaning a heading at the bottom of a page — keep it with
-     the first paragraph of its section. */
+     the first paragraph of its section. Also force a consistent
+     margin rhythm so two adjacent h2/h3 don't collide visually
+     across surfaces. */
   .report-prose h2,
   .report-prose h3,
   .report-prose h4 {
     page-break-after: avoid;
     break-after: avoid;
+    /* Headings never split mid-line and never hyphenate in the
+       PDF — historical "h" / "ttps://" loss came from a soft-
+       hyphen break inserted by Chromium. */
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    hyphens: none !important;
+    -webkit-hyphens: none !important;
+  }
+  /* Reinforce: the eyebrow strip ("Section 02 · Category breakdown")
+     must stay glued to the heading directly below it. The visual
+     pair is meaningless if Chromium splits them across pages. */
+  .section-eyebrow,
+  .report-section-eyebrow {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+  /* Atomic finding / fix / glance / CTA blocks: extend
+     page-break-inside avoidance to the cta-card body and the
+     report-summary groups for consistency with the screen rule. */
+  .cta-card,
+  .cta-card-body,
+  .report-glance,
+  .report-summary-group,
+  .report-snapshot {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  /* Status chips ("Pending", "Easy", "High Impact", "Foundation Fix")
+     must never wrap mid-pill. The label is short — keep it on one
+     line; the row itself wraps to the next line if needed. */
+  .pill,
+  .severity-badge,
+  .report-item-card-badges > *,
+  .cta-card-badge {
+    white-space: nowrap;
   }
 
   /* ---- print-only spacing tightening ----

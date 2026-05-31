@@ -273,6 +273,7 @@ async function buildSampleContext(
     recommendationReadinessScore: number | null;
     aiValidations?: unknown;
     consensusIndex?: unknown;
+    preflightSignals?: unknown;
   } | null,
 ): Promise<AuditReportContext | undefined> {
   if (!intelligence) return undefined;
@@ -321,6 +322,7 @@ async function buildSampleContext(
       weakestCategoryCopy: bundle.weakestCategory?.data.copy ?? null,
       aiValidations: intelligence.aiValidations ?? null,
       consensusIndex: intelligence.consensusIndex ?? null,
+      preflightSignals: intelligence.preflightSignals ?? null,
     };
   } catch (err) {
     console.error(

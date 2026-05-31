@@ -14,6 +14,8 @@ import {
   plainEnglishBandLabel,
   scoreToneFromOverall,
   stripScoreMath,
+  toCustomerHeading,
+  toEvidenceFinding,
   type ReportSection,
   type ScoreDrivers,
 } from "@/lib/parse-report";
@@ -25,6 +27,14 @@ import { ReportCtaCard } from "@/components/ReportCtaCard";
 import { CategoryScoreCard } from "@/components/CategoryScoreCard";
 import { StrengthCard } from "@/components/StrengthCard";
 import { RadarChart } from "@/components/RadarChart";
+import { AiInputsAnalyzed } from "@/components/AiInputsAnalyzed";
+import { FourModelGrid } from "@/components/FourModelGrid";
+import { ConsensusSummary } from "@/components/ConsensusSummary";
+import { WhyYouReceivedThisScore } from "@/components/WhyYouReceivedThisScore";
+import {
+  EvidenceFinding,
+  EvidenceFindingFallback,
+} from "@/components/EvidenceFinding";
 
 /**
  * Shared report body for the customer-facing print page AND the public
@@ -74,6 +84,14 @@ export type AuditReportContext = {
    */
   aiValidations?: unknown;
   consensusIndex?: unknown;
+  /**
+   * V2 preflight signals — `AuditIntelligence.preflightSignals`
+   * JSON payload (PreflightSignals shape). Null for audits that
+   * predate the V2 preflight stage. Consumed by the "AI Inputs
+   * Analyzed" section. Renderer falls back to a "Not analyzed" row
+   * set when null so older audits still render the section cleanly.
+   */
+  preflightSignals?: unknown;
 };
 
 export function AuditReportContent({
@@ -303,15 +321,31 @@ export function AuditReportContent({
         >
           <p className="section-eyebrow">How this score was built</p>
           <p className="mt-4 text-sm leading-relaxed text-white/80">
-            GeoViz fetched and analyzed your homepage HTML,
-            robots.txt, sitemap.xml, schema JSON-LD, and llms.txt.
-            The composite score weights six categories: Schema (25),
-            Crawler Readiness (20), Trust Signals (20), Content
-            Depth (15), Brand / Entity Clarity (10), Technical
-            Accessibility (10). Each report is reviewed before
+            GeoViz analyzed publicly accessible website and trust
+            signals — including site content, business identity
+            details, structured business data, and AI-crawler
+            accessibility. The composite reflects six categories
+            covering AI readability, business identity verification,
+            trust signals, content depth, brand presence, and
+            technical accessibility. Each report is reviewed before
             delivery.
           </p>
         </aside>
+
+        {/* Report v2 — AI Inputs Analyzed. Lists every AI-readable
+            signal GeoViz looked at with a FOUND / PARTIAL / NOT
+            FOUND verdict per row. Reads from preflightSignals when
+            available; falls back to "Not analyzed" rows for older
+            audits that predate preflight. */}
+        <AiInputsAnalyzed
+          preflightSignals={context?.preflightSignals ?? null}
+        />
+
+        {/* Report v2 — Why You Received This Score. Customer-language
+            descriptive read of the strongest + weakest contributors.
+            NOT a separate calculation. Derived from already-parsed
+            categories on the score object. */}
+        <WhyYouReceivedThisScore score={score} />
 
         {/* Category breakdown — primary score visualization. The six
             horizontal score bars are the executive-readable layer. The
@@ -336,6 +370,24 @@ export function AuditReportContent({
             <RadarChart categories={score.categories} />
           </div>
         </section>
+
+        {/* Report v2 — Four-Model Grid. Customer-language read of
+            how each of the four AI systems interprets the business
+            (per-dimension verdicts + knowledge gaps). Sits BEFORE
+            the technical Cross-Model Intelligence card. Fail-soft
+            hidden when no validator data is present. */}
+        <FourModelGrid aiValidations={context?.aiValidations ?? null} />
+
+        {/* Report v2 — AI Consensus Summary. Plain-English
+            distillation of the agreement signals — what all systems
+            identified, what they understood, what they couldn't
+            verify. Renders the Overall AI Recommendation Confidence
+            LABEL (not score). Fail-soft hidden when fewer than 2
+            providers passed. */}
+        <ConsensusSummary
+          aiValidations={context?.aiValidations ?? null}
+          consensusIndex={context?.consensusIndex ?? null}
+        />
 
         {/* Cross-Model Intelligence — renders only when validator
             data is present (gate ON + at least one provider passed).
@@ -793,13 +845,19 @@ function ItemListSection({
 }) {
   const eyebrowKey = tone === "diagnosis" ? "why" : "fix-first";
   const eyebrow = SECTION_EYEBROWS_BY_TYPE[eyebrowKey] ?? `Section ${number}`;
+  // Customer-language heading swap — pure render-layer translation
+  // of any technical rubric labels the model may have echoed into
+  // the section heading. The canonical category names in DB /
+  // telemetry / scoring stay byte-stable; this only swaps the
+  // display label per CLAUDE.md scoring freeze.
+  const displayHeading = toCustomerHeading(heading);
   return (
     <section className={`report-section-card report-section-${tone}`}>
       <div className="report-section-card-header">
         <p className="section-eyebrow">{eyebrow}</p>
         {badge ? <span className="pill">{badge}</span> : null}
       </div>
-      <h2 className="h2 mt-3">{heading}</h2>
+      <h2 className="h2 mt-3">{displayHeading}</h2>
       {items.length >= 2 ? (
         <ol className="report-item-list">
           {items.map((it, i) => (
@@ -836,6 +894,18 @@ function ItemCard({
   const inferredIssueSeverity =
     kind === "issue" ? inferIssueSeverity(item.title, item.body) : null;
 
+  // Report v2 — try to project the labeled fields onto the canonical
+  // four-block evidence schema (What We Found / Why It Matters /
+  // Business Impact / Recommended Fix). When at least one canonical
+  // block matched, we render the EvidenceFinding grid. Otherwise we
+  // fall back to the existing labeled-field <dl> or the raw body
+  // Prose, preserving the legacy render path so nothing regresses.
+  const evidence = toEvidenceFinding(fields, item.body);
+  // Customer-language pass on the item title — swaps technical
+  // category names if the model echoed one verbatim. Most items
+  // already use natural language; this is defensive.
+  const displayTitle = toCustomerHeading(item.title);
+
   return (
     <li className={`report-item-card report-item-card-${kind}`}>
       <div className="report-item-card-head">
@@ -846,7 +916,7 @@ function ItemCard({
         </span>
         <span className="report-item-card-index">#{index}</span>
         <h3 className="report-item-card-title">
-          <InlineProse>{item.title}</InlineProse>
+          <InlineProse>{displayTitle}</InlineProse>
         </h3>
       </div>
       <div className="report-item-card-badges">
@@ -888,7 +958,9 @@ function ItemCard({
           </span>
         ) : null}
       </div>
-      {fields.length >= 2 ? (
+      {evidence.hasStructured ? (
+        <EvidenceFinding evidence={evidence} />
+      ) : fields.length >= 2 ? (
         <dl className="report-item-card-fields">
           {fields.map((f, i) => (
             <div className="report-item-card-field" key={`${f.label}-${i}`}>
@@ -900,9 +972,7 @@ function ItemCard({
           ))}
         </dl>
       ) : (
-        <Prose className="report-item-card-body">
-          {stripScoreMath(item.body)}
-        </Prose>
+        <EvidenceFindingFallback body={stripScoreMath(item.body)} />
       )}
     </li>
   );
@@ -924,13 +994,16 @@ function SectionCard({
   const eyebrow = number
     ? SECTION_EYEBROWS_BY_TYPE[eyebrowKey] ?? `Section ${number}`
     : SECTION_EYEBROWS_BY_TYPE.other;
+  // Customer-language heading swap — pure render-layer translation.
+  // See ItemListSection above for rationale.
+  const displayHeading = toCustomerHeading(section.heading);
   return (
     <section className={`report-section-card report-section-${tone}`}>
       <div className="report-section-card-header">
         <p className="section-eyebrow">{eyebrow}</p>
         {badge ? <span className="pill">{badge}</span> : null}
       </div>
-      <h2 className="h2 mt-3">{section.heading}</h2>
+      <h2 className="h2 mt-3">{displayHeading}</h2>
       <Prose className="mt-5">{stripScoreMath(section.body)}</Prose>
     </section>
   );

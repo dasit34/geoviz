@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { prisma, isDatabaseConfigured } from "@/lib/db";
@@ -9,6 +10,13 @@ import {
   markPendingAction,
   updateNotesAction,
 } from "./actions";
+import {
+  parseAiValidations,
+  parseConsensusIndex,
+  ProviderStatusStrip,
+  type ParsedValidations,
+  type ParsedConsensus,
+} from "@/components/admin/ProviderTelemetryGrid";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -26,6 +34,14 @@ type Order = {
   notes: string | null;
   amount: number;
   createdAt: Date;
+  // Validator + consensus telemetry joined from AuditIntelligence.
+  // Either may be null on rows where the consensus pipeline gate was
+  // off when the audit ran — the UI renders that case as "Not run"
+  // for every provider, never as fabricated participation.
+  intelligence: {
+    aiValidations: unknown;
+    consensusIndex: unknown;
+  } | null;
 };
 
 export default async function AdminPage({
@@ -95,6 +111,20 @@ export default async function AdminPage({
       orders = await prisma.auditOrder.findMany({
         orderBy: { createdAt: "desc" },
         take: 200,
+        include: {
+          // Cross-Model Intelligence telemetry — joined so the queue
+          // can render the per-provider execution chips inline. Only
+          // the two Json columns are selected (aiValidations +
+          // consensusIndex); the heavier deterministicScore /
+          // replayBundle stay out of the list view and are read on
+          // the trace page instead.
+          intelligence: {
+            select: {
+              aiValidations: true,
+              consensusIndex: true,
+            },
+          },
+        },
       });
     } catch (err) {
       console.error("[admin] DB query failed", err);
@@ -166,6 +196,7 @@ export default async function AdminPage({
                 <th className="px-5 py-3">Email</th>
                 <th className="px-5 py-3">Payment</th>
                 <th className="px-5 py-3">Audit</th>
+                <th className="px-5 py-3">Validators</th>
                 <th className="px-5 py-3">Notes</th>
                 <th className="px-5 py-3 text-right">Actions</th>
               </tr>
@@ -174,7 +205,7 @@ export default async function AdminPage({
               {orders.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-5 py-10 text-center text-white/50"
                   >
                     {dbError ? "Database not available." : "No orders yet."}
@@ -208,6 +239,9 @@ export default async function AdminPage({
                   <td className="px-5 py-4">
                     <AuditPill value={o.auditStatus} />
                   </td>
+                  <td className="px-5 py-4 min-w-[18rem]">
+                    <ValidatorsCell intelligence={o.intelligence} />
+                  </td>
                   <td className="px-5 py-4 min-w-[16rem]">
                     <form
                       action={updateNotesAction}
@@ -231,6 +265,12 @@ export default async function AdminPage({
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-col items-end gap-2">
+                      <Link
+                        href={`/admin/trace/${o.id}`}
+                        className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/75 hover:border-white/25 hover:text-white"
+                      >
+                        Trace
+                      </Link>
                       {o.auditStatus === "pending" ? (
                         <form action={markCompletedAction}>
                           <input type="hidden" name="id" value={o.id} />
@@ -284,6 +324,49 @@ function Stat({
     <div className="card">
       <p className="text-xs uppercase tracking-[0.2em] text-white/40">{label}</p>
       <p className={`mt-1 text-2xl font-semibold ${valueColor}`}>{value}</p>
+    </div>
+  );
+}
+
+/**
+ * Per-order validator strip + consensus badge for the queue table.
+ *
+ * Reads directly from the joined `intelligence` row. When intelligence
+ * is null OR aiValidations is null (gate off, validator step did not
+ * run), every provider is rendered as "Not run" — see
+ * `ProviderStatusStrip`'s notRun branch. We never fabricate provider
+ * participation.
+ */
+function ValidatorsCell({
+  intelligence,
+}: {
+  intelligence: Order["intelligence"];
+}) {
+  const validations: ParsedValidations = parseAiValidations(
+    intelligence?.aiValidations ?? null,
+  );
+  const consensus: ParsedConsensus = parseConsensusIndex(
+    intelligence?.consensusIndex ?? null,
+  );
+  return (
+    <div className="flex flex-col gap-2">
+      <ProviderStatusStrip validations={validations} />
+      <div className="text-[11px] text-white/45">
+        Consensus:{" "}
+        {consensus ? (
+          <span className="text-white/75">
+            {consensus.verdict ?? "—"}
+            {consensus.confidence_index != null ? (
+              <span className="mono-data text-white/55">
+                {" "}
+                · idx {consensus.confidence_index}
+              </span>
+            ) : null}
+          </span>
+        ) : (
+          <span className="text-white/45">not computed</span>
+        )}
+      </div>
     </div>
   );
 }
