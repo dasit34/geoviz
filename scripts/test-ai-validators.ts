@@ -4,7 +4,9 @@
  *
  * Mocked-only test runner for the AI validator scaffold. No network.
  * No real API keys read. No DB writes. Mutates `process.env` between
- * scenarios to exercise the gating ladder, then restores at the end.
+ * scenarios to exercise the per-provider API-key gating ladder, then
+ * restores at the end. The master enable flag was removed — API-key
+ * presence is the single gate; the test mirrors that.
  *
  *   npx tsx scripts/test-ai-validators.ts
  *
@@ -29,7 +31,6 @@ import type {
 // Snapshot env vars we mutate so other scripts/dev workflows aren't
 // surprised when this runs alongside them.
 const ENV_KEYS = [
-  "ENABLE_AI_VALIDATORS",
   "OPENAI_API_KEY",
   "GEMINI_API_KEY",
   "PERPLEXITY_API_KEY",
@@ -81,49 +82,47 @@ const sampleInput: ValidationInput = {
 };
 
 async function scenario1Disabled(): Promise<void> {
-  console.log("[ai-validators-test] Scenario 1: ENABLE_AI_VALIDATORS unset (default off)");
+  console.log("[ai-validators-test] Scenario 1: no API keys → all providers unavailable");
   clearEnv();
   const c = await ClaudeValidator.validateBusiness(sampleInput);
-  check("Claude → skipped", c.status === "skipped", `got ${c.status}`);
+  check("Claude → unavailable when ANTHROPIC_API_KEY missing", c.status === "unavailable", `got ${c.status}`);
+  check("Claude error names ANTHROPIC_API_KEY", typeof c.error === "string" && c.error.includes("ANTHROPIC_API_KEY"));
   const o = await OpenAIValidator.validateBusiness(sampleInput);
-  check("OpenAI → skipped", o.status === "skipped", `got ${o.status}`);
+  check("OpenAI → unavailable when OPENAI_API_KEY missing", o.status === "unavailable", `got ${o.status}`);
+  check("OpenAI error names OPENAI_API_KEY", typeof o.error === "string" && o.error.includes("OPENAI_API_KEY"));
   const g = await GeminiValidator.validateBusiness(sampleInput);
-  check("Gemini → skipped", g.status === "skipped", `got ${g.status}`);
+  check("Gemini → unavailable when GEMINI_API_KEY missing", g.status === "unavailable", `got ${g.status}`);
   const p = await PerplexityValidator.validateBusiness(sampleInput);
-  check("Perplexity → skipped", p.status === "skipped", `got ${p.status}`);
+  check("Perplexity → unavailable when PERPLEXITY_API_KEY missing", p.status === "unavailable", `got ${p.status}`);
   const ga = await GoogleAIOverviewValidator.validateBusiness(sampleInput);
   check("Google AI Overview → unavailable (permanent)", ga.status === "unavailable");
 }
 
 async function scenario2EnabledNoKeys(): Promise<void> {
-  console.log("[ai-validators-test] Scenario 2: ENABLE_AI_VALIDATORS=true, no API keys");
+  console.log("[ai-validators-test] Scenario 2: partial keys → only that provider passes");
   clearEnv();
-  process.env.ENABLE_AI_VALIDATORS = "true";
+  process.env.ANTHROPIC_API_KEY = "mock-key";
+  process.env.CLAUDE_VALIDATOR_FIXTURE = "true";
   const c = await ClaudeValidator.validateBusiness(sampleInput);
-  check("Claude → unavailable when ANTHROPIC_API_KEY missing", c.status === "unavailable");
-  check("Claude error names ANTHROPIC_API_KEY", typeof c.error === "string" && c.error.includes("ANTHROPIC_API_KEY"));
+  check("Claude → passed when ANTHROPIC_API_KEY present", c.status === "passed", `got ${c.status}`);
   const o = await OpenAIValidator.validateBusiness(sampleInput);
-  check("OpenAI → unavailable when OPENAI_API_KEY missing", o.status === "unavailable");
-  check("OpenAI error names OPENAI_API_KEY", typeof o.error === "string" && o.error.includes("OPENAI_API_KEY"));
+  check("OpenAI still unavailable (no OPENAI_API_KEY)", o.status === "unavailable", `got ${o.status}`);
   const g = await GeminiValidator.validateBusiness(sampleInput);
-  check("Gemini → unavailable when GEMINI_API_KEY missing", g.status === "unavailable");
+  check("Gemini still unavailable (no GEMINI_API_KEY)", g.status === "unavailable");
   const p = await PerplexityValidator.validateBusiness(sampleInput);
-  check("Perplexity → unavailable when PERPLEXITY_API_KEY missing", p.status === "unavailable");
-  const ga = await GoogleAIOverviewValidator.validateBusiness(sampleInput);
-  check("Google AI Overview → unavailable (regardless of master gate)", ga.status === "unavailable");
+  check("Perplexity still unavailable (no PERPLEXITY_API_KEY)", p.status === "unavailable");
 }
 
 async function scenario3EnabledAllKeys(): Promise<void> {
-  console.log("[ai-validators-test] Scenario 3: ENABLE_AI_VALIDATORS=true + all API keys present");
+  console.log("[ai-validators-test] Scenario 3: all API keys present → all providers pass (via fixture mode)");
   clearEnv();
-  process.env.ENABLE_AI_VALIDATORS = "true";
   process.env.ANTHROPIC_API_KEY = "mock-key";
   process.env.OPENAI_API_KEY = "mock-key";
   process.env.GEMINI_API_KEY = "mock-key";
   process.env.PERPLEXITY_API_KEY = "mock-key";
-  // OpenAI + Claude + Gemini + Perplexity providers are now LIVE-wired —
-  // fixture-mode keeps the test hermetic by short-circuiting the real call
-  // and returning the legacy MOCK_RESPONSE.
+  // OpenAI + Claude + Gemini + Perplexity providers are LIVE-wired —
+  // fixture-mode keeps the test hermetic by short-circuiting the real
+  // call and returning the legacy MOCK_RESPONSE.
   process.env.OPENAI_VALIDATOR_FIXTURE = "true";
   process.env.CLAUDE_VALIDATOR_FIXTURE = "true";
   process.env.GEMINI_VALIDATOR_FIXTURE = "true";
@@ -145,7 +144,6 @@ async function scenario3EnabledAllKeys(): Promise<void> {
 async function scenario4OrchestratorOrdering(): Promise<void> {
   console.log("[ai-validators-test] Scenario 4: orchestrator output ordering + shape");
   clearEnv();
-  process.env.ENABLE_AI_VALIDATORS = "true";
   process.env.ANTHROPIC_API_KEY = "mock-key";
   process.env.OPENAI_API_KEY = "mock-key";
   process.env.GEMINI_API_KEY = "mock-key";
@@ -184,11 +182,10 @@ async function scenario4OrchestratorOrdering(): Promise<void> {
     "ran_at is ISO timestamp",
     typeof result.ran_at === "string" && /^\d{4}-\d{2}-\d{2}T/.test(result.ran_at),
   );
-  check("enabled flag reflects env", result.enabled === true);
 }
 
 async function scenario5OrchestratorDisabled(): Promise<void> {
-  console.log("[ai-validators-test] Scenario 5: orchestrator when validators disabled");
+  console.log("[ai-validators-test] Scenario 5: orchestrator with no keys → all unavailable, never throws");
   clearEnv();
   const originalLog = console.log;
   console.log = () => undefined;
@@ -198,11 +195,9 @@ async function scenario5OrchestratorDisabled(): Promise<void> {
   } finally {
     console.log = originalLog;
   }
-  check("enabled flag is false", result.enabled === false);
-  const skippedExceptGoogle = result.outputs
-    .filter((o) => o.provider !== "google_ai_overview")
-    .every((o) => o.status === "skipped");
-  check("all real providers skipped (Google stays unavailable)", skippedExceptGoogle);
+  check("outputs still has registry length", result.outputs.length === VALIDATOR_REGISTRY.length);
+  const allUnavailable = result.outputs.every((o) => o.status === "unavailable");
+  check("all providers unavailable when no keys configured", allUnavailable);
 }
 
 async function scenario6OrchestratorCatchesThrows(): Promise<void> {

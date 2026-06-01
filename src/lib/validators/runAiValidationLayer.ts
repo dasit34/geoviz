@@ -10,16 +10,10 @@
  * The orchestrator does NOT mutate provider output. Whatever a
  * provider returns is what appears in the result array.
  *
- * Production integration is NOT wired this turn. No caller in the
- * production audit pipeline imports this function. The scaffold exists
- * so future work can call it from (for example) `runObservationExecution`
- * or `persistAuditIntelligence` after the operator decides to ship
- * validator results.
- *
- * TODO(prod-integration): wire `runAiValidationLayer({...})` into the
- * audit-intelligence orchestrator AFTER the operator confirms the
- * scaffold and provides API keys. Until then this function is
- * importable but unused by production code.
+ * Wired into production via `persistAuditIntelligence` in
+ * `src/lib/audit-intelligence.ts`. Runs unconditionally on every
+ * audit; per-provider fail-soft is handled inside each validator
+ * when its `*_API_KEY` is absent (returns `status: "unavailable"`).
  *
  * @see ./types.ts for the input/output contracts
  * @see ./registry.ts for the provider order
@@ -62,7 +56,6 @@ export async function runAiValidationLayer(
   const result: ValidationLayerResult = {
     outputs,
     ran_at: new Date().toISOString(),
-    enabled: process.env.ENABLE_AI_VALIDATORS === "true",
   };
 
   // Dev-only log per scaffold contract. No-op in production. Never

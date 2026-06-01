@@ -72,10 +72,12 @@ export default async function PrintPage({
           trustSignalScore: true,
           structuredIdentityScore: true,
           recommendationReadinessScore: true,
-          // Cross-Model Intelligence (ENABLE_CONSENSUS_PIPELINE-gated).
-          // Both fields are JSON?; null when the gate is off or
-          // validators didn't run. The report renderer fail-soft hides
-          // the section when both are null.
+          // Cross-Model Intelligence — populated on every audit;
+          // `null` only on legacy rows from before the consensus
+          // layer was wired (or when every provider's API key was
+          // absent at audit time). FourModelGrid + ConsensusSummary
+          // render an "AI model analysis unavailable" panel rather
+          // than hiding when these are null.
           aiValidations: true,
           consensusIndex: true,
           // V2 preflight signals — consumed by the report v2

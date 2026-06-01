@@ -13,10 +13,9 @@
  * on or modifying it.
  *
  * Gating ladder:
- *   1. ENABLE_AI_VALIDATORS !== "true"      → status: "skipped"
- *   2. PERPLEXITY_API_KEY not set           → status: "unavailable"
- *   3. PERPLEXITY_VALIDATOR_FIXTURE=true    → MOCK_RESPONSE (test-only)
- *   4. Both gates open + no fixture         → real Perplexity call
+ *   1. PERPLEXITY_API_KEY not set           → status: "unavailable"
+ *   2. PERPLEXITY_VALIDATOR_FIXTURE=true    → MOCK_RESPONSE (test-only)
+ *   3. Otherwise                            → real Perplexity call
  *
  * Rules per scaffold contract:
  *   - 15s timeout via AbortSignal.timeout
@@ -86,10 +85,6 @@ const PERPLEXITY_JSON_SCHEMA = {
     raw_summary: { type: "string" },
   },
 } as const;
-
-function isMasterEnabled(): boolean {
-  return process.env.ENABLE_AI_VALIDATORS === "true";
-}
 
 function missingKeys(): string[] {
   return REQUIRED_ENV_VARS.filter(
@@ -219,25 +214,11 @@ export const PerplexityValidator: AiValidator = {
   name: PROVIDER_NAME,
   requiredEnvVars: REQUIRED_ENV_VARS,
   enabled(): boolean {
-    return isMasterEnabled() && missingKeys().length === 0;
+    return missingKeys().length === 0;
   },
   async validateBusiness(
     input: ValidationInput,
   ): Promise<NormalizedValidationOutput> {
-    if (!isMasterEnabled()) {
-      return {
-        provider: PROVIDER_NAME,
-        status: "skipped",
-        business_understanding_score: null,
-        category_confidence: null,
-        service_area_confidence: null,
-        recommendation_confidence: null,
-        missing_facts: [],
-        cited_sources: [],
-        raw_summary: "[skipped] ENABLE_AI_VALIDATORS is not 'true'",
-        error: null,
-      };
-    }
     const missing = missingKeys();
     if (missing.length > 0) {
       return {

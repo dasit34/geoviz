@@ -82,7 +82,7 @@ function printHelp(): void {
       "Behavior:",
       "  --validators stored   (default) reuse stored aiValidations; recompute consensus only",
       "  --validators skip     skip validator/consensus replay entirely",
-      "  --validators live     re-call LLM validators (requires ENABLE_AI_VALIDATORS=true)",
+      "  --validators live     re-call LLM validators (requires the per-provider *_API_KEY envs)",
       "",
       "Output:",
       "  --json                emit machine-readable JSON instead of human report",
@@ -422,36 +422,30 @@ async function replayOne(
       );
     }
   } else if (validatorMode === "live" && recomputed && row.websiteUrl) {
-    if (process.env.ENABLE_AI_VALIDATORS !== "true") {
-      notes.push(
-        "validators live: ENABLE_AI_VALIDATORS not set — skipped this row",
-      );
-    } else {
-      try {
-        const input: ValidationInput = {
-          businessName: row.businessName,
-          url: row.websiteUrl,
-          deterministicScore: recomputed,
-          categoryScores: recomputed.category_scores,
-          extractedEvidence: row.replayBundle?.evidence ?? null,
-          reportContext: { audit_id: row.auditOrderId },
-        };
-        const result = await runAiValidationLayer(input);
-        for (const o of result.outputs) {
-          if (o.status === "passed") {
-            estimatedCost += VALIDATOR_COST_PER_CALL_USD[o.provider] ?? 0;
-          }
+    try {
+      const input: ValidationInput = {
+        businessName: row.businessName,
+        url: row.websiteUrl,
+        deterministicScore: recomputed,
+        categoryScores: recomputed.category_scores,
+        extractedEvidence: row.replayBundle?.evidence ?? null,
+        reportContext: { audit_id: row.auditOrderId },
+      };
+      const result = await runAiValidationLayer(input);
+      for (const o of result.outputs) {
+        if (o.status === "passed") {
+          estimatedCost += VALIDATOR_COST_PER_CALL_USD[o.provider] ?? 0;
         }
-        computeConsensusIndex({
-          deterministicScore: recomputed,
-          validatorResult: result,
-        });
-        consensusRecomputed = true;
-      } catch (err) {
-        notes.push(
-          `live validator replay failed: ${(err as Error).message.slice(0, 120)}`,
-        );
       }
+      computeConsensusIndex({
+        deterministicScore: recomputed,
+        validatorResult: result,
+      });
+      consensusRecomputed = true;
+    } catch (err) {
+      notes.push(
+        `live validator replay failed: ${(err as Error).message.slice(0, 120)}`,
+      );
     }
   }
 
@@ -736,12 +730,6 @@ async function main(): Promise<void> {
   }
 
   if (args.validators === "live") {
-    if (process.env.ENABLE_AI_VALIDATORS !== "true") {
-      die(
-        "--validators live requires ENABLE_AI_VALIDATORS=true and provider API keys. " +
-          "Aborting before any provider call. Re-run without --validators live, or export the env and try again.",
-      );
-    }
     if (!args.json) {
       // Rough upper-bound estimate to warn the operator
       const perAudit = Object.values(VALIDATOR_COST_PER_CALL_USD).reduce(

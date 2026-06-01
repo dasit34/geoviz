@@ -7,6 +7,11 @@
  * the providers / orchestrator / registry inside the scaffold.
  */
 
+/**
+ * `skipped` is retained for backward compatibility with historical
+ * `aiValidations` records persisted before the master-enable flag was
+ * removed; new audits will only produce `passed | failed | unavailable`.
+ */
 export type ValidationStatus = "skipped" | "passed" | "failed" | "unavailable";
 
 export type ConfidenceLevel = "low" | "medium" | "high" | null;
@@ -52,9 +57,9 @@ export type ValidationInput = {
  *   - implement `enabled()` so callers can predict gating
  *   - implement `validateBusiness(input)` returning the normalized output
  *
- * In the scaffold every provider returns mocked output regardless of
- * env state — see provider files for the TODO(prod-integration) markers
- * where real API calls would replace the mock.
+ * `enabled()` returns true when the provider's required env vars (its
+ * `*_API_KEY`) are present. API-key presence is the single gate;
+ * fixture-mode envs (`*_VALIDATOR_FIXTURE`) remain test-only.
  */
 export type AiValidator = {
   name: string;
@@ -71,5 +76,4 @@ export type AiValidator = {
 export type ValidationLayerResult = {
   outputs: NormalizedValidationOutput[];
   ran_at: string;
-  enabled: boolean;
 };

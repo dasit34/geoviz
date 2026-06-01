@@ -126,7 +126,6 @@ function fixtureResult(outputs: NormalizedValidationOutput[]): ValidationLayerRe
   return {
     outputs,
     ran_at: "2026-05-28T00:00:00.000Z",
-    enabled: true,
   };
 }
 

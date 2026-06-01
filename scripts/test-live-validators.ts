@@ -6,8 +6,9 @@
  * `VALIDATOR_REGISTRY` in PARALLEL against one hard-coded sample
  * business and prints normalized output per provider.
  *
- * Caller must export `ENABLE_AI_VALIDATORS=true` and any per-provider
- * API keys BEFORE invoking. This script does NOT read `.env`.
+ * Caller must export the per-provider API keys BEFORE invoking. This
+ * script does NOT read `.env`. Each provider self-skips with
+ * `status: "unavailable"` when its key is missing.
  *
  * Read-only:
  *   - no DB connection / no Prisma import
@@ -16,9 +17,10 @@
  *   - no env-var values logged (only presence + length)
  *
  * Usage:
- *   ENABLE_AI_VALIDATORS=true \
  *   ANTHROPIC_API_KEY="..." \
  *   OPENAI_API_KEY="..." \
+ *   GEMINI_API_KEY="..." \
+ *   PERPLEXITY_API_KEY="..." \
  *   npx tsx scripts/test-live-validators.ts
  *
  * Exit code: always 0 (debugging tool, not CI gate). Per-provider
@@ -146,8 +148,6 @@ function fmtOutput(o: NormalizedValidationOutput, latencyMs: number): string {
 function envPresenceLine(): string {
   // Presence + length only — never log the value itself.
   const parts: string[] = [];
-  const enable = process.env.ENABLE_AI_VALIDATORS ?? "(unset)";
-  parts.push(`ENABLE_AI_VALIDATORS=${enable}`);
   for (const key of [
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",

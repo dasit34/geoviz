@@ -414,98 +414,90 @@ export async function persistAuditIntelligence(args: {
       `[scoring] success orderId=${orderId} version=${DETERMINISTIC_VERSION} overall=${deterministic.overall_score} band=${deterministic.band} synergy=${deterministic.synergy_bonus_applied} confidence=${deterministic.confidence_level} findings=${deterministic.top_3_findings.length}`,
     );
 
-    // ─── Cross-Model Consensus layer (ENABLE_CONSENSUS_PIPELINE-gated) ──
+    // ─── Cross-Model Consensus layer ──────────────────────────────────
     // Additive, fail-soft. Computes a secondary customer-facing
     // intelligence view: per-dimension rollups of the deterministic
     // categories, cross-model agreement metrics from validator outputs,
     // a derived Confidence Index 0..100, and bullet findings. The
     // deterministic score above remains primary and is byte-equal to
-    // pre-integration runs (this block reads from `deterministic`, never
-    // writes to it). Default behavior is byte-equal to pre-integration
-    // because the env flag is off unless ENABLE_CONSENSUS_PIPELINE=true.
+    // pre-integration runs (this block reads from `deterministic`,
+    // never writes to it).
     //
-    // Boot log — emits once per audit so the operator can confirm
-    // gate state + provider key presence from worker logs. Cheap.
-    {
-      const gateOn = process.env.ENABLE_CONSENSUS_PIPELINE === "true";
+    // Runs on every audit. Per-provider fail-soft is handled inside
+    // each validator: when a `*_API_KEY` is missing, that provider
+    // returns `status: "unavailable"` and the orchestrator + consensus
+    // layer + report UI all degrade gracefully (the `<UnavailablePanel />`
+    // in FourModelGrid/ConsensusSummary renders when no providers pass).
+    // No flag coordination required.
+    try {
+      const { runAiValidationLayer } = await import("@/lib/validators");
+      const { computeConsensusIndex } = await import("@/lib/consensus");
+      type ValidatorResult = Awaited<ReturnType<typeof runAiValidationLayer>>;
+      type ConsensusOutput = ReturnType<typeof computeConsensusIndex>;
+
       const detectedKeys = [
         process.env.OPENAI_API_KEY ? "openai" : null,
         process.env.ANTHROPIC_API_KEY ? "anthropic" : null,
         process.env.GEMINI_API_KEY ? "gemini" : null,
         process.env.PERPLEXITY_API_KEY ? "perplexity" : null,
       ].filter((s): s is string => s !== null);
-      if (gateOn) {
-        console.log(
-          `[consensus] orderId=${orderId} gate=ON providers=${detectedKeys.join(",") || "(none detected)"}`,
-        );
-      } else {
-        console.log(
-          `[consensus] orderId=${orderId} gate=OFF (set ENABLE_CONSENSUS_PIPELINE=true to enable cross-model intelligence; detected keys: ${detectedKeys.join(",") || "(none)"})`,
-        );
-      }
-    }
-    if (process.env.ENABLE_CONSENSUS_PIPELINE === "true") {
+
+      let validatorResult: ValidatorResult | null = null;
       try {
-        const { runAiValidationLayer } = await import("@/lib/validators");
-        const { computeConsensusIndex } = await import("@/lib/consensus");
-        type ValidatorResult = Awaited<ReturnType<typeof runAiValidationLayer>>;
-        type ConsensusOutput = ReturnType<typeof computeConsensusIndex>;
-
-        let validatorResult: ValidatorResult | null = null;
-        try {
-          validatorResult = await runAiValidationLayer({
-            businessName,
-            url: websiteUrl,
-            deterministicScore: deterministic,
-            categoryScores: deterministic.category_scores,
-            extractedEvidence: preflightForScoring,
-            reportContext: { industry: industryRaw ?? null, sample: false },
-          });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(
-            `[consensus] validator step failed orderId=${orderId} (non-fatal): ${msg}`,
-          );
-          validatorResult = null;
-        }
-
-        let consensus: ConsensusOutput | null = null;
-        try {
-          consensus = computeConsensusIndex({
-            deterministicScore: deterministic,
-            validatorResult,
-          });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(
-            `[consensus] index compute failed orderId=${orderId} (non-fatal): ${msg}`,
-          );
-          consensus = null;
-        }
-
-        try {
-          await prisma.auditIntelligence.update({
-            where: { auditOrderId: orderId },
-            data: {
-              aiValidations: jsonOrNull(validatorResult),
-              consensusIndex: jsonOrNull(consensus),
-            },
-          });
-          console.log(
-            `[consensus] success orderId=${orderId} confidence_index=${consensus?.confidence_index ?? "null"} verdict=${consensus?.verdict ?? "null"} agreement=${consensus?.model_agreement ?? "null"} providers_passed=${consensus?.agreement_metrics.providers_passed ?? 0}`,
-          );
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(
-            `[consensus] persist failed orderId=${orderId} (non-fatal): ${msg}`,
-          );
-        }
+        validatorResult = await runAiValidationLayer({
+          businessName,
+          url: websiteUrl,
+          deterministicScore: deterministic,
+          categoryScores: deterministic.category_scores,
+          extractedEvidence: preflightForScoring,
+          reportContext: { industry: industryRaw ?? null, sample: false },
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(
-          `[consensus] orchestrator threw orderId=${orderId} (non-fatal): ${msg}`,
+          `[consensus] validator step failed orderId=${orderId} (non-fatal): ${msg}`,
+        );
+        validatorResult = null;
+      }
+
+      let consensus: ConsensusOutput | null = null;
+      try {
+        consensus = computeConsensusIndex({
+          deterministicScore: deterministic,
+          validatorResult,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[consensus] index compute failed orderId=${orderId} (non-fatal): ${msg}`,
+        );
+        consensus = null;
+      }
+
+      try {
+        await prisma.auditIntelligence.update({
+          where: { auditOrderId: orderId },
+          data: {
+            aiValidations: jsonOrNull(validatorResult),
+            consensusIndex: jsonOrNull(consensus),
+          },
+        });
+        const providersPassed =
+          consensus?.agreement_metrics.providers_passed ?? 0;
+        console.log(
+          `[consensus] orderId=${orderId} keys=${detectedKeys.join(",") || "(none)"} providers_passed=${providersPassed} confidence_index=${consensus?.confidence_index ?? "null"} verdict=${consensus?.verdict ?? "null"} agreement=${consensus?.model_agreement ?? "null"}`,
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[consensus] persist failed orderId=${orderId} (non-fatal): ${msg}`,
         );
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[consensus] orchestrator threw orderId=${orderId} (non-fatal): ${msg}`,
+      );
     }
 
     // ─── Observation execution (ENABLE_OBSERVATION-gated) ────────────
