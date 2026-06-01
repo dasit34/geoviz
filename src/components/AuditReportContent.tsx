@@ -335,6 +335,27 @@ export function AuditReportContent({
           preflightSignals={context?.preflightSignals ?? null}
         />
 
+        {/* Report v2 — Four-Model Grid. Customer-language read of
+            how each of the four AI systems interprets the business
+            (per-dimension verdicts + knowledge gaps). Sits
+            immediately after AI Inputs Analyzed and before Category
+            Breakdown so customers see how AI systems understand
+            them BEFORE they see the score breakdown. Always renders
+            four cards; missing/failed providers render an explicit
+            Status: Unavailable / Reason card. */}
+        <FourModelGrid aiValidations={context?.aiValidations ?? null} />
+
+        {/* Report v2 — AI Consensus Summary. Plain-English
+            distillation of the agreement signals — what all systems
+            identified, what they understood, what they couldn't
+            verify. Renders the Overall AI Recommendation Confidence
+            LABEL (not score). Fail-soft hidden when fewer than 2
+            providers passed. */}
+        <ConsensusSummary
+          aiValidations={context?.aiValidations ?? null}
+          consensusIndex={context?.consensusIndex ?? null}
+        />
+
         {/* Report v2 — Why You Received This Score. Customer-language
             descriptive read of the strongest + weakest contributors.
             NOT a separate calculation. Derived from already-parsed
@@ -365,29 +386,12 @@ export function AuditReportContent({
           </div>
         </section>
 
-        {/* Report v2 — Four-Model Grid. Customer-language read of
-            how each of the four AI systems interprets the business
-            (per-dimension verdicts + knowledge gaps). Sits BEFORE
-            the technical Cross-Model Intelligence card. Fail-soft
-            hidden when no validator data is present. */}
-        <FourModelGrid aiValidations={context?.aiValidations ?? null} />
-
-        {/* Report v2 — AI Consensus Summary. Plain-English
-            distillation of the agreement signals — what all systems
-            identified, what they understood, what they couldn't
-            verify. Renders the Overall AI Recommendation Confidence
-            LABEL (not score). Fail-soft hidden when fewer than 2
-            providers passed. */}
-        <ConsensusSummary
-          aiValidations={context?.aiValidations ?? null}
-          consensusIndex={context?.consensusIndex ?? null}
-        />
-
-        {/* Cross-Model Intelligence — renders only when validator
-            data is present (gate ON + at least one provider passed).
-            Reads from context.aiValidations + context.consensusIndex.
-            Fail-soft hidden when both are null so the report stays
-            identical to its pre-gate shape for older audits. */}
+        {/* Cross-Model Intelligence — technical follow-on to the
+            FourModelGrid + ConsensusSummary blocks rendered earlier
+            (immediately after AI Inputs Analyzed). Reads from
+            context.aiValidations + context.consensusIndex; fail-soft
+            hidden when both are null so the report stays identical
+            to its pre-gate shape for older audits. */}
         <CrossModelIntelligence
           aiValidations={context?.aiValidations ?? null}
           consensusIndex={context?.consensusIndex ?? null}
@@ -1094,17 +1098,21 @@ type ConsensusShape = {
   confidence_band?: string;
 };
 
+// Keys must match the canonical PROVIDER_NAME each validator emits
+// (see src/lib/validators/providers/*.ts). Claude declares "claude",
+// not "anthropic"; Google AI Overview declares "google_ai_overview"
+// with an underscore. Mismatches here = silent card drops.
 const CROSS_MODEL_PROVIDER_DISPLAY: Record<string, string> = {
   openai: "ChatGPT",
-  anthropic: "Claude",
+  claude: "Claude",
   gemini: "Gemini",
   perplexity: "Perplexity",
-  "google-ai-overview": "Google AI Overview",
+  google_ai_overview: "Google AI Overview",
 };
 
 const CROSS_MODEL_PROVIDER_ORDER = [
   "openai",
-  "anthropic",
+  "claude",
   "gemini",
   "perplexity",
 ] as const;

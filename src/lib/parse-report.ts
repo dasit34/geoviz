@@ -868,6 +868,41 @@ export function clipDriverText(s: string, maxLen = 120): string {
 }
 
 /**
+ * Safety net for short customer-facing strings (validator knowledge-
+ * gap blurbs, error reasons, missing-fact bullets) that may carry
+ * inline markdown markers from the LLM. ReactMarkdown via <Prose> /
+ * <InlineProse> is the canonical render path; this helper handles
+ * the in-between cases (clipped fragments, short single-line copy)
+ * where firing up the markdown renderer is overkill or where Prose
+ * is bypassed.
+ *
+ * Strips leading blockquote (`>`), leading list markers (`*`, `-`,
+ * `+`), surrounding emphasis (`*foo*`, `_foo_`, `**foo**`), inline
+ * code backticks, and escaped markdown punctuation. Leaves prose
+ * intact.
+ *
+ * Intentionally minimal — not a full markdown parser.
+ */
+export function stripMarkdownMarkers(s: string): string {
+  if (!s) return "";
+  let out = s;
+  // Leading blockquote + optional leading list marker:
+  //   "> *Foo" → "Foo"   "- bar"  → "bar"   "* baz" → "baz"
+  out = out.replace(/^\s*>+\s*/gm, "");
+  out = out.replace(/^\s*[*+\-]\s+/gm, "");
+  // Bold/italic wrappers (collapse the surrounding markers, keep text):
+  //   "**foo**" → "foo"   "*foo*" → "foo"   "_foo_" → "foo"
+  out = out.replace(/\*\*([^*]+)\*\*/g, "$1");
+  out = out.replace(/(?<!\w)\*([^*\n]+)\*(?!\w)/g, "$1");
+  out = out.replace(/(?<!\w)_([^_\n]+)_(?!\w)/g, "$1");
+  // Inline code backticks: `foo` → foo
+  out = out.replace(/`([^`]+)`/g, "$1");
+  // Backslash-escaped markdown punctuation: \* → *, \_ → _, \` → `
+  out = out.replace(/\\([*_`>\-#])/g, "$1");
+  return out.trim();
+}
+
+/**
  * Extracts ✅ / ✓ / ❌ / ✗ markers and the prose that follows each
  * one, regardless of whether the source body is in inline-paragraph
  * form ("✅ Strong A. ❌ Weak B.") or bullet-list form ("- ✅ Strong
