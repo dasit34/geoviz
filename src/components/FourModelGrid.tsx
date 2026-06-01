@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { InlineProse } from "@/components/Prose";
 import { SECTION_EYEBROWS } from "@/lib/report-sections";
 import { clipDriverText, stripMarkdownMarkers } from "@/lib/parse-report";
@@ -34,6 +36,13 @@ type ValidatorOutputShape = {
   cited_sources?: string[];
   raw_summary?: string;
   error?: string | null;
+  // Report-v3 rich fields. Optional — legacy audits lack them and
+  // the card falls back to the compact verdict layout.
+  industry_identified?: string;
+  location_identified?: string;
+  services_identified?: string[];
+  would_recommend?: "YES" | "PARTIAL" | "NO";
+  recommendation_reason?: string;
 };
 
 type ValidatorLayer = {
@@ -130,6 +139,36 @@ function statusLabel(status: string): string {
   return "Unavailable";
 }
 
+function isRich(o: ValidatorOutputShape): boolean {
+  // Considered "rich" when at least the would_recommend + recommendation_reason
+  // pair is present — those drive the most distinct section of the new
+  // layout. Other rich fields render conditionally when present.
+  return (
+    typeof o.would_recommend === "string" &&
+    typeof o.recommendation_reason === "string" &&
+    o.recommendation_reason.trim().length > 0
+  );
+}
+
+function recommendBadgeTone(v: "YES" | "PARTIAL" | "NO"): string {
+  switch (v) {
+    case "YES":
+      return "text-severity-info border-severity-info/40 bg-severity-info/10";
+    case "PARTIAL":
+      return "text-severity-warning border-severity-warning/40 bg-severity-warning/10";
+    case "NO":
+      return "text-severity-critical border-severity-critical/40 bg-severity-critical/10";
+  }
+}
+
+function businessIdentifiedAsText(o: ValidatorOutputShape): string {
+  const summary = stripMarkdownMarkers((o.raw_summary ?? "").trim());
+  if (summary.length === 0) {
+    return o.industry_identified ?? "Not described by this AI system.";
+  }
+  return clipDriverText(summary, 220);
+}
+
 type DimensionRow = {
   label: string;
   verdict: Verdict;
@@ -216,6 +255,7 @@ export function FourModelGrid({
           const display = PROVIDER_DISPLAY[o.provider] ?? o.provider;
           const dimensions = dimensionsFor(o);
           const unavailable = dimensions === null;
+          const rich = !unavailable && isRich(o);
           return (
             <div
               key={o.provider}
@@ -250,6 +290,8 @@ export function FourModelGrid({
                     </dd>
                   </div>
                 </dl>
+              ) : rich ? (
+                <RichCardBody o={o} display={display} />
               ) : (
                 <>
                   <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[12px]">
@@ -284,5 +326,118 @@ export function FourModelGrid({
         })}
       </div>
     </section>
+  );
+}
+
+function RichCardBody({
+  o,
+  display,
+}: {
+  o: ValidatorOutputShape;
+  display: string;
+}) {
+  const services = (o.services_identified ?? []).filter(
+    (s) => s.trim().length > 0,
+  );
+  const missing = (o.missing_facts ?? []).filter((s) => s.trim().length > 0);
+  const wouldRecommend = o.would_recommend;
+
+  return (
+    <div className="mt-3 space-y-3 text-[12px] leading-relaxed text-white/75">
+      <RichField label={`How ${display} sees the business`}>
+        <InlineProse>
+          {stripMarkdownMarkers(businessIdentifiedAsText(o))}
+        </InlineProse>
+      </RichField>
+      {o.industry_identified ? (
+        <RichField label="Industry understood">
+          <InlineProse>
+            {stripMarkdownMarkers(o.industry_identified)}
+          </InlineProse>
+        </RichField>
+      ) : null}
+      {o.location_identified ? (
+        <RichField label="Location understood">
+          <InlineProse>
+            {stripMarkdownMarkers(o.location_identified)}
+          </InlineProse>
+        </RichField>
+      ) : null}
+      {services.length > 0 ? (
+        <RichField label="Services understood">
+          <ul className="mt-1 space-y-1">
+            {services.slice(0, 5).map((s, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span aria-hidden className="mt-[5px] text-white/30">
+                  •
+                </span>
+                <span>
+                  <InlineProse>{stripMarkdownMarkers(s)}</InlineProse>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </RichField>
+      ) : null}
+      {missing.length > 0 ? (
+        <RichField label={`What ${display} is missing`}>
+          <ul className="mt-1 space-y-1">
+            {missing.slice(0, 5).map((s, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span aria-hidden className="mt-[5px] text-white/30">
+                  •
+                </span>
+                <span>
+                  <InlineProse>{stripMarkdownMarkers(s)}</InlineProse>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </RichField>
+      ) : null}
+      <div className="border-t border-white/[0.05] pt-3">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-white/40">
+          Would {display} comfortably recommend this business?
+        </p>
+        <div className="mt-1.5 flex items-baseline gap-3">
+          <span
+            className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold tracking-[0.14em] ${
+              wouldRecommend
+                ? recommendBadgeTone(wouldRecommend)
+                : "border-white/[0.08] bg-white/[0.02] text-white/50"
+            }`}
+          >
+            {wouldRecommend ?? "—"}
+          </span>
+        </div>
+        {o.recommendation_reason ? (
+          <div className="mt-2 text-white/70">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-white/40">
+              Reason:&nbsp;
+            </span>
+            <InlineProse>
+              {stripMarkdownMarkers(o.recommendation_reason)}
+            </InlineProse>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function RichField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">
+        {label}
+      </p>
+      <div className="mt-1">{children}</div>
+    </div>
   );
 }

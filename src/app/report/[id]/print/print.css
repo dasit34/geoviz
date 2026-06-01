@@ -2367,6 +2367,32 @@ a,
     min-width: 0 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    overflow: hidden !important;
+    overflow: visible !important;
+  }
+
+  /* === Report-v3 polish (Newman/Boehmer follow-up) ================== */
+
+  /* "newmanroofing.co m" — the report cover metadata grid uses its
+     own `.report-cover-meta dd` selector, which the prior commit
+     6d54cb7 rule (`.report-meta a` + `.report-cover-url`) did not
+     reach. Hardens the metadata-cell URL display. */
+  .report-cover-meta dd,
+  .report-cover-meta dd * {
+    hyphens: none !important;
+    -webkit-hyphens: none !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  /* Stronger label break-prevention for "Recommendation Ready" —
+     ensure no parent container squeezes the label cell and keep
+     `overflow-wrap: anywhere` so long labels wrap at safe points
+     rather than mid-word. */
+  .category-score-card {
+    min-width: 0 !important;
+  }
+  .category-score-label {
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
   }
 }

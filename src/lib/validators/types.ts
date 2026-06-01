@@ -32,6 +32,16 @@ export type NormalizedValidationOutput = {
   cited_sources: string[];
   raw_summary: string;
   error: string | null;
+  // ─── Rich understanding fields (optional; legacy records lack these)
+  // Reify what the system prompts already implicitly ask for in
+  // raw_summary — what the AI system identifies about the business.
+  // Render layer falls back to compact verdict layout when all five
+  // are absent (legacy audits).
+  industry_identified?: string;
+  location_identified?: string;
+  services_identified?: string[];
+  would_recommend?: "YES" | "PARTIAL" | "NO";
+  recommendation_reason?: string;
 };
 
 /**

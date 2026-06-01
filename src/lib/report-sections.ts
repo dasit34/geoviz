@@ -46,7 +46,7 @@ export const SECTION_EYEBROWS = {
    * Intelligence card. Intentionally UNNUMBERED so the validator
    * gate ON/OFF state never shifts Section 01–06 numbering.
    */
-  howAiUnderstands: "How AI Currently Understands Your Business",
+  howAiUnderstands: "How AI Systems Currently Understand Your Business",
   /** Section 01 — Executive summary block at the top of the report. */
   executiveSummary: "Section 01 · Executive summary",
   /** Section 02 — Six-category breakdown grid. */

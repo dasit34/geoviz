@@ -474,6 +474,49 @@ export async function persistAuditIntelligence(args: {
         consensus = null;
       }
 
+      // Report-v3 consensus bullets — deterministic 4-group bullet
+      // synthesis + fail-soft Claude Haiku polish step. Both are
+      // additive: legacy renderers fall back gracefully when these
+      // fields are absent.
+      if (consensus && validatorResult) {
+        try {
+          const { buildConsensusBullets } = await import(
+            "@/lib/consensus/buildConsensusBullets"
+          );
+          const bulletsRaw = buildConsensusBullets({
+            outputs: validatorResult.outputs,
+            consensus,
+          });
+          // Mutate the in-memory consensus payload before persistence
+          // so both bullets_raw + bullets_polished land in the same
+          // JSON blob. The type extension is optional, so this is
+          // safe for legacy consumers.
+          consensus = { ...consensus, bullets_raw: bulletsRaw };
+
+          // Polish step — fail-soft. Skips when ANTHROPIC_API_KEY is
+          // missing or any error occurs.
+          try {
+            const { polishConsensusBullets } = await import(
+              "@/lib/consensus/polishConsensusBullets"
+            );
+            const polished = await polishConsensusBullets(bulletsRaw);
+            if (polished) {
+              consensus = { ...consensus, bullets_polished: polished };
+            }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.warn(
+              `[consensus] polish step failed orderId=${orderId} (non-fatal): ${msg}`,
+            );
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[consensus] bullet synthesis failed orderId=${orderId} (non-fatal): ${msg}`,
+          );
+        }
+      }
+
       try {
         await prisma.auditIntelligence.update({
           where: { auditOrderId: orderId },
@@ -484,8 +527,13 @@ export async function persistAuditIntelligence(args: {
         });
         const providersPassed =
           consensus?.agreement_metrics.providers_passed ?? 0;
+        const bulletCounts = consensus?.bullets_polished
+          ? "polished"
+          : consensus?.bullets_raw
+            ? "raw"
+            : "none";
         console.log(
-          `[consensus] orderId=${orderId} keys=${detectedKeys.join(",") || "(none)"} providers_passed=${providersPassed} confidence_index=${consensus?.confidence_index ?? "null"} verdict=${consensus?.verdict ?? "null"} agreement=${consensus?.model_agreement ?? "null"}`,
+          `[consensus] orderId=${orderId} keys=${detectedKeys.join(",") || "(none)"} providers_passed=${providersPassed} confidence_index=${consensus?.confidence_index ?? "null"} verdict=${consensus?.verdict ?? "null"} agreement=${consensus?.model_agreement ?? "null"} bullets=${bulletCounts}`,
         );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

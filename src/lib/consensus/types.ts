@@ -77,6 +77,16 @@ export type AgreementMetrics = {
   agreement_label: AgreementLabel;
 };
 
+/** Customer-facing four-group consensus bullets. Optional because
+ *  legacy persisted records predate this field; the renderer falls
+ *  back to the legacy three-line distillation when absent. */
+export type ConsensusBullets = {
+  agreed: string[];
+  uncertain: string[];
+  missing: string[];
+  barriers: string[];
+};
+
 /** The full output written to `AuditIntelligence.consensusIndex`. */
 export type ConsensusIndex = {
   computed_at: string;
@@ -92,4 +102,12 @@ export type ConsensusIndex = {
   strong_signals: string[];
   visibility_gaps: string[];
   immediate_actions: string[];
+  /** Report-v3 customer-facing bullets. Populated by
+   *  `buildConsensusBullets()` after `computeConsensusIndex` returns.
+   *  Optional on legacy records. */
+  bullets_raw?: ConsensusBullets;
+  /** Same shape as `bullets_raw` but rewritten in natural customer
+   *  language by a fail-soft LLM polish step. Optional on legacy
+   *  records AND when the polish step fails. */
+  bullets_polished?: ConsensusBullets;
 };

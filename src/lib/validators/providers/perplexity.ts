@@ -74,6 +74,11 @@ const PERPLEXITY_JSON_SCHEMA = {
     "missing_facts",
     "cited_sources",
     "raw_summary",
+    "industry_identified",
+    "location_identified",
+    "services_identified",
+    "would_recommend",
+    "recommendation_reason",
   ],
   properties: {
     business_understanding_score: { type: "number" },
@@ -83,6 +88,11 @@ const PERPLEXITY_JSON_SCHEMA = {
     missing_facts: { type: "array", items: { type: "string" } },
     cited_sources: { type: "array", items: { type: "string" } },
     raw_summary: { type: "string" },
+    industry_identified: { type: "string" },
+    location_identified: { type: "string" },
+    services_identified: { type: "array", items: { type: "string" } },
+    would_recommend: { type: "string", enum: ["YES", "PARTIAL", "NO"] },
+    recommendation_reason: { type: "string" },
   },
 } as const;
 
@@ -107,6 +117,17 @@ const MOCK_RESPONSE: NormalizedValidationOutput = {
   raw_summary:
     "[MOCK] Perplexity validator placeholder — fixture mode active",
   error: null,
+  industry_identified: "Roofing contractor",
+  location_identified: "Toledo, OH metro and surrounding counties",
+  services_identified: [
+    "Roof replacement",
+    "Storm damage repair",
+    "Insurance claim support",
+    "Gutter installation",
+  ],
+  would_recommend: "PARTIAL",
+  recommendation_reason:
+    "Clear service offering with cited testimonials, but pricing and licensing details are not visible.",
 };
 
 type PerplexityJsonResponse = {
@@ -117,6 +138,11 @@ type PerplexityJsonResponse = {
   missing_facts?: unknown[];
   cited_sources?: unknown[];
   raw_summary?: string;
+  industry_identified?: string;
+  location_identified?: string;
+  services_identified?: unknown[];
+  would_recommend?: string;
+  recommendation_reason?: string;
 };
 
 function numericToConfidence(n: unknown): ConfidenceLevel {
@@ -134,6 +160,30 @@ function clampScore(n: unknown): number | null {
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
+}
+
+function asNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function asYesPartialNo(
+  value: unknown,
+): "YES" | "PARTIAL" | "NO" | undefined {
+  if (typeof value !== "string") return undefined;
+  const v = value.trim().toUpperCase();
+  if (v === "YES" || v === "PARTIAL" || v === "NO") return v;
+  return undefined;
+}
+
+function asOptionalStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const cleaned = value
+    .filter((item): item is string => typeof item === "string")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return cleaned.length > 0 ? cleaned : undefined;
 }
 
 // Top-level citations from Perplexity reflect the actual retrieval
@@ -177,8 +227,23 @@ function buildPrompt(input: ValidationInput): { system: string; user: string } {
     "Report missing_facts the AI would need to improve interpretation. " +
     "Populate cited_sources only with specific URLs evident in the " +
     "provided context (empty array otherwise). Keep raw_summary to " +
-    "one or two sentences. Return ONLY the JSON object matching the " +
-    "schema — no markdown, no chain-of-thought, no commentary.";
+    "one or two sentences.\n\n" +
+    "Additionally extract, in customer-facing language (no jargon, no " +
+    "JSON terminology):\n" +
+    "  - industry_identified: the business category as you would " +
+    "describe it to a customer (e.g. 'Roofing contractor', 'Family " +
+    "dentistry', 'Commercial HVAC service').\n" +
+    "  - location_identified: the service area as you would describe " +
+    "it to a customer (e.g. 'Toledo, OH metro', 'Statewide', or " +
+    "'Not specified on the site').\n" +
+    "  - services_identified: 3-5 specific services the business " +
+    "appears to offer, written as customer-readable phrases.\n" +
+    "  - would_recommend: exactly YES, PARTIAL, or NO — whether you " +
+    "would comfortably recommend this business to a customer today.\n" +
+    "  - recommendation_reason: one customer-facing sentence " +
+    "explaining the would_recommend verdict.\n\n" +
+    "Return ONLY the JSON object matching the schema — no markdown, " +
+    "no chain-of-thought, no commentary.";
 
   const user =
     `Business name: ${input.businessName ?? "(not provided)"}\n` +
@@ -348,6 +413,11 @@ export const PerplexityValidator: AiValidator = {
             ? parsed.raw_summary
             : "[Perplexity returned no summary]",
         error: null,
+        industry_identified: asNonEmptyString(parsed.industry_identified),
+        location_identified: asNonEmptyString(parsed.location_identified),
+        services_identified: asOptionalStringArray(parsed.services_identified),
+        would_recommend: asYesPartialNo(parsed.would_recommend),
+        recommendation_reason: asNonEmptyString(parsed.recommendation_reason),
       };
     } catch (err) {
       const e = err as Error;

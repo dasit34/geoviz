@@ -345,6 +345,26 @@ export function AuditReportContent({
             Status: Unavailable / Reason card. */}
         <FourModelGrid aiValidations={context?.aiValidations ?? null} />
 
+        {/* Report v3 — WHY THIS MATTERS aside. Static customer-
+            language explanation of why the AI Systems section is
+            load-bearing for discovery. Sits between the per-system
+            cards and the consensus rollup so customers read the
+            "why" right after they see the per-system verdicts. */}
+        <aside
+          className="report-section-card mt-10"
+          aria-label="Why this matters"
+        >
+          <p className="section-eyebrow">Why this matters</p>
+          <h2 className="h2 mt-3">Why AI recommendation confidence matters.</h2>
+          <p className="report-prose mt-4 text-[15px] leading-relaxed text-white/80">
+            AI systems recommend businesses using the information they
+            can confidently identify, verify, and trust. If key
+            information is missing, inconsistent, or difficult to
+            verify, AI systems may choose a competitor with stronger
+            signals — even when your business is the better choice.
+          </p>
+        </aside>
+
         {/* Report v2 — AI Consensus Summary. Plain-English
             distillation of the agreement signals — what all systems
             identified, what they understood, what they couldn't
@@ -1210,7 +1230,7 @@ function CrossModelIntelligence({
         <p className="section-eyebrow">
           {SECTION_EYEBROWS.crossModelIntelligence}
         </p>
-        <span className="pill">{ordered.length} models</span>
+        <span className="pill">{ordered.length} AI Systems</span>
       </div>
       <h2 className="h2 mt-3">How four AI systems interpret your business.</h2>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
