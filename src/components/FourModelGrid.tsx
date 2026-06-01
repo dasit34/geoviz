@@ -395,6 +395,8 @@ function RichCardBody({
           </ul>
         </RichField>
       ) : null}
+      <ConfidenceLevels o={o} />
+      <SourcesUsed o={o} />
       <div className="border-t border-white/[0.05] pt-3">
         <p className="text-[10px] uppercase tracking-[0.12em] text-white/40">
           Would {display} comfortably recommend this business?
@@ -439,5 +441,73 @@ function RichField({
       </p>
       <div className="mt-1">{children}</div>
     </div>
+  );
+}
+
+function confidenceLabel(c: string | null): {
+  text: string;
+  tone: string;
+} | null {
+  if (c === "high") return { text: "High", tone: "text-severity-info" };
+  if (c === "medium")
+    return { text: "Medium", tone: "text-severity-warning" };
+  if (c === "low") return { text: "Low", tone: "text-severity-critical" };
+  return null;
+}
+
+function ConfidenceLevels({ o }: { o: ValidatorOutputShape }) {
+  const rows = [
+    { label: "Industry", c: confidenceLabel(o.category_confidence) },
+    { label: "Service area", c: confidenceLabel(o.service_area_confidence) },
+    {
+      label: "Recommendation",
+      c: confidenceLabel(o.recommendation_confidence),
+    },
+  ].filter((r) => r.c !== null) as Array<{
+    label: string;
+    c: { text: string; tone: string };
+  }>;
+
+  if (rows.length === 0) return null;
+
+  return (
+    <RichField label="Confidence levels">
+      <dl className="grid grid-cols-3 gap-x-3 gap-y-1 text-[11px]">
+        {rows.map((r) => (
+          <div key={r.label} className="flex flex-col gap-0.5">
+            <dt className="text-[9px] uppercase tracking-[0.12em] text-white/40">
+              {r.label}
+            </dt>
+            <dd className={`font-semibold ${r.c.tone}`}>{r.c.text}</dd>
+          </div>
+        ))}
+      </dl>
+    </RichField>
+  );
+}
+
+function SourcesUsed({ o }: { o: ValidatorOutputShape }) {
+  const sources = (o.cited_sources ?? [])
+    .filter((s): s is string => typeof s === "string")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (sources.length === 0) return null;
+
+  const top = sources.slice(0, 5);
+  return (
+    <RichField label="Sources used">
+      <ul className="mt-1 space-y-1">
+        {top.map((s, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <span aria-hidden className="mt-[5px] text-white/30">
+              •
+            </span>
+            <span className="break-all text-white/65">
+              {stripMarkdownMarkers(s)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </RichField>
   );
 }

@@ -28,6 +28,7 @@ import { CategoryScoreCard } from "@/components/CategoryScoreCard";
 import { StrengthCard } from "@/components/StrengthCard";
 import { RadarChart } from "@/components/RadarChart";
 import { AiInputsAnalyzed } from "@/components/AiInputsAnalyzed";
+import { WhatAiSystemsRead } from "@/components/WhatAiSystemsRead";
 import { FourModelGrid } from "@/components/FourModelGrid";
 import { ConsensusSummary } from "@/components/ConsensusSummary";
 import { WhyYouReceivedThisScore } from "@/components/WhyYouReceivedThisScore";
@@ -325,6 +326,16 @@ export function AuditReportContent({
             delivery.
           </p>
         </aside>
+
+        {/* Report v3 — What AI Systems Read. Quantitative metrics
+            strip sitting above the categorical AiInputsAnalyzed
+            checklist. Shows concrete numbers (word count, schema
+            type count, sitemap depth, entity surfaces) so the
+            customer sees what was actually measured, not just
+            FOUND/PARTIAL pills. */}
+        <WhatAiSystemsRead
+          preflightSignals={context?.preflightSignals ?? null}
+        />
 
         {/* Report v2 — AI Inputs Analyzed. Lists every AI-readable
             signal GeoViz looked at with a FOUND / PARTIAL / NOT

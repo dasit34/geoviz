@@ -28,6 +28,15 @@ export const SECTION_EYEBROWS = {
    */
   aiInputsAnalyzed: "AI Inputs Analyzed",
   /**
+   * Report v3 — quantitative metrics strip sitting ABOVE the
+   * categorical "AI Inputs Analyzed" checklist. Surfaces what the
+   * preflight intelligence actually measured (word count, schema
+   * type count, sitemap depth, entity surfaces) so the customer
+   * sees concrete numbers, not just FOUND/PARTIAL pills.
+   * Intentionally UNNUMBERED.
+   */
+  whatAiSystemsRead: "What AI Systems Read",
+  /**
    * Report v2 — descriptive "why this score" breakdown that sits
    * between the score card and Section 02. Intentionally UNNUMBERED
    * so it doesn't disrupt the frozen 01–06 numbering.
