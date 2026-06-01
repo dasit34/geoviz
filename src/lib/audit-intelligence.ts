@@ -460,6 +460,26 @@ export async function persistAuditIntelligence(args: {
         validatorResult = null;
       }
 
+      // Per-provider production trace — one log line per registered
+      // validator. Emitted unconditionally so Railway logs always
+      // prove which providers actually ran, what each returned, and
+      // why a non-`passed` provider didn't deliver. The aggregate
+      // success line below summarizes the same information.
+      if (validatorResult) {
+        for (const o of validatorResult.outputs) {
+          const reason =
+            o.status === "passed"
+              ? "-"
+              : (o.error ?? o.raw_summary ?? "-")
+                  .toString()
+                  .replace(/\s+/g, " ")
+                  .slice(0, 160);
+          console.log(
+            `[consensus] orderId=${orderId} provider=${o.provider} status=${o.status} business_score=${o.business_understanding_score ?? "null"} cat_conf=${o.category_confidence ?? "null"} svc_conf=${o.service_area_confidence ?? "null"} rec_conf=${o.recommendation_confidence ?? "null"} would_recommend=${o.would_recommend ?? "null"} missing_facts=${o.missing_facts?.length ?? 0} cited_sources=${o.cited_sources?.length ?? 0} reason=${reason}`,
+          );
+        }
+      }
+
       let consensus: ConsensusOutput | null = null;
       try {
         consensus = computeConsensusIndex({
@@ -527,13 +547,14 @@ export async function persistAuditIntelligence(args: {
         });
         const providersPassed =
           consensus?.agreement_metrics.providers_passed ?? 0;
+        const providersAttempted = validatorResult?.outputs.length ?? 0;
         const bulletCounts = consensus?.bullets_polished
           ? "polished"
           : consensus?.bullets_raw
             ? "raw"
             : "none";
         console.log(
-          `[consensus] orderId=${orderId} keys=${detectedKeys.join(",") || "(none)"} providers_passed=${providersPassed} confidence_index=${consensus?.confidence_index ?? "null"} verdict=${consensus?.verdict ?? "null"} agreement=${consensus?.model_agreement ?? "null"} bullets=${bulletCounts}`,
+          `[consensus] orderId=${orderId} keys=${detectedKeys.join(",") || "(none)"} providers_attempted=${providersAttempted} providers_passed=${providersPassed} confidence_index=${consensus?.confidence_index ?? "null"} verdict=${consensus?.verdict ?? "null"} agreement=${consensus?.model_agreement ?? "null"} bullets=${bulletCounts}`,
         );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
