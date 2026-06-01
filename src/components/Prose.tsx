@@ -1,5 +1,7 @@
 import ReactMarkdown from "react-markdown";
 
+import { swapTechnicalTerms } from "@/lib/parse-report";
+
 /**
  * Unified markdown renderers for the GeoViz audit report.
  *
@@ -38,13 +40,19 @@ export function Prose({
   children: string;
   className?: string;
 }) {
+  // Report Polish P7 — render-layer safety net runs every customer-
+  // facing markdown block through swapTechnicalTerms() so jargon
+  // ("schema markup", "JSON-LD", "crawler" etc.) is replaced with
+  // plain English before display. Primary defense is the worker
+  // prompt; this catches anything that slips through.
+  const cleaned = swapTechnicalTerms(children);
   return (
     <div
       className={
         className ? `report-prose ${className}` : "report-prose"
       }
     >
-      <ReactMarkdown>{children}</ReactMarkdown>
+      <ReactMarkdown>{cleaned}</ReactMarkdown>
     </div>
   );
 }
@@ -67,7 +75,8 @@ const INLINE_COMPONENTS = {
 } as const;
 
 export function InlineProse({ children }: { children: string }) {
+  const cleaned = swapTechnicalTerms(children);
   return (
-    <ReactMarkdown components={INLINE_COMPONENTS}>{children}</ReactMarkdown>
+    <ReactMarkdown components={INLINE_COMPONENTS}>{cleaned}</ReactMarkdown>
   );
 }

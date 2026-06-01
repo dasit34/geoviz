@@ -64,6 +64,7 @@ function asStringArrayPreserveLength(
 
 export async function polishConsensusBullets(
   raw: ConsensusBullets,
+  businessName?: string,
 ): Promise<ConsensusBullets | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (typeof apiKey !== "string" || apiKey.length === 0) return null;
@@ -78,6 +79,9 @@ export async function polishConsensusBullets(
   try {
     const client = new Anthropic({ apiKey });
 
+    const nameLine = businessName?.trim()
+      ? `  - Use the business name "${businessName.trim()}" naturally where it fits — at least once per non-empty group.\n`
+      : "";
     const system =
       "You rewrite consensus bullets from a GeoViz audit into clear, " +
       "customer-facing language. Rules:\n" +
@@ -89,6 +93,7 @@ export async function polishConsensusBullets(
       "  - No markdown markers (no >, no *, no -).\n" +
       "  - Customer-friendly tone — no jargon, no acronyms.\n" +
       "  - Speak directly to a small business owner.\n" +
+      nameLine +
       "Invoke the polish_bullets tool with the rewritten arrays.";
 
     const user =

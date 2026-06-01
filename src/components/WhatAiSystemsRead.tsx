@@ -3,10 +3,11 @@ import { SECTION_EYEBROWS } from "@/lib/report-sections";
 /**
  * What AI Systems Read — report v3 quantitative metrics strip.
  *
- * Sits above the categorical AiInputsAnalyzed checklist. Each row is
- * a labeled metric drawn from preflightSignals; rows render "Not
- * analyzed" when the underlying preflight module didn't run (legacy
- * audits).
+ * Single consolidated section answering "what did GeoViz analyze?"
+ * (the prior categorical AiInputsAnalyzed checklist was removed in
+ * the Report Polish pass). Each row is a labeled metric drawn from
+ * preflightSignals; rows render "Not analyzed" when the underlying
+ * preflight module didn't run (legacy audits).
  *
  * The goal per the user brief: avoid metrics that make the audit
  * appear smaller than it is. "Homepage analyzed" reads honestly when

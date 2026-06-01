@@ -27,7 +27,7 @@ import { ReportCtaCard } from "@/components/ReportCtaCard";
 import { CategoryScoreCard } from "@/components/CategoryScoreCard";
 import { StrengthCard } from "@/components/StrengthCard";
 import { RadarChart } from "@/components/RadarChart";
-import { AiInputsAnalyzed } from "@/components/AiInputsAnalyzed";
+import { ConsensusActionAnchor } from "@/components/ConsensusActionAnchor";
 import { WhatAiSystemsRead } from "@/components/WhatAiSystemsRead";
 import { FourModelGrid } from "@/components/FourModelGrid";
 import { ConsensusSummary } from "@/components/ConsensusSummary";
@@ -295,6 +295,11 @@ export function AuditReportContent({
               unverified={unverifiedDimensions}
             />
           ) : null}
+          {/* Report Polish P1 — Why You Received This Score now pairs
+              directly with the score card. Customer-language read of
+              the strongest + weakest contributors that explain the
+              number above. Was previously rendered ~7 sections later. */}
+          <WhyYouReceivedThisScore score={score} />
           <p className="report-score-consistency-note">
             The GeoViz score reflects how confidently modern AI
             systems can identify, interpret, and reference your
@@ -327,22 +332,14 @@ export function AuditReportContent({
           </p>
         </aside>
 
-        {/* Report v3 — What AI Systems Read. Quantitative metrics
-            strip sitting above the categorical AiInputsAnalyzed
-            checklist. Shows concrete numbers (word count, schema
-            type count, sitemap depth, entity surfaces) so the
-            customer sees what was actually measured, not just
-            FOUND/PARTIAL pills. */}
+        {/* Report Polish P4 — single consolidated "What AI Systems
+            Read" section. Previously the report rendered both this
+            quantitative strip AND a categorical FOUND/PARTIAL
+            checklist (AiInputsAnalyzed); the two overlapped enough
+            that the customer read it as padding. AiInputsAnalyzed
+            was deleted; the metric strip is now the single answer
+            to "what did the system actually analyze?" */}
         <WhatAiSystemsRead
-          preflightSignals={context?.preflightSignals ?? null}
-        />
-
-        {/* Report v2 — AI Inputs Analyzed. Lists every AI-readable
-            signal GeoViz looked at with a FOUND / PARTIAL / NOT
-            FOUND verdict per row. Reads from preflightSignals when
-            available; falls back to "Not analyzed" rows for older
-            audits that predate preflight. */}
-        <AiInputsAnalyzed
           preflightSignals={context?.preflightSignals ?? null}
         />
 
@@ -354,7 +351,10 @@ export function AuditReportContent({
             them BEFORE they see the score breakdown. Always renders
             four cards; missing/failed providers render an explicit
             Status: Unavailable / Reason card. */}
-        <FourModelGrid aiValidations={context?.aiValidations ?? null} />
+        <FourModelGrid
+          aiValidations={context?.aiValidations ?? null}
+          businessName={businessLabel}
+        />
 
         {/* Report v3 — WHY THIS MATTERS aside. Static customer-
             language explanation of why the AI Systems section is
@@ -385,13 +385,21 @@ export function AuditReportContent({
         <ConsensusSummary
           aiValidations={context?.aiValidations ?? null}
           consensusIndex={context?.consensusIndex ?? null}
+          businessName={businessLabel}
         />
 
-        {/* Report v2 — Why You Received This Score. Customer-language
-            descriptive read of the strongest + weakest contributors.
-            NOT a separate calculation. Derived from already-parsed
-            categories on the score object. */}
-        <WhyYouReceivedThisScore score={score} />
+        {/* Report Polish P6 — Foundation Fix nudge anchored to the
+            peak emotional moment (right after the consensus reveals
+            LOW or MODERATE confidence). Hidden on HIGH confidence
+            reports. Soft anchor only — the full Section 05 CTA still
+            renders at the end of the report. */}
+        <ConsensusActionAnchor
+          aiValidations={context?.aiValidations ?? null}
+          consensusIndex={context?.consensusIndex ?? null}
+          businessName={businessLabel}
+        />
+
+        {/* (Moved to pair with the score card per Report Polish P1.) */}
 
         {/* Category breakdown — primary score visualization. The six
             horizontal score bars are the executive-readable layer. The

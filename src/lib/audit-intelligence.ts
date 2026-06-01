@@ -529,7 +529,10 @@ export async function persistAuditIntelligence(args: {
             const { polishConsensusBullets } = await import(
               "@/lib/consensus/polishConsensusBullets"
             );
-            const polished = await polishConsensusBullets(bulletsRaw);
+            const polished = await polishConsensusBullets(
+              bulletsRaw,
+              businessName ?? undefined,
+            );
             if (polished) {
               consensus = { ...consensus, bullets_polished: polished };
             }

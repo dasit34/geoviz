@@ -883,6 +883,60 @@ export function clipDriverText(s: string, maxLen = 120): string {
  *
  * Intentionally minimal — not a full markdown parser.
  */
+/**
+ * Report Polish P7 — render-layer safety net that swaps developer
+ * terminology in customer-facing prose for plain English
+ * equivalents. The primary defense is the worker prompt's
+ * CUSTOMER-FACING NARRATION block (in scripts/geo-worker.ts); this
+ * helper catches anything that slips through.
+ *
+ * Case-insensitive whole-word matches only. Preserves the original
+ * surrounding punctuation and spacing. Never touches markdown
+ * structure markers — that's stripMarkdownMarkers below.
+ */
+const JARGON_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\bschema markup\b/gi, "machine-readable business info"],
+  [/\bschema\.org\b/gi, "AI-readable business data"],
+  [/\bJSON-LD\b/g, "AI-readable business data"],
+  [/\bstructured data\b/gi, "machine-readable business info"],
+  [/\bAI crawler(?:s)? access\b/gi, "AI reader access"],
+  [/\bAI crawler(?:s)?\b/gi, "AI reader"],
+  [/\bcrawler readiness\b/gi, "AI reader readiness"],
+  [/\bcrawler(?:s)?\b/gi, "AI reader"],
+  [/\bcrawling\b/gi, "reading"],
+  [/\brobots\.txt\b/gi, "AI access rules"],
+  [/\bsitemap\.xml\b/gi, "site map"],
+  [/\bcanonical (?:URL|tag|chain)\b/gi, "primary page reference"],
+  [/\bcanonical\b/gi, "primary"],
+  [/\bhreflang\b/gi, "language signals"],
+  [/\bllms\.txt\b/gi, "AI access guide"],
+  [/\bentity extraction\b/gi, "business identity detection"],
+  [/\bentity disambiguation\b/gi, "business identity clarification"],
+  [/\bembeddings\b/gi, "AI understanding signals"],
+  [/\bvector(?:s)?\b/gi, "AI understanding signals"],
+  [/\bretrieval\b/gi, "AI search"],
+  [/\bvalidators?\b/gi, "AI systems"],
+  [/\brendering\b/gi, "loading"],
+  [/\bhydration\b/gi, "interactive loading"],
+  [/\bSSR\b/g, "server rendering"],
+  [/\bmeta tags\b/gi, "page metadata"],
+  [/\bHTTP headers\b/gi, "server response signals"],
+  [/\bFAQPage\b/g, "FAQ section"],
+  [/\bLocalBusiness JSON\b/gi, "machine-readable business info"],
+  [/\bGPTBot\b/g, "ChatGPT's reader"],
+  [/\bllms-full\.txt\b/gi, "AI access guide"],
+  [/\bNAP\b/g, "name, address, and phone"],
+];
+
+export function swapTechnicalTerms(text: string): string {
+  if (!text) return "";
+  let out = text;
+  for (const [pattern, replacement] of JARGON_REPLACEMENTS) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
+}
+
 export function stripMarkdownMarkers(s: string): string {
   if (!s) return "";
   let out = s;

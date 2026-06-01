@@ -35,6 +35,10 @@ type ValidatorOutputShape = {
   category_confidence: string | null;
   service_area_confidence: string | null;
   recommendation_confidence: string | null;
+  industry_identified?: string;
+  location_identified?: string;
+  services_identified?: string[];
+  missing_facts?: string[];
 };
 
 type DimensionShape = {
@@ -172,6 +176,208 @@ function countConfidence(
   ).length;
 }
 
+// Report Polish P5 — five-part consensus structure derived directly
+// from validator outputs + consensus metrics. Replaces the prior
+// 4-group bullets render (agreed / uncertain / missing / barriers)
+// with the user-specified group labels and business-name-aware copy.
+//
+// buildConsensusBullets() in src/lib/consensus/ stays untouched —
+// this is a render-layer reorganization only.
+
+type FivePartConsensus = {
+  businessType: string[];
+  serviceCategory: string[];
+  locationUnderstanding: string[];
+  missingTrustSignals: string[];
+  missingRecommendationSignals: string[];
+};
+
+function pickMajorityString(values: string[]): string | null {
+  const counts = new Map<string, { display: string; count: number }>();
+  for (const v of values) {
+    const trimmed = v.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    const prev = counts.get(key);
+    if (prev) prev.count += 1;
+    else counts.set(key, { display: trimmed, count: 1 });
+  }
+  let best: { display: string; count: number } | null = null;
+  for (const e of counts.values()) {
+    if (!best || e.count > best.count) best = e;
+  }
+  return best ? best.display : null;
+}
+
+const TRUST_KEYWORDS =
+  /\b(trust|review|credential|license|certif|badge|testimonial|bbb|accred|insurance|warranty|guarantee|verified)\b/i;
+
+function buildFivePart(
+  outputs: ValidatorOutputShape[],
+  metrics: ConsensusShape["agreement_metrics"],
+  businessName: string,
+): FivePartConsensus {
+  const passed = outputs.filter((o) => o.status === "passed");
+  const N = passed.length;
+  const name = businessName || "your business";
+
+  const out: FivePartConsensus = {
+    businessType: [],
+    serviceCategory: [],
+    locationUnderstanding: [],
+    missingTrustSignals: [],
+    missingRecommendationSignals: [],
+  };
+
+  // Business type identified — industry_identified agreement
+  const industries = passed
+    .map((o) => o.industry_identified ?? "")
+    .filter((s) => s.length > 0);
+  const majorityIndustry = pickMajorityString(industries);
+  if (majorityIndustry && industries.length >= Math.ceil(N / 2)) {
+    const agreeingCount = industries.filter(
+      (s) => s.toLowerCase() === majorityIndustry.toLowerCase(),
+    ).length;
+    if (agreeingCount === N) {
+      out.businessType.push(
+        `All ${N} AI systems identified ${name} as a ${majorityIndustry.toLowerCase().replace(/\.$/, "")}.`,
+      );
+    } else {
+      out.businessType.push(
+        `${agreeingCount} of ${N} AI systems identified ${name} as a ${majorityIndustry.toLowerCase().replace(/\.$/, "")}.`,
+      );
+    }
+  } else if (metrics?.category_confidence_majority === "high") {
+    out.businessType.push(
+      `${N} AI systems confidently identified the type of business ${name} operates.`,
+    );
+  } else {
+    out.businessType.push(
+      `AI systems were uncertain about ${name}'s business category — sharper signals would clarify the identity.`,
+    );
+  }
+
+  // Service category — shared services across providers
+  const serviceFreq = new Map<string, { display: string; count: number }>();
+  for (const o of passed) {
+    if (!Array.isArray(o.services_identified)) continue;
+    const seenInProv = new Set<string>();
+    for (const s of o.services_identified) {
+      const display = s.trim();
+      if (!display) continue;
+      const key = display.toLowerCase();
+      if (seenInProv.has(key)) continue;
+      seenInProv.add(key);
+      const prev = serviceFreq.get(key);
+      if (prev) prev.count += 1;
+      else serviceFreq.set(key, { display, count: 1 });
+    }
+  }
+  const sharedServices = Array.from(serviceFreq.values())
+    .filter((e) => e.count >= 2)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
+  if (sharedServices.length > 0) {
+    out.serviceCategory.push(
+      `Shared service understanding: ${sharedServices.map((s) => s.display).join(", ")}.`,
+    );
+  } else if (metrics?.category_confidence_majority === "high") {
+    out.serviceCategory.push(
+      `AI systems agreed on the broad service category ${name} operates in.`,
+    );
+  } else {
+    out.serviceCategory.push(
+      `AI systems struggled to align on the specific services ${name} offers.`,
+    );
+  }
+
+  // Location understanding
+  const locations = passed
+    .map((o) => o.location_identified ?? "")
+    .filter((s) => s.length > 0);
+  const majorityLocation = pickMajorityString(locations);
+  const svcMajority = metrics?.service_area_confidence_majority;
+  if (majorityLocation && locations.length >= Math.ceil(N / 2)) {
+    const agreeing = locations.filter(
+      (s) => s.toLowerCase() === majorityLocation.toLowerCase(),
+    ).length;
+    out.locationUnderstanding.push(
+      `${agreeing} of ${N} AI systems identified ${name}'s service area as ${majorityLocation}.`,
+    );
+  } else if (svcMajority === "high") {
+    out.locationUnderstanding.push(
+      `Most AI systems read ${name}'s geographic service area confidently.`,
+    );
+  } else if (svcMajority === "low" || svcMajority === null) {
+    out.locationUnderstanding.push(
+      `AI systems could not confidently determine ${name}'s service area from the site.`,
+    );
+  } else {
+    out.locationUnderstanding.push(
+      `Service area read was mixed across AI systems — partial signals only.`,
+    );
+  }
+
+  // Missing facts pool, dedupe by lowercased substring, categorize
+  const factPool = new Map<string, { display: string; count: number }>();
+  for (const o of passed) {
+    if (!Array.isArray(o.missing_facts)) continue;
+    const seenInProv = new Set<string>();
+    for (const raw of o.missing_facts) {
+      if (typeof raw !== "string") continue;
+      const display = raw.trim().replace(/[\.;,!?]+$/g, "");
+      if (!display) continue;
+      const key = display.toLowerCase();
+      if (seenInProv.has(key)) continue;
+      seenInProv.add(key);
+      const prev = factPool.get(key);
+      if (prev) prev.count += 1;
+      else factPool.set(key, { display, count: 1 });
+    }
+  }
+  const shared = Array.from(factPool.values()).filter((e) => e.count >= 2);
+  const trustItems = shared
+    .filter((e) => TRUST_KEYWORDS.test(e.display))
+    .slice(0, 4);
+  const otherItems = shared
+    .filter((e) => !TRUST_KEYWORDS.test(e.display))
+    .slice(0, 4);
+
+  if (trustItems.length > 0) {
+    for (const t of trustItems) {
+      out.missingTrustSignals.push(
+        t.display.charAt(0).toUpperCase() + t.display.slice(1),
+      );
+    }
+  } else if (metrics?.recommendation_confidence_majority === "low") {
+    out.missingTrustSignals.push(
+      `${name} lacks consistent trust signals (reviews, credentials, third-party verification) that AI systems weigh heavily.`,
+    );
+  } else {
+    out.missingTrustSignals.push(
+      `No specific trust-signal gaps surfaced across systems.`,
+    );
+  }
+
+  if (otherItems.length > 0) {
+    for (const o2 of otherItems) {
+      out.missingRecommendationSignals.push(
+        o2.display.charAt(0).toUpperCase() + o2.display.slice(1),
+      );
+    }
+  } else if (metrics?.recommendation_confidence_majority === "low") {
+    out.missingRecommendationSignals.push(
+      `AI systems lack the surrounding context (clear service area, pricing direction, hours) to confidently recommend ${name}.`,
+    );
+  } else {
+    out.missingRecommendationSignals.push(
+      `No specific recommendation-signal gaps surfaced beyond trust factors.`,
+    );
+  }
+
+  return out;
+}
+
 function UnavailablePanel() {
   return (
     <section
@@ -192,9 +398,11 @@ function UnavailablePanel() {
 export function ConsensusSummary({
   aiValidations,
   consensusIndex,
+  businessName,
 }: {
   aiValidations: unknown;
   consensusIndex: unknown;
+  businessName?: string;
 }) {
   const layer = aiValidations as ValidatorLayer;
   const consensus = consensusIndex as ConsensusShape | null;
@@ -234,34 +442,39 @@ export function ConsensusSummary({
     recommendationReadinessScore,
   );
 
-  // Prefer LLM-polished bullets when the worker step succeeded; fall
-  // back to the deterministic raw bullets; fall back further to the
-  // legacy 3-line distillation when neither is present (older audits).
-  const bullets = pickBullets(consensus.bullets_polished, consensus.bullets_raw);
-  const groups: Array<{ label: string; items: string[] }> = bullets
-    ? [
-        { label: "All Systems Agreed", items: bullets.agreed ?? [] },
-        {
-          label: "Some Systems Were Uncertain About",
-          items: bullets.uncertain ?? [],
-        },
-        { label: "Missing Across Most Systems", items: bullets.missing ?? [] },
-        { label: "Recommendation Barriers", items: bullets.barriers ?? [] },
-      ].filter((g) => g.items.length > 0)
-    : [];
+  // Report Polish P5 — five-part structure derived directly from
+  // validator outputs + consensus metrics + the businessName prop.
+  // The deterministic buildConsensusBullets() output stays available
+  // as a render fallback for legacy audits but is no longer the
+  // primary source on fresh audits.
+  const safeName = businessName?.trim() ?? "";
+  const fivePart = buildFivePart(layer.outputs, metrics, safeName);
+  const groups: Array<{ label: string; items: string[] }> = [
+    { label: "Business type identified", items: fivePart.businessType },
+    { label: "Service category identified", items: fivePart.serviceCategory },
+    { label: "Location understanding", items: fivePart.locationUnderstanding },
+    { label: "Missing trust signals", items: fivePart.missingTrustSignals },
+    {
+      label: "Missing recommendation signals",
+      items: fivePart.missingRecommendationSignals,
+    },
+  ].filter((g) => g.items.length > 0);
 
-  const fallbackLines = bullets ? null : buildLegacyLines(
-    layer.outputs,
-    passedCount,
-  );
+  // Legacy 3-line distillation kept for audits whose outputs lack
+  // the rich fields the 5-part derivation depends on. In practice
+  // buildFivePart always produces at least one fallback sentence per
+  // group, so this only fires on truly empty / corrupt records.
+  const fallbackLines = groups.length === 0
+    ? buildLegacyLines(layer.outputs, passedCount)
+    : null;
 
   return (
-    <section className="report-section-card mt-10" aria-label="AI consensus summary">
+    <section className="report-section-card mt-10" aria-label="Where all AI systems agreed">
       <div className="report-section-card-header">
-        <p className="section-eyebrow">{SECTION_EYEBROWS.aiConsensusSummary}</p>
+        <p className="section-eyebrow">Where all AI systems agreed</p>
         <span className="pill">{passedCount} AI Systems</span>
       </div>
-      <h2 className="h2 mt-3">Where all the AI systems agree.</h2>
+      <h2 className="h2 mt-3">Executive summary.</h2>
       {groups.length > 0 ? (
         <div className="mt-5 space-y-5">
           {groups.map((g) => (

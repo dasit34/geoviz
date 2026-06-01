@@ -422,6 +422,26 @@ headlines, finding bodies, and fix descriptions):
   use them in the Section 1 breakdown bullets — those must keep
   the rubric names so the score parser keeps matching.
 
+  HARD BANNED-TERMS RULE (customer-facing prose only — the
+  Section 1 breakdown bullets are exempt and keep the rubric
+  names). The following terms MUST NOT appear anywhere in
+  customer-facing prose (per-category "why" sentences, finding
+  bodies, fix descriptions, business impact, score drivers):
+
+    schema markup, JSON-LD, schema.org, structured data, crawler,
+    crawling, robots.txt, sitemap.xml, canonical, hreflang,
+    llms.txt, entity extraction, entity disambiguation, vector,
+    embeddings, retrieval, validator, rendering, hydration, SSR,
+    meta tags, HTTP headers, NAP, FAQPage, LocalBusiness JSON,
+    GPTBot, llms-full.
+
+  Use plain English equivalents instead: "machine-readable
+  business info", "AI-readable signals", "business identity
+  data", "how AI reads your site", "how the business shows up
+  in AI answers." If you find yourself wanting to use any banned
+  term, replace it with the closest plain-English framing from
+  the INSTEAD-OF replacements above.
+
 CROSS-MODEL NARRATION (mandatory — applies whenever any prose
 references how individual AI systems interpret the business):
 
@@ -936,6 +956,26 @@ headlines, finding bodies, and fix descriptions):
   These descriptors are for prose / sub-headings ONLY. Do NOT
   use them in the Section 1 breakdown bullets — those must keep
   the rubric names so the score parser keeps matching.
+
+  HARD BANNED-TERMS RULE (customer-facing prose only — the
+  Section 1 breakdown bullets are exempt and keep the rubric
+  names). The following terms MUST NOT appear anywhere in
+  customer-facing prose (per-category "why" sentences, finding
+  bodies, fix descriptions, business impact, score drivers):
+
+    schema markup, JSON-LD, schema.org, structured data, crawler,
+    crawling, robots.txt, sitemap.xml, canonical, hreflang,
+    llms.txt, entity extraction, entity disambiguation, vector,
+    embeddings, retrieval, validator, rendering, hydration, SSR,
+    meta tags, HTTP headers, NAP, FAQPage, LocalBusiness JSON,
+    GPTBot, llms-full.
+
+  Use plain English equivalents instead: "machine-readable
+  business info", "AI-readable signals", "business identity
+  data", "how AI reads your site", "how the business shows up
+  in AI answers." If you find yourself wanting to use any banned
+  term, replace it with the closest plain-English framing from
+  the INSTEAD-OF replacements above.
 
 CROSS-MODEL NARRATION (mandatory — applies whenever any prose
 references how individual AI systems interpret the business):

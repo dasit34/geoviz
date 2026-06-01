@@ -26,14 +26,13 @@ export const SECTION_EYEBROWS = {
    * each was found, partially found, or not found. Intentionally
    * UNNUMBERED so it doesn't shift the existing 01–06 sequence.
    */
-  aiInputsAnalyzed: "AI Inputs Analyzed",
   /**
-   * Report v3 — quantitative metrics strip sitting ABOVE the
-   * categorical "AI Inputs Analyzed" checklist. Surfaces what the
-   * preflight intelligence actually measured (word count, schema
-   * type count, sitemap depth, entity surfaces) so the customer
-   * sees concrete numbers, not just FOUND/PARTIAL pills.
-   * Intentionally UNNUMBERED.
+   * Single consolidated "what we analyzed" section. Quantitative
+   * metrics strip drawn from preflightSignals (word count, schema
+   * type count, sitemap depth, entity surfaces). The prior
+   * categorical AI Inputs Analyzed checklist was removed in the
+   * Report Polish pass to eliminate redundancy. Intentionally
+   * UNNUMBERED.
    */
   whatAiSystemsRead: "What AI Systems Read",
   /**

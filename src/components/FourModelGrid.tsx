@@ -139,6 +139,94 @@ function statusLabel(status: string): string {
   return "Unavailable";
 }
 
+// Report Polish P2 — provider-specific top-border accent so a glance
+// at the 4 cards communicates "four distinct AI systems," not
+// "one analysis pasted 4×". Uses existing Tailwind tokens.
+const PROVIDER_ACCENT: Record<string, string> = {
+  openai: "border-t-2 border-t-severity-info",
+  claude: "border-t-2 border-t-accent",
+  gemini: "border-t-2 border-t-accent-blue",
+  perplexity: "border-t-2 border-t-cyan",
+};
+
+function providerAccentClass(provider: string): string {
+  return PROVIDER_ACCENT[provider] ?? "border-t-2 border-t-white/[0.12]";
+}
+
+// Report Polish P2 + P3 — derive a per-card signature observation
+// that differentiates this AI System's reading from the others.
+// Picks the strongest unique angle for the current provider. Uses
+// the businessName when supplied so each line reads as personalized
+// rather than templated.
+function deriveSignatureObservation(
+  o: ValidatorOutputShape,
+  others: ValidatorOutputShape[],
+  businessName?: string,
+): string | null {
+  if (o.status !== "passed") return null;
+
+  const display = PROVIDER_DISPLAY[o.provider] ?? o.provider;
+  const name = businessName?.trim() || "this business";
+  const passedOthers = others.filter(
+    (x) => x.provider !== o.provider && x.status === "passed",
+  );
+
+  const myScore = o.business_understanding_score;
+  const othersScores = passedOthers
+    .map((x) => x.business_understanding_score)
+    .filter((s): s is number => typeof s === "number");
+  if (
+    typeof myScore === "number" &&
+    othersScores.length > 0 &&
+    myScore === Math.max(myScore, ...othersScores) &&
+    myScore - Math.min(...othersScores) >= 8
+  ) {
+    return `${display} had the clearest read of ${name}'s business identity (${myScore}/100).`;
+  }
+
+  const mySources = o.cited_sources?.length ?? 0;
+  const othersMaxSources = Math.max(
+    0,
+    ...passedOthers.map((x) => x.cited_sources?.length ?? 0),
+  );
+  if (mySources >= 3 && mySources > othersMaxSources) {
+    return `${display} cited the most external sources (${mySources}) — strongest third-party evidence for ${name}.`;
+  }
+
+  const myMissing = o.missing_facts?.length ?? 0;
+  const othersMaxMissing = Math.max(
+    0,
+    ...passedOthers.map((x) => x.missing_facts?.length ?? 0),
+  );
+  if (myMissing >= 3 && myMissing > othersMaxMissing) {
+    return `${display} flagged the most missing facts (${myMissing}) — the strictest reader of ${name}.`;
+  }
+
+  const myRec = o.would_recommend;
+  const othersRecs = passedOthers
+    .map((x) => x.would_recommend)
+    .filter((r): r is "YES" | "PARTIAL" | "NO" => Boolean(r));
+  if (myRec && othersRecs.length >= 2) {
+    const majority = othersRecs.every((r) => r === othersRecs[0])
+      ? othersRecs[0]
+      : null;
+    if (majority && myRec !== majority) {
+      if (myRec === "YES" && majority !== "YES") {
+        return `${display} would recommend ${name}; the others were less sure.`;
+      }
+      if (myRec === "NO" && majority !== "NO") {
+        return `${display} was the most cautious — would not actively recommend ${name} today.`;
+      }
+    }
+  }
+
+  if (o.industry_identified && businessName) {
+    return `${display} understood ${name} as a ${o.industry_identified.toLowerCase().replace(/\.$/, "")}.`;
+  }
+
+  return null;
+}
+
 function isRich(o: ValidatorOutputShape): boolean {
   // Considered "rich" when at least the would_recommend + recommendation_reason
   // pair is present — those drive the most distinct section of the new
@@ -217,8 +305,10 @@ function UnavailablePanel() {
 
 export function FourModelGrid({
   aiValidations,
+  businessName,
 }: {
   aiValidations: unknown;
+  businessName?: string;
 }) {
   const layer = aiValidations as ValidatorLayer;
   if (!layer || !Array.isArray(layer.outputs) || layer.outputs.length === 0) {
@@ -256,10 +346,11 @@ export function FourModelGrid({
           const dimensions = dimensionsFor(o);
           const unavailable = dimensions === null;
           const rich = !unavailable && isRich(o);
+          const signature = deriveSignatureObservation(o, ordered, businessName);
           return (
             <div
               key={o.provider}
-              className="rounded-md border border-white/[0.08] bg-white/[0.02] p-4"
+              className={`rounded-md border border-white/[0.08] bg-white/[0.02] p-4 ${providerAccentClass(o.provider)}`}
             >
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-sm font-semibold text-white/85">{display}</p>
@@ -271,6 +362,11 @@ export function FourModelGrid({
                   {statusLabel(o.status)}
                 </span>
               </div>
+              {signature ? (
+                <p className="mt-1.5 text-[11px] italic leading-snug text-white/55">
+                  {signature}
+                </p>
+              ) : null}
               {unavailable ? (
                 <dl className="mt-3 grid gap-y-2 text-[12px]">
                   <div className="flex flex-col gap-0.5">
@@ -291,7 +387,11 @@ export function FourModelGrid({
                   </div>
                 </dl>
               ) : rich ? (
-                <RichCardBody o={o} display={display} />
+                <RichCardBody
+                  o={o}
+                  display={display}
+                  businessName={businessName}
+                />
               ) : (
                 <>
                   <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[12px]">
@@ -332,19 +432,22 @@ export function FourModelGrid({
 function RichCardBody({
   o,
   display,
+  businessName,
 }: {
   o: ValidatorOutputShape;
   display: string;
+  businessName?: string;
 }) {
   const services = (o.services_identified ?? []).filter(
     (s) => s.trim().length > 0,
   );
   const missing = (o.missing_facts ?? []).filter((s) => s.trim().length > 0);
   const wouldRecommend = o.would_recommend;
+  const subject = businessName?.trim() || "the business";
 
   return (
     <div className="mt-3 space-y-3 text-[12px] leading-relaxed text-white/75">
-      <RichField label={`How ${display} sees the business`}>
+      <RichField label={`How ${display} sees ${subject}`}>
         <InlineProse>
           {stripMarkdownMarkers(businessIdentifiedAsText(o))}
         </InlineProse>
@@ -380,7 +483,7 @@ function RichCardBody({
         </RichField>
       ) : null}
       {missing.length > 0 ? (
-        <RichField label={`What ${display} is missing`}>
+        <RichField label={`What ${display} is missing about ${subject}`}>
           <ul className="mt-1 space-y-1">
             {missing.slice(0, 5).map((s, i) => (
               <li key={i} className="flex items-start gap-2">
@@ -399,7 +502,7 @@ function RichCardBody({
       <SourcesUsed o={o} />
       <div className="border-t border-white/[0.05] pt-3">
         <p className="text-[10px] uppercase tracking-[0.12em] text-white/40">
-          Would {display} comfortably recommend this business?
+          Would {display} comfortably recommend {subject}?
         </p>
         <div className="mt-1.5 flex items-baseline gap-3">
           <span
