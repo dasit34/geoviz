@@ -2373,20 +2373,51 @@ a,
     overflow-wrap: anywhere !important;
   }
 
-  /* FourModelGrid + ConsensusSummary card grids — at print width
-     (720px > Tailwind sm 640px), `sm:grid-cols-2` activates and 4
-     cards can overflow the printable area. Force a 2-col grid with
-     min-width 0 children + break-inside avoid so each card stays
-     whole and within its container. */
+  /* FourModelGrid + ConsensusSummary card grids — switch to a
+     SINGLE COLUMN in print. Previously the 2-col grid with
+     `page-break-inside: avoid` per card caused tall+short pairs
+     to leave large blank space at page bottoms (Cutler PDF page 7
+     was 90% empty because ChatGPT's tall card couldn't fit
+     alongside Claude's short card and BOTH pushed to the next
+     page). Single-column stacks the 4 cards vertically with
+     predictable pagination: each card uses only the height it
+     needs, the next card starts immediately below, breaks happen
+     between cards rather than orphaning whole pages.
+     The cards keep `break-inside: avoid` so an individual card
+     never splits across pages — only the gap between cards is a
+     valid break point. */
   .report-section-card .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
   }
   .report-section-card .grid > * {
     min-width: 0 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     overflow: visible !important;
+  }
+
+  /* Tighter vertical rhythm in print. Previously every section
+     card used Tailwind `mt-10` (40px) which read as too generous
+     in PDFs. Reduce to a moderate gap that still separates
+     sections but stops feeling stretched. */
+  .report-section-card {
+    margin-top: 18px !important;
+    padding: 22px 24px !important;
+  }
+  .report-section-card .h2 {
+    margin-top: 8px !important;
+    margin-bottom: 6px !important;
+  }
+  .report-section-card .muted {
+    margin-top: 6px !important;
+  }
+  /* Section card grids (categorical strips like What AI Systems
+     Read) use tighter inter-row spacing in print too. */
+  .report-section-card ul.mt-6,
+  .report-section-card ul.mt-5,
+  .report-section-card div.mt-6 {
+    margin-top: 14px !important;
   }
 
   /* === Report-v3 polish (Newman/Boehmer follow-up) ================== */

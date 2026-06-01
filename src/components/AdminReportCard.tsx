@@ -77,10 +77,20 @@ export function AdminReportCard({
   adminKey,
   order,
   validatorTelemetry = null,
+  deterministicScore = null,
 }: {
   adminKey: string;
   order: Order;
   validatorTelemetry?: ValidatorTelemetry;
+  /**
+   * Canonical deterministic score JSON from
+   * `AuditIntelligence.deterministicScore`. When threaded through
+   * `parseReportScore()` + `<ReportViewerClient />`, both the admin
+   * banner and the admin preview read from the same source the
+   * customer PDF uses — eliminating admin-vs-PDF score divergence.
+   * Null on legacy rows from before the deterministic engine.
+   */
+  deterministicScore?: unknown;
 }) {
   const [reportStatus, setReportStatus] = useState(order.reportStatus);
   const [markdown, setMarkdown] = useState<string | null>(order.reportMarkdown);
@@ -501,7 +511,13 @@ export function AdminReportCard({
   const sendDisabled = anyBusy || sendBlockReason !== null;
   const markDisabled =
     anyBusy || reportStatus !== "generated" || reviewStatus === "approved";
-  const scoreInfo = parseReportScore(markdown);
+  // Pass the deterministic score so parseReportScore() routes through
+  // the canonical resolver instead of regex-parsing the markdown's
+  // declared hero. Same source the customer PDF uses.
+  const scoreInfo = parseReportScore(
+    markdown,
+    deterministicScore ? { deterministicScore } : null,
+  );
 
   // Single per-order status banner — the headline an operator should be able
   // to read from across the room. Distinct from the granular pills (paid /
@@ -982,6 +998,17 @@ export function AdminReportCard({
       {expanded && markdown ? (
         <div className="border-b border-white/10 px-5 py-6 md:px-8 md:py-8">
           {scoreInfo ? <ScoreBanner score={scoreInfo.score} status={scoreInfo.status} business={businessLabel} url={order.websiteUrl} /> : null}
+          {/* Score-source diagnostic strip. Surfaces exactly which
+              source the admin preview is reading from so any
+              future admin-vs-PDF divergence is visible at a glance.
+              Mirrors the data the PDF route loads. */}
+          <ScoreSourceDiagnostic
+            orderId={order.id}
+            scoreInfo={scoreInfo}
+            deterministicScore={deterministicScore}
+            reportGeneratedAt={reportGeneratedAt}
+            validatorTelemetry={validatorTelemetry}
+          />
           <p className="mt-5 text-[10px] uppercase tracking-[0.2em] text-white/50">
             Report
             {reportGeneratedAt
@@ -993,6 +1020,7 @@ export function AdminReportCard({
               markdown={markdown}
               orderId={order.id}
               businessLabel={businessLabel}
+              deterministicScore={deterministicScore}
             />
           </div>
         </div>
@@ -1148,6 +1176,102 @@ function StatusBadges({
       )}
       <span className="text-white/35">{formatShort(createdAt)}</span>
     </div>
+  );
+}
+
+function ScoreSourceDiagnostic({
+  orderId,
+  scoreInfo,
+  deterministicScore,
+  reportGeneratedAt,
+  validatorTelemetry,
+}: {
+  orderId: string;
+  scoreInfo: { score: number; status: string | null } | null;
+  deterministicScore: unknown;
+  reportGeneratedAt: string | null;
+  validatorTelemetry: ValidatorTelemetry;
+}) {
+  // Quick null-narrow on the JSON column. We don't need a full
+  // schema check here — `parseReportScore()` already validates;
+  // this diagnostic just surfaces presence + version.
+  const det = (deterministicScore ?? null) as {
+    scoring_version?: string;
+    overall_score?: number;
+  } | null;
+  const dsOverall =
+    det && typeof det.overall_score === "number" ? det.overall_score : null;
+  const dsVersion =
+    det && typeof det.scoring_version === "string" ? det.scoring_version : null;
+  const source = dsOverall !== null
+    ? `deterministic ${dsVersion ?? "unknown"}`
+    : "legacy markdown regex";
+  const dsMismatch =
+    scoreInfo &&
+    dsOverall !== null &&
+    scoreInfo.score !== dsOverall;
+  const providers = validatorTelemetry?.providers ?? [];
+  const passedCount = providers.filter((p) => p.status === "passed").length;
+  return (
+    <details className="mt-3 rounded-md border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[11px] text-white/55">
+      <summary className="cursor-pointer font-semibold uppercase tracking-[0.16em] text-white/40">
+        Score source diagnostic
+      </summary>
+      <dl className="mt-2 grid gap-y-1 sm:grid-cols-2">
+        <div>
+          <dt className="text-white/40">Order ID</dt>
+          <dd className="mono-data text-white/75">{orderId}</dd>
+        </div>
+        <div>
+          <dt className="text-white/40">Score source (admin preview)</dt>
+          <dd className="mono-data text-white/75">{source}</dd>
+        </div>
+        <div>
+          <dt className="text-white/40">Admin / PDF overall</dt>
+          <dd className="mono-data text-white/75">
+            {scoreInfo?.score ?? "—"}
+            {dsMismatch ? (
+              <span className="ml-2 text-severity-warning">
+                ↯ mismatch (deterministic={dsOverall})
+              </span>
+            ) : null}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-white/40">Generated at</dt>
+          <dd className="mono-data text-white/75">
+            {reportGeneratedAt
+              ? new Date(reportGeneratedAt).toISOString()
+              : "—"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-white/40">aiValidations present</dt>
+          <dd className="mono-data text-white/75">
+            {providers.length > 0 ? `yes (${providers.length})` : "no"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-white/40">Providers passed</dt>
+          <dd className="mono-data text-white/75">
+            {providers.length > 0 ? `${passedCount} / ${providers.length}` : "—"}
+          </dd>
+        </div>
+      </dl>
+      <p className="mt-2 text-white/40">
+        If admin shows one score and the downloaded PDF shows another, the
+        most common cause is `deterministicScore` not being threaded
+        through here — confirm the source field above reads
+        <code className="mono-data text-white/75 mx-1">
+          deterministic …
+        </code>
+        not
+        <code className="mono-data text-white/75 mx-1">
+          legacy markdown regex
+        </code>
+        .
+      </p>
+    </details>
   );
 }
 

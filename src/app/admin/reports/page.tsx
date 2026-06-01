@@ -90,13 +90,20 @@ export default async function AdminReportsPage({
     orderBy: { createdAt: "desc" },
     take: 200,
     include: {
-      // Cross-Model Intelligence telemetry — surfaces in the admin
-      // card so the operator can see per-provider validator status +
-      // whether consensus was computed for each order. Read-only.
+      // Cross-Model Intelligence telemetry + canonical score.
+      // `deterministicScore` is the canonical scoring authority —
+      // when present, AdminReportCard threads it through
+      // parseReportScore() and ReportViewerClient so the admin
+      // preview reads from the SAME source as the customer PDF.
+      // Without this select, the admin would fall back to regex
+      // parsing of the worker markdown's declared hero score,
+      // which can disagree with the canonical sum and cause an
+      // admin-vs-PDF score mismatch.
       intelligence: {
         select: {
           aiValidations: true,
           consensusIndex: true,
+          deterministicScore: true,
         },
       },
     },
@@ -367,6 +374,9 @@ export default async function AdminReportsPage({
                 key={o.id}
                 adminKey={key!}
                 validatorTelemetry={validatorTelemetry}
+                deterministicScore={
+                  o.intelligence?.deterministicScore ?? null
+                }
                 order={{
                   id: o.id,
                   email: o.email,
