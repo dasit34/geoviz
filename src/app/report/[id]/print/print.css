@@ -1921,6 +1921,20 @@ a,
 
 /* ---- print rules — preserve dark theme in PDF (PDF is secondary,
        but it should still be readable). ---- */
+/* Launch Blocker P1 #5 — disable font ligatures globally in print.
+   Chromium's Puppeteer PDF renderer can drop the second character of
+   common ligatures ("fi", "fl") when subsetting fonts, producing
+   "veried" instead of "verified", "of ce" instead of "office", etc.
+   Turning ligatures off entirely is the most robust prevention and
+   has zero visual cost in our typography. */
+@media print {
+  * {
+    font-variant-ligatures: none !important;
+    -webkit-font-feature-settings: "liga" 0, "clig" 0, "dlig" 0 !important;
+    font-feature-settings: "liga" 0, "clig" 0, "dlig" 0 !important;
+  }
+}
+
 @page {
   size: A4;
   /* 18mm top/bottom (was 14mm/18mm) — prevents the CTA card from
@@ -2011,11 +2025,16 @@ a,
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
-  /* Cover is its own page — the report body starts on page 2. */
+  /* Cover is its own page — the report body starts on page 2.
+     min-height must fit WITHIN the @page printable area (A4 297mm -
+     18mm top - 18mm bottom = 261mm). Previously 265mm, which
+     overflowed by ~4mm and caused page-break-after to render an
+     extra blank page 2 before the body. 245mm gives a safe 16mm
+     buffer for any content reflow. */
   .report-cover {
     page-break-after: always;
     break-after: page;
-    min-height: calc(297mm - 32mm);
+    min-height: calc(297mm - 52mm);
   }
   /* Outer section card MAY split between its inner item-cards —
      overrides the screen rule that kept the whole section atomic. */
@@ -2384,15 +2403,20 @@ a,
     overflow-wrap: anywhere !important;
   }
 
-  /* Stronger label break-prevention for "Recommendation Ready" —
-     ensure no parent container squeezes the label cell and keep
-     `overflow-wrap: anywhere` so long labels wrap at safe points
-     rather than mid-word. */
+  /* Launch Blocker P1 #4 — label break-prevention for "Recommendation
+     Ready" and other category labels. The prior `overflow-wrap:
+     anywhere` was permissive enough to allow mid-word breaks
+     ("Recommendati on Ready"). Locking to break-word + keep-all
+     forces the label to wrap only at the space between "Recommendation"
+     and "Ready" — never mid-word. */
   .category-score-card {
     min-width: 0 !important;
   }
   .category-score-label {
     max-width: 100% !important;
-    overflow-wrap: anywhere !important;
+    overflow-wrap: break-word !important;
+    word-break: keep-all !important;
+    hyphens: none !important;
+    -webkit-hyphens: none !important;
   }
 }

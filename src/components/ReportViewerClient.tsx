@@ -5,6 +5,7 @@ import {
   cleanScoreSectionBody,
   clipDriverText,
   deriveStrengths,
+  formatBusinessName,
   extractFixMeta,
   inferFixPriority,
   inferIssueSeverity,
@@ -35,7 +36,7 @@ import "@/app/report/[id]/print/print.css";
 export function ReportViewerClient({
   markdown,
   orderId,
-  businessLabel,
+  businessLabel: rawBusinessLabel,
   deterministicScore = null,
 }: {
   markdown: string;
@@ -46,6 +47,8 @@ export function ReportViewerClient({
   deterministicScore?: unknown;
 }) {
   const [showRaw, setShowRaw] = useState(false);
+  // Launch Blocker P1 #2 — Title-Case the business name once.
+  const businessLabel = formatBusinessName(rawBusinessLabel);
   const score = getCanonicalScore({
     reportMarkdown: markdown,
     intelligence: deterministicScore ? { deterministicScore } : null,
@@ -66,7 +69,8 @@ export function ReportViewerClient({
   // Mirror the customer-page caps so the admin preview matches what
   // ships: ≤ 3 bullets per group, ≤ 120 chars per bullet.
   const SUMMARY_PER_GROUP_LIMIT = 3;
-  const SUMMARY_BULLET_CHAR_LIMIT = 120;
+  // Launch Blocker P1 #3 — kept in sync with AuditReportContent.
+const SUMMARY_BULLET_CHAR_LIMIT = 280;
   const rawDrivers = parseScoreDrivers(scoreProse);
   const scoreDrivers: ScoreDrivers = {
     positive: rawDrivers.positive

@@ -1,6 +1,7 @@
 import {
   cleanScoreSectionBody,
   clipDriverText,
+  formatBusinessName,
   deriveBestCurrentSignals,
   deriveStrengths,
   extractFixMeta,
@@ -97,7 +98,7 @@ export type AuditReportContext = {
 
 export function AuditReportContent({
   orderId,
-  businessLabel,
+  businessLabel: rawBusinessLabel,
   websiteUrl,
   reportMarkdown,
   reportGeneratedAt,
@@ -123,6 +124,14 @@ export function AuditReportContent({
     undefined,
     { year: "numeric", month: "long", day: "numeric" },
   );
+
+  // Launch Blocker P1 #2 — normalize the business name once at the
+  // top of the component. Every downstream render site reads from
+  // `businessLabel` (the Title-Cased value), never `rawBusinessLabel`.
+  // Customer-entered names like "acme plumbing" become "Acme Plumbing"
+  // before they reach the cover, hero, AI System cards, consensus,
+  // CTA, or anywhere else in the report.
+  const businessLabel = formatBusinessName(rawBusinessLabel);
 
   const score = getCanonicalScore({
     reportMarkdown,
@@ -152,10 +161,14 @@ export function AuditReportContent({
   // Structured executive summary — extracted from the score prose so
   // the opening of the report scans as 2–3 short groups instead of a
   // dense paragraph. Capped at 3 bullets per group and each bullet
-  // clipped to ~120 chars so each item targets a single desktop line
-  // (mobile wraps cleanly via the flex `report-summary-item` layout).
+  // Launch Blocker P1 #3 — bumped from 120 → 280 chars per bullet.
+  // The Signal Evidence section carries the strongest concrete
+  // evidence in the report (missing entity fields, varying business
+  // names, exact word counts). 120 was clipping these mid-sentence
+  // with "…" — the customer's most valuable read was being cut.
+  // 280 captures full sentences while still bounding extreme outputs.
   const SUMMARY_PER_GROUP_LIMIT = 3;
-  const SUMMARY_BULLET_CHAR_LIMIT = 120;
+  const SUMMARY_BULLET_CHAR_LIMIT = 280;
   const rawDrivers = parseScoreDrivers(scoreProse);
   const scoreDrivers: ScoreDrivers = {
     positive: rawDrivers.positive
@@ -425,16 +438,15 @@ export function AuditReportContent({
           </div>
         </section>
 
-        {/* Cross-Model Intelligence — technical follow-on to the
-            FourModelGrid + ConsensusSummary blocks rendered earlier
-            (immediately after AI Inputs Analyzed). Reads from
-            context.aiValidations + context.consensusIndex; fail-soft
-            hidden when both are null so the report stays identical
-            to its pre-gate shape for older audits. */}
-        <CrossModelIntelligence
-          aiValidations={context?.aiValidations ?? null}
-          consensusIndex={context?.consensusIndex ?? null}
-        />
+        {/* Launch Blocker P2 #7 — Cross-Model Intelligence block
+            REMOVED. The customer already sees the same 4 systems
+            with the full read on pages 7-9 via FourModelGrid (rich
+            cards with Industry / Location / Services / Missing /
+            Confidence / Sources / Would-Recommend / Reason). Repeating
+            those same 4 systems here with truncated text weakened
+            both surfaces and read as padding. The component
+            definition remains in this file for legacy callers but is
+            no longer rendered in the audit report. */}
 
         {/* Top strengths (≥70%) when present; otherwise fall back to
             "Best current signals" — the top-N highest scoring categories

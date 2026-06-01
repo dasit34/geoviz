@@ -229,33 +229,39 @@ function buildFivePart(
     missingRecommendationSignals: [],
   };
 
-  // Business type identified — industry_identified agreement
+  // Launch Blocker P2 #6 — section is titled "Where All AI Systems
+  // Agreed" so it must only contain actual agreement. The threshold is
+  // a strict majority on the SAME value (not just majority of
+  // providers that returned ANY industry). Below-majority cases are
+  // intentionally dropped — the section can render fewer than 5
+  // groups when systems didn't reach consensus on a dimension.
   const industries = passed
     .map((o) => o.industry_identified ?? "")
     .filter((s) => s.length > 0);
   const majorityIndustry = pickMajorityString(industries);
-  if (majorityIndustry && industries.length >= Math.ceil(N / 2)) {
-    const agreeingCount = industries.filter(
-      (s) => s.toLowerCase() === majorityIndustry.toLowerCase(),
-    ).length;
-    if (agreeingCount === N) {
+  const industryAgreeingCount = majorityIndustry
+    ? industries.filter(
+        (s) => s.toLowerCase() === majorityIndustry.toLowerCase(),
+      ).length
+    : 0;
+  if (majorityIndustry && industryAgreeingCount >= Math.ceil(N / 2)) {
+    if (industryAgreeingCount === N) {
       out.businessType.push(
         `All ${N} AI systems identified ${name} as a ${majorityIndustry.toLowerCase().replace(/\.$/, "")}.`,
       );
     } else {
       out.businessType.push(
-        `${agreeingCount} of ${N} AI systems identified ${name} as a ${majorityIndustry.toLowerCase().replace(/\.$/, "")}.`,
+        `${industryAgreeingCount} of ${N} AI systems identified ${name} as a ${majorityIndustry.toLowerCase().replace(/\.$/, "")}.`,
       );
     }
   } else if (metrics?.category_confidence_majority === "high") {
     out.businessType.push(
       `${N} AI systems confidently identified the type of business ${name} operates.`,
     );
-  } else {
-    out.businessType.push(
-      `AI systems were uncertain about ${name}'s business category — sharper signals would clarify the identity.`,
-    );
   }
+  // No filler when systems disagreed — the customer reads disagreement
+  // as a real finding, not as the system failing. The Cross-Model
+  // section surfaces actual disagreement separately.
 
   // Service category — shared services across providers
   const serviceFreq = new Map<string, { display: string; count: number }>();
@@ -285,11 +291,9 @@ function buildFivePart(
     out.serviceCategory.push(
       `AI systems agreed on the broad service category ${name} operates in.`,
     );
-  } else {
-    out.serviceCategory.push(
-      `AI systems struggled to align on the specific services ${name} offers.`,
-    );
   }
+  // No filler when systems disagreed — group will be hidden by the
+  // render layer's empty-group filter.
 
   // Location understanding
   const locations = passed
@@ -297,26 +301,33 @@ function buildFivePart(
     .filter((s) => s.length > 0);
   const majorityLocation = pickMajorityString(locations);
   const svcMajority = metrics?.service_area_confidence_majority;
-  if (majorityLocation && locations.length >= Math.ceil(N / 2)) {
-    const agreeing = locations.filter(
-      (s) => s.toLowerCase() === majorityLocation.toLowerCase(),
-    ).length;
-    out.locationUnderstanding.push(
-      `${agreeing} of ${N} AI systems identified ${name}'s service area as ${majorityLocation}.`,
-    );
+  // Same strict-majority rule as business type: only emit a location
+  // bullet when an actual majority of AI systems agreed on the same
+  // location string. Otherwise leave the group empty so the render
+  // filter drops it.
+  const locationAgreeingCount = majorityLocation
+    ? locations.filter(
+        (s) => s.toLowerCase() === majorityLocation.toLowerCase(),
+      ).length
+    : 0;
+  if (majorityLocation && locationAgreeingCount >= Math.ceil(N / 2)) {
+    if (locationAgreeingCount === N) {
+      out.locationUnderstanding.push(
+        `All ${N} AI systems identified ${name}'s service area as ${majorityLocation}.`,
+      );
+    } else {
+      out.locationUnderstanding.push(
+        `${locationAgreeingCount} of ${N} AI systems identified ${name}'s service area as ${majorityLocation}.`,
+      );
+    }
   } else if (svcMajority === "high") {
     out.locationUnderstanding.push(
       `Most AI systems read ${name}'s geographic service area confidently.`,
     );
-  } else if (svcMajority === "low" || svcMajority === null) {
-    out.locationUnderstanding.push(
-      `AI systems could not confidently determine ${name}'s service area from the site.`,
-    );
-  } else {
-    out.locationUnderstanding.push(
-      `Service area read was mixed across AI systems — partial signals only.`,
-    );
   }
+  // No filler for low/mixed — the absence of a confident location read
+  // is itself a finding that belongs in the Missing Recommendation
+  // Signals group below, not under "Agreed."
 
   // Missing facts pool, dedupe by lowercased substring, categorize
   const factPool = new Map<string, { display: string; count: number }>();
@@ -343,6 +354,11 @@ function buildFivePart(
     .filter((e) => !TRUST_KEYWORDS.test(e.display))
     .slice(0, 4);
 
+  // Launch Blocker P2 #8 — emit Missing Trust Signals ONLY when
+  // there are real findings or a low-confidence majority. The prior
+  // "No specific gaps surfaced" filler bullets read as the system
+  // failing to find issues, not as actually clean. Empty groups are
+  // hidden by the render layer.
   if (trustItems.length > 0) {
     for (const t of trustItems) {
       out.missingTrustSignals.push(
@@ -352,10 +368,6 @@ function buildFivePart(
   } else if (metrics?.recommendation_confidence_majority === "low") {
     out.missingTrustSignals.push(
       `${name} lacks consistent trust signals (reviews, credentials, third-party verification) that AI systems weigh heavily.`,
-    );
-  } else {
-    out.missingTrustSignals.push(
-      `No specific trust-signal gaps surfaced across systems.`,
     );
   }
 
@@ -368,10 +380,6 @@ function buildFivePart(
   } else if (metrics?.recommendation_confidence_majority === "low") {
     out.missingRecommendationSignals.push(
       `AI systems lack the surrounding context (clear service area, pricing direction, hours) to confidently recommend ${name}.`,
-    );
-  } else {
-    out.missingRecommendationSignals.push(
-      `No specific recommendation-signal gaps surfaced beyond trust factors.`,
     );
   }
 

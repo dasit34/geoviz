@@ -857,6 +857,40 @@ export type ScoreDrivers = {
  * trimmed before the ellipsis so the result reads cleanly. Pure
  * helper — no parsing, no scoring, no side effects.
  */
+/**
+ * Launch Blocker P1 #2 — business-name Title-Casing.
+ *
+ * Customer-entered business names sometimes arrive all-lowercase
+ * (e.g. via uppercase-disabled order forms). Rendering that lowercase in
+ * the most prominent typography on the cover + hero reads as
+ * auto-generated and unreviewed. This helper Title-Cases all-lowercase
+ * input while preserving:
+ *   - Mixed-case names ("Bilski Dental & CARE Esthetics") as-is
+ *   - All-uppercase names ("BILSKI DENTAL") as-is (explicit choice)
+ *   - Acronyms / professional suffixes embedded in mixed input
+ *     ("Joe Smith DDS") as-is
+ *
+ * The detection is conservative: only force-Title-Case the input when
+ * it contains lowercase letters AND zero uppercase letters. Anything
+ * with any uppercase letter is preserved verbatim.
+ */
+export function formatBusinessName(name: string | null | undefined): string {
+  if (!name) return "";
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return "";
+  const hasLower = /[a-z]/.test(trimmed);
+  const hasUpper = /[A-Z]/.test(trimmed);
+  if (!hasLower || hasUpper) return trimmed;
+  // All-lowercase: title-case each token; preserve internal apostrophes.
+  return trimmed
+    .split(/(\s+)/)
+    .map((token) => {
+      if (/^\s+$/.test(token) || token.length === 0) return token;
+      return token[0].toUpperCase() + token.slice(1);
+    })
+    .join("");
+}
+
 export function clipDriverText(s: string, maxLen = 120): string {
   if (!s) return "";
   const trimmed = s.trim();

@@ -47,7 +47,10 @@ const REASON_TEMPLATE: Record<keyof ConfidenceInputs, string> = {
   evidence_completeness: "Limited audit-pipeline completeness.",
   preflight_success: "Initial site fetch was partial.",
   schema_certainty: "Schema markup partially detected.",
-  entity_certainty: "Business identity weakly verified across surfaces.",
+  // Launch Blocker P1 #5 — avoid the "fi" ligature which Chromium's
+  // Puppeteer renderer can drop in PDF output. Using "confirmed"
+  // carries the same meaning without triggering the ligature.
+  entity_certainty: "Business identity weakly confirmed across surfaces.",
   content_extraction_quality: "Some site content was difficult to extract.",
   render_coverage: "Headless render did not cover all pages.",
 };
