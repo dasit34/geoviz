@@ -430,6 +430,16 @@ export async function persistAuditIntelligence(args: {
     // in FourModelGrid/ConsensusSummary renders when no providers pass).
     // No flag coordination required.
     try {
+      // [consensus] block entered — version-stamped permanent log.
+      // Bump `version=` literal whenever the consensus block is
+      // edited (new providers, schema changes, bullet logic, etc.).
+      // Future stale-deploy debugging: if a fresh audit emits zero
+      // `[consensus] block entered` lines, the worker is on a commit
+      // older than the change that bumped this literal — full stop.
+      console.log(
+        `[consensus] block entered orderId=${orderId} version=2026-06-01-a`,
+      );
+
       const { runAiValidationLayer } = await import("@/lib/validators");
       const { computeConsensusIndex } = await import("@/lib/consensus");
       type ValidatorResult = Awaited<ReturnType<typeof runAiValidationLayer>>;
@@ -562,6 +572,19 @@ export async function persistAuditIntelligence(args: {
           `[consensus] persist failed orderId=${orderId} (non-fatal): ${msg}`,
         );
       }
+
+      // [consensus] block exited cleanly — bookend to the entered
+      // log above. Proves the entire block ran without throwing into
+      // the outer catch. `persisted=` reflects whether validator
+      // outputs reached the DB; `bullets=` mirrors the aggregate line.
+      const exitBullets = consensus?.bullets_polished
+        ? "polished"
+        : consensus?.bullets_raw
+          ? "raw"
+          : "none";
+      console.log(
+        `[consensus] block exited orderId=${orderId} persisted=${validatorResult !== null} bullets=${exitBullets}`,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(
