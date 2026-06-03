@@ -6,6 +6,7 @@ import {
   scoreToneFromOverall,
   type ReportScore,
 } from "@/lib/parse-report";
+import { formatDisplayScore } from "@/lib/scoring/format-score";
 
 /**
  * Primary GeoViz score artifact. Same JSX powers the on-screen view
@@ -62,7 +63,7 @@ export function ReportScoreCard({
   context?: ReportScoreCardContext;
 }) {
   const tone = scoreToneFromOverall(score.overall);
-  const overallLabel = typeof score.overall === "number" ? score.overall : "—";
+  const overallLabel = formatDisplayScore(score.overall);
   // Customer-facing status: plain-English label collapsed from the
   // 5-band rubric. Falls back to a parsed status word only when the
   // overall couldn't be extracted from the markdown.

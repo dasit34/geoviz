@@ -13,12 +13,7 @@ import {
   findSampleEntryBySlug,
   type SampleEntry,
 } from "@/lib/sample-registry";
-import {
-  getAuditPercentileBundle,
-  type AuditScoreSnapshot,
-} from "@/lib/intelligence/audit-percentile";
-import { formatCustomerConfidence } from "@/lib/intelligence/confidence-display";
-import type { DeterministicScore } from "@/lib/scoring/types";
+import { buildReportContext } from "@/lib/intelligence/build-report-context";
 import "@/app/report/[id]/print/print.css";
 
 /**
@@ -87,7 +82,7 @@ export default async function SampleReportSlugPage({
           reportMarkdown={audit.reportMarkdown}
           reportGeneratedAt={audit.reportGeneratedAt}
           deterministicScore={audit.intelligence?.deterministicScore ?? null}
-          context={await buildSampleContext(audit.intelligence ?? null)}
+          context={await buildReportContext(audit.intelligence ?? null)}
           otherAvailable={otherAvailable}
         />
       ) : (
@@ -255,80 +250,8 @@ function PendingSample({ entry }: { entry: SampleEntry }) {
   );
 }
 
-/**
- * Phase L: compute benchmark + confidence context for the sample
- * report. Mirrors the helper in `/report/[id]/print/page.tsx`.
- * Fail-soft — returns undefined on any failure so the sample
- * renders unchanged when intelligence data is missing.
- */
-async function buildSampleContext(
-  intelligence: {
-    deterministicScore: unknown;
-    industryCategoryNormalized: string | null;
-    overallScore: number | null;
-    semanticClarityScore: number | null;
-    crawlerAccessibilityScore: number | null;
-    trustSignalScore: number | null;
-    structuredIdentityScore: number | null;
-    recommendationReadinessScore: number | null;
-    aiValidations?: unknown;
-    consensusIndex?: unknown;
-    preflightSignals?: unknown;
-  } | null,
-): Promise<AuditReportContext | undefined> {
-  if (!intelligence) return undefined;
-  if (intelligence.overallScore === null) return undefined;
-  try {
-    const snapshot: AuditScoreSnapshot = {
-      industrySlug: intelligence.industryCategoryNormalized,
-      overallScore: intelligence.overallScore,
-      semanticClarityScore: intelligence.semanticClarityScore,
-      crawlerAccessibilityScore: intelligence.crawlerAccessibilityScore,
-      trustSignalScore: intelligence.trustSignalScore,
-      structuredIdentityScore: intelligence.structuredIdentityScore,
-      recommendationReadinessScore: intelligence.recommendationReadinessScore,
-    };
-    const bundle = await getAuditPercentileBundle(snapshot);
-    const cohortCellValue =
-      bundle.overall.bucket === "insufficient"
-        ? "Industry benchmark forming"
-        : `${bundle.overall.bucket}${
-            intelligence.industryCategoryNormalized
-              ? ` (${intelligence.industryCategoryNormalized})`
-              : ""
-          }`;
-
-    let confidenceLabel: string | null = null;
-    let confidenceReason: string | null = null;
-    const deterministic = intelligence.deterministicScore as
-      | DeterministicScore
-      | null;
-    if (
-      deterministic &&
-      typeof deterministic === "object" &&
-      "confidence_level" in deterministic &&
-      "confidence_inputs" in deterministic
-    ) {
-      const framing = formatCustomerConfidence(deterministic);
-      confidenceLabel = framing.label;
-      confidenceReason = framing.reason;
-    }
-
-    return {
-      percentileCopy: bundle.overall.copy,
-      cohortCellValue,
-      confidenceLabel,
-      confidenceReason,
-      weakestCategoryCopy: bundle.weakestCategory?.data.copy ?? null,
-      aiValidations: intelligence.aiValidations ?? null,
-      consensusIndex: intelligence.consensusIndex ?? null,
-      preflightSignals: intelligence.preflightSignals ?? null,
-    };
-  } catch (err) {
-    console.error(
-      "[sample-report/slug] buildSampleContext failed:",
-      (err as Error).message?.slice(0, 200),
-    );
-    return undefined;
-  }
-}
+// `buildSampleContext` removed — the sample page now calls the shared
+// `buildReportContext` (src/lib/intelligence/build-report-context.ts),
+// the same builder the PDF + admin surfaces use. Eliminates the
+// copy-paste duplication and guarantees the sample renders the exact
+// percentile/confidence context customers receive.

@@ -94,6 +94,22 @@ check("ordinary Title-Case words survive (no locative context)", () => {
   );
 });
 
+check("'to'/'from' are NOT locative cues (Moore issue-title defect)", () => {
+  // Production defect: "AI Has No Way to Verify Business Identity" became
+  // "...to your service area Business Identity" because "to" was treated
+  // as a locative preposition. Capitalized verbs after to/from/for must
+  // survive.
+  const prose =
+    "AI Has No Way to Verify Business Identity. The Homepage Has Almost " +
+    "Nothing for AI to Read. Customers want to Schedule a service from " +
+    "Reliable contractors.";
+  const out = stripFabricatedGeography(prose, VALIDATIONS, "Twinsburg Dental");
+  for (const word of ["Verify", "Read", "Schedule", "Reliable"]) {
+    assert.ok(out.includes(word), `"${word}" must NOT be stripped after to/for/from`);
+  }
+  assert.ok(!out.includes("your service area"), "nothing should be replaced");
+});
+
 check("fabricated city in a locative slot IS still stripped", () => {
   // preposition-before, locative-noun-after, and City,State forms.
   const out = stripFabricatedGeography(

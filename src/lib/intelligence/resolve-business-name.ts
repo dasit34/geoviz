@@ -69,6 +69,11 @@ function cleanArticleTitle(raw: string | null): string | null {
   if (!raw) return null;
   let s = raw.trim();
   if (!s) return null;
+  // Reject SEO/marketing page titles wholesale rather than salvaging a
+  // misleading fragment. "Commercial Flat Roofing Experts Serving Ohio,
+  // Michigan, Indiana - Repair" would otherwise yield the trailing word
+  // "Repair" — worse than falling through to the order/domain name.
+  if (!isPlausibleBusinessName(s)) return null;
   // Split on common separators, take the longest non-empty segment.
   const parts = s
     .split(/[\|\-–—:·•]/)
@@ -148,6 +153,58 @@ function meaningfullyDifferent(a: string, b: string): boolean {
   return true;
 }
 
+// Full US state names — used to detect service-area SEO strings that
+// masquerade as business names ("... Serving Ohio, Michigan, Indiana").
+const US_STATE_NAMES = new Set<string>([
+  "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
+  "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
+  "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana",
+  "maine", "maryland", "massachusetts", "michigan", "minnesota",
+  "mississippi", "missouri", "montana", "nebraska", "nevada", "ohio",
+  "oklahoma", "oregon", "pennsylvania", "tennessee", "texas", "utah",
+  "vermont", "virginia", "washington", "wisconsin", "wyoming",
+]);
+
+/**
+ * Quality gate for an on-site-derived name candidate (schema / article
+ * title / homepage / footer). SEO-stuffed page titles frequently land
+ * in these fields — e.g. "Commercial Flat Roofing Experts Serving Ohio,
+ * Michigan, Indiana - Repair" — and must NOT become the report's hero
+ * title. A real business name is short, doesn't market itself, and
+ * doesn't enumerate a multi-state service area.
+ *
+ * High-precision rejects only (avoid dropping legitimate names like
+ * "Rick's Affordable Heating" — which is why marketing adjectives such
+ * as "affordable" are deliberately NOT rejected):
+ *   - more than 6 words, or longer than 55 chars;
+ *   - contains "serving" / "specializing" (service-area phrasing);
+ *   - names two or more US states (a service-area list, not a name).
+ */
+function isPlausibleBusinessName(name: string): boolean {
+  const n = normalize(name);
+  if (!n) return false;
+  const words = n.split(/\s+/);
+  if (words.length > 6) return false;
+  if (n.length > 55) return false;
+  if (/\b(serving|specializing)\b/i.test(n)) return false;
+  let stateHits = 0;
+  for (const w of words) {
+    if (US_STATE_NAMES.has(w.toLowerCase().replace(/[^a-z]/g, ""))) {
+      stateHits += 1;
+    }
+  }
+  if (stateHits >= 2) return false;
+  return true;
+}
+
+/**
+ * Return the candidate only when it passes the plausibility gate;
+ * otherwise null so the resolver falls through to the next source.
+ */
+function gated(name: string | null): string | null {
+  return name && isPlausibleBusinessName(name) ? name : null;
+}
+
 function asPreflight(v: unknown): PreflightSignals | null {
   if (!v || typeof v !== "object") return null;
   const obj = v as Record<string, unknown>;
@@ -162,23 +219,27 @@ export function resolveBusinessName(
 
   // Collect every candidate that's non-empty so we can surface
   // conflicts honestly.
-  const schemaName = preflight?.entityConsistency?.extractedEntities?.name
-    ?.schema
-    ? normalize(preflight.entityConsistency.extractedEntities.name.schema)
-    : null;
-  const articleTitle = cleanArticleTitle(
-    preflight?.readability?.articleTitle ?? null,
+  // Every on-site candidate passes through the plausibility gate so an
+  // SEO-stuffed page title can never become the hero name. A rejected
+  // candidate is treated as absent and the resolver falls through.
+  const schemaName = gated(
+    preflight?.entityConsistency?.extractedEntities?.name?.schema
+      ? normalize(preflight.entityConsistency.extractedEntities.name.schema)
+      : null,
   );
-  const homepageName = preflight?.entityConsistency?.extractedEntities?.name
-    ?.homepage
-    ? normalize(
-        preflight.entityConsistency.extractedEntities.name.homepage,
-      )
-    : null;
-  const footerName = preflight?.entityConsistency?.extractedEntities?.name
-    ?.footer
-    ? normalize(preflight.entityConsistency.extractedEntities.name.footer)
-    : null;
+  const articleTitle = gated(
+    cleanArticleTitle(preflight?.readability?.articleTitle ?? null),
+  );
+  const homepageName = gated(
+    preflight?.entityConsistency?.extractedEntities?.name?.homepage
+      ? normalize(preflight.entityConsistency.extractedEntities.name.homepage)
+      : null,
+  );
+  const footerName = gated(
+    preflight?.entityConsistency?.extractedEntities?.name?.footer
+      ? normalize(preflight.entityConsistency.extractedEntities.name.footer)
+      : null,
+  );
   const orderName = input.order.businessName
     ? titleCaseLoose(input.order.businessName)
     : null;

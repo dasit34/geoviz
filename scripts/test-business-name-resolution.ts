@@ -197,6 +197,69 @@ check("no inconsistency when the order name itself is chosen", () => {
   assert.equal(r.inconsistency, null);
 });
 
+// ── SEO-junk quality gate (Moore Roofing production defect) ─────────
+// The on-site name/title was the SEO string "Commercial Flat Roofing
+// Experts Serving Ohio, Michigan, Indiana - Repair". It must NEVER
+// become the hero name — the resolver falls through to the clean order
+// name, and (with no order name) to the domain.
+const MOORE_SEO =
+  "Commercial Flat Roofing Experts Serving Ohio, Michigan, Indiana - Repair";
+
+check("SEO-stuffed schema/title name is rejected → order name wins", () => {
+  const r = resolveBusinessName({
+    intelligence: {
+      preflightSignals: preflight({
+        schemaName: MOORE_SEO,
+        articleTitle: MOORE_SEO,
+        homepageName: MOORE_SEO,
+      }),
+    },
+    order: {
+      businessName: "Moore Roofing",
+      email: "x@moore-roofing.com",
+      websiteUrl: "https://www.moore-roofing.com",
+    },
+  });
+  assert.equal(r.name, "Moore Roofing", `got "${r.name}"`);
+  assert.equal(r.source, "order");
+  assert.equal(r.inconsistency, null, "junk name must not surface as alternate");
+});
+
+check("SEO-stuffed name + no order name → domain fallback, not junk", () => {
+  const r = resolveBusinessName({
+    intelligence: {
+      preflightSignals: preflight({ schemaName: MOORE_SEO, articleTitle: MOORE_SEO }),
+    },
+    order: { businessName: null, email: null, websiteUrl: "https://www.moore-roofing.com" },
+  });
+  assert.equal(r.source, "domain");
+  assert.equal(r.name, "Moore Roofing");
+});
+
+check("article title is not salvaged into a trailing junk word", () => {
+  // Previously cleanArticleTitle reduced "...- Repair" to "Repair".
+  const r = resolveBusinessName({
+    intelligence: { preflightSignals: preflight({ articleTitle: MOORE_SEO }) },
+    order: { businessName: "Moore Roofing", email: null, websiteUrl: "https://moore-roofing.com" },
+  });
+  assert.notEqual(r.name, "Repair");
+  assert.equal(r.name, "Moore Roofing");
+});
+
+check("a legitimate multi-word name still passes the gate", () => {
+  const r = resolve(preflight({ schemaName: "Independence Realty Group" }));
+  assert.equal(r.source, "schema");
+  assert.equal(r.name, "Independence Realty Group");
+});
+
+check("a name that merely contains a state word still passes", () => {
+  // One state token is fine ("Ohio Valley Roofing"); only TWO+ states
+  // (a service-area list) trips the gate.
+  const r = resolve(preflight({ schemaName: "Ohio Valley Roofing" }));
+  assert.equal(r.source, "schema");
+  assert.equal(r.name, "Ohio Valley Roofing");
+});
+
 if (failed > 0) {
   console.log(
     `[business-name-resolution] FAILED — passed=${passed} failed=${failed}`,

@@ -2,6 +2,7 @@ import {
   categoryToneFromRatio,
   type ScoreCategory,
 } from "@/lib/parse-report";
+import { formatDisplayScore } from "@/lib/scoring/format-score";
 
 /**
  * Premium card for one rubric category. Same template every render —
@@ -49,7 +50,7 @@ export function CategoryScoreCard({ category }: { category: ScoreCategory }) {
         </span>
         {hasScore ? (
           <span className="category-score-num">
-            {normalizedScore}
+            {formatDisplayScore(normalizedScore)}
             <span className="category-score-max"> / 100</span>
           </span>
         ) : (

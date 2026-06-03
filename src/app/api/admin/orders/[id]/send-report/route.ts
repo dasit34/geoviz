@@ -4,6 +4,10 @@ import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { getResend, FROM_EMAIL } from "@/lib/resend";
 import { buildPdfBaseUrl, generateAuditPdf } from "@/lib/generate-pdf";
 import { parseReportScore } from "@/lib/parse-report-score";
+import {
+  formatDisplayScore,
+  formatDisplayScoreOutOf100,
+} from "@/lib/scoring/format-score";
 import { resolveBusinessName } from "@/lib/intelligence/resolve-business-name";
 import { applyApiRateLimit } from "@/lib/rate-limit";
 
@@ -169,13 +173,13 @@ export async function POST(
     deterministicScore: order.intelligence?.deterministicScore ?? null,
   });
   const scoreLabel = scoreInfo
-    ? `Score: ${scoreInfo.score}/100`
+    ? `Score: ${formatDisplayScoreOutOf100(scoreInfo.score)}`
     : "Your report is ready";
   const subject = `Your AI Visibility Report is ready — ${scoreLabel}`;
 
   const biggestIssueLine = extractBiggestIssue(order.reportMarkdown);
   const summarySentence = scoreInfo
-    ? `Your audit scored ${scoreInfo.score}/100 (${scoreInfo.status ?? "see report"}).`
+    ? `Your audit scored ${formatDisplayScoreOutOf100(scoreInfo.score)} (${scoreInfo.status ?? "see report"}).`
     : "Your AI Visibility audit is ready.";
 
   const textBody = buildTextBody({
@@ -484,7 +488,7 @@ function renderScoreChip(score: number, status: string | null): string {
     ? `<div style="font-size:11px;color:#666;margin-top:2px;text-transform:uppercase;letter-spacing:0.1em;">${safeStatus}</div>`
     : "";
   return `<div style="display:inline-block;padding:8px 14px;border-radius:999px;border:2px solid ${tone.border};background:${tone.bg};margin:0 0 16px;">
-    <span style="font-size:18px;font-weight:800;color:${tone.num};letter-spacing:-0.01em;">${score}</span><span style="font-size:13px;color:${tone.num};font-weight:600;"> / 100</span>
+    <span style="font-size:18px;font-weight:800;color:${tone.num};letter-spacing:-0.01em;">${formatDisplayScore(score)}</span><span style="font-size:13px;color:${tone.num};font-weight:600;"> / 100</span>
     ${statusRow}
   </div>`;
 }

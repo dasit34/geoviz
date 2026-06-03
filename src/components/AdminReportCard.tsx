@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ReportViewerClient } from "./ReportViewerClient";
 import { resolveBusinessName } from "@/lib/intelligence/resolve-business-name";
 import { parseReportScore, scoreTone } from "@/lib/parse-report-score";
+import { formatDisplayScore } from "@/lib/scoring/format-score";
 import {
   deriveProcessingStatus,
   failureReasonDescription,
@@ -1363,7 +1364,7 @@ function ScoreBanner({
         className={`flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-full border-2 ${ring}`}
       >
         <div className={`text-3xl font-bold leading-none ${number}`}>
-          {score}
+          {formatDisplayScore(score)}
         </div>
         <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">
           / 100

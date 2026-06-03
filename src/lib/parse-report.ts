@@ -1032,8 +1032,12 @@ function buildAllowedPlaceSet(
 // rather than ordinary capitalized English. A preposition immediately
 // before ("serving Akron"), a locative noun immediately after
 // ("Akron area"), or a "City, <State>" form all qualify.
+// Locative prepositions only. "to"/"from"/"into"/"toward(s)" are
+// deliberately EXCLUDED — they precede ordinary capitalized verbs far
+// more often than places ("AI has no way to Verify", "for AI to Read"),
+// and including them corrupted issue titles into "your service area".
 const LOCATIVE_BEFORE_RE =
-  /\b(in|near|around|throughout|serving|servicing|across|outside|surrounding|within|greater|from|into|toward|towards|to)\s+$/i;
+  /\b(in|near|around|throughout|serving|servicing|across|outside|surrounding|within|greater)\s+$/i;
 const LOCATIVE_AFTER_RE =
   /^\s*(area|areas|county|township|region|regions|metro|neighbou?rhoods?|suburbs?|community|communities)\b/i;
 

@@ -20,6 +20,7 @@ import {
   type ScoreDrivers,
 } from "@/lib/parse-report";
 import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
+import { formatDisplayScore } from "@/lib/scoring/format-score";
 import { SECTION_EYEBROWS } from "@/lib/report-sections";
 import { Prose, InlineProse } from "@/components/Prose";
 import { ReportScoreCard } from "@/components/ReportScoreCard";
@@ -616,7 +617,7 @@ function ReportCover({
   /** Optional cohort cell — "Top 25% (roofing)" or "Industry benchmark forming" */
   cohortCellValue?: string | null;
 }) {
-  const scoreLabel = typeof overall === "number" ? overall : "—";
+  const scoreLabel = formatDisplayScore(overall);
   const displayUrl = prettifyUrlForDisplay(websiteUrl);
   return (
     <section className="report-cover" aria-label="AI visibility report cover">

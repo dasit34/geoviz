@@ -2334,17 +2334,29 @@ a,
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
-  /* 2026-05-15: PDF rendering was splitting long category labels
-     mid-word ("Recommendati / on Readiness"). In the print/PDF
-     context the 3-col card has plenty of room for any single word
-     in our label set — force WORD-BOUNDARY breaks only, and
-     disable hyphenation explicitly so Chromium's PDF renderer
-     can't insert a soft-hyphen break. */
+  /* AUTHORITATIVE category-label wrapping rule for print (reconciles
+     three prior conflicting blocks). The mid-word split
+     "Recommendati / on Ready" came from `overflow-wrap: anywhere`
+     (breaks at ANY char) winning the cascade. Lock to:
+       - overflow-wrap: normal + word-break: keep-all → NEVER break
+         mid-word; the only legal break is the space ("Recommendation
+         / Ready");
+       - drop the rubric-weight chip onto its own line so it can't
+         steal width from the label text on a narrow 3-col card —
+         leaving the full label slot for the longest single word
+         ("Recommendation");
+       - a touch smaller so "Recommendation" comfortably fits the slot. */
   .category-score-label {
-    overflow-wrap: break-word !important;
-    word-break: normal !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
     hyphens: none !important;
     -webkit-hyphens: none !important;
+    font-size: 12px !important;
+  }
+  .category-score-label .category-score-weight {
+    display: block !important;
+    margin-left: 0 !important;
+    margin-top: 3px !important;
   }
   .strength-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -2373,9 +2385,10 @@ a,
      Chromium uses to break long words at fallback hyphenation points
      when the printable width is narrow. Suppress on labels and links
      where the break is never welcome. */
+  /* NOTE: `.category-score-label` is deliberately NOT in this group —
+     `overflow-wrap: anywhere` is what caused the mid-word "Recommendati
+     / on" split. Its wrapping is owned by the authoritative rule above. */
   .report-prose a,
-  .category-score-label,
-  .category-score-label *,
   [class*="finding-label"],
   .score-card-inline-ref,
   .pill {
@@ -2510,20 +2523,13 @@ a,
     overflow-wrap: anywhere !important;
   }
 
-  /* Launch Blocker P1 #4 — label break-prevention for "Recommendation
-     Ready" and other category labels. The prior `overflow-wrap:
-     anywhere` was permissive enough to allow mid-word breaks
-     ("Recommendati on Ready"). Locking to break-word + keep-all
-     forces the label to wrap only at the space between "Recommendation"
-     and "Ready" — never mid-word. */
+  /* Card may shrink in the grid; label wrapping is owned by the single
+     authoritative rule earlier in this @media block (overflow-wrap:
+     normal + word-break: keep-all + weight chip on its own line). The
+     prior duplicate `.category-score-label` rule here was removed — it
+     set `max-width: 100%` (removing the score's reserved space) and
+     re-introduced cascade ambiguity. */
   .category-score-card {
     min-width: 0 !important;
-  }
-  .category-score-label {
-    max-width: 100% !important;
-    overflow-wrap: break-word !important;
-    word-break: keep-all !important;
-    hyphens: none !important;
-    -webkit-hyphens: none !important;
   }
 }
