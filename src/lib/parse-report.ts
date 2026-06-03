@@ -382,6 +382,15 @@ const STRENGTH_LABELS: Record<ScoreCategoryKey, string> = {
   brand: "Clear, consistent brand identity across the web",
   tech: "Highly AI-readable site structure",
 };
+
+// Phase B1 — when the preflight schema analyzer ran and explicitly
+// did NOT detect an FAQ schema type, swap the content strength's
+// label to one that doesn't claim FAQ content. Prevents the Page-5
+// "FAQ found: No" vs Page-12 "FAQ strength" contradiction.
+const STRENGTH_LABELS_NO_FAQ: Partial<Record<ScoreCategoryKey, string>> = {
+  content: "Deep service content for AI to quote",
+};
+
 const STRENGTH_THRESHOLD = 0.7;
 
 export type CategoryStrength = {
@@ -391,18 +400,48 @@ export type CategoryStrength = {
   max: number;
 };
 
-export function deriveStrengths(score: ReportScore): CategoryStrength[] {
+/**
+ * Optional preflight signal shape consumed by `deriveStrengths` to
+ * guard against fact-contradicting strengths. The Json-typed
+ * `AuditIntelligence.preflightSignals` payload satisfies this shape;
+ * callers may pass `null` (legacy audits) and the function will
+ * preserve the prior behavior.
+ */
+type StrengthsPreflight = {
+  schema?: { detectedTypes?: string[] | null } | null;
+} | null;
+
+export function deriveStrengths(
+  score: ReportScore,
+  preflight?: StrengthsPreflight,
+): CategoryStrength[] {
+  // Three states for the FAQ signal:
+  //   true  → preflight ran and detectedTypes includes an FAQ type.
+  //   false → preflight ran but detectedTypes lacks any FAQ type.
+  //   null  → preflight did not run (legacy audit); preserve original label.
+  let hasFaqSignal: boolean | null = null;
+  const detected = preflight?.schema?.detectedTypes;
+  if (Array.isArray(detected)) {
+    hasFaqSignal = detected.some((t) => typeof t === "string" && /faq/i.test(t));
+  }
+
   return score.categories
     .filter(
       (c): c is ScoreCategory & { score: number } =>
         typeof c.score === "number" && c.score / c.max >= STRENGTH_THRESHOLD,
     )
-    .map((c) => ({
-      key: c.key,
-      label: STRENGTH_LABELS[c.key] ?? c.label,
-      score: c.score,
-      max: c.max,
-    }));
+    .map((c) => {
+      let label = STRENGTH_LABELS[c.key] ?? c.label;
+      if (c.key === "content" && hasFaqSignal === false) {
+        label = STRENGTH_LABELS_NO_FAQ.content ?? label;
+      }
+      return {
+        key: c.key,
+        label,
+        score: c.score,
+        max: c.max,
+      };
+    });
 }
 
 // Neutral, honest labels for the fallback "Best current signals"
@@ -891,6 +930,217 @@ export function formatBusinessName(name: string | null | undefined): string {
     .join("");
 }
 
+/**
+ * Phase B4 — strip fabricated city / locality references from
+ * customer-facing prose.
+ *
+ * The Section 04 / Section 06 narration occasionally names cities the
+ * audited business doesn't operate in (the Akron / Twinsburg /
+ * Youngstown incident on a Twinsburg-only firm). The prompt cannot
+ * always be relied on. This helper is the render-layer guard:
+ *
+ *   1. Build a "validated locations" set from the cross-model
+ *      validator outputs (`aiValidations[].outputs[]`'s
+ *      `location_identified` field). Each entry is split on commas,
+ *      lowercased, and deduped.
+ *   2. Add the customer-entered business name to the allowlist so a
+ *      city embedded in the company name (e.g. "Twinsburg Dental")
+ *      survives.
+ *   3. Walk the prose, find capitalized 1-2 word phrases that look
+ *      like city names (heuristic: leading capital, no trailing
+ *      digits, not at sentence start preceded by a period), and check
+ *      whether each appears in the allowlist.
+ *   4. Replace any disallowed match with `"your service area"`.
+ *
+ * Emits one `console.warn` per call when any strip happens so the
+ * fabrication-rate is grep-able in worker logs.
+ *
+ * Conservative by design: when validatedLocations is empty (no
+ * validator output), the helper is a no-op so legacy audits stay
+ * unchanged.
+ */
+type ValidatorOutputForGeography = {
+  status?: string;
+  location_identified?: string | null;
+};
+type ValidatorLayerForGeography = {
+  outputs?: ValidatorOutputForGeography[];
+} | null;
+
+// Common multi-word state names that show up as part of validated
+// locations. Tokenized so we never strip "Ohio" when the validator
+// said "Twinsburg, Ohio".
+const US_STATE_TOKENS = new Set<string>([
+  "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
+  "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
+  "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana",
+  "maine", "maryland", "massachusetts", "michigan", "minnesota",
+  "mississippi", "missouri", "montana", "nebraska", "nevada", "new",
+  "hampshire", "jersey", "mexico", "york", "north", "carolina",
+  "dakota", "ohio", "oklahoma", "oregon", "pennsylvania", "rhode",
+  "island", "south", "tennessee", "texas", "utah", "vermont",
+  "virginia", "washington", "west", "wisconsin", "wyoming",
+]);
+
+// Words that frequently start with a capital letter in prose but are
+// not place names — keep them off the strip path so we don't replace
+// "GeoViz" or "Google" with "your service area."
+const NON_PLACE_TOKENS = new Set<string>([
+  "geoviz", "google", "chatgpt", "claude", "gemini", "perplexity",
+  "openai", "anthropic", "ai", "llm", "schema", "json", "ld",
+  "seo", "geo", "the", "this", "that", "your", "our", "we",
+  "they", "their", "section", "monday", "tuesday", "wednesday",
+  "thursday", "friday", "saturday", "sunday", "january", "february",
+  "march", "april", "may", "june", "july", "august", "september",
+  "october", "november", "december",
+]);
+
+function buildAllowedPlaceSet(
+  aiValidations: ValidatorLayerForGeography,
+  businessName: string | null | undefined,
+): Set<string> {
+  const out = new Set<string>();
+  const ingest = (raw: string | null | undefined): void => {
+    if (!raw) return;
+    for (const segment of raw.split(/[,;/]/)) {
+      const trimmed = segment.trim().toLowerCase();
+      if (trimmed.length >= 3) out.add(trimmed);
+      // Also add individual tokens (so "Twinsburg, Ohio" allows both
+      // "Twinsburg" and "Ohio" appearing standalone in prose).
+      for (const token of trimmed.split(/\s+/)) {
+        if (token.length >= 3) out.add(token);
+      }
+    }
+  };
+  if (aiValidations?.outputs) {
+    for (const o of aiValidations.outputs) {
+      if (o.status !== "passed") continue;
+      ingest(o.location_identified ?? null);
+    }
+  }
+  // Allow city-in-business-name (e.g. "Twinsburg Dental").
+  if (businessName) {
+    for (const token of businessName.split(/\s+/)) {
+      const clean = token.toLowerCase().replace(/[^a-z]/g, "");
+      if (clean.length >= 3) out.add(clean);
+    }
+  }
+  return out;
+}
+
+// Locative cues that mark a Title-Case candidate as an actual place
+// rather than ordinary capitalized English. A preposition immediately
+// before ("serving Akron"), a locative noun immediately after
+// ("Akron area"), or a "City, <State>" form all qualify.
+const LOCATIVE_BEFORE_RE =
+  /\b(in|near|around|throughout|serving|servicing|across|outside|surrounding|within|greater|from|into|toward|towards|to)\s+$/i;
+const LOCATIVE_AFTER_RE =
+  /^\s*(area|areas|county|township|region|regions|metro|neighbou?rhoods?|suburbs?|community|communities)\b/i;
+
+/**
+ * True when the text surrounding a Title-Case candidate reads as a
+ * place reference: a locative preposition just before, a locative noun
+ * just after, or a `, <State>` suffix ("Akron, Ohio"). Pure helper for
+ * stripFabricatedGeography's precision gate.
+ */
+function hasLocativeContext(before: string, after: string): boolean {
+  if (LOCATIVE_BEFORE_RE.test(before)) return true;
+  if (LOCATIVE_AFTER_RE.test(after)) return true;
+  // "City, Ohio" / "City, TX" — comma then a US state word or a 2-letter
+  // state abbreviation.
+  const commaState = after.match(/^\s*,\s*([A-Za-z]{2,})/);
+  if (commaState) {
+    const next = commaState[1].toLowerCase();
+    if (US_STATE_TOKENS.has(next) || /^[a-z]{2}$/.test(next)) return true;
+  }
+  return false;
+}
+
+export function stripFabricatedGeography(
+  prose: string,
+  aiValidations: ValidatorLayerForGeography,
+  businessName: string | null | undefined,
+  options: { logTag?: string } = {},
+): string {
+  if (!prose) return prose;
+  const allowed = buildAllowedPlaceSet(aiValidations, businessName);
+  // When we have NO validated locations to compare against, there's
+  // nothing to strip — return the prose untouched. Legacy audits
+  // (validator layer null) keep their existing behavior.
+  if (allowed.size === 0) return prose;
+
+  let stripCount = 0;
+  // Match a capitalized 1-2 word phrase. The capture group covers
+  // "Akron", "New York", "Beverly Hills". Reject matches that begin
+  // a sentence (the captured phrase can't be preceded by `. ` or `! `
+  // or `? ` or `^`) — we don't strip "Akron is …" when it opens a
+  // sentence, since sentence-initial caps are routine and the false-
+  // positive cost is high.
+  //
+  // CRITICAL precision gate: Title Case alone does NOT make a word a
+  // place — ordinary capitalized words ("Found", "Matters", "When",
+  // "Deploy", evidence-block labels like "What We Found") are Title
+  // Case too. Stripping by "capitalized AND not in a safelist" mangles
+  // every such word into "your service area" the moment the validator
+  // layer agrees on ANY location (allowed-set non-empty). So a
+  // candidate is only treated as a place when it sits in a LOCATIVE
+  // CONTEXT — introduced by a locative preposition ("in/near/serving
+  // Akron"), trailed by a locative noun ("Springfield area/county"),
+  // or written as "City, <State>". This keeps the true positives the
+  // guard exists for while eliminating the false-positive class.
+  const replaced = prose.replace(
+    /(?<=[a-z,)"\s])\b([A-Z][a-z]{2,}(?:\s[A-Z][a-z]{2,}){0,1})\b/g,
+    (match, phrase: string, offset: number, full: string) => {
+      const lower = phrase.toLowerCase();
+      const firstToken = lower.split(/\s+/)[0] ?? lower;
+      if (NON_PLACE_TOKENS.has(firstToken)) return match;
+      // Allow individual state words (Ohio, Texas) to pass through —
+      // they're rarely the customer-trust-breaking case.
+      if (US_STATE_TOKENS.has(firstToken) && lower === firstToken) {
+        return match;
+      }
+      // If any constituent token is in the allowed set, keep the
+      // phrase — "Twinsburg" appears in "Twinsburg Dental Group" and
+      // should never get stripped from a Twinsburg report.
+      for (const token of lower.split(/\s+/)) {
+        if (allowed.has(token)) return match;
+      }
+      if (allowed.has(lower)) return match;
+      // Locative-context gate — only strip a candidate that actually
+      // reads as a place in situ. Without one of these cues, a
+      // capitalized word is far more likely ordinary English than a
+      // fabricated city.
+      const before = full.slice(Math.max(0, offset - 24), offset);
+      const after = full.slice(offset + match.length, offset + match.length + 24);
+      if (!hasLocativeContext(before, after)) return match;
+      // Looks like a place AND sits in a locative slot AND is not in
+      // the validated allow-set → strip.
+      stripCount += 1;
+      return "your service area";
+    },
+  );
+
+  if (stripCount > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[geo-fabrication] stripped ${stripCount} unrecognized place mention(s) from prose${
+        options.logTag ? ` tag=${options.logTag}` : ""
+      }`,
+    );
+    // Tidy the substitution seams: a candidate matched via the
+    // locative-noun cue ("Springfield area") leaves a trailing noun
+    // ("your service area area"), and a "City, State" strip leaves a
+    // dangling state ("your service area, Ohio"). Collapse both.
+    return replaced
+      .replace(
+        /your service area\s+(area|areas|county|township|region|regions|metro|community|communities)\b/gi,
+        "your service area",
+      )
+      .replace(/your service area,\s+[A-Z][a-zA-Z.]+/g, "your service area");
+  }
+  return replaced;
+}
+
 export function clipDriverText(s: string, maxLen = 120): string {
   if (!s) return "";
   const trimmed = s.trim();
@@ -948,7 +1198,9 @@ const JARGON_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bentity disambiguation\b/gi, "business identity clarification"],
   [/\bembeddings\b/gi, "AI understanding signals"],
   [/\bvector(?:s)?\b/gi, "AI understanding signals"],
-  [/\bretrieval\b/gi, "AI search"],
+  // Absorb an optional preceding "AI " so "AI retrieval" collapses to
+  // "AI search" instead of doubling into "AI AI search".
+  [/\b(?:AI\s+)?retrieval\b/gi, "AI search"],
   [/\bvalidators?\b/gi, "AI systems"],
   [/\brendering\b/gi, "loading"],
   [/\bhydration\b/gi, "interactive loading"],

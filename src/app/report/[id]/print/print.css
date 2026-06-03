@@ -138,6 +138,18 @@ a,
   hyphens: none;
   -webkit-hyphens: none;
 }
+.report-cover-name-conflict {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 192, 120, 0.85);
+  letter-spacing: 0.01em;
+  max-width: 56ch;
+}
+.report-cover-name-conflict span {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+}
 .report-cover-scorerow {
   display: flex;
   align-items: flex-end;
@@ -435,6 +447,21 @@ a,
   line-height: 1.55;
   color: rgba(255, 255, 255, 0.75);
   max-width: 52ch;
+}
+/* F6 — deterministic "why this score" explainer. Renders only when
+   there's a real strong/weak category gap to explain. Body-prose
+   typography, slightly narrower than the page so it reads as
+   commentary rather than a primary statement. */
+.score-card-explainer {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.68);
+  max-width: 62ch;
+  padding: 10px 12px;
+  border-left: 2px solid rgba(255, 122, 24, 0.45);
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 0 4px 4px 0;
 }
 /* Phase L: percentile + confidence context strip rendered below
    the score caption. Two pill-shaped chips, soft border, mono-
@@ -1028,6 +1055,26 @@ a,
   hyphens: none;
   -webkit-hyphens: none;
 }
+/* Phase C — rubric weight chip. Sits inline-block after the label so
+   the customer can see "Recommendation Ready · 25%" together and
+   reconstruct the math (max value = weight in percent since the
+   frozen v1 rubric sums to 100). Desaturated and mono so it reads as
+   metadata, not a score. */
+.category-score-label .category-score-weight {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
 .category-score-num {
   font-size: 18px;
   font-weight: 800;
@@ -1296,6 +1343,35 @@ a,
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+/* Phase F — premium section marker rhythm. Mono number, large
+   accent-tinted, paired with the section title. Sits above the
+   first card of each numbered section as a chapter divider. Mirrors
+   the Cloudflare / Semrush / Gartner executive-brief pattern. */
+.report-section-marker {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 20px;
+  page-break-after: avoid;
+}
+.report-section-marker-num {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgba(255, 122, 24, 0.85);
+  line-height: 1;
+  min-width: 40px;
+}
+.report-section-marker-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.15;
+  margin: 0;
 }
 .report-section-diagnosis {
   border-color: rgba(255, 122, 24, 0.18);

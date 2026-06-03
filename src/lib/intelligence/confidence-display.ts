@@ -21,9 +21,9 @@ import type {
 } from "@/lib/scoring/types";
 
 export type CustomerConfidenceLabel =
-  | "High confidence"
-  | "Moderate confidence"
-  | "Limited confidence";
+  | "Audit completeness: High"
+  | "Audit completeness: Moderate"
+  | "Audit completeness: Limited";
 
 export type CustomerConfidenceFraming = {
   label: CustomerConfidenceLabel;
@@ -31,15 +31,24 @@ export type CustomerConfidenceFraming = {
   reason: string;
 };
 
+// Phase B2 — the pre-rename labels ("Moderate confidence", etc.) read
+// to customers as "how confident GeoViz is in the score." That mental
+// model collides with the Cross-Model Agreement pill on the consensus
+// section, which is a separate signal (how much the four AI systems
+// agreed with each other). Renaming this surface to "Audit
+// completeness" pins it to what it actually measures: how complete
+// our evidence pipeline was. The two pills are now textually
+// distinct and can't be misread as competing readings of the same
+// thing.
 function labelFor(level: ConfidenceLevel): CustomerConfidenceLabel {
   switch (level) {
     case "high":
-      return "High confidence";
+      return "Audit completeness: High";
     case "moderate":
-      return "Moderate confidence";
+      return "Audit completeness: Moderate";
     case "low":
     default:
-      return "Limited confidence";
+      return "Audit completeness: Limited";
   }
 }
 

@@ -23,7 +23,7 @@ type Contributor = {
 // for an AI system trying to recommend the business.
 const POSITIVE_LABELS: Record<ScoreCategoryKey, string> = {
   schema: "Business identity verified by AI",
-  crawler: "AI crawlers can reach your site",
+  crawler: "AI systems can reach your site",
   trust: "Testimonials and trust signals detected",
   content: "Content depth enough to quote",
   brand: "Brand identity is clear and consistent",
@@ -34,7 +34,7 @@ const POSITIVE_LABELS: Record<ScoreCategoryKey, string> = {
 // signal. Customer-language; never names rubric weights.
 const NEGATIVE_LABELS: Record<ScoreCategoryKey, string> = {
   schema: "AI cannot easily verify your business identity",
-  crawler: "AI crawlers may have trouble reaching your content",
+  crawler: "AI systems may have trouble reaching your content",
   trust: "Reviews and trust signals are limited",
   content: "Content depth is not sufficient for AI to quote",
   brand: "Brand identity is not consistent across the web",

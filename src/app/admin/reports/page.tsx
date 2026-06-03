@@ -11,6 +11,7 @@ import { checkPageRateLimit } from "@/lib/rate-limit";
 import { RateLimitedNotice } from "@/components/RateLimitedNotice";
 import { headers } from "next/headers";
 import { costTone, type CostTone } from "@/lib/pricing";
+import { buildReportContext } from "@/lib/intelligence/build-report-context";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -104,10 +105,43 @@ export default async function AdminReportsPage({
           aiValidations: true,
           consensusIndex: true,
           deterministicScore: true,
+          // Phase B3 — preflight signals drive resolveBusinessName so
+          // the admin shows the same resolved name the customer PDF
+          // does, and the FAQ strength guard (B1) can read schema
+          // detectedTypes when the full report renders on the
+          // operator surface (Phase D swap).
+          preflightSignals: true,
+          // Phase D — the percentile + confidence bundle that
+          // buildReportContext() needs to construct the same context
+          // payload the PDF route does. Without these, the admin
+          // would render <AuditReportContent /> with no context strip
+          // (percentile / confidence) — re-introducing the divergence
+          // we just closed.
+          industryCategoryNormalized: true,
+          overallScore: true,
+          semanticClarityScore: true,
+          crawlerAccessibilityScore: true,
+          trustSignalScore: true,
+          structuredIdentityScore: true,
+          recommendationReadinessScore: true,
         },
       },
     },
   });
+
+  // Phase D — build the same `AuditReportContext` payload per order
+  // that the PDF route constructs, server-side, so the admin queue's
+  // <AuditReportContent /> render is fully populated. Fail-soft per
+  // order: any single buildReportContext throw resolves to undefined
+  // and that one card renders without the context strip while the
+  // other orders stay healthy.
+  const reportContextById = new Map<string, Awaited<ReturnType<typeof buildReportContext>>>();
+  await Promise.all(
+    orders.map(async (o) => {
+      const ctx = await buildReportContext(o.intelligence ?? null);
+      reportContextById.set(o.id, ctx);
+    }),
+  );
 
   // ---- Today's cost & runtime summary (operator-facing) ----
   //
@@ -377,6 +411,16 @@ export default async function AdminReportsPage({
                 deterministicScore={
                   o.intelligence?.deterministicScore ?? null
                 }
+                preflightSignals={
+                  o.intelligence?.preflightSignals ?? null
+                }
+                aiValidations={
+                  o.intelligence?.aiValidations ?? null
+                }
+                consensusIndex={
+                  o.intelligence?.consensusIndex ?? null
+                }
+                reportContext={reportContextById.get(o.id) ?? null}
                 order={{
                   id: o.id,
                   email: o.email,

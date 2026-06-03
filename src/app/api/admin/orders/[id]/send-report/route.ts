@@ -4,6 +4,7 @@ import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { getResend, FROM_EMAIL } from "@/lib/resend";
 import { buildPdfBaseUrl, generateAuditPdf } from "@/lib/generate-pdf";
 import { parseReportScore } from "@/lib/parse-report-score";
+import { resolveBusinessName } from "@/lib/intelligence/resolve-business-name";
 import { applyApiRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -45,6 +46,22 @@ export async function POST(
 
   const order = await prisma.auditOrder.findUnique({
     where: { id: params.id },
+    include: {
+      // Phase A — the email must read the canonical deterministic
+      // score (same source as admin + PDF). Pre-fix, this route's
+      // parseReportScore() call fell back to regex on the markdown
+      // hero, diverging from the surfaces customers also see.
+      // Phase B3 — preflight + aiValidations drive resolveBusinessName
+      // so the email name matches the PDF cover (e.g. "Independence
+      // Realty Group" rather than the raw "Rg Ohio" order input).
+      intelligence: {
+        select: {
+          deterministicScore: true,
+          preflightSignals: true,
+          aiValidations: true,
+        },
+      },
+    },
   });
   if (!order) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -117,7 +134,20 @@ export async function POST(
     );
   }
 
-  const businessLabel = order.businessName || order.websiteUrl;
+  // Phase B3 — resolve the customer-facing business name through the
+  // same priority chain the PDF cover uses (schema.org Organization
+  // name > article title > entity-consistency scrape > order input >
+  // domain fallback). Email subject + body now match what the cover
+  // displays.
+  const nameResolution = resolveBusinessName({
+    intelligence: order.intelligence ?? null,
+    order: {
+      businessName: order.businessName,
+      email: order.email,
+      websiteUrl: order.websiteUrl,
+    },
+  });
+  const businessLabel = nameResolution.name || order.websiteUrl;
   const baseUrl = buildPdfBaseUrl(req);
   // Loud warning if production accidentally resolves to localhost — the
   // customer email shouldn't ever go out with localhost links. The send
@@ -132,7 +162,12 @@ export async function POST(
   const pdfUrl = `${baseUrl.replace(/\/$/, "")}/api/report/${encodeURIComponent(order.id)}/pdf`;
 
   // Pull the score for the subject line and the email summary.
-  const scoreInfo = parseReportScore(order.reportMarkdown);
+  // Phase A — thread deterministicScore so the email reads the same
+  // canonical integer the PDF + admin surface; previously this fell
+  // back to the regex parser on the markdown hero.
+  const scoreInfo = parseReportScore(order.reportMarkdown, {
+    deterministicScore: order.intelligence?.deterministicScore ?? null,
+  });
   const scoreLabel = scoreInfo
     ? `Score: ${scoreInfo.score}/100`
     : "Your report is ready";

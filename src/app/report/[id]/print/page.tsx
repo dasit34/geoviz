@@ -8,12 +8,8 @@ import { Footer } from "@/components/Footer";
 import { logReportAccessAttempt } from "@/lib/report-access";
 import { checkPageRateLimit } from "@/lib/rate-limit";
 import { RateLimitedNotice } from "@/components/RateLimitedNotice";
-import {
-  getAuditPercentileBundle,
-  type AuditScoreSnapshot,
-} from "@/lib/intelligence/audit-percentile";
-import { formatCustomerConfidence } from "@/lib/intelligence/confidence-display";
-import type { DeterministicScore } from "@/lib/scoring/types";
+import { buildReportContext } from "@/lib/intelligence/build-report-context";
+import { resolveBusinessName } from "@/lib/intelligence/resolve-business-name";
 import "./print.css";
 
 /**
@@ -125,12 +121,32 @@ export default async function PrintPage({
     return <ReportInFlight orderId={order.id} />;
   }
 
-  const businessLabel = order.businessName ?? order.email;
+  // F2 — render-time business-name resolution. Reads schema-org
+  // Organization.name (best), article title, then surface scrapes,
+  // before falling back to order.businessName / domain. Surfaces an
+  // identity-inconsistency pill on the cover when the resolved name
+  // diverges meaningfully from the user's input.
+  const nameResolution = resolveBusinessName({
+    intelligence: order.intelligence ?? null,
+    order: {
+      businessName: order.businessName,
+      email: order.email,
+      websiteUrl: order.websiteUrl,
+    },
+  });
+  const businessLabel = nameResolution.name;
 
   // Phase L: compute customer-facing benchmark + confidence context.
   // Pure DB reads; null-safe; fully fail-soft (any error → no
   // context, report renders as it did pre-Phase L).
   const reportContext = await buildReportContext(order.intelligence ?? null);
+  const contextWithIdentity: AuditReportContext | undefined = reportContext
+    ? { ...reportContext, nameInconsistency: nameResolution.inconsistency }
+    : nameResolution.inconsistency
+      ? ({
+          nameInconsistency: nameResolution.inconsistency,
+        } as AuditReportContext)
+      : undefined;
 
   return (
     <AuditReportContent
@@ -140,92 +156,15 @@ export default async function PrintPage({
       reportMarkdown={order.reportMarkdown}
       reportGeneratedAt={order.reportGeneratedAt}
       deterministicScore={order.intelligence?.deterministicScore ?? null}
-      context={reportContext}
+      context={contextWithIdentity}
     />
   );
 }
 
-/**
- * Phase L: compute percentile + confidence context server-side.
- * Returns `undefined` (rather than throwing) on any failure path so
- * the report renders unchanged when intelligence data is missing or
- * the cohort lookup hits an edge case.
- */
-async function buildReportContext(
-  intelligence: {
-    deterministicScore: unknown;
-    industryCategoryNormalized: string | null;
-    overallScore: number | null;
-    semanticClarityScore: number | null;
-    crawlerAccessibilityScore: number | null;
-    trustSignalScore: number | null;
-    structuredIdentityScore: number | null;
-    recommendationReadinessScore: number | null;
-    aiValidations?: unknown;
-    consensusIndex?: unknown;
-    preflightSignals?: unknown;
-  } | null,
-): Promise<AuditReportContext | undefined> {
-  if (!intelligence) return undefined;
-  if (intelligence.overallScore === null) return undefined;
-  try {
-    const snapshot: AuditScoreSnapshot = {
-      industrySlug: intelligence.industryCategoryNormalized,
-      overallScore: intelligence.overallScore,
-      semanticClarityScore: intelligence.semanticClarityScore,
-      crawlerAccessibilityScore: intelligence.crawlerAccessibilityScore,
-      trustSignalScore: intelligence.trustSignalScore,
-      structuredIdentityScore: intelligence.structuredIdentityScore,
-      recommendationReadinessScore: intelligence.recommendationReadinessScore,
-    };
-    const bundle = await getAuditPercentileBundle(snapshot);
-
-    // Build the cover-page "Cohort" cell value. Friendly short
-    // form, never speculative.
-    const cohortCellValue =
-      bundle.overall.bucket === "insufficient"
-        ? "Industry benchmark forming"
-        : `${bundle.overall.bucket}${
-            intelligence.industryCategoryNormalized
-              ? ` (${intelligence.industryCategoryNormalized})`
-              : ""
-          }`;
-
-    // Confidence framing from the deterministic engine output.
-    let confidenceLabel: string | null = null;
-    let confidenceReason: string | null = null;
-    const deterministic = intelligence.deterministicScore as
-      | DeterministicScore
-      | null;
-    if (
-      deterministic &&
-      typeof deterministic === "object" &&
-      "confidence_level" in deterministic &&
-      "confidence_inputs" in deterministic
-    ) {
-      const framing = formatCustomerConfidence(deterministic);
-      confidenceLabel = framing.label;
-      confidenceReason = framing.reason;
-    }
-
-    return {
-      percentileCopy: bundle.overall.copy,
-      cohortCellValue,
-      confidenceLabel,
-      confidenceReason,
-      weakestCategoryCopy: bundle.weakestCategory?.data.copy ?? null,
-      aiValidations: intelligence.aiValidations ?? null,
-      consensusIndex: intelligence.consensusIndex ?? null,
-      preflightSignals: intelligence.preflightSignals ?? null,
-    };
-  } catch (err) {
-    console.error(
-      "[report/print] buildReportContext failed:",
-      (err as Error).message?.slice(0, 200),
-    );
-    return undefined;
-  }
-}
+// Phase D — buildReportContext lifted to
+// `src/lib/intelligence/build-report-context.ts` so both the PDF
+// route AND the admin queue construct the same payload that
+// `<AuditReportContent />` consumes. See that module for the body.
 
 /**
  * Branded "your audit is being prepared" surface. Renders for any

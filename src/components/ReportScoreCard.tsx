@@ -99,6 +99,13 @@ export function ReportScoreCard({
 
       <p className="score-card-caption">{captionForTone(tone)}</p>
 
+      {(() => {
+        const explainer = deriveScoreExplanation(score);
+        return explainer ? (
+          <p className="score-card-explainer">{explainer}</p>
+        ) : null;
+      })()}
+
       {context && (context.percentileCopy || context.confidenceLabel) ? (
         <div className="score-card-context-strip">
           {context.percentileCopy ? (
@@ -189,4 +196,54 @@ function formatAuditDate(d: Date): string {
     month: "short",
     day: "numeric",
   });
+}
+
+/**
+ * F6 — deterministic "why this score" explainer. Answers the obvious
+ * customer question when a few categories are perfect but the overall
+ * lands mid-range: "if Tech and AI Readability are 100, why is the
+ * overall 56?" Derived entirely from `score.categories` — no model
+ * generation, no fabrication risk.
+ *
+ * Gate: only render when there's a real gap to explain — at least one
+ * category at ≥80% of its max AND at least one at <40% of its max AND
+ * the overall is below 70. Otherwise the caption already says enough.
+ */
+export function deriveScoreExplanation(score: ReportScore): string | null {
+  if (typeof score.overall !== "number" || score.overall >= 70) return null;
+  const scored = score.categories
+    .map((c) => ({
+      short: c.short,
+      ratio:
+        typeof c.score === "number" && c.max > 0 ? c.score / c.max : null,
+    }))
+    .filter(
+      (c): c is { short: string; ratio: number } => c.ratio !== null,
+    )
+    .sort((a, b) => b.ratio - a.ratio);
+  if (scored.length < 2) return null;
+  const highest = scored[0];
+  const lowest = scored[scored.length - 1];
+  if (!highest || !lowest) return null;
+  if (highest.ratio < 0.8 || lowest.ratio >= 0.4) return null;
+
+  const nextHighest = scored[1];
+  const nextLowest = scored[scored.length - 2];
+  const strongList =
+    nextHighest && nextHighest.ratio >= 0.8
+      ? `${highest.short} and ${nextHighest.short}`
+      : highest.short;
+  const weakList =
+    nextLowest && nextLowest.ratio < 0.4
+      ? `${lowest.short} and ${nextLowest.short}`
+      : lowest.short;
+
+  return (
+    `Your website is strong on ${strongList}, so AI systems can read ` +
+    `and interpret it cleanly. The overall lands at ${Math.round(score.overall)} because ` +
+    `${weakList} are incomplete — those are the signals AI systems ` +
+    `use to verify who you are and whether to recommend you. Strong ` +
+    `readability without strong identity signals reads as ambiguous ` +
+    `to recommendation engines.`
+  );
 }

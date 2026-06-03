@@ -61,6 +61,14 @@ const PROVIDER_DISPLAY: Record<string, string> = {
 
 const PROVIDER_ORDER = ["openai", "claude", "gemini", "perplexity"] as const;
 
+// Defensive whitespace collapse for any string that gets interpolated
+// into a customer-facing label. Catches NBSP / zero-width / accidental
+// double-spaces from upstream validators or the resolved business
+// name. Cheap, idempotent.
+function normalizeLabel(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
 function syntheticMissing(provider: string): ValidatorOutputShape {
   return {
     provider,
@@ -165,8 +173,8 @@ function deriveSignatureObservation(
 ): string | null {
   if (o.status !== "passed") return null;
 
-  const display = PROVIDER_DISPLAY[o.provider] ?? o.provider;
-  const name = businessName?.trim() || "this business";
+  const display = normalizeLabel(PROVIDER_DISPLAY[o.provider] ?? o.provider);
+  const name = normalizeLabel(businessName?.trim() || "this business");
   const passedOthers = others.filter(
     (x) => x.provider !== o.provider && x.status === "passed",
   );
@@ -306,9 +314,12 @@ function UnavailablePanel() {
 export function FourModelGrid({
   aiValidations,
   businessName,
+  auditUrl,
 }: {
   aiValidations: unknown;
   businessName?: string;
+  /** F5 — audited business URL; drives source-relevance filtering. */
+  auditUrl?: string;
 }) {
   const layer = aiValidations as ValidatorLayer;
   if (!layer || !Array.isArray(layer.outputs) || layer.outputs.length === 0) {
@@ -342,7 +353,7 @@ export function FourModelGrid({
       </p>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {ordered.map((o) => {
-          const display = PROVIDER_DISPLAY[o.provider] ?? o.provider;
+          const display = normalizeLabel(PROVIDER_DISPLAY[o.provider] ?? o.provider);
           const dimensions = dimensionsFor(o);
           const unavailable = dimensions === null;
           const rich = !unavailable && isRich(o);
@@ -391,6 +402,7 @@ export function FourModelGrid({
                   o={o}
                   display={display}
                   businessName={businessName}
+                  auditUrl={auditUrl}
                 />
               ) : (
                 <>
@@ -433,17 +445,19 @@ function RichCardBody({
   o,
   display,
   businessName,
+  auditUrl,
 }: {
   o: ValidatorOutputShape;
   display: string;
   businessName?: string;
+  auditUrl?: string;
 }) {
   const services = (o.services_identified ?? []).filter(
     (s) => s.trim().length > 0,
   );
   const missing = (o.missing_facts ?? []).filter((s) => s.trim().length > 0);
   const wouldRecommend = o.would_recommend;
-  const subject = businessName?.trim() || "the business";
+  const subject = normalizeLabel(businessName?.trim() || "the business");
 
   return (
     <div className="mt-3 space-y-3 text-[12px] leading-relaxed text-white/75">
@@ -499,7 +513,7 @@ function RichCardBody({
         </RichField>
       ) : null}
       <ConfidenceLevels o={o} />
-      <SourcesUsed o={o} />
+      <SourcesUsed o={o} businessName={businessName} auditUrl={auditUrl} />
       <div className="border-t border-white/[0.05] pt-3">
         <p className="text-[10px] uppercase tracking-[0.12em] text-white/40">
           Would {display} comfortably recommend {subject}?
@@ -560,10 +574,10 @@ function confidenceLabel(c: string | null): {
 
 function ConfidenceLevels({ o }: { o: ValidatorOutputShape }) {
   const rows = [
-    { label: "Industry", c: confidenceLabel(o.category_confidence) },
-    { label: "Service area", c: confidenceLabel(o.service_area_confidence) },
+    { label: "industry", c: confidenceLabel(o.category_confidence) },
+    { label: "service area", c: confidenceLabel(o.service_area_confidence) },
     {
-      label: "Recommendation",
+      label: "recommendation",
       c: confidenceLabel(o.recommendation_confidence),
     },
   ].filter((r) => r.c !== null) as Array<{
@@ -573,34 +587,171 @@ function ConfidenceLevels({ o }: { o: ValidatorOutputShape }) {
 
   if (rows.length === 0) return null;
 
+  // F8 — single-line collapse. Was a 3-col grid taking ~40-60px per
+  // card; now reads as inline metadata under "Confidence."
   return (
-    <RichField label="Confidence levels">
-      <dl className="grid grid-cols-3 gap-x-3 gap-y-1 text-[11px]">
-        {rows.map((r) => (
-          <div key={r.label} className="flex flex-col gap-0.5">
-            <dt className="text-[9px] uppercase tracking-[0.12em] text-white/40">
-              {r.label}
-            </dt>
-            <dd className={`font-semibold ${r.c.tone}`}>{r.c.text}</dd>
-          </div>
+    <RichField label="Confidence">
+      <p className="text-[11px] leading-snug text-white/70">
+        {rows.map((r, i) => (
+          <span key={r.label}>
+            {r.label}{" "}
+            <span className={`font-semibold ${r.c.tone}`}>{r.c.text}</span>
+            {i < rows.length - 1 ? (
+              <span aria-hidden className="mx-1.5 text-white/30">
+                ·
+              </span>
+            ) : null}
+          </span>
         ))}
-      </dl>
+      </p>
     </RichField>
   );
 }
 
-function SourcesUsed({ o }: { o: ValidatorOutputShape }) {
+// F5 — domains we consider trust-eroding when listed as "sources"
+// against a small local business. LLC-formation / template
+// generators / generic catch-alls. Additive list — keep growing.
+const GENERIC_SOURCE_DOMAINS = new Set<string>([
+  "businessrocket.com",
+  "bizee.com",
+  "incfile.com",
+  "tailorbrands.com",
+  "northwestregisteredagent.com",
+  "legalzoom.com",
+  "rocketlawyer.com",
+  "zenbusiness.com",
+  "youtube.com",
+  "youtu.be",
+  "wikipedia.org",
+  "reddit.com",
+  "quora.com",
+  "facebook.com",
+  "instagram.com",
+  "twitter.com",
+  "x.com",
+  "pinterest.com",
+  "tiktok.com",
+]);
+
+/**
+ * Pull a hostname out of a raw cited source string. Many validators
+ * emit a bare URL; some prepend "Source: " or wrap in markdown.
+ * Returns null for non-URL-looking strings.
+ */
+function hostFromSource(s: string): string | null {
+  const cleaned = s
+    .replace(/^Source\s*:\s*/i, "")
+    .replace(/^\[(.*?)\]\((.+?)\)\s*$/, "$2")
+    .trim();
+  // Find the first http(s)://... segment.
+  const m = cleaned.match(/https?:\/\/([^\s\/)]+)/i);
+  if (!m) return null;
+  return m[1]?.toLowerCase().replace(/^www\./, "") ?? null;
+}
+
+function rootDomainOf(host: string): string {
+  // Crude eTLD+1 — last two labels. Good enough for filtering vs
+  // generic catch-alls; we're not doing eTLD-correct slicing.
+  const labels = host.split(".");
+  if (labels.length <= 2) return host;
+  return labels.slice(-2).join(".");
+}
+
+function SourcesUsed({
+  o,
+  businessName,
+  auditUrl,
+}: {
+  o: ValidatorOutputShape;
+  businessName?: string;
+  auditUrl?: string;
+}) {
   const sources = (o.cited_sources ?? [])
     .filter((s): s is string => typeof s === "string")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
   if (sources.length === 0) return null;
 
-  const top = sources.slice(0, 5);
+  const auditHost = auditUrl ? hostFromSource(auditUrl) : null;
+  const auditRoot = auditHost ? rootDomainOf(auditHost) : null;
+  const nameLower = (businessName ?? "").toLowerCase().trim();
+
+  // Classify each source.
+  type Bucket = "own-site" | "direct" | "authority" | "generic" | "other";
+  const classify = (raw: string): Bucket => {
+    const host = hostFromSource(raw);
+    if (!host) {
+      // Plain-text reference, no URL — check for business-name mention.
+      if (nameLower.length >= 3 && raw.toLowerCase().includes(nameLower)) {
+        return "direct";
+      }
+      return "other";
+    }
+    const root = rootDomainOf(host);
+    if (auditRoot && (root === auditRoot || host === auditHost)) {
+      return "own-site";
+    }
+    if (
+      nameLower.length >= 3 &&
+      (host.includes(nameLower.replace(/\s+/g, "")) ||
+        raw.toLowerCase().includes(nameLower))
+    ) {
+      return "direct";
+    }
+    if (GENERIC_SOURCE_DOMAINS.has(root) || GENERIC_SOURCE_DOMAINS.has(host)) {
+      return "generic";
+    }
+    if (root.endsWith(".gov") || host.endsWith(".gov")) return "authority";
+    if (root.endsWith(".bbb.org") || host.includes("bbb.org")) {
+      return "authority";
+    }
+    return "other";
+  };
+
+  const strong: string[] = [];
+  let genericCount = 0;
+  const otherSources: string[] = [];
+  for (const s of sources) {
+    const bucket = classify(s);
+    if (bucket === "own-site" || bucket === "direct" || bucket === "authority") {
+      strong.push(s);
+    } else if (bucket === "generic") {
+      genericCount += 1;
+    } else {
+      otherSources.push(s);
+    }
+  }
+
+  // Cap surfaced URLs at 3 — anything beyond that folds into a
+  // count tail so the card doesn't bloat vertically.
+  const surfaced = strong.slice(0, 3);
+  const surfacedOverflow = Math.max(0, strong.length - surfaced.length);
+
+  if (surfaced.length === 0 && genericCount === 0 && otherSources.length === 0) {
+    return null;
+  }
+
+  if (surfaced.length === 0) {
+    return (
+      <RichField label="Sources used">
+        <p className="mt-1 text-white/55">
+          No strong third-party business sources found.
+          {genericCount + otherSources.length > 0 ? (
+            <span className="text-white/40">
+              {" "}
+              ({genericCount + otherSources.length} generic web reference
+              {genericCount + otherSources.length === 1 ? "" : "s"} reviewed)
+            </span>
+          ) : null}
+        </p>
+      </RichField>
+    );
+  }
+
   return (
     <RichField label="Sources used">
       <ul className="mt-1 space-y-1">
-        {top.map((s, i) => (
+        {surfaced.map((s, i) => (
           <li key={i} className="flex items-start gap-2">
             <span aria-hidden className="mt-[5px] text-white/30">
               •
@@ -610,6 +761,20 @@ function SourcesUsed({ o }: { o: ValidatorOutputShape }) {
             </span>
           </li>
         ))}
+        {surfacedOverflow + genericCount + otherSources.length > 0 ? (
+          <li className="flex items-start gap-2 text-white/40">
+            <span aria-hidden className="mt-[5px] text-white/25">
+              •
+            </span>
+            <span>
+              {surfacedOverflow > 0
+                ? `+ ${surfacedOverflow} more direct reference${surfacedOverflow === 1 ? "" : "s"}; `
+                : ""}
+              {genericCount + otherSources.length} additional web source
+              {genericCount + otherSources.length === 1 ? "" : "s"} reviewed
+            </span>
+          </li>
+        ) : null}
       </ul>
     </RichField>
   );

@@ -93,6 +93,10 @@ function isDeterministicScore(v: unknown): v is DeterministicScore {
 /**
  * Convert a `DeterministicScore` → the legacy `ReportScore` shape so
  * existing UI components don't need to know about the new engine.
+ *
+ * Rounds at the display boundary. The underlying `DeterministicScore`
+ * in the DB keeps full precision for replay / calibration; customer
+ * surfaces only ever see integers.
  */
 function toReportScore(d: DeterministicScore): ReportScore {
   const categories: ScoreCategory[] = CATEGORY_ORDER.map((key) => {
@@ -106,16 +110,17 @@ function toReportScore(d: DeterministicScore): ReportScore {
       short: meta.short,
       tooltip: meta.tooltip,
       max: cat.max,
-      score: cat.score,
+      score: Math.round(cat.score),
     };
   });
 
+  const overall = Math.round(d.overall_score);
   return {
-    overall: d.overall_score,
+    overall,
     status: d.band,
     categories,
-    declaredOverall: d.overall_score,
-    rubricSum: d.overall_score,
+    declaredOverall: overall,
+    rubricSum: overall,
   };
 }
 

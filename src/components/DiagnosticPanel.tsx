@@ -30,7 +30,7 @@ const SAMPLE_ROWS: Row[] = [
   },
   {
     label: "Crawlability",
-    caption: "robots.txt allows AI crawlers; sitemap present.",
+    caption: "robots.txt allows AI systems; sitemap present.",
     chip: "clear",
   },
   {

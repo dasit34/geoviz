@@ -2,14 +2,13 @@ import {
   cleanScoreSectionBody,
   clipDriverText,
   formatBusinessName,
-  deriveBestCurrentSignals,
-  deriveStrengths,
   extractFixMeta,
   inferFixPriority,
   inferIssueSeverity,
   parseEnumeratedItems,
   parseLabeledFields,
   parseReportSections,
+  stripFabricatedGeography,
   parseScoreDrivers,
   pickCleanHeroSentence,
   plainEnglishBandLabel,
@@ -26,7 +25,6 @@ import { Prose, InlineProse } from "@/components/Prose";
 import { ReportScoreCard } from "@/components/ReportScoreCard";
 import { ReportCtaCard } from "@/components/ReportCtaCard";
 import { CategoryScoreCard } from "@/components/CategoryScoreCard";
-import { StrengthCard } from "@/components/StrengthCard";
 import { RadarChart } from "@/components/RadarChart";
 import { ConsensusActionAnchor } from "@/components/ConsensusActionAnchor";
 import { WhatAiSystemsRead } from "@/components/WhatAiSystemsRead";
@@ -94,6 +92,16 @@ export type AuditReportContext = {
    * set when null so older audits still render the section cleanly.
    */
   preflightSignals?: unknown;
+  /**
+   * F2 — populated when the rendered business name diverges from
+   * `order.businessName`. Cover surfaces both names so the customer
+   * sees the conflict instead of having their input silently
+   * overwritten.
+   */
+  nameInconsistency?: {
+    primary: string;
+    alternates: string[];
+  } | null;
 };
 
 export function AuditReportContent({
@@ -137,7 +145,25 @@ export function AuditReportContent({
     reportMarkdown,
     intelligence: deterministicScore ? { deterministicScore } : null,
   });
-  const layout = parseReportSections(reportMarkdown);
+  const rawLayout = parseReportSections(reportMarkdown);
+  // Phase B4 — strip fabricated city / locality references from every
+  // section's prose body before render. Compares against the
+  // cross-model validator consensus on `location_identified`. Logs
+  // one telemetry line per section that gets scrubbed.
+  const layout = {
+    ...rawLayout,
+    sections: rawLayout.sections.map((s) => ({
+      ...s,
+      body: stripFabricatedGeography(
+        s.body,
+        (context?.aiValidations ?? null) as Parameters<
+          typeof stripFabricatedGeography
+        >[1],
+        rawBusinessLabel,
+        { logTag: `${orderId}:${s.slug}` },
+      ),
+    })),
+  };
   const tone = scoreToneFromOverall(score.overall);
   const band =
     typeof score.overall === "number"
@@ -186,19 +212,10 @@ export function AuditReportContent({
     scoreDrivers.negative.length > 0 ||
     summaryFixes.length > 0;
 
-  const strengths = deriveStrengths(score);
-  const bestSignals = strengths.length === 0
-    ? deriveBestCurrentSignals(score, 3)
-    : [];
-  const showBestSignalsFallback = strengths.length === 0 && bestSignals.length > 0;
-
-  // Dimensions AI cannot yet verify — REAL weak categories only
-  // (parsed sub-score present AND ratio < 0.4). Surfaced as analytical
-  // evidence; never fabricated, never invented when a sub-score is
-  // missing (null is excluded so we don't assert a gap we can't prove).
-  const unverifiedDimensions = score.categories
-    .filter((c) => c.score !== null && c.score / c.max < 0.4)
-    .map((c) => c.short);
+  // Phase E — strengths / bestSignals / unverifiedDimensions all
+  // consumed by the (now removed) Top Strengths and ExecutiveSummary
+  // sections. WhyYouReceivedThisScore derives the same data
+  // internally, so the local computations here are no longer needed.
 
   return (
     <div className="report-host bg-ink-950 text-white">
@@ -210,6 +227,7 @@ export function AuditReportContent({
             from already-parsed data. */}
         <ReportCover
           businessLabel={businessLabel}
+          nameInconsistency={context?.nameInconsistency ?? null}
           websiteUrl={websiteUrl}
           overall={score.overall}
           band={band}
@@ -254,37 +272,22 @@ export function AuditReportContent({
           </dl>
         </header>
 
-        {/* "Search is shifting" thesis — hardcoded so the premise is
-            byte-stable across every delivered audit. Sits immediately
-            after the hero so the customer reads the buying premise
-            before the diagnostic blocks. NOT LLM-generated; never
-            drifts. */}
-        <aside
-          className="report-section-card mt-10"
-          aria-label="Why this audit exists"
-        >
-          <p className="section-eyebrow">Why this audit exists</p>
-          <p className="mt-4 text-base leading-relaxed text-white/80">
-            Customer discovery is shifting from search results to AI
-            answers. When ChatGPT, Claude, Gemini, or Perplexity
-            recommends a local business, it can only cite what it
-            can read, trust, and verify. This audit measures how
-            clearly your business shows up inside that layer.
-          </p>
-        </aside>
+        {/* Phase E — "Why this audit exists" aside removed: it was a
+            hardcoded marketing premise that duplicated "Why this
+            matters" later in the document and pushed the score
+            further down the page.
+            "Executive at a Glance" removed: it surfaced top issues
+            BEFORE the score, training the customer to read failure
+            before context. The full Section 02 / 03 below carry the
+            same content with evidence. */}
 
-        {/* Executive headlines — top issues + top fixes at a glance.
-            The radar chart that previously lived alongside this block
-            now sits as a secondary visual under the category cards
-            below, so the customer's first scoring touchpoint is the
-            horizontal category bars (more readable for non-technical
-            owners) instead of the radar shape. */}
-        {issueItems.length >= 2 || fixItems.length >= 2 ? (
-          <ExecutiveAtAGlance issues={issueItems} fixes={fixItems} />
-        ) : null}
+        {/* Phase F — Section 01 marker. Numbered intelligence-brief
+            structure (Cloudflare / Semrush executive-report rhythm).
+            Cover → hero → Section 01 → … → Section 06 → Appendix. */}
+        <SectionMarker number="01" title="Your Score" />
 
         {/* Overall score card */}
-        <section className="mt-12">
+        <section className="mt-6">
           <ReportScoreCard
             score={score}
             markdown={reportMarkdown}
@@ -301,18 +304,46 @@ export function AuditReportContent({
                 : undefined
             }
           />
-          {summaryHasContent ? (
-            <ExecutiveSummaryBlock
-              drivers={scoreDrivers}
-              fixes={summaryFixes}
-              unverified={unverifiedDimensions}
-            />
-          ) : null}
+          {/* Phase E — ExecutiveSummaryBlock removed. Its three groups
+              (signals AI can use / missing retrieval / unverified
+              dimensions) are now consolidated into WhyYouReceivedThisScore
+              below, which uses the same drivers data through the
+              POSITIVE_LABELS / NEGATIVE_LABELS customer-language table. */}
           {/* Report Polish P1 — Why You Received This Score now pairs
               directly with the score card. Customer-language read of
               the strongest + weakest contributors that explain the
-              number above. Was previously rendered ~7 sections later. */}
+              number above. */}
           <WhyYouReceivedThisScore score={score} />
+
+          {/* Phase F — Category Breakdown moved up to live with the
+              score, as part of the opening Your Score section. The six
+              horizontal score bars are the executive-readable layer.
+              The radar chart sits below as a secondary supporting
+              visual so owners can also see the *shape* of their
+              visibility once they've read the bars. Each bar shows
+              its rubric weight (Phase C) so the customer can
+              reconstruct the overall from the six cards. */}
+          <section className="report-section-card report-section-impact mt-10">
+            <div className="report-section-card-header">
+              <p className="section-eyebrow">
+                {SECTION_EYEBROWS.categoryBreakdown}
+              </p>
+              <span className="pill">6 dimensions scored</span>
+            </div>
+            <h2 className="h2 mt-3">Where the score comes from.</h2>
+            <div className="category-score-grid mt-6">
+              {score.categories.map((cat) => (
+                <CategoryScoreCard key={cat.key} category={cat} />
+              ))}
+            </div>
+            <div className="category-score-radar-wrap mt-8">
+              <p className="category-score-radar-label">
+                Score distribution at a glance
+              </p>
+              <RadarChart categories={score.categories} />
+            </div>
+          </section>
+
           <p className="report-score-consistency-note">
             The GeoViz score reflects how confidently modern AI
             systems can identify, interpret, and reference your
@@ -321,29 +352,17 @@ export function AuditReportContent({
           </p>
         </section>
 
-        {/* Methodology disclosure — discloses the frozen v1 rubric
-            (weights), the signals fetched, and the operator-review
-            step. Hardcoded React (not LLM-generated) so the values
-            stay byte-stable across audits and match the frozen
-            scoring constitution. Category weights mirror
-            src/lib/scoring/getCanonicalScore.ts and are public-safe
-            per CLAUDE.md "Scoring Freeze". */}
-        <aside
-          className="report-section-card mt-10"
-          aria-label="How this score was built"
-        >
-          <p className="section-eyebrow">How this score was built</p>
-          <p className="mt-4 text-sm leading-relaxed text-white/80">
-            GeoViz analyzed publicly accessible website and trust
-            signals — including site content, business identity
-            details, structured business data, and AI-crawler
-            accessibility. The composite reflects six categories
-            covering AI readability, business identity verification,
-            trust signals, content depth, brand presence, and
-            technical accessibility. Each report is reviewed before
-            delivery.
-          </p>
-        </aside>
+        {/* Phase E — "How this score was built" methodology aside
+            moved into the appendix at the end of the report. It's
+            customer-valuable but not customer-essential, and
+            interrupted the read from score → AI systems. */}
+
+        {/* Phase F — Section 02 marker. Groups the WhatAiSystemsRead
+            metric strip, FourModelGrid (per-provider verdicts),
+            ConsensusSummary (cross-model agreement), and
+            ConsensusActionAnchor (soft CTA) into one numbered
+            section: "What AI Systems Found." */}
+        <SectionMarker number="02" title="What AI Systems Found" />
 
         {/* Report Polish P4 — single consolidated "What AI Systems
             Read" section. Previously the report rendered both this
@@ -367,27 +386,14 @@ export function AuditReportContent({
         <FourModelGrid
           aiValidations={context?.aiValidations ?? null}
           businessName={businessLabel}
+          auditUrl={websiteUrl}
         />
 
-        {/* Report v3 — WHY THIS MATTERS aside. Static customer-
-            language explanation of why the AI Systems section is
-            load-bearing for discovery. Sits between the per-system
-            cards and the consensus rollup so customers read the
-            "why" right after they see the per-system verdicts. */}
-        <aside
-          className="report-section-card mt-10"
-          aria-label="Why this matters"
-        >
-          <p className="section-eyebrow">Why this matters</p>
-          <h2 className="h2 mt-3">Why AI recommendation confidence matters.</h2>
-          <p className="report-prose mt-4 text-[15px] leading-relaxed text-white/80">
-            AI systems recommend businesses using the information they
-            can confidently identify, verify, and trust. If key
-            information is missing, inconsistent, or difficult to
-            verify, AI systems may choose a competitor with stronger
-            signals — even when your business is the better choice.
-          </p>
-        </aside>
+        {/* Phase E — "Why this matters" aside removed. It duplicated
+            the (also removed) "Why this audit exists" premise. The
+            Foundation Fix CTA below already carries the action ask
+            and the consensus section's footnote carries the
+            interpretive frame. */}
 
         {/* Report v2 — AI Consensus Summary. Plain-English
             distillation of the agreement signals — what all systems
@@ -412,31 +418,9 @@ export function AuditReportContent({
           businessName={businessLabel}
         />
 
-        {/* (Moved to pair with the score card per Report Polish P1.) */}
-
-        {/* Category breakdown — primary score visualization. The six
-            horizontal score bars are the executive-readable layer. The
-            radar chart sits below as a secondary supporting visual so
-            owners can also see the *shape* of their visibility once
-            they've read the bars. */}
-        <section className="report-section-card report-section-impact mt-10">
-          <div className="report-section-card-header">
-            <p className="section-eyebrow">{SECTION_EYEBROWS.categoryBreakdown}</p>
-            <span className="pill">6 dimensions scored</span>
-          </div>
-          <h2 className="h2 mt-3">Where the score comes from.</h2>
-          <div className="category-score-grid mt-6">
-            {score.categories.map((cat) => (
-              <CategoryScoreCard key={cat.key} category={cat} />
-            ))}
-          </div>
-          <div className="category-score-radar-wrap mt-8">
-            <p className="category-score-radar-label">
-              Score distribution at a glance
-            </p>
-            <RadarChart categories={score.categories} />
-          </div>
-        </section>
+        {/* Phase F — Category breakdown moved up to pair with the
+            score card under Section 01, immediately after
+            WhyYouReceivedThisScore. */}
 
         {/* Launch Blocker P2 #7 — Cross-Model Intelligence block
             REMOVED. The customer already sees the same 4 systems
@@ -448,53 +432,11 @@ export function AuditReportContent({
             definition remains in this file for legacy callers but is
             no longer rendered in the audit report. */}
 
-        {/* Top strengths (≥70%) when present; otherwise fall back to
-            "Best current signals" — the top-N highest scoring categories
-            with an honest caveat. The two surfaces are conditional on
-            strengths.length so customers never see a negative
-            "No category scored…" message in a section called Top
-            Strengths. */}
-        <section className="report-section-card report-section-strengths mt-10">
-          <div className="report-section-card-header">
-            <p className="section-eyebrow">
-              {showBestSignalsFallback
-                ? SECTION_EYEBROWS.bestCurrentSignals
-                : SECTION_EYEBROWS.topStrengths}
-            </p>
-            {strengths.length > 0 ? (
-              <span className="pill">{strengths.length} surfaced</span>
-            ) : null}
-          </div>
-          <h2 className="h2 mt-3">
-            {showBestSignalsFallback
-              ? "Your strongest current signals."
-              : "What's working in your favor."}
-          </h2>
-          {strengths.length > 0 ? (
-            <div className="strength-grid mt-6">
-              {strengths.map((s) => (
-                <StrengthCard key={s.key} label={s.label} />
-              ))}
-            </div>
-          ) : showBestSignalsFallback ? (
-            <>
-              <p className="muted mt-5 text-sm">
-                These are the strongest current signals in the audit,
-                even if they still need improvement.
-              </p>
-              <div className="strength-grid mt-6">
-                {bestSignals.map((s) => (
-                  <StrengthCard key={s.key} label={s.label} />
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="muted mt-5 text-sm">
-              Every dimension has room to grow — see Top Issues and
-              Quick Fixes below.
-            </p>
-          )}
-        </section>
+        {/* Phase E — Top Strengths section removed. Its strength cards
+            were a duplicate of the positive contributors already shown
+            in WhyYouReceivedThisScore (with the same customer-language
+            POSITIVE_LABELS). One read of strengths per report is
+            enough. */}
 
         {/* Platform visibility section removed pre-launch (2026-05-15)
             — the per-platform "Visibility profile pending" rows were
@@ -510,7 +452,7 @@ export function AuditReportContent({
             items={issueItems}
             fallbackBody={whySection.body}
             tone="diagnosis"
-            number="02"
+            number="03"
             badge="Top 3 issues"
             itemKind="issue"
           />
@@ -532,7 +474,7 @@ export function AuditReportContent({
             items={fixItems}
             fallbackBody={fixSection.body}
             tone="action"
-            number="03"
+            number="04"
             badge="Top 3 fixes"
             itemKind="fix"
           />
@@ -542,7 +484,7 @@ export function AuditReportContent({
           <SectionCard
             section={happensSection}
             tone="impact"
-            number="04"
+            number="05"
             badge="Business outcome"
           />
         ) : null}
@@ -563,22 +505,49 @@ export function AuditReportContent({
           </div>
         ) : null}
 
-        {techSection ? (
-          <details className="report-tech-details mt-12">
-            <summary>
-              <span className="section-eyebrow">Appendix</span>
-              <span className="report-tech-summary-title">
-                Technical Details (Advanced)
-              </span>
-              <span className="report-tech-summary-hint">
-                Click to expand — for your developer
-              </span>
-            </summary>
-            <Prose className="mt-5">
-              {stripScoreMath(techSection.body)}
-            </Prose>
-          </details>
-        ) : null}
+        {/* Phase E — Appendix consolidates the methodology disclosure
+            (moved out of the body) with the optional technical-details
+            section (when the worker emits one). Collapsed by default
+            so the main read ends with the CTA, not an engineering
+            block. */}
+        <details className="report-tech-details mt-12" open={false}>
+          <summary>
+            <span className="section-eyebrow">Appendix</span>
+            <span className="report-tech-summary-title">
+              Methodology &amp; Technical Details
+            </span>
+            <span className="report-tech-summary-hint">
+              Click to expand — how this score was built
+            </span>
+          </summary>
+          <div className="mt-5 space-y-6">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                How this score was built
+              </p>
+              <p className="report-prose mt-3 text-[14px] leading-relaxed text-white/80">
+                GeoViz analyzed publicly accessible website and trust
+                signals — including site content, business identity
+                details, structured business data, and AI-crawler
+                accessibility. The composite reflects six categories
+                covering AI readability, business identity verification,
+                trust signals, content depth, brand presence, and
+                technical accessibility. Each report is reviewed
+                before delivery.
+              </p>
+            </div>
+            {techSection ? (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                  Technical details (advanced)
+                </p>
+                <Prose className="mt-3">
+                  {stripScoreMath(techSection.body)}
+                </Prose>
+              </div>
+            ) : null}
+          </div>
+        </details>
 
         <footer className="report-footer">
           <div className="report-footer-brand">GeoViz</div>
@@ -593,6 +562,28 @@ export function AuditReportContent({
 }
 
 /**
+ * Phase F — premium intelligence-brief section marker. Mono number
+ * on the left, h2 title on the right, thin accent rule underneath.
+ * Mirrors the Cloudflare / Semrush / Gartner executive-report
+ * numbered-section pattern. Stays tight: one line, no body prose —
+ * just the chapter heading that anchors the read.
+ */
+function SectionMarker({
+  number,
+  title,
+}: {
+  number: string;
+  title: string;
+}) {
+  return (
+    <div className="report-section-marker mt-14">
+      <span className="report-section-marker-num">{number}</span>
+      <h2 className="report-section-marker-title">{title}</h2>
+    </div>
+  );
+}
+
+/**
  * Premium cover sheet. Pure presentation, no fabrication — every
  * value is already-parsed report data the body also uses. In the PDF
  * this is forced onto its own page (.report-cover page-break-after in
@@ -600,6 +591,7 @@ export function AuditReportContent({
  */
 function ReportCover({
   businessLabel,
+  nameInconsistency,
   websiteUrl,
   overall,
   band,
@@ -610,6 +602,10 @@ function ReportCover({
   cohortCellValue,
 }: {
   businessLabel: string;
+  nameInconsistency?: {
+    primary: string;
+    alternates: string[];
+  } | null;
   websiteUrl: string;
   overall: number | null;
   band: string;
@@ -634,6 +630,12 @@ function ReportCover({
       <div className="report-cover-headline">
         <p className="report-cover-eyebrow">AI Visibility Intelligence Report</p>
         <h1 className="report-cover-business">{businessLabel}</h1>
+        {nameInconsistency && nameInconsistency.alternates.length > 0 ? (
+          <p className="report-cover-name-conflict">
+            Identity inconsistency detected — also referenced as{" "}
+            <span>{nameInconsistency.alternates.join(", ")}</span>.
+          </p>
+        ) : null}
         <p className="report-cover-url">{displayUrl}</p>
       </div>
 

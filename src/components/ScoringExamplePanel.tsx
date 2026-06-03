@@ -106,7 +106,7 @@ export function ScoringExamplePanel({
         <span className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-0.5">
           Moderate confidence
           <span aria-hidden className="mx-1 text-white/30">·</span>
-          <span className="text-white/45">schema markup partially detected</span>
+          <span className="text-white/45">structured business details partially detected</span>
         </span>
       </div>
       <p className="px-6 pt-2 text-[11px] text-white/45">

@@ -2,15 +2,22 @@
  * Report Polish P6 — Foundation Fix nudge anchored to the moment
  * the consensus reveals LOW or MODERATE recommendation confidence.
  *
- * Pure presentation. Re-derives the same confidence label as
- * ConsensusSummary (using the same persisted consensusIndex data)
- * so the conditional render stays in sync without prop-drilling
- * the value from the sibling component.
+ * Pure presentation. Derives the confidence label from the same
+ * persisted consensusIndex data as ConsensusSummary via the shared
+ * `deriveConsensusConfidenceLabel` helper, so the conditional render
+ * stays in sync with the sibling section by construction (one source
+ * of truth, not two hand-synced copies).
  *
  * Renders nothing on HIGH confidence reports; the existing
  * Section 05 Foundation Fix CTA at the end of the report carries
  * the formal pitch in those cases.
  */
+
+import {
+  asNonNegativeScore,
+  asRecommendationMajority,
+  deriveConsensusConfidenceLabel,
+} from "@/lib/intelligence/derive-consensus-label";
 
 type ValidatorOutputShape = {
   status: string;
@@ -33,48 +40,6 @@ type ConsensusShape = {
   };
 };
 
-function asScore(v: number | undefined): number {
-  return typeof v === "number" && Number.isFinite(v) ? Math.max(0, v) : 0;
-}
-
-function asMajority(
-  v: string | null | undefined,
-): "low" | "medium" | "high" | null {
-  if (v === "low" || v === "medium" || v === "high") return v;
-  return null;
-}
-
-type ConfidenceLabel = "LOW" | "MODERATE" | "HIGH";
-
-function deriveLabel(
-  passedCount: number,
-  agreementLabel: string | undefined,
-  recommendationMajority: "low" | "medium" | "high" | null,
-  trustSignalsScore: number,
-  recommendationReadinessScore: number,
-): ConfidenceLabel {
-  if (recommendationMajority === "low") return "LOW";
-  if (trustSignalsScore < 35 || recommendationReadinessScore < 30) return "LOW";
-  if (
-    passedCount >= 3 &&
-    agreementLabel === "Strong" &&
-    recommendationMajority === "high" &&
-    trustSignalsScore >= 70 &&
-    recommendationReadinessScore >= 70
-  ) {
-    return "HIGH";
-  }
-  if (
-    passedCount >= 2 &&
-    (agreementLabel === "Strong" || agreementLabel === "Moderate") &&
-    (recommendationMajority === "high" || recommendationMajority === "medium") &&
-    (trustSignalsScore >= 35 || recommendationReadinessScore >= 30)
-  ) {
-    return "MODERATE";
-  }
-  return "LOW";
-}
-
 export function ConsensusActionAnchor({
   aiValidations,
   consensusIndex,
@@ -96,12 +61,12 @@ export function ConsensusActionAnchor({
       : layer.outputs.filter((o) => o.status === "passed").length;
   if (passedCount < 2) return null;
 
-  const label = deriveLabel(
+  const label = deriveConsensusConfidenceLabel(
     passedCount,
     metrics.agreement_label,
-    asMajority(metrics.recommendation_confidence_majority),
-    asScore(consensus.dimensions?.trust_signals?.score),
-    asScore(consensus.dimensions?.recommendation_readiness?.score),
+    asRecommendationMajority(metrics.recommendation_confidence_majority),
+    asNonNegativeScore(consensus.dimensions?.trust_signals?.score),
+    asNonNegativeScore(consensus.dimensions?.recommendation_readiness?.score),
   );
   if (label === "HIGH") return null;
 
@@ -122,9 +87,9 @@ export function ConsensusActionAnchor({
       <h3 className="h3 mt-2">Need help fixing these issues?</h3>
       <p className="mt-2 text-[14px] leading-relaxed text-white/80">
         {lead} Our Foundation Fix service implements the improvements
-        identified in this audit — machine-readable business info,
-        trust signals, and AI-readable service detail — so AI systems
-        can confidently recommend {name}.
+        identified in this audit — business details AI tools can
+        verify, trust signals, and clear service descriptions — so AI
+        systems can confidently recommend {name}.
       </p>
       <p className="mt-3 text-[12px] text-accent">
         See the Foundation Fix plan below in Section 05 →

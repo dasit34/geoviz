@@ -1,6 +1,11 @@
 import { InlineProse } from "@/components/Prose";
 import { SECTION_EYEBROWS } from "@/lib/report-sections";
 import { stripMarkdownMarkers } from "@/lib/parse-report";
+import {
+  asNonNegativeScore,
+  asRecommendationMajority,
+  deriveConsensusConfidenceLabel,
+} from "@/lib/intelligence/derive-consensus-label";
 
 /**
  * AI Consensus Summary — report v2.
@@ -81,76 +86,11 @@ type ValidatorLayer = {
 
 type ConfidenceLabel = "LOW" | "MODERATE" | "HIGH";
 
-/**
- * Customer-facing recommendation-confidence label.
- *
- * Pre-2026-06 versions read only (passedCount, agreementLabel) and
- * could return HIGH on weak-signal audits where four providers all
- * AGREED the business had LOW recommendation_confidence. That confused
- * customers — agreement on a negative is not a positive signal. The
- * corrected cascade folds in:
- *   - recommendation_confidence_majority across the passed providers
- *   - the deterministic Trust Signals score (0..100)
- *   - the deterministic Recommendation Readiness score (0..100)
- *
- * Frozen-surface note: this is a PRESENTATION label only. It does not
- * touch any deterministic scoring weight, band threshold, ladder
- * anchor, or the canonical GeoViz score.
- */
-function deriveOverallConfidence(
-  passedCount: number,
-  agreementLabel: string | undefined,
-  recommendationMajority: "low" | "medium" | "high" | null,
-  trustSignalsScore: number,
-  recommendationReadinessScore: number,
-): ConfidenceLabel {
-  // Rule 1 — providers agree the business has weak recommendation
-  // signal: always LOW, regardless of how tightly they cluster.
-  if (recommendationMajority === "low") return "LOW";
-
-  // Rule 2 — deterministic floor: critically weak Trust Signals or
-  // Recommendation Readiness blocks any HIGH/MODERATE outcome.
-  if (trustSignalsScore < 35 || recommendationReadinessScore < 30) {
-    return "LOW";
-  }
-
-  // Rule 3 — HIGH requires every supporting signal.
-  if (
-    passedCount >= 3 &&
-    agreementLabel === "Strong" &&
-    recommendationMajority === "high" &&
-    trustSignalsScore >= 70 &&
-    recommendationReadinessScore >= 70
-  ) {
-    return "HIGH";
-  }
-
-  // Rule 4 — MODERATE on softer combinations.
-  if (
-    passedCount >= 2 &&
-    (agreementLabel === "Strong" || agreementLabel === "Moderate") &&
-    (recommendationMajority === "high" ||
-      recommendationMajority === "medium") &&
-    (trustSignalsScore >= 35 || recommendationReadinessScore >= 30)
-  ) {
-    return "MODERATE";
-  }
-
-  return "LOW";
-}
-
-function asConfidenceMajority(
-  value: string | null | undefined,
-): "low" | "medium" | "high" | null {
-  if (value === "low" || value === "medium" || value === "high") return value;
-  return null;
-}
-
-function asNonNegScore(value: number | undefined): number {
-  return typeof value === "number" && Number.isFinite(value)
-    ? Math.max(0, value)
-    : 0;
-}
+// The recommendation-confidence label cascade now lives in the shared
+// `deriveConsensusConfidenceLabel` helper so this section and the
+// ConsensusActionAnchor nudge can never silently desync. See
+// src/lib/intelligence/derive-consensus-label.ts for the rule
+// documentation and the frozen-surface note.
 
 function confidenceToneClass(c: ConfidenceLabel): string {
   switch (c) {
@@ -190,6 +130,11 @@ type FivePartConsensus = {
   locationUnderstanding: string[];
   missingTrustSignals: string[];
   missingRecommendationSignals: string[];
+  // True only when every agreement-bearing bullet (business type,
+  // service category, location) reflects strict 4/4 unanimity. Drives
+  // the section header — "WHERE ALL AI SYSTEMS AGREED" must not appear
+  // when underlying bullets read "X of N agreed."
+  everyAgreementUnanimous: boolean;
 };
 
 function pickMajorityString(values: string[]): string | null {
@@ -227,7 +172,11 @@ function buildFivePart(
     locationUnderstanding: [],
     missingTrustSignals: [],
     missingRecommendationSignals: [],
+    everyAgreementUnanimous: true,
   };
+  // Track whether any agreement-bearing bullet was emitted at all —
+  // an empty agreement section is not "unanimous," it's empty.
+  let anyAgreementEmitted = false;
 
   // Launch Blocker P2 #6 — section is titled "Where All AI Systems
   // Agreed" so it must only contain actual agreement. The threshold is
@@ -249,15 +198,20 @@ function buildFivePart(
       out.businessType.push(
         `All ${N} AI systems identified ${name} as a ${majorityIndustry.toLowerCase().replace(/\.$/, "")}.`,
       );
+      anyAgreementEmitted = true;
     } else {
       out.businessType.push(
         `${industryAgreeingCount} of ${N} AI systems identified ${name} as a ${majorityIndustry.toLowerCase().replace(/\.$/, "")}.`,
       );
+      anyAgreementEmitted = true;
+      out.everyAgreementUnanimous = false;
     }
   } else if (metrics?.category_confidence_majority === "high") {
     out.businessType.push(
       `${N} AI systems confidently identified the type of business ${name} operates.`,
     );
+    anyAgreementEmitted = true;
+    out.everyAgreementUnanimous = false;
   }
   // No filler when systems disagreed — the customer reads disagreement
   // as a real finding, not as the system failing. The Cross-Model
@@ -287,10 +241,16 @@ function buildFivePart(
     out.serviceCategory.push(
       `Shared service understanding: ${sharedServices.map((s) => s.display).join(", ")}.`,
     );
+    anyAgreementEmitted = true;
+    // "Shared services" is a 2+ majority signal, not strict 4/4 — the
+    // services need not be agreed by ALL providers to surface here.
+    out.everyAgreementUnanimous = false;
   } else if (metrics?.category_confidence_majority === "high") {
     out.serviceCategory.push(
       `AI systems agreed on the broad service category ${name} operates in.`,
     );
+    anyAgreementEmitted = true;
+    out.everyAgreementUnanimous = false;
   }
   // No filler when systems disagreed — group will be hidden by the
   // render layer's empty-group filter.
@@ -315,15 +275,20 @@ function buildFivePart(
       out.locationUnderstanding.push(
         `All ${N} AI systems identified ${name}'s service area as ${majorityLocation}.`,
       );
+      anyAgreementEmitted = true;
     } else {
       out.locationUnderstanding.push(
         `${locationAgreeingCount} of ${N} AI systems identified ${name}'s service area as ${majorityLocation}.`,
       );
+      anyAgreementEmitted = true;
+      out.everyAgreementUnanimous = false;
     }
   } else if (svcMajority === "high") {
     out.locationUnderstanding.push(
       `Most AI systems read ${name}'s geographic service area confidently.`,
     );
+    anyAgreementEmitted = true;
+    out.everyAgreementUnanimous = false;
   }
   // No filler for low/mixed — the absence of a confident location read
   // is itself a finding that belongs in the Missing Recommendation
@@ -383,6 +348,9 @@ function buildFivePart(
     );
   }
 
+  // No agreement bullets emitted at all → header cannot honestly claim
+  // "all AI systems agreed." Empty agreement ≠ unanimous agreement.
+  if (!anyAgreementEmitted) out.everyAgreementUnanimous = false;
   return out;
 }
 
@@ -395,7 +363,7 @@ function UnavailablePanel() {
       <div className="report-section-card-header">
         <p className="section-eyebrow">{SECTION_EYEBROWS.aiConsensusSummary}</p>
       </div>
-      <h2 className="h2 mt-3">Where all the AI systems agree.</h2>
+      <h2 className="h2 mt-3">AI consensus summary.</h2>
       <p className="muted mt-3 text-sm leading-relaxed">
         AI model analysis unavailable for this audit.
       </p>
@@ -432,17 +400,17 @@ export function ConsensusSummary({
   // deterministic dimension scores out of the existing consensusIndex
   // payload (already persisted, no schema change required) and the
   // recommendation-confidence majority across the passed providers.
-  const trustSignalsScore = asNonNegScore(
+  const trustSignalsScore = asNonNegativeScore(
     consensus.dimensions?.trust_signals?.score,
   );
-  const recommendationReadinessScore = asNonNegScore(
+  const recommendationReadinessScore = asNonNegativeScore(
     consensus.dimensions?.recommendation_readiness?.score,
   );
-  const recommendationMajority = asConfidenceMajority(
+  const recommendationMajority = asRecommendationMajority(
     metrics.recommendation_confidence_majority,
   );
 
-  const overall = deriveOverallConfidence(
+  const overall = deriveConsensusConfidenceLabel(
     passedCount,
     metrics.agreement_label,
     recommendationMajority,
@@ -476,13 +444,26 @@ export function ConsensusSummary({
     ? buildLegacyLines(layer.outputs, passedCount)
     : null;
 
+  // F4 — only label the section "all agreed" when every agreement
+  // bullet emitted by buildFivePart reflects strict 4/4 unanimity.
+  // Otherwise downgrade honestly to "mostly agreed."
+  const sectionEyebrow = fivePart.everyAgreementUnanimous
+    ? "Where all AI systems agreed"
+    : "Where AI systems mostly agreed";
+  const sectionTitle = fivePart.everyAgreementUnanimous
+    ? "Where all the AI systems agree."
+    : "AI consensus summary.";
+
   return (
-    <section className="report-section-card mt-10" aria-label="Where all AI systems agreed">
+    <section
+      className="report-section-card mt-10"
+      aria-label={sectionEyebrow}
+    >
       <div className="report-section-card-header">
-        <p className="section-eyebrow">Where all AI systems agreed</p>
+        <p className="section-eyebrow">{sectionEyebrow}</p>
         <span className="pill">{passedCount} AI Systems</span>
       </div>
-      <h2 className="h2 mt-3">Executive summary.</h2>
+      <h2 className="h2 mt-3">{sectionTitle}</h2>
       {groups.length > 0 ? (
         <div className="mt-5 space-y-5">
           {groups.map((g) => (
@@ -525,7 +506,7 @@ export function ConsensusSummary({
       ) : null}
       <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-white/[0.05] pt-4">
         <span className="text-[11px] uppercase tracking-[0.14em] text-white/45">
-          Overall AI Recommendation Confidence
+          Cross-model agreement
         </span>
         <span
           className={`mono-data text-sm font-semibold ${confidenceToneClass(overall)}`}
@@ -534,10 +515,10 @@ export function ConsensusSummary({
         </span>
       </div>
       <p className="muted mt-3 text-[11px] leading-relaxed">
-        Confidence label is a directional read of cross-model
-        agreement combined with trust + recommendation-readiness
-        signals. Not a separate score; the GeoViz score remains the
-        canonical outcome.
+        Cross-model agreement measures how strongly the four AI
+        systems converged on this audit&apos;s findings. It is a
+        separate read from the audit-completeness label on the score
+        card, and is never used as a score in itself.
       </p>
     </section>
   );

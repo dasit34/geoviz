@@ -33,10 +33,20 @@ export function CategoryScoreCard({ category }: { category: ScoreCategory }) {
   const normalizedScore =
     category.score === null ? null : Math.round(ratio * 100);
   const hasScore = normalizedScore !== null;
+  // Phase C — surface the rubric weight as a small badge so customers
+  // can reconstruct the overall from the six cards. The frozen v1
+  // rubric sums to 100, so `category.max` IS the weight in percent
+  // (Schema 25, Crawler 20, Trust 20, Content 15, Brand 10, Tech 10).
+  const weightLabel = `${Math.round(category.max)}% of score`;
   return (
     <div className={`category-score-card category-score-tone-${tone}`}>
       <div className="category-score-head">
-        <span className="category-score-label">{category.short}</span>
+        <span className="category-score-label">
+          {category.short}
+          <span className="category-score-weight" aria-label={weightLabel}>
+            {Math.round(category.max)}%
+          </span>
+        </span>
         {hasScore ? (
           <span className="category-score-num">
             {normalizedScore}

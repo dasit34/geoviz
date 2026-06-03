@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ReportViewerClient } from "./ReportViewerClient";
+import { resolveBusinessName } from "@/lib/intelligence/resolve-business-name";
 import { parseReportScore, scoreTone } from "@/lib/parse-report-score";
 import {
   deriveProcessingStatus,
@@ -78,6 +79,10 @@ export function AdminReportCard({
   order,
   validatorTelemetry = null,
   deterministicScore = null,
+  preflightSignals = null,
+  aiValidations = null,
+  consensusIndex = null,
+  reportContext = null,
 }: {
   adminKey: string;
   order: Order;
@@ -91,6 +96,28 @@ export function AdminReportCard({
    * Null on legacy rows from before the deterministic engine.
    */
   deterministicScore?: unknown;
+  /**
+   * Phase B3 — preflight signals payload (`PreflightSignals` JSON
+   * from `AuditIntelligence.preflightSignals`). Drives the business
+   * name resolver so the admin shows the same resolved label the
+   * customer PDF cover does. Null on legacy rows.
+   */
+  preflightSignals?: unknown;
+  /**
+   * Phase D — cross-model validator + consensus payloads forwarded
+   * to the full `<AuditReportContent />` render swapped in for
+   * `<ReportViewerClient />`. Null on legacy rows.
+   */
+  aiValidations?: unknown;
+  consensusIndex?: unknown;
+  /**
+   * Phase D — the same `AuditReportContext` payload the customer PDF
+   * receives, computed server-side via `buildReportContext()`. Drives
+   * percentile copy, confidence label, four-model grid + consensus
+   * sections in the admin preview so it matches what the customer
+   * sees exactly.
+   */
+  reportContext?: unknown;
 }) {
   const [reportStatus, setReportStatus] = useState(order.reportStatus);
   const [markdown, setMarkdown] = useState<string | null>(order.reportMarkdown);
@@ -487,7 +514,23 @@ export function AdminReportCard({
     }
   };
 
-  const businessLabel = order.businessName ?? order.websiteUrl;
+  // Phase B3 — resolve the customer-facing business name using the
+  // same priority chain the PDF cover uses. The operator now sees
+  // "Independence Realty Group" (the schema-org resolved name)
+  // alongside an "Identity inconsistency detected" pill instead of
+  // the raw "Rg Ohio" order input, matching the customer's PDF.
+  const nameResolution = resolveBusinessName({
+    intelligence: {
+      preflightSignals,
+    },
+    order: {
+      businessName: order.businessName,
+      email: order.email,
+      websiteUrl: order.websiteUrl,
+    },
+  });
+  const businessLabel = nameResolution.name || order.websiteUrl;
+  const nameInconsistency = nameResolution.inconsistency;
   const anyBusy = running || sending || marking || savingReview;
   // The "recipient" checklist item is auto-controlled by the confirm button —
   // every other item is a manual checkbox. All six must be ticked + the
@@ -582,6 +625,15 @@ export function AdminReportCard({
           <h3 className="text-lg font-semibold text-white leading-tight">
             {businessLabel}
           </h3>
+          {nameInconsistency && nameInconsistency.alternates.length > 0 ? (
+            <p className="mt-1 text-[11px] leading-snug text-amber-200/85">
+              Identity inconsistency — also referenced as{" "}
+              <span className="font-semibold text-white/85">
+                {nameInconsistency.alternates.join(", ")}
+              </span>
+              . (Operator-entered name vs schema-org resolved.)
+            </p>
+          ) : null}
           <a
             href={order.websiteUrl}
             target="_blank"
@@ -1020,7 +1072,13 @@ export function AdminReportCard({
               markdown={markdown}
               orderId={order.id}
               businessLabel={businessLabel}
+              nameInconsistency={nameInconsistency}
+              websiteUrl={order.websiteUrl}
+              reportGeneratedAt={
+                reportGeneratedAt ? new Date(reportGeneratedAt) : null
+              }
               deterministicScore={deterministicScore}
+              reportContext={reportContext}
             />
           </div>
         </div>
