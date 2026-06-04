@@ -260,6 +260,79 @@ check("a name that merely contains a state word still passes", () => {
   assert.equal(r.name, "Ohio Valley Roofing");
 });
 
+// ── Browser / bot-wall interstitial blacklist (LaBre Law defect) ────
+// A Cloudflare-protected site fetches "Just a moment..." as the title.
+// That must NEVER be the business name.
+for (const junk of [
+  "Just a moment...",
+  "Loading...",
+  "Please wait",
+  "Attention Required! | Cloudflare",
+  "Access denied",
+  "Checking your browser before accessing",
+  "Just a moment… | Cloudflare",
+]) {
+  check(`junk title "${junk.slice(0, 28)}…" is rejected → order name`, () => {
+    const r = resolveBusinessName({
+      intelligence: {
+        preflightSignals: preflight({
+          schemaName: junk,
+          articleTitle: junk,
+          homepageName: junk,
+        }),
+      },
+      order: { businessName: "LaBre Law", email: null, websiteUrl: "https://labrelaw.com" },
+    });
+    assert.equal(r.name, "LaBre Law", `got "${r.name}"`);
+    assert.doesNotMatch(r.name.toLowerCase(), /just a moment|cloudflare|loading|denied/);
+  });
+}
+
+check("LaBre intercaps casing is preserved (not flattened to 'Labre')", () => {
+  const r = resolveBusinessName({
+    intelligence: { preflightSignals: preflight({}) },
+    order: { businessName: "LaBre Law", email: null, websiteUrl: "https://labrelaw.com" },
+  });
+  assert.equal(r.name, "LaBre Law");
+});
+
+// ── Provider-consensus fallback (junk on-site + no order name) ──────
+const LABRE_VALIDATIONS = {
+  outputs: [
+    { provider: "openai", status: "passed", raw_summary: "LaBre Law Office is a personal injury law firm serving Toledo." },
+    { provider: "claude", status: "passed", raw_summary: "LaBre Law Office is a law practice focused on injury cases." },
+    { provider: "gemini", status: "passed", raw_summary: "The firm provides legal services in Ohio." },
+  ],
+};
+
+check("provider consensus resolves the name when on-site + order are junk/absent", () => {
+  const r = resolveBusinessName({
+    intelligence: {
+      preflightSignals: preflight({ schemaName: "Just a moment...", articleTitle: "Just a moment..." }),
+      aiValidations: LABRE_VALIDATIONS,
+    },
+    order: { businessName: null, email: null, websiteUrl: "https://labrelaw.com" },
+  });
+  assert.equal(r.source, "provider-consensus");
+  assert.equal(r.name, "LaBre Law Office");
+});
+
+check("single-provider name is NOT enough for consensus (needs >= 2)", () => {
+  const r = resolveBusinessName({
+    intelligence: {
+      preflightSignals: preflight({ schemaName: "Just a moment..." }),
+      aiValidations: {
+        outputs: [
+          { provider: "openai", status: "passed", raw_summary: "LaBre Law Office is a firm." },
+          { provider: "claude", status: "passed", raw_summary: "Some other description entirely." },
+        ],
+      },
+    },
+    order: { businessName: null, email: null, websiteUrl: "https://labrelaw.com" },
+  });
+  assert.equal(r.source, "domain", "should fall to domain without 2-provider agreement");
+});
+
 if (failed > 0) {
   console.log(
     `[business-name-resolution] FAILED — passed=${passed} failed=${failed}`,

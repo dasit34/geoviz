@@ -523,6 +523,7 @@ export function AdminReportCard({
   const nameResolution = resolveBusinessName({
     intelligence: {
       preflightSignals,
+      aiValidations,
     },
     order: {
       businessName: order.businessName,
@@ -1047,28 +1048,50 @@ export function AdminReportCard({
         </div>
       ) : null}
 
-      {/* Inline expanded report. Score banner up top, prose below. */}
+      {/* Inline expanded report.
+          LaBre parity review — the operator-only ScoreBanner +
+          ScoreSourceDiagnostic + "generated" line are NO LONGER stacked
+          above the report (they made the admin preview look different
+          from the customer PDF). They now live in a collapsed
+          "Operator diagnostics" panel. The customer-preview area below
+          renders ONLY <ReportViewerClient/> → <AuditReportContent/> —
+          the SAME component + props the PDF route renders, so admin and
+          PDF cannot diverge on report content. */}
       {expanded && markdown ? (
         <div className="border-b border-white/10 px-5 py-6 md:px-8 md:py-8">
-          {scoreInfo ? <ScoreBanner score={scoreInfo.score} status={scoreInfo.status} business={businessLabel} url={order.websiteUrl} /> : null}
-          {/* Score-source diagnostic strip. Surfaces exactly which
-              source the admin preview is reading from so any
-              future admin-vs-PDF divergence is visible at a glance.
-              Mirrors the data the PDF route loads. */}
-          <ScoreSourceDiagnostic
-            orderId={order.id}
-            scoreInfo={scoreInfo}
-            deterministicScore={deterministicScore}
-            reportGeneratedAt={reportGeneratedAt}
-            validatorTelemetry={validatorTelemetry}
-          />
-          <p className="mt-5 text-[10px] uppercase tracking-[0.2em] text-white/50">
-            Report
-            {reportGeneratedAt
-              ? ` · generated ${new Date(reportGeneratedAt).toLocaleString()}`
-              : ""}
-          </p>
-          <div className="mt-3 rounded-lg border border-white/10 bg-ink-900/80 p-6 md:p-8">
+          <details className="mb-5 rounded-lg border border-white/10 bg-ink-900/50 p-4">
+            <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">
+              Operator diagnostics — not part of the customer report
+            </summary>
+            <div className="mt-4">
+              {scoreInfo ? (
+                <ScoreBanner
+                  score={scoreInfo.score}
+                  status={scoreInfo.status}
+                  business={businessLabel}
+                  url={order.websiteUrl}
+                />
+              ) : null}
+              {/* Surfaces exactly which source the preview reads from so
+                  any future admin-vs-PDF divergence is visible. */}
+              <ScoreSourceDiagnostic
+                orderId={order.id}
+                scoreInfo={scoreInfo}
+                deterministicScore={deterministicScore}
+                reportGeneratedAt={reportGeneratedAt}
+                validatorTelemetry={validatorTelemetry}
+              />
+              <p className="mt-5 text-[10px] uppercase tracking-[0.2em] text-white/50">
+                Report
+                {reportGeneratedAt
+                  ? ` · generated ${new Date(reportGeneratedAt).toLocaleString()}`
+                  : ""}
+              </p>
+            </div>
+          </details>
+
+          {/* Customer report — byte-identical to the delivered PDF. */}
+          <div className="rounded-lg border border-white/10 bg-ink-900/80 p-6 md:p-8">
             <ReportViewerClient
               markdown={markdown}
               orderId={order.id}

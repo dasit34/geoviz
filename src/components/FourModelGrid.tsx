@@ -452,94 +452,87 @@ function RichCardBody({
   businessName?: string;
   auditUrl?: string;
 }) {
-  const services = (o.services_identified ?? []).filter(
-    (s) => s.trim().length > 0,
-  );
-  const missing = (o.missing_facts ?? []).filter((s) => s.trim().length > 0);
+  // LaBre review — COMPACT card. Long prose ("How X sees"), the full
+  // services + missing lists, full sources, and the 3-axis confidence
+  // detail moved to the per-provider appendix (FourModelAppendix). The
+  // card now answers the at-a-glance question only: verdict, business
+  // type, location, top services, the single biggest gap, one short
+  // reason. Goal: 4 cards in 1–2 pages, not 4.
+  const services = (o.services_identified ?? [])
+    .map((s) => stripMarkdownMarkers(s).trim())
+    .filter((s) => s.length > 0);
+  const topServices = services.slice(0, 3).join(", ");
+  const mainGap = (o.missing_facts ?? [])
+    .map((s) => stripMarkdownMarkers(s).trim())
+    .find((s) => s.length > 0);
   const wouldRecommend = o.would_recommend;
   const subject = normalizeLabel(businessName?.trim() || "the business");
+  const reason = o.recommendation_reason
+    ? clipDriverText(stripMarkdownMarkers(o.recommendation_reason), 160)
+    : null;
 
   return (
-    <div className="mt-3 space-y-3 text-[12px] leading-relaxed text-white/75">
-      <RichField label={`How ${display} sees ${subject}`}>
-        <InlineProse>
-          {stripMarkdownMarkers(businessIdentifiedAsText(o))}
-        </InlineProse>
-      </RichField>
-      {o.industry_identified ? (
-        <RichField label="Industry understood">
-          <InlineProse>
-            {stripMarkdownMarkers(o.industry_identified)}
-          </InlineProse>
-        </RichField>
-      ) : null}
-      {o.location_identified ? (
-        <RichField label="Location understood">
-          <InlineProse>
-            {stripMarkdownMarkers(o.location_identified)}
-          </InlineProse>
-        </RichField>
-      ) : null}
-      {services.length > 0 ? (
-        <RichField label="Services understood">
-          <ul className="mt-1 space-y-1">
-            {services.slice(0, 5).map((s, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span aria-hidden className="mt-[5px] text-white/30">
-                  •
-                </span>
-                <span>
-                  <InlineProse>{stripMarkdownMarkers(s)}</InlineProse>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </RichField>
-      ) : null}
-      {missing.length > 0 ? (
-        <RichField label={`What ${display} is missing about ${subject}`}>
-          <ul className="mt-1 space-y-1">
-            {missing.slice(0, 5).map((s, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span aria-hidden className="mt-[5px] text-white/30">
-                  •
-                </span>
-                <span>
-                  <InlineProse>{stripMarkdownMarkers(s)}</InlineProse>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </RichField>
-      ) : null}
-      <ConfidenceLevels o={o} />
-      <SourcesUsed o={o} businessName={businessName} auditUrl={auditUrl} />
-      <div className="border-t border-white/[0.05] pt-3">
-        <p className="text-[10px] uppercase tracking-[0.12em] text-white/40">
-          Would {display} comfortably recommend {subject}?
-        </p>
-        <div className="mt-1.5 flex items-baseline gap-3">
-          <span
-            className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold tracking-[0.14em] ${
-              wouldRecommend
-                ? recommendBadgeTone(wouldRecommend)
-                : "border-white/[0.08] bg-white/[0.02] text-white/50"
-            }`}
-          >
-            {wouldRecommend ?? "—"}
-          </span>
-        </div>
-        {o.recommendation_reason ? (
-          <div className="mt-2 text-white/70">
-            <span className="text-[10px] uppercase tracking-[0.12em] text-white/40">
-              Reason:&nbsp;
-            </span>
-            <InlineProse>
-              {stripMarkdownMarkers(o.recommendation_reason)}
-            </InlineProse>
-          </div>
-        ) : null}
+    <div className="mt-3 space-y-2.5 text-[12px] leading-relaxed text-white/75">
+      {/* Verdict — the headline read */}
+      <div className="flex items-center gap-2">
+        <span
+          className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold tracking-[0.14em] ${
+            wouldRecommend
+              ? recommendBadgeTone(wouldRecommend)
+              : "border-white/[0.08] bg-white/[0.02] text-white/50"
+          }`}
+        >
+          {wouldRecommend ?? "—"}
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.12em] text-white/40">
+          would recommend
+        </span>
       </div>
+
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+        {o.industry_identified ? (
+          <CompactField label="Business type">
+            {stripMarkdownMarkers(o.industry_identified)}
+          </CompactField>
+        ) : null}
+        {o.location_identified ? (
+          <CompactField label="Location">
+            {stripMarkdownMarkers(o.location_identified)}
+          </CompactField>
+        ) : null}
+      </dl>
+
+      {topServices ? (
+        <CompactField label="Top services">{topServices}</CompactField>
+      ) : null}
+      {mainGap ? (
+        <CompactField label="Main missing signal">{mainGap}</CompactField>
+      ) : null}
+      {reason ? (
+        <p className="border-t border-white/[0.05] pt-2 text-[11px] italic leading-snug text-white/60">
+          “{reason}”
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Compact inline label/value used by the slimmed provider cards. */
+function CompactField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-[10px] uppercase tracking-[0.12em] text-white/40">
+        {label}
+      </dt>
+      <dd className="font-medium text-white/80">
+        <InlineProse>{String(children)}</InlineProse>
+      </dd>
     </div>
   );
 }
@@ -777,5 +770,109 @@ function SourcesUsed({
         ) : null}
       </ul>
     </RichField>
+  );
+}
+
+/**
+ * Per-provider FULL detail, moved out of the compact cards (LaBre
+ * review) into the report appendix: the long "How X sees…" summary,
+ * the complete services + missing-signal lists, the 3-axis confidence
+ * read, and the full sources list. Renders nothing when the validator
+ * layer is empty. Consumed inside AuditReportContent's appendix
+ * <details> so the main flow stays scannable while the depth remains
+ * available to anyone who wants it.
+ */
+export function FourModelAppendix({
+  aiValidations,
+  businessName,
+  auditUrl,
+}: {
+  aiValidations: unknown;
+  businessName?: string;
+  auditUrl?: string;
+}) {
+  const layer = aiValidations as ValidatorLayer;
+  if (!layer || !Array.isArray(layer.outputs) || layer.outputs.length === 0) {
+    return null;
+  }
+  const byProvider: Record<string, ValidatorOutputShape> = {};
+  for (const o of layer.outputs) {
+    if (o && typeof o.provider === "string") byProvider[o.provider] = o;
+  }
+  const ordered = PROVIDER_ORDER.map((p) => byProvider[p]).filter(
+    (o): o is ValidatorOutputShape => !!o && isRich(o),
+  );
+  if (ordered.length === 0) return null;
+
+  const subject = normalizeLabel(businessName?.trim() || "the business");
+
+  return (
+    <div className="mt-4 space-y-5">
+      <p className="text-[13px] font-semibold text-white/80">
+        Per-AI-system detail
+      </p>
+      {ordered.map((o) => {
+        const display = normalizeLabel(
+          PROVIDER_DISPLAY[o.provider] ?? o.provider,
+        );
+        const services = (o.services_identified ?? []).filter(
+          (s) => s.trim().length > 0,
+        );
+        const missing = (o.missing_facts ?? []).filter(
+          (s) => s.trim().length > 0,
+        );
+        return (
+          <div
+            key={o.provider}
+            className="rounded-md border border-white/[0.06] bg-white/[0.015] p-4 text-[12px] leading-relaxed text-white/75"
+          >
+            <p className="text-sm font-semibold text-white/85">{display}</p>
+            <div className="mt-3 space-y-3">
+              <RichField label={`How ${display} sees ${subject}`}>
+                <InlineProse>
+                  {stripMarkdownMarkers(businessIdentifiedAsText(o))}
+                </InlineProse>
+              </RichField>
+              {services.length > 0 ? (
+                <RichField label="Services understood">
+                  <ul className="mt-1 space-y-1">
+                    {services.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span aria-hidden className="mt-[5px] text-white/30">
+                          •
+                        </span>
+                        <span>
+                          <InlineProse>{stripMarkdownMarkers(s)}</InlineProse>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </RichField>
+              ) : null}
+              {missing.length > 0 ? (
+                <RichField
+                  label={`What ${display} is missing about ${subject}`}
+                >
+                  <ul className="mt-1 space-y-1">
+                    {missing.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span aria-hidden className="mt-[5px] text-white/30">
+                          •
+                        </span>
+                        <span>
+                          <InlineProse>{stripMarkdownMarkers(s)}</InlineProse>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </RichField>
+              ) : null}
+              <ConfidenceLevels o={o} />
+              <SourcesUsed o={o} businessName={businessName} auditUrl={auditUrl} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

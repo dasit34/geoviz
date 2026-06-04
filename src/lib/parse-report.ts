@@ -1182,11 +1182,37 @@ export function clipDriverText(s: string, maxLen = 120): string {
  * surrounding punctuation and spacing. Never touches markdown
  * structure markers — that's stripMarkdownMarkers below.
  */
+// Customer-facing plain-English for structured-data terms. "schema",
+// "machine-readable", and similar developer words read as jargon to a
+// local business owner. Order matters: most-specific phrases first so
+// "schema markup" / "schema.org" resolve before the standalone
+// "schema" rule.
+const VERIFIABLE_DETAILS = "business details AI systems can verify";
+const STRUCTURED_DETAILS = "structured business details";
+
 const JARGON_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
-  [/\bschema markup\b/gi, "machine-readable business info"],
-  [/\bschema\.org\b/gi, "AI-readable business data"],
-  [/\bJSON-LD\b/g, "AI-readable business data"],
-  [/\bstructured data\b/gi, "machine-readable business info"],
+  [/\bLocalBusiness JSON(?:-LD)?\b/gi, VERIFIABLE_DETAILS],
+  [/\bschema markup\b/gi, VERIFIABLE_DETAILS],
+  [/\bschema\.org\b/gi, STRUCTURED_DETAILS],
+  [/\bJSON-LD\b/g, STRUCTURED_DETAILS],
+  [/\bstructured data\b/gi, VERIFIABLE_DETAILS],
+  // Standalone "schema" — runs AFTER the specific schema phrases above
+  // so it only catches bare uses ("missing schema").
+  [/\bschema\b/gi, STRUCTURED_DETAILS],
+  // Already-swapped phrasings that may appear raw in validator text —
+  // normalize them to the new vocabulary too.
+  [/\bmachine-readable business (?:info|data)\b/gi, VERIFIABLE_DETAILS],
+  [/\bAI-readable business data\b/gi, STRUCTURED_DETAILS],
+  // Standalone "machine-readable X" (e.g. "machine-readable reviews")
+  // — runs AFTER the business-info phrase above so that one wins first.
+  [/\bmachine-readable\b/gi, "AI-readable"],
+  // "noindex" — the single most opaque technical term in these audits.
+  // Absorb a preceding article so "a noindex directive" doesn't become
+  // "a a setting…".
+  [
+    /\b(?:an?\s+)?noindex(?:\s+(?:directive|tag|meta tag|setting))?\b/gi,
+    "a setting telling search and AI systems to skip the page",
+  ],
   [/\bAI crawler(?:s)? access\b/gi, "AI reader access"],
   [/\bAI crawler(?:s)?\b/gi, "AI reader"],
   [/\bcrawler readiness\b/gi, "AI reader readiness"],
@@ -1212,7 +1238,6 @@ const JARGON_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bmeta tags\b/gi, "page metadata"],
   [/\bHTTP headers\b/gi, "server response signals"],
   [/\bFAQPage\b/g, "FAQ section"],
-  [/\bLocalBusiness JSON\b/gi, "machine-readable business info"],
   [/\bGPTBot\b/g, "ChatGPT's reader"],
   [/\bllms-full\.txt\b/gi, "AI access guide"],
   [/\bNAP\b/g, "name, address, and phone"],
@@ -1224,6 +1249,14 @@ export function swapTechnicalTerms(text: string): string {
   for (const [pattern, replacement] of JARGON_REPLACEMENTS) {
     out = out.replace(pattern, replacement);
   }
+  // Collapse a double-swap seam: source text like "structured data
+  // (schema.org)" otherwise renders two swapped phrases back-to-back
+  // ("business details AI systems can verify (structured business
+  // details)"). Drop the now-redundant parenthetical.
+  out = out.replace(
+    /\b(business details AI systems can verify|structured business details)\s*\((?:business details AI systems can verify|structured business details)\)/gi,
+    "$1",
+  );
   return out;
 }
 

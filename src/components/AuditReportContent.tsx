@@ -10,7 +10,6 @@ import {
   parseReportSections,
   stripFabricatedGeography,
   parseScoreDrivers,
-  pickCleanHeroSentence,
   plainEnglishBandLabel,
   scoreToneFromOverall,
   stripScoreMath,
@@ -29,7 +28,7 @@ import { CategoryScoreCard } from "@/components/CategoryScoreCard";
 import { RadarChart } from "@/components/RadarChart";
 import { ConsensusActionAnchor } from "@/components/ConsensusActionAnchor";
 import { WhatAiSystemsRead } from "@/components/WhatAiSystemsRead";
-import { FourModelGrid } from "@/components/FourModelGrid";
+import { FourModelGrid, FourModelAppendix } from "@/components/FourModelGrid";
 import { ConsensusSummary } from "@/components/ConsensusSummary";
 import { WhyYouReceivedThisScore } from "@/components/WhyYouReceivedThisScore";
 import {
@@ -180,7 +179,6 @@ export function AuditReportContent({
   const scoreProse = scoreSection
     ? cleanScoreSectionBody(scoreSection.body)
     : "";
-  const heroAssessment = pickCleanHeroSentence(scoreProse);
 
   const issueItems = whySection ? parseEnumeratedItems(whySection.body) : [];
   const fixItems = fixSection ? parseEnumeratedItems(fixSection.body) : [];
@@ -234,44 +232,15 @@ export function AuditReportContent({
           band={band}
           tone={tone}
           dateLabel={dateLabel}
-          assessment={heroAssessment}
           reportRef={`GEO-${orderId.slice(-8).toUpperCase()}`}
           cohortCellValue={context?.cohortCellValue ?? null}
         />
 
-        {/* Hero */}
-        <header className="report-hero">
-          <p className="section-eyebrow">GeoViz · GEO Audit Report</p>
-          <h1 className="h1 mt-4 max-w-3xl">{businessLabel}</h1>
-          <p className="report-hero-subtitle">
-            Your AI Visibility Report —{" "}
-            <span className={`report-band-inline report-band-inline-${tone}`}>
-              {band}
-            </span>
-          </p>
-          {heroAssessment ? (
-            <p className="report-hero-assessment">{heroAssessment}</p>
-          ) : null}
-          <dl className="report-meta">
-            <div>
-              <dt>Website audited</dt>
-              <dd>
-                <a
-                  href={websiteUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-white/85 hover:text-accent"
-                >
-                  {prettifyUrlForDisplay(websiteUrl)}
-                </a>
-              </dd>
-            </div>
-            <div>
-              <dt>Generated</dt>
-              <dd>{dateLabel}</dd>
-            </div>
-          </dl>
-        </header>
+        {/* Hero header REMOVED (LaBre review) — it duplicated the
+            cover's business name, band, assessment, website, and
+            generated date, producing two near-identical opening pages.
+            The cover now carries the brand/identity/metadata; the body
+            opens directly at Section 01 "Your Score". */}
 
         {/* Phase E — "Why this audit exists" aside removed: it was a
             hardcoded marketing premise that duplicated "Why this
@@ -324,26 +293,10 @@ export function AuditReportContent({
               visibility once they've read the bars. Each bar shows
               its rubric weight (Phase C) so the customer can
               reconstruct the overall from the six cards. */}
-          <section className="report-section-card report-section-impact mt-10">
-            <div className="report-section-card-header">
-              <p className="section-eyebrow">
-                {SECTION_EYEBROWS.categoryBreakdown}
-              </p>
-              <span className="pill">6 dimensions scored</span>
-            </div>
-            <h2 className="h2 mt-3">Where the score comes from.</h2>
-            <div className="category-score-grid mt-6">
-              {score.categories.map((cat) => (
-                <CategoryScoreCard key={cat.key} category={cat} />
-              ))}
-            </div>
-            <div className="category-score-radar-wrap mt-8">
-              <p className="category-score-radar-label">
-                Score distribution at a glance
-              </p>
-              <RadarChart categories={score.categories} />
-            </div>
-          </section>
+          {/* LaBre review — Category Breakdown MOVED out of Section 01
+              to after the Consensus section (see below), so the flow is
+              Score+Why → What AI Found → Consensus → Category Breakdown
+              → Issues. */}
 
           <p className="report-score-consistency-note">
             The GeoViz score reflects how confidently modern AI
@@ -419,9 +372,33 @@ export function AuditReportContent({
           businessName={businessLabel}
         />
 
-        {/* Phase F — Category breakdown moved up to pair with the
-            score card under Section 01, immediately after
-            WhyYouReceivedThisScore. */}
+        {/* Category Breakdown — moved here (LaBre review) so the
+            customer reads the score → how AI systems read them →
+            consensus, and ONLY THEN the six-dimension breakdown that
+            explains where the number comes from. The six bars are the
+            executive-readable layer; the radar below shows the shape.
+            Each bar shows its rubric weight so the customer can
+            reconstruct the overall from the six cards. */}
+        <section className="report-section-card report-section-impact mt-10">
+          <div className="report-section-card-header">
+            <p className="section-eyebrow">
+              {SECTION_EYEBROWS.categoryBreakdown}
+            </p>
+            <span className="pill">6 dimensions scored</span>
+          </div>
+          <h2 className="h2 mt-3">Where the score comes from.</h2>
+          <div className="category-score-grid mt-6">
+            {score.categories.map((cat) => (
+              <CategoryScoreCard key={cat.key} category={cat} />
+            ))}
+          </div>
+          <div className="category-score-radar-wrap mt-8">
+            <p className="category-score-radar-label">
+              Score distribution at a glance
+            </p>
+            <RadarChart categories={score.categories} />
+          </div>
+        </section>
 
         {/* Launch Blocker P2 #7 — Cross-Model Intelligence block
             REMOVED. The customer already sees the same 4 systems
@@ -537,6 +514,16 @@ export function AuditReportContent({
                 before delivery.
               </p>
             </div>
+            {/* Per-AI-system full detail (LaBre review) — the long
+                "How X sees…" summaries, complete services/missing
+                lists, confidence read, and full sources moved here from
+                the compact provider cards so the main flow stays
+                scannable while the depth stays available. */}
+            <FourModelAppendix
+              aiValidations={context?.aiValidations ?? null}
+              businessName={businessLabel}
+              auditUrl={websiteUrl}
+            />
             {techSection ? (
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
@@ -598,7 +585,6 @@ function ReportCover({
   band,
   tone,
   dateLabel,
-  assessment,
   reportRef,
   cohortCellValue,
 }: {
@@ -612,7 +598,6 @@ function ReportCover({
   band: string;
   tone: "ok" | "warn" | "bad" | "muted";
   dateLabel: string;
-  assessment: string | null;
   reportRef: string;
   /** Optional cohort cell — "Top 25% (roofing)" or "Industry benchmark forming" */
   cohortCellValue?: string | null;
@@ -654,9 +639,9 @@ function ReportCover({
         </div>
       </div>
 
-      {assessment ? (
-        <p className="report-cover-assessment">{assessment}</p>
-      ) : null}
+      {/* Assessment paragraph REMOVED (LaBre review) — the cover is a
+          clean premium brief: brand, identity, score, metadata. No
+          diagnosis prose. */}
 
       <dl className="report-cover-meta">
         <div>

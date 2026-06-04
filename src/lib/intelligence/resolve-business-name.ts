@@ -37,6 +37,7 @@ export type BusinessNameResolution = {
     | "homepage"
     | "footer"
     | "order"
+    | "provider-consensus"
     | "domain";
   /**
    * Populated when the chosen name differs meaningfully from
@@ -52,6 +53,12 @@ export type BusinessNameResolution = {
 type ResolverInput = {
   intelligence?: {
     preflightSignals?: unknown;
+    /**
+     * Cross-model validator layer. Used as a best-effort
+     * provider-consensus name source when the on-site signals are junk
+     * (bot wall / SEO title) and no order name is available.
+     */
+    aiValidations?: unknown;
   } | null;
   order: {
     businessName: string | null;
@@ -109,12 +116,15 @@ function titleCaseLoose(raw: string): string {
     .replace(/[-_]+/g, " ")
     .split(" ")
     .filter((w) => w.length > 0)
-    .map((w) =>
+    .map((w) => {
       // Preserve acronyms (all-caps short tokens) as-is.
-      w.length <= 4 && w === w.toUpperCase()
-        ? w
-        : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
-    )
+      if (w.length <= 4 && w === w.toUpperCase()) return w;
+      // Preserve intentional intercaps / camel-case brand names
+      // ("LaBre", "McKay", "iPhone") — an uppercase letter after the
+      // first position signals deliberate casing we must not flatten.
+      if (/[A-Z]/.test(w.slice(1))) return w;
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    })
     .join(" ");
 }
 
@@ -165,17 +175,59 @@ const US_STATE_NAMES = new Set<string>([
   "vermont", "virginia", "washington", "wisconsin", "wyoming",
 ]);
 
+// Browser / bot-wall / loading interstitial titles. When a site is
+// behind Cloudflare (or similar) the fetched <title> / readability
+// title is the challenge page, NOT the business — e.g. "Just a
+// moment...". These must NEVER become the report's hero name. Matched
+// as a case-insensitive substring so "Just a moment…", "Just a
+// moment... | Cloudflare" etc. are all caught.
+const JUNK_NAME_SUBSTRINGS: readonly string[] = [
+  "just a moment",
+  "loading",
+  "please wait",
+  "attention required",
+  "access denied",
+  "checking your browser",
+  "checking if the site connection is secure",
+  "cloudflare",
+  "enable javascript",
+  "javascript is required",
+  "are you human",
+  "verify you are human",
+  "verifying you are human",
+  "captcha",
+  "403 forbidden",
+  "404 not found",
+  "page not found",
+  "site maintenance",
+  "under construction",
+  "redirecting",
+  "one moment",
+];
+
+/**
+ * True when a candidate is a browser/bot-wall/loading interstitial
+ * rather than a real business name.
+ */
+function isJunkName(name: string): boolean {
+  const n = normalize(name).toLowerCase();
+  if (!n) return true;
+  return JUNK_NAME_SUBSTRINGS.some((j) => n.includes(j));
+}
+
 /**
  * Quality gate for an on-site-derived name candidate (schema / article
- * title / homepage / footer). SEO-stuffed page titles frequently land
- * in these fields — e.g. "Commercial Flat Roofing Experts Serving Ohio,
- * Michigan, Indiana - Repair" — and must NOT become the report's hero
- * title. A real business name is short, doesn't market itself, and
+ * title / homepage / footer). SEO-stuffed page titles and browser
+ * interstitials frequently land in these fields — e.g. "Commercial Flat
+ * Roofing Experts Serving Ohio, Michigan, Indiana - Repair" or "Just a
+ * moment..." — and must NOT become the report's hero title. A real
+ * business name is short, doesn't market itself, isn't a bot wall, and
  * doesn't enumerate a multi-state service area.
  *
  * High-precision rejects only (avoid dropping legitimate names like
  * "Rick's Affordable Heating" — which is why marketing adjectives such
  * as "affordable" are deliberately NOT rejected):
+ *   - a browser/loading/bot-wall interstitial (JUNK_NAME_SUBSTRINGS);
  *   - more than 6 words, or longer than 55 chars;
  *   - contains "serving" / "specializing" (service-area phrasing);
  *   - names two or more US states (a service-area list, not a name).
@@ -183,6 +235,7 @@ const US_STATE_NAMES = new Set<string>([
 function isPlausibleBusinessName(name: string): boolean {
   const n = normalize(name);
   if (!n) return false;
+  if (isJunkName(n)) return false;
   const words = n.split(/\s+/);
   if (words.length > 6) return false;
   if (n.length > 55) return false;
@@ -210,6 +263,50 @@ function asPreflight(v: unknown): PreflightSignals | null {
   const obj = v as Record<string, unknown>;
   if (!("ok" in obj) || !("engineVersion" in obj)) return null;
   return v as PreflightSignals;
+}
+
+/**
+ * Best-effort provider-consensus business name. When the on-site
+ * signals are junk (bot wall / SEO title) the cross-model validators
+ * usually still name the business in their summary prose ("LaBre Law
+ * Office is a personal-injury firm…"). Extract the leading proper-noun
+ * phrase before an "is/are/—/," boundary from each passed provider's
+ * `raw_summary`, then return it ONLY when ≥2 providers agree on the
+ * same normalized name AND it passes the plausibility gate.
+ *
+ * Conservative by design: this is a fallback, not an authority. It
+ * never overrides a usable on-site or order name.
+ */
+function extractProviderConsensusName(aiValidations: unknown): string | null {
+  if (!aiValidations || typeof aiValidations !== "object") return null;
+  const outputs = (aiValidations as { outputs?: unknown }).outputs;
+  if (!Array.isArray(outputs)) return null;
+
+  const counts = new Map<string, { display: string; count: number }>();
+  for (const raw of outputs) {
+    if (!raw || typeof raw !== "object") continue;
+    const o = raw as { status?: unknown; raw_summary?: unknown };
+    if (o.status !== "passed") continue;
+    const summary = typeof o.raw_summary === "string" ? o.raw_summary : "";
+    if (!summary) continue;
+    // Leading phrase up to the first " is/are/was/—/–/-/," boundary.
+    const m = summary
+      .trim()
+      .match(/^([A-Z][A-Za-z0-9&'’.\- ]{1,54}?)\s+(?:is|are|was|were|—|–|-|,)/);
+    if (!m) continue;
+    const candidate = gated(normalize(m[1]));
+    if (!candidate) continue;
+    const key = candidate.toLowerCase();
+    const prev = counts.get(key);
+    if (prev) prev.count += 1;
+    else counts.set(key, { display: candidate, count: 1 });
+  }
+
+  let best: { display: string; count: number } | null = null;
+  for (const e of counts.values()) {
+    if (!best || e.count > best.count) best = e;
+  }
+  return best && best.count >= 2 ? best.display : null;
 }
 
 export function resolveBusinessName(
@@ -240,9 +337,17 @@ export function resolveBusinessName(
       ? normalize(preflight.entityConsistency.extractedEntities.name.footer)
       : null,
   );
-  const orderName = input.order.businessName
+  // The customer's own input — trusted, but still reject a junk value
+  // (a bot wall could have been captured upstream).
+  const rawOrderName = input.order.businessName
     ? titleCaseLoose(input.order.businessName)
     : null;
+  const orderName = rawOrderName && !isJunkName(rawOrderName) ? rawOrderName : null;
+  // Best-effort cross-model consensus — only used when on-site + order
+  // names are unavailable, and only when ≥2 providers agree.
+  const providerConsensusName = extractProviderConsensusName(
+    input.intelligence?.aiValidations,
+  );
   const domainName = fromDomain(input.order.websiteUrl);
 
   let chosen: { name: string; source: BusinessNameResolution["source"] };
@@ -257,6 +362,8 @@ export function resolveBusinessName(
     chosen = { name: footerName, source: "footer" };
   } else if (orderName) {
     chosen = { name: orderName, source: "order" };
+  } else if (providerConsensusName) {
+    chosen = { name: providerConsensusName, source: "provider-consensus" };
   } else if (domainName) {
     chosen = { name: domainName, source: "domain" };
   } else {
