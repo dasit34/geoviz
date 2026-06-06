@@ -2,9 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/db";
-import { ADMIN_COOKIE, getAdminPassword, isAuthed } from "@/lib/admin-auth";
+import {
+  ADMIN_COOKIE,
+  adminCookieToken,
+  getAdminPassword,
+  isAuthed,
+  verifyAdminPassword,
+} from "@/lib/admin-auth";
+import { checkRateLimit, clientIpHashFromHeaders } from "@/lib/rate-limit";
+
+// Brute-force guard on the admin login. In-memory / per-instance (same
+// limiter the public routes use) — meaningfully raises the bar for a single
+// operator's login without a Redis dependency. Counts every attempt.
+const LOGIN_LIMIT = 8;
+const LOGIN_WINDOW_MS = 15 * 60_000;
 
 export async function loginAction(formData: FormData) {
   const password = String(formData.get("password") ?? "");
@@ -13,11 +26,31 @@ export async function loginAction(formData: FormData) {
   if (!expected) {
     redirect("/admin?error=not_configured");
   }
-  if (password !== expected) {
+
+  // `headers()` returns a ReadonlyHeaders; the limiter only calls `.get()`.
+  const ipHash = clientIpHashFromHeaders(headers() as unknown as Headers);
+  const limited = checkRateLimit(
+    `admin:login:${ipHash}`,
+    LOGIN_LIMIT,
+    LOGIN_WINDOW_MS,
+  );
+  if (!limited.allowed) {
+    console.warn(
+      `[admin-login] rate-limited ipHash=${ipHash} retryAfterSec=${limited.retryAfterSec}`,
+    );
+    redirect("/admin?error=rate_limited");
+  }
+
+  if (!verifyAdminPassword(password)) {
     redirect("/admin?error=invalid");
   }
 
-  cookies().set(ADMIN_COOKIE, password, {
+  const token = adminCookieToken();
+  if (!token) {
+    redirect("/admin?error=not_configured");
+  }
+
+  cookies().set(ADMIN_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

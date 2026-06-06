@@ -74,6 +74,13 @@ export default async function AdminPage({
               </div>
             ) : null}
 
+            {searchParams?.error === "rate_limited" ? (
+              <div className="mt-6 rounded-md border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+                Too many sign-in attempts. Please wait a few minutes and try
+                again.
+              </div>
+            ) : null}
+
             <form action={loginAction} className="card mt-6 space-y-4">
               <label
                 htmlFor="password"

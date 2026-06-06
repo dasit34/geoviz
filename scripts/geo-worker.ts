@@ -67,7 +67,15 @@ import {
   type TokenUsage,
 } from "../src/lib/pricing";
 
-const TIMEOUT_MS = Number(process.env.GEO_WORKER_TIMEOUT_MS ?? 300_000); // 5 min hard cap
+// Audit hard-cap. Sanitized so a malformed env (`""`, `"0"`, `"abc"`) can't
+// silently set a sub-second / NaN timeout that fails every audit instantly
+// (launch-readiness #2.2). Falls back to 5 min and warns in preflight.
+const TIMEOUT_MS_DEFAULT = 300_000; // 5 min hard cap
+const TIMEOUT_MS_RAW = process.env.GEO_WORKER_TIMEOUT_MS;
+const TIMEOUT_MS_PARSED = Number(TIMEOUT_MS_RAW ?? TIMEOUT_MS_DEFAULT);
+const TIMEOUT_MS_VALID =
+  Number.isFinite(TIMEOUT_MS_PARSED) && TIMEOUT_MS_PARSED >= 30_000;
+const TIMEOUT_MS = TIMEOUT_MS_VALID ? TIMEOUT_MS_PARSED : TIMEOUT_MS_DEFAULT;
 const POLL_MS = Number(process.env.GEO_WORKER_POLL_MS ?? 12_000); // loop-mode poll cadence
 const LOOP_MODE =
   process.env.GEO_WORKER_LOOP === "true" || process.argv.includes("--loop");
@@ -2328,6 +2336,34 @@ function preflightOrExit(): void {
   log(
     `[geo-worker] resolved AUDIT_MODE='${AUDIT_MODE}' (raw GEO_AUDIT_MODE=${JSON.stringify(process.env.GEO_AUDIT_MODE ?? null)})`,
   );
+
+  // 0a. Timeout sanity — warn (don't fail) if a malformed GEO_WORKER_TIMEOUT_MS
+  // was supplied; we've already clamped to the 5-min default above.
+  if (TIMEOUT_MS_RAW !== undefined && !TIMEOUT_MS_VALID) {
+    logErr(
+      `[geo-worker] WARN ignoring invalid GEO_WORKER_TIMEOUT_MS=${JSON.stringify(TIMEOUT_MS_RAW)} ` +
+        `(must be a number ≥ 30000) — using default ${TIMEOUT_MS_DEFAULT}ms.`,
+    );
+  }
+
+  // 0b. Delivery env — the worker emails the customer + operator on
+  // completion/failure. Missing keys make delivery silently no-op, so warn
+  // loudly at boot (non-fatal: email is fail-soft; audits still generate).
+  if (!process.env.RESEND_API_KEY) {
+    logErr(
+      "[geo-worker] WARN RESEND_API_KEY is not set — customer report-ready and " +
+        "failure emails will NOT be delivered. Set it in Railway → Variables.",
+    );
+  } else if (
+    !process.env.RESEND_EMAIL_FROM &&
+    !process.env.EMAIL_FROM &&
+    !process.env.RESEND_FROM_EMAIL
+  ) {
+    logErr(
+      "[geo-worker] WARN no sender configured (RESEND_EMAIL_FROM / EMAIL_FROM / " +
+        "RESEND_FROM_EMAIL) — Resend will reject sends from the placeholder address.",
+    );
+  }
 
   // 1. DATABASE_URL must be set (the worker is useless without it).
   if (!process.env.DATABASE_URL) {
