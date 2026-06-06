@@ -420,8 +420,23 @@ function buildHtmlBody(
         <td align="center">
           <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #ececec;">
             <tr>
-              <td style="padding:28px 32px 8px;">
-                <div style="color:#ff7a18;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">GeoViz</div>
+              <td style="padding:26px 32px 8px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+                  <td style="vertical-align:middle;padding-right:9px;line-height:0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="26" height="26" fill="none" style="display:block;">
+                      <path d="M 35.15 34.04 A 15 15 0 1 1 35.15 13.96" stroke="rgba(15,23,42,0.45)" stroke-width="2"/>
+                      <circle cx="22.2" cy="38.9" r="2.0" fill="#64748b"/>
+                      <circle cx="10.8" cy="31.0" r="2.4" fill="#0f172a"/>
+                      <circle cx="10.6" cy="17.2" r="2.0" fill="#64748b"/>
+                      <circle cx="21.9" cy="9.2" r="2.4" fill="#0f172a"/>
+                      <circle cx="35.0" cy="13.8" r="2.0" fill="#0f172a"/>
+                      <line x1="24" y1="24" x2="35" y2="24" stroke="#FF6A1A" stroke-width="3" stroke-linecap="round"/>
+                      <circle cx="35" cy="24" r="2.3" fill="#FF6A1A"/>
+                      <circle cx="24" cy="24" r="3.4" fill="#FF6A1A"/>
+                    </svg>
+                  </td>
+                  <td style="vertical-align:middle;font-size:18px;font-weight:700;letter-spacing:-0.01em;color:#111;">GeoViz<span style="color:#ff6a1a;">.ai</span></td>
+                </tr></table>
               </td>
             </tr>
             <tr>
@@ -435,7 +450,7 @@ function buildHtmlBody(
             </tr>
             <tr>
               <td style="padding:0 32px;">
-                <div style="background:#fff4ea;border-left:3px solid #ff7a18;padding:12px 14px;border-radius:4px;margin:0 0 22px;font-size:14px;line-height:1.55;color:#1a1a1a;">
+                <div style="background:#fff3ea;border-left:3px solid #ff6a1a;padding:12px 14px;border-radius:4px;margin:0 0 22px;font-size:14px;line-height:1.55;color:#1a1a1a;">
                   <strong style="color:#111;">Biggest issue:</strong> ${safeIssue}
                 </div>
               </td>
@@ -444,13 +459,13 @@ function buildHtmlBody(
               <td align="left" style="padding:4px 32px 8px;">
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
-                    <td style="background:#ff7a18;border-radius:6px;">
+                    <td style="background:#ff6a1a;border-radius:6px;">
                       <a href="${safeView}" style="display:inline-block;padding:13px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;">View Your Report →</a>
                     </td>
                   </tr>
                 </table>
                 <div style="margin-top:10px;font-size:13px;color:#666;">
-                  Or <a href="${safePdf}" style="color:#ff7a18;text-decoration:underline;">download PDF</a>.
+                  Or <a href="${safePdf}" style="color:#ff6a1a;text-decoration:underline;">download PDF</a>.
                 </div>
               </td>
             </tr>
@@ -482,7 +497,7 @@ function renderScoreChip(score: number, status: string | null): string {
       ? { border: "#2da94f", bg: "#f0faf3", num: "#1f7e3a" }
       : score >= 50
         ? { border: "#c98604", bg: "#fdf6e9", num: "#946203" }
-        : { border: "#ff7a18", bg: "#fff4ea", num: "#ff7a18" };
+        : { border: "#ff6a1a", bg: "#fff3ea", num: "#ff6a1a" };
   const safeStatus = status ? escapeHtml(status) : "";
   const statusRow = safeStatus
     ? `<div style="font-size:11px;color:#666;margin-top:2px;text-transform:uppercase;letter-spacing:0.1em;">${safeStatus}</div>`

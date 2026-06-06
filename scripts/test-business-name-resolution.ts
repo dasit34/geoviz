@@ -288,6 +288,31 @@ for (const junk of [
   });
 }
 
+// ── Generic / descriptive titles (Sherriff Goslin + Cleveland defects)
+for (const junk of ["Home", "Homepage", "Welcome", "Index"]) {
+  check(`generic page title "${junk}" is rejected → order name`, () => {
+    const r = resolveBusinessName({
+      intelligence: { preflightSignals: preflight({ schemaName: junk, articleTitle: junk, homepageName: junk }) },
+      order: { businessName: "Sherriff Goslin", email: null, websiteUrl: "https://sherriffgoslin.com" },
+    });
+    assert.equal(r.name, "Sherriff Goslin", `got "${r.name}"`);
+  });
+}
+
+check("descriptive '<service> in <Place>' title is rejected → order name", () => {
+  const r = resolveBusinessName({
+    intelligence: {
+      preflightSignals: preflight({
+        schemaName: "Full Service Dentistry in Northeast Ohio",
+        articleTitle: "Full Service Dentistry in Northeast Ohio",
+        homepageName: "Full Service Dentistry in Northeast Ohio",
+      }),
+    },
+    order: { businessName: "Cleveland Smile Center", email: null, websiteUrl: "https://clevelandsmilecenter.com" },
+  });
+  assert.equal(r.name, "Cleveland Smile Center");
+});
+
 check("LaBre intercaps casing is preserved (not flattened to 'Labre')", () => {
   const r = resolveBusinessName({
     intelligence: { preflightSignals: preflight({}) },

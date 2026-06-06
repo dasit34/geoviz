@@ -35,6 +35,57 @@
   --font-geist: var(--font-inter);
   --font-geist-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
     monospace;
+
+  /* ============================================================
+   * BRAND SYSTEM v2 — canonical tokens (single source of truth).
+   * Added ADDITIVELY in Phase 1: nothing is repointed yet. Phases
+   * 2–3 alias the legacy Tailwind / OKLCH / report --rd-* systems
+   * onto these so the whole product shares one palette + type.
+   * Direction: AI Visibility Network — intelligence base + one
+   * orange signal; orange→magenta gradient reserved for the
+   * network visualization ONLY (never UI chrome).
+   * ============================================================ */
+  /* surfaces (near-black → navy) */
+  --gv-bg: #06070a;
+  --gv-bg-navy: #0b1120;
+  --gv-panel: #0f172a;
+  --gv-panel-2: #131c30;
+  --gv-line: rgba(226, 232, 240, 0.11);
+  --gv-line-soft: rgba(226, 232, 240, 0.06);
+  /* text (paper → graphite) */
+  --gv-fg: #f1f5f9;
+  --gv-fg-dim: rgba(226, 232, 240, 0.64);
+  --gv-fg-faint: rgba(226, 232, 240, 0.42);
+  --gv-graphite: #7c8598;
+  /* the ONE signal accent */
+  --gv-signal: #ff6a1a;
+  --gv-signal-glow: #ff8a3c;
+  /* network-visualization gradient (viz only — not chrome) */
+  --gv-net-from: #ff6a1a;
+  --gv-net-to: #ff2d78;
+  /* telemetry / status (one set) */
+  --gv-cyan: #38e1ff;
+  --gv-ok: #4ade80;
+  --gv-warn: #fbbf24;
+  --gv-bad: #f87171;
+  /* type families (v2) */
+  --gv-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif,
+    system-ui, sans-serif;
+  --gv-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --gv-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", Menlo,
+    monospace;
+}
+
+/* Brand v2 font-family utilities (consume the canonical type tokens). */
+.font-gv-display {
+  font-family: var(--gv-display);
+}
+.font-gv-body {
+  font-family: var(--gv-body);
+}
+.font-gv-mono {
+  font-family: var(--gv-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Page surface — solid dark navy/graphite at the body level.
@@ -1016,7 +1067,7 @@ body {
   }
   .status-chip-clear   { color: #6ce39a; background: rgba(108, 227, 154, 0.10); }
   .status-chip-strong  { color: #6ce39a; background: rgba(108, 227, 154, 0.10); }
-  .status-chip-weak    { color: #ff9a3c; background: rgba(255, 154, 60, 0.10); }
+  .status-chip-weak    { color: #ff8a3c; background: rgba(255, 138, 60, 0.10); }
   .status-chip-missing { color: #ff6b6b; background: rgba(255, 107, 107, 0.10); }
   .status-chip-review  { color: #67e8f9; background: rgba(103, 232, 249, 0.08); }
 }
@@ -1059,7 +1110,7 @@ body {
 
 .bg-radial-orange {
   background:
-    radial-gradient(60% 50% at 70% 0%, rgba(255, 122, 24, 0.18), transparent 60%),
+    radial-gradient(60% 50% at 70% 0%, rgba(255, 106, 26, 0.18), transparent 60%),
     radial-gradient(50% 40% at 10% 30%, rgba(43, 139, 255, 0.12), transparent 60%);
 }
 
@@ -1110,22 +1161,22 @@ body {
 .report-prose strong { color: #ffffff; font-weight: 600; }
 .report-prose em { color: rgba(255, 255, 255, 0.85); }
 .report-prose a {
-  color: #ff7a18;
+  color: #ff6a1a;
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: rgba(255, 122, 24, 0.4);
+  text-decoration-color: rgba(255, 106, 26, 0.4);
 }
-.report-prose a:hover { text-decoration-color: rgba(255, 122, 24, 0.9); }
+.report-prose a:hover { text-decoration-color: rgba(255, 106, 26, 0.9); }
 .report-prose ul,
 .report-prose ol { margin: 0 0 1.1rem; padding-left: 1.4rem; }
 .report-prose li { margin: 0.35rem 0; }
-.report-prose ul li::marker { color: rgba(255, 122, 24, 0.7); }
-.report-prose ol li::marker { color: rgba(255, 122, 24, 0.7); font-weight: 600; }
+.report-prose ul li::marker { color: rgba(255, 106, 26, 0.7); }
+.report-prose ol li::marker { color: rgba(255, 106, 26, 0.7); font-weight: 600; }
 .report-prose blockquote {
   margin: 1.25rem 0;
   padding: 0.6rem 1rem;
-  border-left: 3px solid #ff7a18;
-  background: rgba(255, 122, 24, 0.05);
+  border-left: 3px solid #ff6a1a;
+  background: rgba(255, 106, 26, 0.05);
   color: rgba(255, 255, 255, 0.92);
   font-style: italic;
 }

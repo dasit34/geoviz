@@ -27,7 +27,7 @@ export function Header() {
           </Link>
         </nav>
         <Link href="/order" className="btn-primary text-sm">
-          Get my visibility score
+          Run AI Visibility Audit
         </Link>
       </div>
     </header>

@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-  AuditReportContent,
-  type AuditReportContext,
-} from "@/components/AuditReportContent";
+import { type AuditReportContext } from "@/components/AuditReportContent";
+import { ReportSurface } from "@/components/report/ReportSurface";
 import "@/app/report/[id]/print/print.css";
 
 /**
@@ -16,7 +14,7 @@ import "@/app/report/[id]/print/print.css";
  * inconsistency. The operator couldn't see what the customer saw.
  *
  * Now: thin client wrapper that owns the show-raw / show-rendered
- * toggle and renders `<AuditReportContent />` directly so the admin
+ * toggle and renders `<ReportSurface />` directly so the admin
  * preview is byte-for-byte the customer report. Same component tree,
  * same `context` payload, same render output.
  *
@@ -42,7 +40,7 @@ export function ReportViewerClient({
     primary: string;
     alternates: string[];
   } | null;
-  /** Required by AuditReportContent for the cover meta strip + link. */
+  /** Required by ReportSurface for the cover meta strip + link. */
   websiteUrl?: string;
   reportGeneratedAt?: Date | null;
   /** When present, drives the canonical-resolver read path. Falls back
@@ -93,7 +91,7 @@ export function ReportViewerClient({
         // renders edge-to-edge with the cover bleeding to the card
         // border — matches the PDF page rhythm.
         <div className="-mx-6 -my-6 md:-mx-8 md:-my-8 rounded-lg overflow-hidden">
-          <AuditReportContent
+          <ReportSurface
             orderId={orderId ?? "preview"}
             businessLabel={businessLabel ?? "your business"}
             websiteUrl={websiteUrl ?? ""}

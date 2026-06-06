@@ -217,7 +217,7 @@ function buildOperatorNotificationHtml(args: {
           <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #ececec;">
             <tr>
               <td style="padding:28px 32px 8px;">
-                <div style="color:#ff7a18;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">GeoViz · Operator</div>
+                <div style="color:#ff6a1a;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">GeoViz · Operator</div>
               </td>
             </tr>
             <tr>
@@ -245,12 +245,12 @@ function buildOperatorNotificationHtml(args: {
               <td align="left" style="padding:4px 32px 4px;">
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
-                    <td style="background:#ff7a18;border-radius:6px;">
+                    <td style="background:#ff6a1a;border-radius:6px;">
                       <a href="${sr}" style="display:inline-block;padding:12px 22px;font-size:14.5px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;">Review Report →</a>
                     </td>
                     <td style="width:10px;"></td>
-                    <td style="border:1px solid #ff7a18;border-radius:6px;">
-                      <a href="${sa}" style="display:inline-block;padding:11px 20px;font-size:14.5px;font-weight:600;color:#ff7a18;text-decoration:none;letter-spacing:0.01em;">Open Admin Queue →</a>
+                    <td style="border:1px solid #ff6a1a;border-radius:6px;">
+                      <a href="${sa}" style="display:inline-block;padding:11px 20px;font-size:14.5px;font-weight:600;color:#ff6a1a;text-decoration:none;letter-spacing:0.01em;">Open Admin Queue →</a>
                     </td>
                   </tr>
                 </table>

@@ -60,7 +60,7 @@ a,
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   background:
-    radial-gradient(120% 80% at 82% 0%, rgba(255, 122, 24, 0.1), transparent 60%),
+    radial-gradient(120% 80% at 82% 0%, rgba(255, 106, 26, 0.1), transparent 60%),
     linear-gradient(180deg, rgba(13, 16, 24, 0.92), rgba(8, 10, 16, 0.96));
   padding: 56px 48px;
   overflow: hidden;
@@ -95,7 +95,7 @@ a,
   color: #ffffff;
 }
 .report-cover-brand span {
-  color: #ff7a18;
+  color: #ff6a1a;
 }
 .report-cover-kicker {
   font-size: 10px;
@@ -113,7 +113,7 @@ a,
   font-weight: 700;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: #ff7a18;
+  color: #ff6a1a;
 }
 .report-cover-business {
   margin: 14px 0 0;
@@ -168,10 +168,10 @@ a,
   color: #6ce39a;
 }
 .report-cover-score-warn {
-  color: #ffc46b;
+  color: #fbbf24;
 }
 .report-cover-score-bad {
-  color: #ff9a3c;
+  color: #ff8a3c;
 }
 .report-cover-score-muted {
   color: rgba(255, 255, 255, 0.7);
@@ -280,10 +280,10 @@ a,
   color: #6ce39a;
 }
 .report-band-inline-warn {
-  color: #ffc46b;
+  color: #fbbf24;
 }
 .report-band-inline-bad {
-  color: #ff9a3c;
+  color: #ff8a3c;
 }
 .report-band-inline-muted {
   color: rgba(255, 255, 255, 0.7);
@@ -339,13 +339,13 @@ a,
   border-color: rgba(108, 227, 154, 0.45);
 }
 .report-band-pill-warn {
-  color: #ffc46b;
+  color: #fbbf24;
   background: rgba(201, 134, 4, 0.14);
   border-color: rgba(255, 196, 107, 0.45);
 }
 .report-band-pill-bad {
-  color: #ff9a3c;
-  background: rgba(255, 122, 24, 0.14);
+  color: #ff8a3c;
+  background: rgba(255, 106, 26, 0.14);
   border-color: rgba(255, 154, 60, 0.55);
 }
 .report-band-pill-muted {
@@ -396,13 +396,13 @@ a,
   border-color: rgba(108, 227, 154, 0.45);
 }
 .score-card-tone-warn .score-card-top-status {
-  color: #ffc46b;
+  color: #fbbf24;
   background: rgba(201, 134, 4, 0.14);
   border-color: rgba(255, 196, 107, 0.45);
 }
 .score-card-tone-bad .score-card-top-status {
-  color: #ff9a3c;
-  background: rgba(255, 122, 24, 0.14);
+  color: #ff8a3c;
+  background: rgba(255, 106, 26, 0.14);
   border-color: rgba(255, 154, 60, 0.55);
 }
 .score-card-tone-muted .score-card-top-status {
@@ -430,10 +430,10 @@ a,
   color: #6ce39a;
 }
 .score-card-tone-warn .score-card-inline-ref-num {
-  color: #ffc46b;
+  color: #fbbf24;
 }
 .score-card-tone-bad .score-card-inline-ref-num {
-  color: #ff9a3c;
+  color: #ff8a3c;
 }
 .score-card-inline-ref-max {
   color: rgba(255, 255, 255, 0.45);
@@ -459,7 +459,7 @@ a,
   color: rgba(255, 255, 255, 0.68);
   max-width: 62ch;
   padding: 10px 12px;
-  border-left: 2px solid rgba(255, 122, 24, 0.45);
+  border-left: 2px solid rgba(255, 106, 26, 0.45);
   background: rgba(255, 255, 255, 0.025);
   border-radius: 0 4px 4px 0;
 }
@@ -610,10 +610,10 @@ a,
   background: #2da94f;
 }
 .score-card-bar-fill-warn {
-  background: #ffc46b;
+  background: #fbbf24;
 }
 .score-card-bar-fill-bad {
-  background: #ff7a18;
+  background: #ff6a1a;
 }
 
 .report-band-explainer {
@@ -728,7 +728,7 @@ a,
 }
 .report-band-explainer ul li::marker,
 .report-band-explainer ol li::marker {
-  color: #ff7a18;
+  color: #ff6a1a;
   font-weight: 700;
 }
 .report-band-explainer li {
@@ -783,7 +783,7 @@ a,
   color: #6ce39a;
 }
 .report-summary-label-negative {
-  color: #ff9a3c;
+  color: #ff8a3c;
 }
 .report-summary-label-fix {
   color: #6ea8ff;
@@ -826,9 +826,9 @@ a,
   border-color: rgba(108, 227, 154, 0.45);
 }
 .report-summary-marker-negative {
-  color: #ff9a3c;
-  background: rgba(255, 122, 24, 0.14);
-  border-color: rgba(255, 122, 24, 0.45);
+  color: #ff8a3c;
+  background: rgba(255, 106, 26, 0.14);
+  border-color: rgba(255, 106, 26, 0.45);
 }
 .report-summary-marker-fix {
   color: #6ea8ff;
@@ -953,13 +953,13 @@ a,
   stroke-width: 1;
 }
 .radar-chart-data {
-  fill: rgba(255, 122, 24, 0.2);
-  stroke: #ff7a18;
+  fill: rgba(255, 106, 26, 0.2);
+  stroke: #ff6a1a;
   stroke-width: 2;
   stroke-linejoin: round;
 }
 .radar-chart-data-point {
-  fill: #ff9a3c;
+  fill: #ff8a3c;
   stroke: #05070d;
   stroke-width: 1.5;
 }
@@ -1101,10 +1101,10 @@ a,
   color: #6ce39a;
 }
 .category-score-tone-warn .category-score-num {
-  color: #ffc46b;
+  color: #fbbf24;
 }
 .category-score-tone-bad .category-score-num {
-  color: #ff9a3c;
+  color: #ff8a3c;
 }
 .category-score-max {
   color: rgba(255, 255, 255, 0.4);
@@ -1138,10 +1138,10 @@ a,
   background: #2da94f;
 }
 .category-score-bar-fill-warn {
-  background: #ffc46b;
+  background: #fbbf24;
 }
 .category-score-bar-fill-bad {
-  background: #ff7a18;
+  background: #ff6a1a;
 }
 .category-score-bar-fill-muted {
   background: rgba(255, 255, 255, 0.18);
@@ -1289,10 +1289,10 @@ a,
   background: #6ce39a;
 }
 .platform-tone-warn .platform-row-marker {
-  background: #ffc46b;
+  background: #fbbf24;
 }
 .platform-tone-bad .platform-row-marker {
-  background: #ff9a3c;
+  background: #ff8a3c;
 }
 .platform-row-badge {
   padding: 4px 12px;
@@ -1309,14 +1309,14 @@ a,
   border-color: rgba(108, 227, 154, 0.4);
 }
 .platform-row-badge-warn {
-  color: #ffc46b;
+  color: #fbbf24;
   background: rgba(201, 134, 4, 0.14);
   border-color: rgba(255, 196, 107, 0.4);
 }
 .platform-row-badge-bad {
-  color: #ff9a3c;
-  background: rgba(255, 122, 24, 0.12);
-  border-color: rgba(255, 122, 24, 0.4);
+  color: #ff8a3c;
+  background: rgba(255, 106, 26, 0.12);
+  border-color: rgba(255, 106, 26, 0.4);
 }
 .platform-row-badge-muted {
   color: rgba(255, 255, 255, 0.55);
@@ -1361,7 +1361,7 @@ a,
   font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: rgba(255, 122, 24, 0.85);
+  color: rgba(255, 106, 26, 0.85);
   line-height: 1;
   min-width: 40px;
 }
@@ -1374,7 +1374,7 @@ a,
   margin: 0;
 }
 .report-section-diagnosis {
-  border-color: rgba(255, 122, 24, 0.18);
+  border-color: rgba(255, 106, 26, 0.18);
 }
 .report-section-action {
   border-color: rgba(43, 139, 255, 0.18);
@@ -1402,7 +1402,7 @@ a,
   break-inside: avoid;
 }
 .report-item-card-issue {
-  border-left: 3px solid rgba(255, 122, 24, 0.7);
+  border-left: 3px solid rgba(255, 106, 26, 0.7);
 }
 .report-item-card-fix {
   border-left: 3px solid rgba(43, 139, 255, 0.7);
@@ -1445,9 +1445,9 @@ a,
   border-color: rgba(248, 113, 113, 0.4);
 }
 .severity-high {
-  color: #ff9a3c;
-  background: rgba(255, 122, 24, 0.12);
-  border-color: rgba(255, 122, 24, 0.4);
+  color: #ff8a3c;
+  background: rgba(255, 106, 26, 0.12);
+  border-color: rgba(255, 106, 26, 0.4);
 }
 .severity-quick {
   color: #6ce39a;
@@ -1475,7 +1475,7 @@ a,
 /* Medium-priority — sits between High Impact (orange) and Quick Win
    (green). Yellow-amber for the middle band. */
 .severity-medium {
-  color: #ffc46b;
+  color: #fbbf24;
   background: rgba(201, 134, 4, 0.14);
   border-color: rgba(255, 196, 107, 0.4);
 }
@@ -1489,7 +1489,7 @@ a,
   border-color: rgba(108, 227, 154, 0.4);
 }
 .difficulty-moderate {
-  color: #ffc46b;
+  color: #fbbf24;
   background: rgba(201, 134, 4, 0.14);
   border-color: rgba(255, 196, 107, 0.4);
 }
@@ -1503,8 +1503,8 @@ a,
    render with the brand orange. No is muted so the customer knows
    it's something they / their developer must own. */
 .foundation-yes {
-  color: #ff9a3c;
-  background: rgba(255, 122, 24, 0.14);
+  color: #ff8a3c;
+  background: rgba(255, 106, 26, 0.14);
   border-color: rgba(255, 154, 60, 0.5);
   font-weight: 800;
 }
@@ -1523,9 +1523,9 @@ a,
   flex: 0 0 28px;
 }
 .report-item-card-icon-issue {
-  background: rgba(255, 122, 24, 0.14);
-  color: #ff9a3c;
-  border: 1px solid rgba(255, 122, 24, 0.3);
+  background: rgba(255, 106, 26, 0.14);
+  color: #ff8a3c;
+  border: 1px solid rgba(255, 106, 26, 0.3);
 }
 .report-item-card-icon-fix {
   background: rgba(43, 139, 255, 0.14);
@@ -1678,7 +1678,7 @@ a,
   color: rgba(255, 255, 255, 0.85);
 }
 .report-prose a {
-  color: #ff9a3c;
+  color: #ff8a3c;
   text-decoration: underline;
   text-underline-offset: 2px;
   /* Match the universal anchor hardening at top of file — long
@@ -1699,14 +1699,14 @@ a,
 }
 .report-prose ul li::marker,
 .report-prose ol li::marker {
-  color: #ff7a18;
+  color: #ff6a1a;
   font-weight: 700;
 }
 .report-prose blockquote {
   margin: 14px 0;
   padding: 10px 16px;
-  border-left: 3px solid #ff7a18;
-  background: rgba(255, 122, 24, 0.06);
+  border-left: 3px solid #ff6a1a;
+  background: rgba(255, 106, 26, 0.06);
   color: rgba(255, 255, 255, 0.85);
   border-radius: 4px;
 }
@@ -1763,7 +1763,7 @@ a,
 }
 .cta-card-accent {
   height: 2px;
-  background: #ff7a18;
+  background: #ff6a1a;
 }
 .cta-card-body {
   padding: 30px 32px 32px;
@@ -1773,7 +1773,7 @@ a,
   font-weight: 800;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: #ff9a3c;
+  color: #ff8a3c;
   margin-bottom: 10px;
 }
 .cta-card-headline {
@@ -1809,8 +1809,8 @@ a,
 }
 .cta-card-badge-price {
   padding: 8px 18px;
-  background: rgba(255, 122, 24, 0.12);
-  color: #ff9a3c;
+  background: rgba(255, 106, 26, 0.12);
+  color: #ff8a3c;
   font-size: 16px;
   border: 1px solid rgba(255, 154, 60, 0.5);
 }
@@ -1843,7 +1843,7 @@ a,
   display: inline-block;
   padding: 14px 28px;
   border-radius: 10px;
-  background: #ff7a18;
+  background: #ff6a1a;
   color: #05070d !important;
   font-size: 15px;
   font-weight: 700;
@@ -1854,7 +1854,7 @@ a,
   print-color-adjust: exact;
 }
 .cta-card-button:hover {
-  background: #ff9a3c;
+  background: #ff8a3c;
 }
 .cta-card-fineprint {
   margin: 14px 0 0;
@@ -1908,7 +1908,7 @@ a,
   flex-wrap: wrap;
 }
 .report-footer-brand {
-  color: #ff9a3c;
+  color: #ff8a3c;
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;

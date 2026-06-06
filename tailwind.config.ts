@@ -15,9 +15,11 @@ const config: Config = {
           700: "#181d2b",
           600: "#232a3d",
         },
+        // Brand System v2 — the ONE GeoViz signal orange (consolidated
+        // from the four legacy oranges). Mirrors --gv-signal in globals.css.
         accent: {
-          DEFAULT: "#ff7a18",
-          glow: "#ff9a3c",
+          DEFAULT: "#ff6a1a",
+          glow: "#ff8a3c",
           blue: "#2b8bff",
         },
         // Semantic status tokens (UI polish Phase A — UI_POLISH_PLAN.md
@@ -62,8 +64,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Inter", "sans-serif"],
-        display: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Inter", "sans-serif"],
+        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
+        // Brand System v2 display face — Space Grotesk (wordmark + headlines).
+        display: ["var(--font-space-grotesk)", "var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
         // Mono stack for data values — scores, IDs, percentages,
         // timestamps, technical inputs. Defined but not yet applied in
         // this PR — Phase C is where `font-mono` lands on actual
@@ -73,13 +76,13 @@ const config: Config = {
         mono: ["ui-monospace", "SFMono-Regular", "SF Mono", "Menlo", "Consolas", "monospace"],
       },
       boxShadow: {
-        glow: "0 0 60px -10px rgba(255, 122, 24, 0.45)",
+        glow: "0 0 60px -10px rgba(255, 106, 26, 0.45)",
         "glow-blue": "0 0 60px -10px rgba(43, 139, 255, 0.45)",
         card: "0 30px 80px -30px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.04)",
       },
       backgroundImage: {
         "grid-fade":
-          "radial-gradient(circle at 50% 0%, rgba(255,122,24,0.18), transparent 55%), radial-gradient(circle at 80% 30%, rgba(43,139,255,0.12), transparent 50%)",
+          "radial-gradient(circle at 50% 0%, rgba(255,106,26,0.18), transparent 55%), radial-gradient(circle at 80% 30%, rgba(43,139,255,0.12), transparent 50%)",
       },
       keyframes: {
         pulseSoft: {

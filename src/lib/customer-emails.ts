@@ -37,6 +37,30 @@ import { resolveAppBaseUrl } from "@/lib/app-url";
 export const CUSTOMER_SUCCESS_SUBJECT = "Your AI Visibility Report is ready";
 
 /**
+ * Brand System v2 email lockup (dark surface): the constellation mark +
+ * "GeoViz.ai" wordmark. The mark is inline SVG — Apple Mail renders it;
+ * Gmail strips it, in which case the "GeoViz.ai" text beside it is the
+ * graceful fallback. Matches the favicon / OG / header lockup so the
+ * deliverable email reads as the same brand as the report it links to.
+ */
+const BRAND_LOCKUP_DARK = `<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+  <td style="vertical-align:middle;padding-right:9px;line-height:0;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="28" height="28" fill="none" style="display:block;">
+      <path d="M 35.15 34.04 A 15 15 0 1 1 35.15 13.96" stroke="rgba(226,232,240,0.55)" stroke-width="2"/>
+      <circle cx="22.2" cy="38.9" r="2.0" fill="#7C8598"/>
+      <circle cx="10.8" cy="31.0" r="2.4" fill="#E2E8F0"/>
+      <circle cx="10.6" cy="17.2" r="2.0" fill="#7C8598"/>
+      <circle cx="21.9" cy="9.2" r="2.4" fill="#E2E8F0"/>
+      <circle cx="35.0" cy="13.8" r="2.0" fill="#E2E8F0"/>
+      <line x1="24" y1="24" x2="35" y2="24" stroke="#FF6A1A" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="35" cy="24" r="2.3" fill="#FF6A1A"/>
+      <circle cx="24" cy="24" r="3.4" fill="#FF6A1A"/>
+    </svg>
+  </td>
+  <td style="vertical-align:middle;font-size:19px;font-weight:700;letter-spacing:-0.01em;color:#ffffff;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">GeoViz<span style="color:#ff6a1a;">.ai</span></td>
+</tr></table>`;
+
+/**
  * Reply-to address customers see on the delayed/failed email. Replies
  * land in the operator's support inbox. Same domain as the FROM.
  *
@@ -167,7 +191,7 @@ function buildHtml(args: {
   copy: ReturnType<typeof customerCopyFor>;
 }): string {
   const { businessLabel, websiteUrl, customerStatus, copy } = args;
-  const accent = customerStatus === "delayed" ? "#ffc46b" : "#ff7a18";
+  const accent = customerStatus === "delayed" ? "#fbbf24" : "#ff6a1a";
   return `<!doctype html>
 <html>
   <body style="margin:0;padding:0;background:#0b0d14;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e8eaf0;">
@@ -318,8 +342,9 @@ function buildSuccessHtml(args: {
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#0b0d14;padding:32px 16px;">
       <tr><td align="center">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="560" style="max-width:560px;background:#10131c;border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:hidden;">
-          <tr><td style="padding:28px 32px 8px;">
-            <div style="font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#ff7a18;">Report ready</div>
+          <tr><td style="padding:24px 32px 0;">${BRAND_LOCKUP_DARK}</td></tr>
+          <tr><td style="padding:14px 32px 8px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#ff6a1a;">Report ready</div>
             <h1 style="margin:14px 0 0;font-size:22px;font-weight:700;letter-spacing:-0.01em;color:#ffffff;">Your AI Visibility Report is ready.</h1>
             <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.55);">${sb} · ${sw}</p>
           </td></tr>
@@ -327,7 +352,7 @@ function buildSuccessHtml(args: {
             Your report is ready to review.
           </td></tr>
           <tr><td style="padding:8px 32px 8px;">
-            <a href="${sr}" style="display:inline-block;background:#ff7a18;color:#ffffff;text-decoration:none;font-size:14.5px;font-weight:600;letter-spacing:0.01em;padding:12px 22px;border-radius:6px;">Open the report →</a>
+            <a href="${sr}" style="display:inline-block;background:#ff6a1a;color:#ffffff;text-decoration:none;font-size:14.5px;font-weight:600;letter-spacing:0.01em;padding:12px 22px;border-radius:6px;">Open the report →</a>
           </td></tr>
           <tr><td style="padding:14px 32px 28px;font-size:14px;line-height:1.6;color:rgba(255,255,255,0.6);">
             The link is private to you — no login required. You can return to it any time.

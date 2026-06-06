@@ -1,12 +1,13 @@
 import Link from "next/link";
 
+import { GeoVizMark } from "@/components/brand/GeoVizMark";
+
 /**
- * Footer — landing-page footer (Phase I, Claude Design handoff).
+ * Footer — landing-page footer.
  *
- * Big Instrument Serif "GeoViz.AI" wordmark + three columns
- * (brand+tag, Product, Company). Bottom row carries copyright +
- * contact email. Sits over the global PageAtmosphere via a soft
- * downward radial glow.
+ * Brand System v2 lockup (constellation mark + "GeoViz.ai" in the display
+ * face) + three columns (brand+tag, Product, Company). Bottom row carries
+ * copyright + contact email. Sits over a soft downward radial glow.
  */
 
 const PRODUCT = [
@@ -45,32 +46,23 @@ export function Footer() {
       <div className="container-shell relative">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
-            <h2
-              style={{
-                fontFamily: "var(--font-instrument), serif",
-                fontSize: "clamp(60px, 7vw, 88px)",
-                letterSpacing: "-0.03em",
-                lineHeight: 0.9,
-                margin: 0,
-                color: "var(--ink)",
-              }}
-            >
-              GeoViz
+            <span className="inline-flex items-center gap-3">
+              <GeoVizMark size={52} />
               <span
+                className="font-gv-display"
                 style={{
-                  fontFamily: "var(--font-geist-mono), monospace",
-                  fontSize: "16px",
-                  color: "var(--ink-low)",
-                  letterSpacing: "0.18em",
-                  marginLeft: 8,
-                  verticalAlign: "middle",
+                  fontSize: "clamp(40px, 5vw, 60px)",
+                  fontWeight: 600,
+                  letterSpacing: "-0.02em",
+                  lineHeight: 0.95,
+                  color: "var(--ink)",
                 }}
               >
-                .AI
+                GeoViz<span style={{ color: "var(--gv-signal)" }}>.ai</span>
               </span>
-            </h2>
+            </span>
             <p
-              className="mt-4"
+              className="mt-5"
               style={{
                 fontFamily: "var(--font-geist), system-ui, sans-serif",
                 fontSize: "14.5px",

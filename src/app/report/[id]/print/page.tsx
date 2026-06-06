@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
-import { AuditReportContent, type AuditReportContext } from "@/components/AuditReportContent";
+import { type AuditReportContext } from "@/components/AuditReportContent";
+import { ReportSurface } from "@/components/report/ReportSurface";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { logReportAccessAttempt } from "@/lib/report-access";
@@ -21,7 +22,8 @@ import "./print.css";
  * Auth: anyone with the URL can view. 25-char cuid order IDs give
  * ~120 bits of entropy. Metadata is noindex/nofollow.
  *
- * The actual report body lives in <AuditReportContent /> so that the
+ * The actual report body lives in <ReportSurface /> (the single fixed-
+ * template renderer over the deterministic ReportModel) so that the
  * public `/sample-report` page (the GeoViz self-audit preview) can
  * render the exact same template against a different audit row
  * without forking the design.
@@ -149,7 +151,7 @@ export default async function PrintPage({
       : undefined;
 
   return (
-    <AuditReportContent
+    <ReportSurface
       orderId={order.id}
       businessLabel={businessLabel}
       websiteUrl={order.websiteUrl}
@@ -164,7 +166,7 @@ export default async function PrintPage({
 // Phase D — buildReportContext lifted to
 // `src/lib/intelligence/build-report-context.ts` so both the PDF
 // route AND the admin queue construct the same payload that
-// `<AuditReportContent />` consumes. See that module for the body.
+// `<ReportSurface />` consumes. See that module for the body.
 
 /**
  * Branded "your audit is being prepared" surface. Renders for any

@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -23,6 +24,10 @@ export const metadata = {
 };
 
 export default async function TestReportPage() {
+  // Dev-only diagnostic route (runs a live crawler against a hardcoded URL).
+  // Never reachable in production.
+  if (process.env.NODE_ENV === "production") notFound();
+
   const startedAt = Date.now();
   const audit = await crawlPage(TEST_INPUT.url, {
     businessName: TEST_INPUT.businessName,

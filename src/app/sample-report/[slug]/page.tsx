@@ -2,10 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import {
-  AuditReportContent,
-  type AuditReportContext,
-} from "@/components/AuditReportContent";
+import { type AuditReportContext } from "@/components/AuditReportContent";
+import { ReportSurface } from "@/components/report/ReportSurface";
 import {
   SAMPLE_REGISTRY,
   findAvailableSamples,
@@ -129,7 +127,7 @@ function RealSample({
         </div>
       </section>
 
-      <AuditReportContent
+      <ReportSurface
         orderId={orderId}
         businessLabel={entry.businessName}
         websiteUrl={entry.publicUrl}

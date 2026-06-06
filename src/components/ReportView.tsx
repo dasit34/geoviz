@@ -295,7 +295,7 @@ function ScoreDial({
   status: string;
 }) {
   const ringColor =
-    tone === "ok" ? "#34d399" : tone === "warn" ? "#f59e0b" : "#ff7a18";
+    tone === "ok" ? "#34d399" : tone === "warn" ? "#f59e0b" : "#ff6a1a";
   const numberColor =
     tone === "ok"
       ? "text-emerald-300"

@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -27,6 +28,9 @@ export default function ReportPreviewPage({
 }: {
   searchParams?: SearchParams;
 }) {
+  // Dev-only internal preview of the report generator. Never reachable in prod.
+  if (process.env.NODE_ENV === "production") notFound();
+
   const isTestRender = Boolean(
     searchParams?.url || searchParams?.business || searchParams?.orderId,
   );

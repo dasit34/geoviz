@@ -236,10 +236,20 @@ function isPlausibleBusinessName(name: string): boolean {
   const n = normalize(name);
   if (!n) return false;
   if (isJunkName(n)) return false;
+  // Generic page titles ("Home", "Welcome") — the homepage <title>/<h1>
+  // of a poorly-tagged site, not a business name.
+  if (GENERIC_TITLES.has(n.toLowerCase())) return false;
   const words = n.split(/\s+/);
   if (words.length > 6) return false;
   if (n.length > 55) return false;
   if (/\b(serving|specializing)\b/i.test(n)) return false;
+  // Descriptive "<service> in/near <Place>" titles ("Full Service
+  // Dentistry in Northeast Ohio") read as a tagline, not a brand. Only
+  // trip on 4+ word phrases with a locative clause to avoid rejecting
+  // legitimate short names.
+  if (words.length >= 4 && /\b(?:in|near|across|throughout)\s+[A-Z][a-z]/.test(n)) {
+    return false;
+  }
   let stateHits = 0;
   for (const w of words) {
     if (US_STATE_NAMES.has(w.toLowerCase().replace(/[^a-z]/g, ""))) {
@@ -249,6 +259,24 @@ function isPlausibleBusinessName(name: string): boolean {
   if (stateHits >= 2) return false;
   return true;
 }
+
+// Generic homepage titles that are never a business name.
+const GENERIC_TITLES = new Set<string>([
+  "home",
+  "homepage",
+  "home page",
+  "welcome",
+  "index",
+  "main",
+  "untitled",
+  "untitled document",
+  "our website",
+  "official site",
+  "official website",
+  "start",
+  "landing page",
+  "default",
+]);
 
 /**
  * Return the candidate only when it passes the plausibility gate;

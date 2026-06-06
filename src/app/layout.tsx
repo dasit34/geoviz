@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
-import { Inter, Newsreader, Instrument_Serif } from "next/font/google";
+import {
+  Inter,
+  Newsreader,
+  Instrument_Serif,
+  JetBrains_Mono,
+  Poppins,
+  Space_Grotesk,
+} from "next/font/google";
 import "./globals.css";
 
 /**
@@ -49,6 +56,37 @@ const instrument = Instrument_Serif({
   variable: "--font-instrument",
 });
 
+// JetBrains Mono — the data typeface for the redesigned report
+// (scores, %, IDs, meters, timestamps). Embedded by next/font so the
+// Puppeteer PDF renders it. Exposed as `--font-jetbrains`.
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-jetbrains",
+});
+
+// Poppins — the GeoViz brand display face (wordmark + report section
+// titles). Embedded by next/font so the Puppeteer PDF renders it.
+const poppins = Poppins({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-poppins",
+});
+
+// Space Grotesk — Brand System v2 display face (wordmark + headlines).
+// Technical-but-modern grotesk; embedded by next/font so the Puppeteer
+// PDF renders it. Exposed as `--font-space-grotesk`. Rolls out across
+// surfaces in v2 Phases 2–3; loaded here so the v2 brand preview + the
+// eventual header/report can consume it.
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["500", "600", "700"],
+  variable: "--font-space-grotesk",
+});
+
 export const metadata: Metadata = {
   title: "GeoViz — AI Visibility Intelligence for Businesses",
   description:
@@ -78,7 +116,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${newsreader.variable} ${instrument.variable}`}
+      className={`${inter.variable} ${newsreader.variable} ${instrument.variable} ${jetbrainsMono.variable} ${poppins.variable} ${spaceGrotesk.variable}`}
     >
       <body className="min-h-screen font-sans antialiased">
         <div className="amber-spine" aria-hidden />

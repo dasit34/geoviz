@@ -46,13 +46,25 @@ const DIMENSIONS = [
   },
 ];
 
+// The four directly-tested AI models — each scored on how clearly it
+// interprets, trusts, and retrieves the business. Google AI Overviews is
+// NOT one of these; it's a search-visibility surface shown separately as a
+// derived readiness signal (see SEARCH_READINESS below).
 const COMMAND_LANES = [
-  { platform: "ChatGPT",      confidence: 0.86, detail: "Interprets clearly · trusted · retrievable" },
-  { platform: "Claude",       confidence: 0.78, detail: "Interprets clearly · trusted · partial retrieval" },
-  { platform: "Perplexity",   confidence: 0.52, detail: "Interprets clearly · weak trust · partial retrieval" },
-  { platform: "Gemini",       confidence: 0.24, detail: "Partial interpretation · weak trust · low retrieval" },
-  { platform: "AI Overviews", confidence: 0.16, detail: "Low interpretation · no trust signal · not retrievable" },
+  { platform: "ChatGPT",    confidence: 0.86, detail: "Interprets clearly · trusted · retrievable" },
+  { platform: "Claude",     confidence: 0.78, detail: "Interprets clearly · trusted · partial retrieval" },
+  { platform: "Perplexity", confidence: 0.52, detail: "Interprets clearly · weak trust · partial retrieval" },
+  { platform: "Gemini",     confidence: 0.24, detail: "Partial interpretation · weak trust · low retrieval" },
 ];
+
+// AI-powered search visibility — analyzed, not directly model-tested.
+// Shown as a readiness signal derived from structured-data, crawl access,
+// and content depth, never as a fifth validated model score.
+const SEARCH_READINESS = {
+  surface: "Google AI Overviews",
+  readiness: 0.16,
+  detail: "Readiness signal · derived from structured data + crawl access + content depth",
+};
 
 const FIX_SCOPE = [
   "Machine-readable business identity",
@@ -158,7 +170,7 @@ export default function Page() {
           <div className="relative">
             <div
               aria-hidden
-              className="pointer-events-none absolute -inset-x-6 -inset-y-4 -z-10 bg-[radial-gradient(60%_70%_at_50%_50%,rgba(255,122,24,0.20),transparent_70%)] blur-2xl"
+              className="pointer-events-none absolute -inset-x-6 -inset-y-4 -z-10 bg-[radial-gradient(60%_70%_at_50%_50%,rgba(255,106,26,0.20),transparent_70%)] blur-2xl"
             />
             <FigurePlate n={1} caption="visibility resolution">
               <VisibilitySignalField className="mx-auto max-w-xl" />
@@ -413,7 +425,7 @@ export default function Page() {
       <section className="relative border-t border-white/[0.06] bg-ink-950">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-2/3 bg-[radial-gradient(60%_100%_at_50%_100%,rgba(255,122,24,0.08),transparent_70%)]"
+          className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-2/3 bg-[radial-gradient(60%_100%_at_50%_100%,rgba(255,106,26,0.08),transparent_70%)]"
         />
         <div className="container-page py-32 text-center md:py-40">
           <Thesis className="mx-auto max-w-3xl text-3xl sm:text-4xl">
@@ -656,8 +668,9 @@ function CommandCenter() {
         How different AI systems interpret and retrieve the same business.
       </SectionHeading>
       <p className="mt-5 max-w-2xl text-lg leading-[1.55] text-white/70">
-        A sample look at how four AI systems interpret one business.
-        Every value is directional sample data.
+        Directly tested across ChatGPT, Claude, Gemini, and Perplexity, with
+        additional analysis for AI-powered search visibility, including Google
+        AI Overviews. Every value is directional sample data.
       </p>
 
       <div className="mt-12 overflow-hidden rounded-lg border border-white/10 bg-gradient-to-b from-ink-950 to-ink-900">
@@ -675,6 +688,9 @@ function CommandCenter() {
         </div>
 
         <div className="p-6 lg:p-8">
+          <p className="mono-data mb-3 text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/45">
+            Directly tested AI models
+          </p>
           <ul className="space-y-2">
             {COMMAND_LANES.map((lane) => (
               <li
@@ -707,8 +723,28 @@ function CommandCenter() {
             ))}
           </ul>
 
+          {/* AI-powered search visibility — analyzed, not directly model-tested.
+              Rendered as a distinct readiness lane (orange "READINESS" tag, no
+              model-confidence bar) so it never reads as a fifth scored model. */}
+          <p className="mono-data mb-3 mt-7 text-[10.5px] font-semibold uppercase tracking-[0.2em] text-white/45">
+            AI search visibility
+          </p>
+          <div className="grid items-center gap-x-3 gap-y-2 rounded-md border border-accent/25 bg-accent/[0.04] px-4 py-3.5 text-sm grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,200px)_minmax(0,1fr)_auto] md:gap-x-4">
+            <span className="text-base font-medium text-white/85">
+              {SEARCH_READINESS.surface}
+            </span>
+            <span className="col-span-2 text-[12px] leading-relaxed text-white/60 md:col-span-1 md:order-2">
+              {SEARCH_READINESS.detail}
+            </span>
+            <span className="mono-data justify-self-end rounded-sm border border-accent/40 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent md:order-3">
+              Readiness
+            </span>
+          </div>
+
           <p className="mt-8 text-[12px] text-white/40">
             Sample data · directional · no live measurement of your business.
+            Google AI Overviews is a search-visibility readiness signal, not a
+            directly tested model.
           </p>
         </div>
       </div>
