@@ -567,7 +567,19 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
   return PROVIDER_ORDER.map((p) => {
     const o = byProvider[p];
     const display = PROVIDER_DISPLAY[p] ?? p;
-    if (!o || o.status !== "passed") {
+    // Render a card whenever the validator produced ANY usable signal for this
+    // provider — not only when status === "passed". The old FourModelGrid
+    // showed a card for any present output; mirror that so partial/degraded
+    // runs still surface. Only when there's NO output (or a hard error with no
+    // data) do we mark the provider UNAVAILABLE.
+    const hasData =
+      !!o &&
+      (o.status === "passed" ||
+        typeof o.business_understanding_score === "number" ||
+        !!o.would_recommend ||
+        (Array.isArray(o.missing_facts) && o.missing_facts.length > 0) ||
+        !!o.industry_identified);
+    if (!hasData) {
       return {
         provider: p,
         display,
@@ -603,7 +615,7 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
     return {
       provider: p,
       display,
-      status: "passed",
+      status: o.status ?? "passed",
       verdict,
       businessType: o.industry_identified?.trim() || null,
       location: o.location_identified?.trim() || null,
@@ -836,7 +848,9 @@ export function buildReportModel(
     diagnostics,
     fixes,
     businessImpact,
-    hasProviders: providers.some((p) => p.status === "passed"),
+    // True when ANY provider produced usable data (drives the page-level
+    // "verdicts not run" note). UNAVAILABLE = no data for that provider.
+    hasProviders: providers.some((p) => p.verdict !== "UNAVAILABLE"),
     hasEvidence: isPreflight(input.preflightSignals),
   };
 }

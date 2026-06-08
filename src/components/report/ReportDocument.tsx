@@ -243,17 +243,21 @@ function PlatformsPage({ model, reportId }: { model: ReportModel; reportId: stri
         confidently recommend the business.
       </p>
 
-      {m.hasProviders ? (
-        <div className="rd-prov-grid">
-          {m.providers.map((p) => (
-            <PlatformCard key={p.provider} provider={p} />
-          ))}
-        </div>
-      ) : (
-        <p className="rd-note">
-          Cross-model verdicts were not captured for this audit.
+      {/* Always render all four named platforms — directly testing ChatGPT,
+          Claude, Gemini, and Perplexity is a core GeoViz proof point. Cards
+          without a captured validator response render in an honest
+          "Not captured" state (never fabricated). */}
+      <div className="rd-prov-grid">
+        {m.providers.map((p) => (
+          <PlatformCard key={p.provider} provider={p} />
+        ))}
+      </div>
+      {!m.hasProviders ? (
+        <p className="rd-note rd-prov-note">
+          Live cross-model verdicts were not run for this audit. Each platform is
+          shown above with the data captured at audit time.
         </p>
-      )}
+      ) : null}
 
       {m.readiness.length > 0 ? <ReadinessStrip readiness={m.readiness} /> : null}
     </Page>
