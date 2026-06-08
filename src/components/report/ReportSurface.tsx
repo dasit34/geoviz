@@ -54,6 +54,7 @@ export function ReportSurface({
           aiValidations: context.aiValidations,
           nameInconsistency: context.nameInconsistency,
           preflightSignals: context.preflightSignals,
+          industryNormalized: context.industryNormalized,
         }
       : null,
   });

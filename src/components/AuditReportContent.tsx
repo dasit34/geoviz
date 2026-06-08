@@ -109,6 +109,12 @@ export type AuditReportContext = {
     primary: string;
     alternates: string[];
   } | null;
+  /**
+   * Normalized industry slug — `AuditIntelligence.industryCategoryNormalized`.
+   * Drives conditional local-vs-general report copy (e.g. avoid "nearby
+   * customer" wording for ecommerce/general/unknown businesses).
+   */
+  industryNormalized?: string | null;
 };
 
 export function AuditReportContent({

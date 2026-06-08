@@ -279,6 +279,18 @@ function PlatformCard({ provider }: { provider: ReportModelProvider }) {
       </div>
       {unavailable ? (
         <p className="rd-prov-na">No response captured for this audit.</p>
+      ) : p.fetchFailed ? (
+        <div className="rd-prov-body">
+          <div className="rd-prov-field">
+            <span className="rd-prov-k">Understanding</span>
+            <span className={`rd-prov-score rd-v-${understandingTone(p.understandingScore)}`}>
+              {p.understandingScore === null ? "—" : p.understandingScore}
+            </span>
+          </div>
+          <p className="rd-prov-na">
+            {p.display} could not access or render enough content during this test.
+          </p>
+        </div>
       ) : (
         <div className="rd-prov-body">
           <div className="rd-prov-field">
@@ -289,7 +301,7 @@ function PlatformCard({ provider }: { provider: ReportModelProvider }) {
           </div>
           <div className="rd-prov-field">
             <span className="rd-prov-k">Reads as</span>
-            <span className="rd-prov-v">{readsAs || "Recognized as a local business"}</span>
+            <span className="rd-prov-v">{readsAs || "Recognized as a business"}</span>
           </div>
           <div className="rd-prov-field">
             <span className="rd-prov-k">Main gap</span>
@@ -509,6 +521,7 @@ function evidencePill(s: EvidenceStatus): { label: string; tone: Tone } {
   if (s === "pass") return { label: "PASS", tone: "ok" };
   if (s === "warn") return { label: "WARN", tone: "warn" };
   if (s === "fail") return { label: "FAIL", tone: "bad" };
+  if (s === "unconfirmed") return { label: "NOT CONFIRMED", tone: "muted" };
   return { label: "NOT ANALYZED", tone: "muted" };
 }
 

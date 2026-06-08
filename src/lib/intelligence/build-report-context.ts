@@ -92,6 +92,7 @@ export async function buildReportContext(
       aiValidations: intelligence.aiValidations ?? null,
       consensusIndex: intelligence.consensusIndex ?? null,
       preflightSignals: intelligence.preflightSignals ?? null,
+      industryNormalized: intelligence.industryCategoryNormalized ?? null,
     };
   } catch (err) {
     console.error(

@@ -102,6 +102,8 @@ export type ReportModelProvider = {
   understandingScore: number | null;
   /** Per-platform recommendation readiness. */
   recommendationReadiness: Confidence;
+  /** True when this model could not load/render the site during its test. */
+  fetchFailed: boolean;
 };
 
 export type ReportModelDiagnostic = {
@@ -145,8 +147,13 @@ export type ReportModelExecutive = {
   weakestLabel: string;
 };
 
-/** A single inspected-signal row for the "Evidence Reviewed" page. */
-export type EvidenceStatus = "pass" | "warn" | "fail" | "na";
+/**
+ * A single inspected-signal row for the "Evidence Reviewed" page.
+ * `unconfirmed` = the signal was NOT actually checked (e.g. crawlability never
+ * audited) — a neutral state, NEVER a FAIL, and never the basis for a hard fix.
+ * `na` = the signal is unknown to BOTH preflight and the deterministic engine.
+ */
+export type EvidenceStatus = "pass" | "warn" | "fail" | "unconfirmed" | "na";
 export type ReportModelEvidence = {
   label: string;
   descriptor: string;
@@ -315,6 +322,38 @@ const FIX_BUSINESS_IMPACT: Record<CategoryKey, string> = {
   tech: "A cleaner structure lets AI systems interpret your site fully, strengthening every signal.",
 };
 
+// General (non-local) variants — used when the business is NOT confidently a
+// local / service-area business, so we never force "nearby customer" / "local
+// option" / "where you operate" wording onto an ecommerce/general/unknown site.
+const SCHEMA_WHY_GENERAL =
+  "When a customer asks an AI assistant which business to choose in this category, the model needs a confirmed business identity to name. Without it, AI systems skip you and cite a competitor they can verify.";
+const SCHEMA_FIX_IMPACT_GENERAL =
+  "AI tools can now confirm who you are and what you do — the minimum required to appear in an AI recommendation.";
+
+// Normalized industry slugs that represent local / service-area businesses
+// (mirrors src/lib/intelligence/industry-taxonomy.ts).
+const LOCAL_INDUSTRY_SLUGS = new Set<string>([
+  "roofing", "hvac", "plumbing", "electrical", "landscaping", "legal", "dental",
+  "medical", "restaurant", "salon", "real_estate", "automotive",
+  "local_services", "home_services",
+]);
+
+/**
+ * A business is treated as local/service-area only when its normalized industry
+ * is a local type AND there's a corroborating location signal (a model that
+ * identified a location). This guards against mislabeled inputs (e.g. an
+ * ecommerce site tagged "real_estate") wrongly getting "nearby customer" copy.
+ */
+function detectIsLocal(
+  industryNormalized: string | null | undefined,
+  providers: ReportModelProvider[],
+): boolean {
+  if (!industryNormalized || !LOCAL_INDUSTRY_SLUGS.has(industryNormalized)) {
+    return false;
+  }
+  return providers.some((p) => !!p.location && p.location.trim().length > 0);
+}
+
 function toneForPct(pct: number): Tone {
   return categoryToneFromRatio(pct / 100);
 }
@@ -329,148 +368,178 @@ function isPreflight(v: unknown): v is PreflightSignals {
 }
 
 /**
- * Build the "Evidence Reviewed" rows from preflight signals (+ the trust
- * category as a proxy for review/trust markers). Real data only — every
- * row falls back to "na" ("Not analyzed") when its signal is absent, so
- * legacy audits without preflight degrade gracefully. Order matches the
- * report template.
+ * Build the "Evidence Reviewed" rows. DETERMINISTIC-FIRST: prefer the preflight
+ * HTTP signals only when the preflight fetch succeeded; otherwise derive each
+ * row from the deterministic engine's category scores/reasons + evidence-summary
+ * flags so a KNOWN gap reads as FAIL (never a lazy "Not analyzed"), and a signal
+ * that was never checked reads as NOT CONFIRMED (neutral) — never a FAIL.
+ * "Not analyzed" (na) survives only when NEITHER source knows the signal.
  */
 function buildEvidence(
   preflight: unknown,
-  trustPct: number | null,
+  det: DeterministicScore | null,
+  categories: ReportModelCategory[],
 ): ReportModelEvidence[] {
   const p = isPreflight(preflight) ? preflight : null;
+  const pfOk = !!p && p.fetchOk === true; // preflight modules are only meaningful when the fetch worked
+  const es = det?.evidence_summary ?? null;
+  const cat = (k: CategoryKey) => categories.find((c) => c.key === k) ?? null;
+  const reasonOf = (k: CategoryKey) => det?.category_scores?.[k]?.reason ?? "";
   const rows: ReportModelEvidence[] = [];
+  const L = (label: string, descriptor: string, status: EvidenceStatus) => ({
+    label,
+    descriptor,
+    status,
+  });
 
   // 1. Homepage readable content
-  const r = p?.readability ?? null;
-  rows.push(
-    !r
-      ? { label: "Homepage readable content", descriptor: "Not analyzed", status: "na" }
-      : r.parsedByReadability
-        ? {
-            label: "Homepage readable content",
-            descriptor: "Extracted article text successfully",
-            status: "pass",
-          }
-        : r.textLength > 0
-          ? {
-              label: "Homepage readable content",
-              descriptor: "Body text extracted via fallback",
-              status: "warn",
-            }
-          : {
-              label: "Homepage readable content",
-              descriptor: "Little readable text could be extracted",
-              status: "fail",
-            },
-  );
+  const r = pfOk ? p!.readability : null;
+  {
+    const label = "Homepage readable content";
+    if (r) {
+      rows.push(
+        r.parsedByReadability
+          ? L(label, "Extracted article text successfully", "pass")
+          : r.textLength > 0
+            ? L(label, "Body text extracted via fallback", "warn")
+            : L(label, "Little readable text could be extracted", "fail"),
+      );
+    } else {
+      const content = cat("content");
+      const score = content?.score ?? null;
+      rows.push(
+        score === null
+          ? L(label, "Not analyzed", "na")
+          : score < 25
+            ? L(label, "Minimal readable content on the homepage", "fail")
+            : score < 50
+              ? L(label, "Limited readable content extracted", "warn")
+              : L(label, "Readable content present", "pass"),
+      );
+    }
+  }
 
   // 2. JSON-LD schema blocks
-  const s = p?.schema ?? null;
-  rows.push(
-    !s
-      ? { label: "JSON-LD schema blocks", descriptor: "Not analyzed", status: "na" }
-      : s.rawJsonLdCount === 0
-        ? {
-            label: "JSON-LD schema blocks",
-            descriptor: "No JSON-LD structured data found",
-            status: "fail",
-          }
-        : s.missingFields.length > 0
-          ? {
-              label: "JSON-LD schema blocks",
-              descriptor: `${s.rawJsonLdCount} block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields incomplete`,
-              status: "warn",
-            }
-          : {
-              label: "JSON-LD schema blocks",
-              descriptor: `${s.rawJsonLdCount} block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields complete`,
-              status: "pass",
-            },
-  );
+  const s = pfOk ? p!.schema : null;
+  {
+    const label = "JSON-LD schema blocks";
+    if (s) {
+      rows.push(
+        s.rawJsonLdCount === 0
+          ? L(label, "No JSON-LD structured data found", "fail")
+          : s.missingFields.length > 0
+            ? L(label, `${s.rawJsonLdCount} block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields incomplete`, "warn")
+            : L(label, `${s.rawJsonLdCount} block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields complete`, "pass"),
+      );
+    } else {
+      const schema = cat("schema");
+      const score = schema?.score ?? null;
+      const reason = reasonOf("schema");
+      rows.push(
+        score === null
+          ? L(label, "Not analyzed", "na")
+          : /no json-?ld|0 block/i.test(reason) || score < 20
+            ? L(label, "0 JSON-LD blocks found on the homepage", "fail")
+            : score < 60
+              ? L(label, "Structured data present; identity fields incomplete", "warn")
+              : L(label, "Structured data present", "pass"),
+      );
+    }
+  }
 
   // 3. NAP consistency
-  const e = p?.entityConsistency ?? null;
-  rows.push(
-    !e
-      ? { label: "NAP consistency", descriptor: "Not analyzed", status: "na" }
-      : e.inconsistencies.length > 0
-        ? {
-            label: "NAP consistency",
-            descriptor: `${e.inconsistencies.length} name / address / phone inconsistenc${e.inconsistencies.length === 1 ? "y" : "ies"} detected`,
-            status: "fail",
-          }
-        : {
-            label: "NAP consistency",
-            descriptor: "Name, address, and phone align across surfaces",
-            status: "pass",
-          },
-  );
+  const e = pfOk ? p!.entityConsistency : null;
+  {
+    const label = "NAP consistency";
+    if (e) {
+      rows.push(
+        e.inconsistencies.length > 0
+          ? L(label, `${e.inconsistencies.length} name / address / phone inconsistenc${e.inconsistencies.length === 1 ? "y" : "ies"} detected`, "fail")
+          : L(label, "Name, address, and phone align across surfaces", "pass"),
+      );
+    } else if (es && !es.entity_checked) {
+      rows.push(L(label, "Not enough business identity data to verify", "unconfirmed"));
+    } else {
+      const brand = cat("brand");
+      const score = brand?.score ?? null;
+      rows.push(
+        score === null
+          ? L(label, "Not analyzed", "na")
+          : score < 30
+            ? L(label, "No complete name / address / phone found across surfaces", "fail")
+            : score < 60
+              ? L(label, "Business identity only partly consistent across surfaces", "warn")
+              : L(label, "Business identity consistent across surfaces", "pass"),
+      );
+    }
+  }
 
-  // 4. Robots and crawl access
-  const c = p?.crawlability ?? null;
-  rows.push(
-    !c
-      ? { label: "Robots and crawl access", descriptor: "Not analyzed", status: "na" }
-      : c.score >= 70
-        ? {
-            label: "Robots and crawl access",
-            descriptor: "robots.txt present; site accessible",
-            status: "pass",
-          }
-        : c.score >= 40
-          ? {
-              label: "Robots and crawl access",
-              descriptor: c.warnings[0] ?? "Some crawl-access limitations detected",
-              status: "warn",
-            }
-          : {
-              label: "Robots and crawl access",
-              descriptor: c.failedChecks[0] ?? "Crawl access blocked or misconfigured",
-              status: "fail",
-            },
-  );
+  // 4. Robots and crawl access — only a verdict when actually audited.
+  const c = pfOk && es?.crawlability_audited ? p!.crawlability : null;
+  {
+    const label = "Robots and crawl access";
+    if (c) {
+      rows.push(
+        c.score >= 70
+          ? L(label, "robots.txt present; site accessible", "pass")
+          : c.score >= 40
+            ? L(label, c.warnings[0] ?? "Some crawl-access limitations detected", "warn")
+            : L(label, c.failedChecks[0] ?? "Crawl access blocked or misconfigured", "fail"),
+      );
+    } else if (es && !es.crawlability_audited) {
+      rows.push(L(label, "Crawl access not confirmed in this audit", "unconfirmed"));
+    } else {
+      rows.push(L(label, "Not analyzed", "na"));
+    }
+  }
 
   // 5. Homepage depth (word count)
-  rows.push(
-    !r
-      ? { label: "Homepage depth", descriptor: "Not analyzed", status: "na" }
-      : r.wordCount >= 300
-        ? {
-            label: "Homepage depth",
-            descriptor: `${r.wordCount} words; meets depth recommendation`,
-            status: "pass",
-          }
-        : {
-            label: "Homepage depth",
-            descriptor: `${r.wordCount} words; below 300-word recommendation`,
-            status: "warn",
-          },
-  );
+  {
+    const label = "Homepage depth";
+    if (r) {
+      rows.push(
+        r.wordCount >= 300
+          ? L(label, `${r.wordCount} words; meets depth recommendation`, "pass")
+          : L(label, `${r.wordCount} words; below 300-word recommendation`, "warn"),
+      );
+    } else {
+      const content = cat("content");
+      const score = content?.score ?? null;
+      const wc = (() => {
+        const m = reasonOf("content").match(/(\d+)\s*words?|word count[:\s]+(\d+)/i);
+        const n = m ? Number(m[1] ?? m[2]) : NaN;
+        return Number.isFinite(n) ? n : null;
+      })();
+      rows.push(
+        wc !== null
+          ? wc >= 300
+            ? L(label, `${wc} words; meets depth recommendation`, "pass")
+            : L(label, `${wc} words; below 300-word recommendation`, "fail")
+          : score === null
+            ? L(label, "Not analyzed", "na")
+            : score < 25
+              ? L(label, "Insufficient content; below 300-word recommendation", "fail")
+              : score < 50
+                ? L(label, "Thin content; below depth recommendation", "warn")
+                : L(label, "Content depth meets recommendation", "pass"),
+      );
+    }
+  }
 
-  // 6. Reviews and trust signals (trust category as the proxy signal)
-  rows.push(
-    trustPct === null
-      ? { label: "Reviews and trust signals", descriptor: "Not analyzed", status: "na" }
-      : trustPct >= 60
-        ? {
-            label: "Reviews and trust signals",
-            descriptor: "Verifiable third-party trust markers present",
-            status: "pass",
-          }
-        : trustPct >= 30
-          ? {
-              label: "Reviews and trust signals",
-              descriptor: "Limited third-party trust markers",
-              status: "warn",
-            }
-          : {
-              label: "Reviews and trust signals",
-              descriptor: "Insufficient verifiable third-party trust markers",
-              status: "fail",
-            },
-  );
+  // 6. Reviews and trust signals (trust category)
+  {
+    const label = "Reviews and trust signals";
+    const trustPct = cat("trust")?.score ?? null;
+    rows.push(
+      trustPct === null
+        ? L(label, "Not analyzed", "na")
+        : trustPct >= 60
+          ? L(label, "Verifiable third-party trust markers present", "pass")
+          : trustPct >= 30
+            ? L(label, "Limited third-party trust markers", "warn")
+            : L(label, "Insufficient verifiable third-party trust markers", "fail"),
+    );
+  }
 
   return rows;
 }
@@ -519,6 +588,8 @@ export type BuildReportModelInput = {
   } | null;
   /** V2 preflight signals → "Evidence Reviewed" page. Null/absent for legacy. */
   preflightSignals?: unknown;
+  /** Normalized industry slug → conditional local-vs-general copy. */
+  industryNormalized?: string | null;
   /** Phase 2 narration; omit for deterministic Phase-1 copy. */
   narration?: ReportNarration | null;
 };
@@ -544,10 +615,41 @@ type ProviderShape = {
   recommendation_reason?: string;
   business_understanding_score?: number | null;
   recommendation_confidence?: string | null;
+  raw_summary?: string;
+  error?: string | null;
 };
 
 function asConfidence(v: unknown): Confidence {
   return v === "low" || v === "medium" || v === "high" ? v : null;
+}
+
+/**
+ * Validator fields like `location_identified` / `industry_identified` are free
+ * text — a model that found nothing often returns a sentinel phrase ("Not
+ * specified on the site", "Unknown", "N/A") rather than an empty string. Those
+ * are NOT real signals: surfacing them as a "READS AS" location is misleading,
+ * and (critically) treating them as a corroborating location flips a mislabeled
+ * site into "nearby customer" local copy. Collapse sentinels to null.
+ */
+const FIELD_SENTINEL_RE =
+  /^(?:not?\s+specified|none?(?:\s+(?:specified|found|identified))?|n\/?a|unknown|unclear|unspecified|not\s+(?:found|identified|available|provided|listed|mentioned|stated|clear)|no\s+(?:location|specific\s+location|address)|cannot\s+(?:determine|identify)|could\s+not\s+(?:determine|identify))\b/i;
+
+function meaningfulField(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  if (!t) return null;
+  if (FIELD_SENTINEL_RE.test(t)) return null;
+  return t;
+}
+
+const FETCH_FAIL_RE =
+  /fail(?:ed|ure)?\s+to\s+load|could\s+not\s+(?:access|load|render|reach)|website\s+(?:failed|did\s+not|could\s+not).*load|unable\s+to\s+(?:access|load|render)|preventing\s+(?:any\s+)?(?:content\s+)?extraction|page\s+did\s+not\s+load/i;
+
+function detectFetchFailed(o: ProviderShape): boolean {
+  const blobs = [o.raw_summary, o.error, ...(o.missing_facts ?? [])]
+    .filter((x): x is string => typeof x === "string")
+    .join(" ");
+  return FETCH_FAIL_RE.test(blobs);
 }
 
 const PROVIDER_DISPLAY: Record<string, string> = {
@@ -592,6 +694,7 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
         reason: null,
         understandingScore: null,
         recommendationReadiness: null,
+        fetchFailed: false,
       };
     }
     const services = (o.services_identified ?? [])
@@ -617,13 +720,14 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
       display,
       status: o.status ?? "passed",
       verdict,
-      businessType: o.industry_identified?.trim() || null,
-      location: o.location_identified?.trim() || null,
+      businessType: meaningfulField(o.industry_identified),
+      location: meaningfulField(o.location_identified),
       topServices: services,
       mainGap,
       reason: o.recommendation_reason?.trim() || null,
       understandingScore: us,
       recommendationReadiness: asConfidence(o.recommendation_confidence),
+      fetchFailed: detectFetchFailed(o),
     };
   });
 }
@@ -736,18 +840,32 @@ export function buildReportModel(
       ]
     : [];
 
+  // Providers first — needed to decide local-vs-general copy (a local copy
+  // tone requires a corroborating detected location).
+  const providers = buildProviders(input.providerOutputs);
+  const isLocal = detectIsLocal(input.industryNormalized, providers);
+  // Was crawlability actually audited? When not, we must not prescribe a
+  // robots.txt-specific fix (only verify-access wording).
+  const crawlAudited = det?.evidence_summary?.crawlability_audited === true;
+  // No "robots.txt" wording here — crawlability wasn't audited, so we only
+  // recommend verifying access, never editing a file we didn't inspect.
+  const SOFT_CRAWL_ACTION =
+    "Verify that AI and search crawlers can access the public homepage (crawl access was not confirmed in this audit).";
+
   // ── Diagnostics (which 3 + severity come from the engine) ────────
   const findings = det?.top_3_findings ?? [];
   const diagnostics: ReportModelDiagnostic[] = findings.map((f, i) => {
     const n = narration?.diagnostics?.[f.id];
     const detReason = det?.category_scores?.[f.category]?.reason;
+    const why =
+      f.category === "schema" && !isLocal ? SCHEMA_WHY_GENERAL : WHY_IT_HURTS[f.category];
     return {
       rank: i + 1,
       title: f.message,
       severity: f.severity,
       category: f.category,
       problem: n?.problem ?? detReason ?? f.message,
-      whyItHurts: n?.whyItHurts ?? WHY_IT_HURTS[f.category],
+      whyItHurts: n?.whyItHurts ?? why,
     };
   });
 
@@ -758,7 +876,14 @@ export function buildReportModel(
     const cat = (finding?.category ?? "schema") as CategoryKey;
     const fm = FIX_META[cat];
     const n = narration?.fixes?.[fx.id];
-    const action = n?.action ?? fx.action;
+    // Crawler fix: only prescribe robots.txt specifics when crawlability was
+    // actually audited; otherwise soften to "verify crawl access" so we never
+    // recommend editing a robots.txt we never inspected.
+    const rawAction = n?.action ?? fx.action;
+    const action =
+      cat === "crawler" && !crawlAudited && !n?.action ? SOFT_CRAWL_ACTION : rawAction;
+    const impactCopy =
+      cat === "schema" && !isLocal ? SCHEMA_FIX_IMPACT_GENERAL : FIX_BUSINESS_IMPACT[cat];
     // Issue headline = the linked finding (what's wrong); distinct from the
     // action (the exact fix). Fall back to the category gap label so the card
     // title and body never repeat the same sentence.
@@ -770,7 +895,7 @@ export function buildReportModel(
       difficulty: fm.difficulty,
       impact: fx.impact,
       action,
-      businessImpact: n?.businessImpact ?? FIX_BUSINESS_IMPACT[cat],
+      businessImpact: n?.businessImpact ?? impactCopy,
       unlocks: fm.unlocks,
       foundationFix: fm.foundationFix,
     };
@@ -809,16 +934,14 @@ export function buildReportModel(
     weakestLabel: weakest?.label ?? "Trust Signals",
   };
 
-  const evidence = buildEvidence(
-    input.preflightSignals,
-    categories.find((c) => c.key === "trust")?.score ?? null,
-  );
+  const evidence = buildEvidence(input.preflightSignals, det, categories);
 
+  const closingClause = isLocal
+    ? "when a nearby customer asks an AI who to hire"
+    : "when a customer asks an AI which business to choose in this category";
   const businessImpact =
     narration?.businessImpact ??
-    `Your real-world reputation is stronger than the signals your website currently sends to AI tools. Closing the gaps above gives AI systems the confirmed identity, trust, and content they need to recommend ${input.resolvedBusinessName} when a nearby customer asks an AI who to hire.`;
-
-  const providers = buildProviders(input.providerOutputs);
+    `Your real-world reputation is stronger than the signals your website currently sends to AI tools. Closing the gaps above gives AI systems the confirmed identity, trust, and content they need to recommend ${input.resolvedBusinessName} ${closingClause}.`;
 
   return {
     meta: {
@@ -878,6 +1001,7 @@ export type RenderModelInputs = {
     aiValidations?: unknown;
     nameInconsistency?: { primary: string; alternates: string[] } | null;
     preflightSignals?: unknown;
+    industryNormalized?: string | null;
   } | null;
 };
 
@@ -952,6 +1076,7 @@ export function buildReportModelFromRender(
       confidenceReason: input.context?.confidenceReason ?? null,
     },
     preflightSignals: input.context?.preflightSignals ?? null,
+    industryNormalized: input.context?.industryNormalized ?? null,
     narration: parseNarration(input.reportMarkdown),
   });
 }
