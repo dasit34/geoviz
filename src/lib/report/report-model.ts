@@ -30,6 +30,7 @@ import type {
   PublicBucketKey,
   IssueSeverity,
 } from "@/lib/scoring/types";
+import type { PreflightSignals } from "@/lib/intelligence/preflight/types";
 import type { ReportScore } from "@/lib/parse-report";
 import {
   plainEnglishBandLabel,
@@ -118,10 +119,12 @@ export type FixDifficulty = "Easy" | "Moderate" | "Technical";
 
 export type ReportModelFix = {
   rank: number;
+  /** Short issue/headline the fix addresses (distinct from `action`). */
+  issue: string;
   title: string;
   difficulty: FixDifficulty;
   impact: "high" | "medium" | "low";
-  /** Concrete action. */
+  /** Concrete action ("exact fix"). */
   action: string;
   /** Business outcome. */
   businessImpact: string;
@@ -136,6 +139,18 @@ export type ReportModelExecutive = {
   summaryBullets: string[];
   strongestSignal: string;
   weakestSignal: string;
+  /** Bare category label of the strongest signal (for stat tiles). */
+  strongestLabel: string;
+  /** Bare category label of the widest gap (for stat tiles). */
+  weakestLabel: string;
+};
+
+/** A single inspected-signal row for the "Evidence Reviewed" page. */
+export type EvidenceStatus = "pass" | "warn" | "fail" | "na";
+export type ReportModelEvidence = {
+  label: string;
+  descriptor: string;
+  status: EvidenceStatus;
 };
 
 /**
@@ -164,11 +179,15 @@ export type ReportModel = {
   providers: ReportModelProvider[];
   /** Derived AI-search / visibility readiness factors (incl. Google AI Overviews). */
   readiness: ReadinessFactor[];
+  /** Inspected-signal rows for the "Evidence Reviewed" page (from preflight). */
+  evidence: ReportModelEvidence[];
   diagnostics: ReportModelDiagnostic[];
   fixes: ReportModelFix[];
   businessImpact: string;
   /** True when at least one cross-model validator passed. */
   hasProviders: boolean;
+  /** True when preflight signals were available to populate Evidence Reviewed. */
+  hasEvidence: boolean;
 };
 
 // ── Display vocab ───────────────────────────────────────────────────
@@ -300,6 +319,162 @@ function toneForPct(pct: number): Tone {
   return categoryToneFromRatio(pct / 100);
 }
 
+function isPreflight(v: unknown): v is PreflightSignals {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    "fetchOk" in (v as object) &&
+    "engineVersion" in (v as object)
+  );
+}
+
+/**
+ * Build the "Evidence Reviewed" rows from preflight signals (+ the trust
+ * category as a proxy for review/trust markers). Real data only — every
+ * row falls back to "na" ("Not analyzed") when its signal is absent, so
+ * legacy audits without preflight degrade gracefully. Order matches the
+ * report template.
+ */
+function buildEvidence(
+  preflight: unknown,
+  trustPct: number | null,
+): ReportModelEvidence[] {
+  const p = isPreflight(preflight) ? preflight : null;
+  const rows: ReportModelEvidence[] = [];
+
+  // 1. Homepage readable content
+  const r = p?.readability ?? null;
+  rows.push(
+    !r
+      ? { label: "Homepage readable content", descriptor: "Not analyzed", status: "na" }
+      : r.parsedByReadability
+        ? {
+            label: "Homepage readable content",
+            descriptor: "Extracted article text successfully",
+            status: "pass",
+          }
+        : r.textLength > 0
+          ? {
+              label: "Homepage readable content",
+              descriptor: "Body text extracted via fallback",
+              status: "warn",
+            }
+          : {
+              label: "Homepage readable content",
+              descriptor: "Little readable text could be extracted",
+              status: "fail",
+            },
+  );
+
+  // 2. JSON-LD schema blocks
+  const s = p?.schema ?? null;
+  rows.push(
+    !s
+      ? { label: "JSON-LD schema blocks", descriptor: "Not analyzed", status: "na" }
+      : s.rawJsonLdCount === 0
+        ? {
+            label: "JSON-LD schema blocks",
+            descriptor: "No JSON-LD structured data found",
+            status: "fail",
+          }
+        : s.missingFields.length > 0
+          ? {
+              label: "JSON-LD schema blocks",
+              descriptor: `${s.rawJsonLdCount} block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields incomplete`,
+              status: "warn",
+            }
+          : {
+              label: "JSON-LD schema blocks",
+              descriptor: `${s.rawJsonLdCount} block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields complete`,
+              status: "pass",
+            },
+  );
+
+  // 3. NAP consistency
+  const e = p?.entityConsistency ?? null;
+  rows.push(
+    !e
+      ? { label: "NAP consistency", descriptor: "Not analyzed", status: "na" }
+      : e.inconsistencies.length > 0
+        ? {
+            label: "NAP consistency",
+            descriptor: `${e.inconsistencies.length} name / address / phone inconsistenc${e.inconsistencies.length === 1 ? "y" : "ies"} detected`,
+            status: "fail",
+          }
+        : {
+            label: "NAP consistency",
+            descriptor: "Name, address, and phone align across surfaces",
+            status: "pass",
+          },
+  );
+
+  // 4. Robots and crawl access
+  const c = p?.crawlability ?? null;
+  rows.push(
+    !c
+      ? { label: "Robots and crawl access", descriptor: "Not analyzed", status: "na" }
+      : c.score >= 70
+        ? {
+            label: "Robots and crawl access",
+            descriptor: "robots.txt present; site accessible",
+            status: "pass",
+          }
+        : c.score >= 40
+          ? {
+              label: "Robots and crawl access",
+              descriptor: c.warnings[0] ?? "Some crawl-access limitations detected",
+              status: "warn",
+            }
+          : {
+              label: "Robots and crawl access",
+              descriptor: c.failedChecks[0] ?? "Crawl access blocked or misconfigured",
+              status: "fail",
+            },
+  );
+
+  // 5. Homepage depth (word count)
+  rows.push(
+    !r
+      ? { label: "Homepage depth", descriptor: "Not analyzed", status: "na" }
+      : r.wordCount >= 300
+        ? {
+            label: "Homepage depth",
+            descriptor: `${r.wordCount} words; meets depth recommendation`,
+            status: "pass",
+          }
+        : {
+            label: "Homepage depth",
+            descriptor: `${r.wordCount} words; below 300-word recommendation`,
+            status: "warn",
+          },
+  );
+
+  // 6. Reviews and trust signals (trust category as the proxy signal)
+  rows.push(
+    trustPct === null
+      ? { label: "Reviews and trust signals", descriptor: "Not analyzed", status: "na" }
+      : trustPct >= 60
+        ? {
+            label: "Reviews and trust signals",
+            descriptor: "Verifiable third-party trust markers present",
+            status: "pass",
+          }
+        : trustPct >= 30
+          ? {
+              label: "Reviews and trust signals",
+              descriptor: "Limited third-party trust markers",
+              status: "warn",
+            }
+          : {
+              label: "Reviews and trust signals",
+              descriptor: "Insufficient verifiable third-party trust markers",
+              status: "fail",
+            },
+  );
+
+  return rows;
+}
+
 function pctOf(score: number, max: number): number {
   return max > 0 ? Math.round((score / max) * 100) : 0;
 }
@@ -342,6 +517,8 @@ export type BuildReportModelInput = {
     confidenceLabel?: string | null;
     confidenceReason?: string | null;
   } | null;
+  /** V2 preflight signals → "Evidence Reviewed" page. Null/absent for legacy. */
+  preflightSignals?: unknown;
   /** Phase 2 narration; omit for deterministic Phase-1 copy. */
   narration?: ReportNarration | null;
 };
@@ -569,12 +746,18 @@ export function buildReportModel(
     const cat = (finding?.category ?? "schema") as CategoryKey;
     const fm = FIX_META[cat];
     const n = narration?.fixes?.[fx.id];
+    const action = n?.action ?? fx.action;
+    // Issue headline = the linked finding (what's wrong); distinct from the
+    // action (the exact fix). Fall back to the category gap label so the card
+    // title and body never repeat the same sentence.
+    const issue = finding?.message?.trim() || `${CATEGORY_LABEL[cat].label} gap`;
     return {
       rank: i + 1,
-      title: fx.action,
+      issue: issue === action ? `${CATEGORY_LABEL[cat].label} gap` : issue,
+      title: action,
       difficulty: fm.difficulty,
       impact: fx.impact,
-      action: n?.action ?? fx.action,
+      action,
       businessImpact: n?.businessImpact ?? FIX_BUSINESS_IMPACT[cat],
       unlocks: fm.unlocks,
       foundationFix: fm.foundationFix,
@@ -610,7 +793,14 @@ export function buildReportModel(
           ],
     strongestSignal,
     weakestSignal,
+    strongestLabel: strongest?.label ?? "Technical Access",
+    weakestLabel: weakest?.label ?? "Trust Signals",
   };
+
+  const evidence = buildEvidence(
+    input.preflightSignals,
+    categories.find((c) => c.key === "trust")?.score ?? null,
+  );
 
   const businessImpact =
     narration?.businessImpact ??
@@ -642,10 +832,12 @@ export function buildReportModel(
     categories,
     providers,
     readiness,
+    evidence,
     diagnostics,
     fixes,
     businessImpact,
     hasProviders: providers.some((p) => p.status === "passed"),
+    hasEvidence: isPreflight(input.preflightSignals),
   };
 }
 
@@ -663,7 +855,7 @@ export type RenderModelInputs = {
   reportMarkdown: string | null;
   reportGeneratedAt: Date | null;
   deterministicScore: unknown;
-  /** AuditReportContext: aiValidations + percentile/cohort/confidence + nameInconsistency. */
+  /** AuditReportContext: aiValidations + percentile/cohort/confidence + nameInconsistency + preflight. */
   context?: {
     percentileCopy?: string | null;
     cohortCellValue?: string | null;
@@ -671,6 +863,7 @@ export type RenderModelInputs = {
     confidenceReason?: string | null;
     aiValidations?: unknown;
     nameInconsistency?: { primary: string; alternates: string[] } | null;
+    preflightSignals?: unknown;
   } | null;
 };
 
@@ -744,6 +937,7 @@ export function buildReportModelFromRender(
       confidenceLabel: input.context?.confidenceLabel ?? null,
       confidenceReason: input.context?.confidenceReason ?? null,
     },
+    preflightSignals: input.context?.preflightSignals ?? null,
     narration: parseNarration(input.reportMarkdown),
   });
 }

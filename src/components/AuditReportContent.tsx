@@ -1,3 +1,10 @@
+/**
+ * @deprecated LEGACY renderer — markdown-driven dark report. Production PDFs
+ * now use the Figma-spec `ReportDocument` via `ReportSurface`. This path is
+ * reached ONLY by old audits that predate the deterministic scoring engine
+ * (no `deterministicScore` → no structured buckets/diagnostics/fixes). Do not
+ * use for new surfaces; it is kept solely so historical reports still render.
+ */
 import {
   cleanScoreSectionBody,
   clipDriverText,

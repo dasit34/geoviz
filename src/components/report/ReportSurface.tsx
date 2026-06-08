@@ -53,6 +53,7 @@ export function ReportSurface({
           confidenceReason: context.confidenceReason,
           aiValidations: context.aiValidations,
           nameInconsistency: context.nameInconsistency,
+          preflightSignals: context.preflightSignals,
         }
       : null,
   });
@@ -67,11 +68,11 @@ export function ReportSurface({
       model.fixes.length > 0);
 
   if (model && hasDeterministicContent) {
+    // The report template paints its own per-page light/dark surfaces; the
+    // host is a neutral mat so the pages read as sheets on screen.
     return (
-      <div className="report-host bg-ink-950 text-white">
-        <div className="container-page py-14 md:py-20">
-          <ReportDocument model={model} />
-        </div>
+      <div className="report-host rd-host">
+        <ReportDocument model={model} />
       </div>
     );
   }

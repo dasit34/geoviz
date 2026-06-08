@@ -28,3 +28,6 @@ tsconfig.tsbuildinfo
 
 # session lock (harness-local)
 .claude/scheduled_tasks.lock
+
+# Figma design source (reference only — not a served asset)
+public/references/geoviz-report-template.pdf

@@ -27,34 +27,29 @@ export function ReportCtaCard({
 
   return (
     <section className="cta-card" aria-label="AI Visibility Foundation Fix offer">
-      <div className="cta-card-accent" />
       <div className="cta-card-body">
         <div className="cta-card-eyebrow">AI Visibility Foundation Fix</div>
         <h2 className="cta-card-headline">
           Fix the foundation AI systems use to recommend you
         </h2>
         <p className="cta-card-lede">
-          A scoped infrastructure engagement that addresses the
-          underlying technical, trust, and discoverability gaps
-          surfaced in your audit — so AI systems can identify,
-          verify, and reference your business more confidently.
+          GeoViz can implement the fixes identified in this audit — a scoped
+          engagement that closes the technical, trust, and discoverability gaps
+          surfaced above, so AI systems can identify, verify, and reference your
+          business with confidence.
         </p>
 
         <div className="cta-card-badges">
-          <span className="cta-card-badge cta-card-badge-price">
-            $497 one-time
-          </span>
-          <span className="cta-card-badge cta-card-badge-meta">
-            3–5 business days
-          </span>
+          <span className="cta-card-badge cta-card-badge-price">$497 one-time</span>
+          <span className="cta-card-badge cta-card-badge-meta">3–5 business days</span>
         </div>
 
         <a className="cta-card-button" href={href}>
-          Request My AI Visibility Foundation Fix →
+          Request My AI Visibility Foundation Fix
         </a>
         <p className="cta-card-fineprint">
-          We&rsquo;ll send a scoped setup plan within one business day.
-          Complex websites may require custom scoping.
+          We&rsquo;ll send a scoped setup plan within one business day. Complex
+          websites may require custom scoping.
         </p>
       </div>
     </section>
