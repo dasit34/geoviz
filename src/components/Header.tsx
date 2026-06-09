@@ -4,7 +4,7 @@ import { Logo } from "./Logo";
 export function Header() {
   return (
     <header className="sticky top-0 z-30 border-b border-white/5 bg-ink-950/70 backdrop-blur">
-      <div className="container-page flex h-16 items-center justify-between">
+      <div className="container-page flex h-20 items-center justify-between">
         <Logo />
         <nav className="hidden items-center gap-7 text-sm text-white/70 lg:flex">
           <Link

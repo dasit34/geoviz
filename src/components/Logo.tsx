@@ -13,14 +13,17 @@ export function Logo({ className = "" }: { className?: string }) {
     <Link
       href="/"
       aria-label="GeoViz — AI Visibility Intelligence"
-      className={`inline-flex items-center gap-2.5 text-white ${className}`}
+      className={`inline-flex items-center gap-2.5 text-white sm:gap-3.5 ${className}`}
     >
-      <GeoVizMark size={30} />
+      <GeoVizMark
+        size={50}
+        className="h-[38px] w-[38px] sm:h-[50px] sm:w-[50px]"
+      />
       <span className="inline-flex flex-col leading-none">
-        <span className="font-display text-[20px] font-semibold leading-none tracking-[-0.01em]">
+        <span className="font-display text-[20px] font-semibold leading-none tracking-[-0.01em] sm:text-[30px]">
           GeoViz<span className="text-[color:var(--gv-signal)]">.ai</span>
         </span>
-        <span className="mono-data mt-1.5 text-[8.5px] font-semibold uppercase tracking-[0.3em] text-white/35">
+        <span className="mono-data mt-1.5 hidden text-[10px] font-semibold uppercase tracking-[0.3em] text-white/45 sm:block">
           AI Visibility Intelligence
         </span>
       </span>

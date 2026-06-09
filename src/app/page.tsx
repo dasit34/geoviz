@@ -3,6 +3,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VisibilitySignalField } from "@/components/VisibilitySignalField";
 import { ScoringExamplePanel } from "@/components/ScoringExamplePanel";
+import { ProviderMark } from "@/components/report/BrandMarks";
 
 /**
  * Homepage — C2 Command Center rebuild. Presentation-only.
@@ -65,6 +66,42 @@ const SEARCH_READINESS = {
   readiness: 0.16,
   detail: "Readiness signal · derived from structured data + crawl access + content depth",
 };
+
+// Multi-model credibility block — the four directly-tested AI systems, each
+// framed by the interpretive question GeoViz answers for it. `provider` keys
+// map to ProviderMark; `accent` reuses the report's per-provider top-border
+// tokens so the homepage and the report read as one brand. AI Overviews is
+// NOT here — it's the derived readiness note under the grid.
+const MODEL_ENDPOINTS = [
+  {
+    provider: "openai",
+    name: "ChatGPT",
+    question: "Can it understand what you do?",
+    label: "Understanding + recommendation confidence",
+    accent: "border-t-severity-info",
+  },
+  {
+    provider: "claude",
+    name: "Claude",
+    question: "Can it reason about your business clearly?",
+    label: "Business interpretation + reasoning gaps",
+    accent: "border-t-accent",
+  },
+  {
+    provider: "gemini",
+    name: "Gemini",
+    question: "Can it recognize your entity and local relevance?",
+    label: "Entity clarity + AI search readiness",
+    accent: "border-t-accent-blue",
+  },
+  {
+    provider: "perplexity",
+    name: "Perplexity",
+    question: "Can it find and cite enough evidence?",
+    label: "Sourceability + citation confidence",
+    accent: "border-t-cyan",
+  },
+];
 
 const FIX_SCOPE = [
   "Machine-readable business identity",
@@ -178,6 +215,9 @@ export default function Page() {
           </div>
         </div>
       </section>
+
+      {/* ── MULTI-MODEL CREDIBILITY (supporting block, unnumbered) ── */}
+      <MultiModelTesting />
 
       {/* ── PRIMER · the shift (editorial context, unnumbered) ── */}
       <Section tone="light">
@@ -649,6 +689,77 @@ function FaqItem({ q, a }: { q: string; a: string }) {
         </p>
       </details>
     </li>
+  );
+}
+
+/**
+ * Multi-model credibility block (supporting, unnumbered) — sits directly
+ * under the hero to prove GeoViz is *tested across* the major AI systems,
+ * not a generic SEO scan. Four provider endpoints, each with the
+ * interpretive question GeoViz answers, then the derived AI-Overviews note
+ * and a CTA line that routes into the $97 audit. Defensible language only
+ * ("tested/checked across" — never partnered/integrated/guaranteed).
+ */
+function MultiModelTesting() {
+  return (
+    <Section>
+      <SectionIndex n={0} label="Multi-model AI visibility testing" />
+      <SectionHeading>
+        Tested across the AI systems customers actually use.
+      </SectionHeading>
+      <p className="mt-5 max-w-2xl text-lg leading-[1.55] text-white/70">
+        GeoViz checks how your business is understood across ChatGPT, Claude,
+        Gemini, and Perplexity — then turns those findings into a clear
+        visibility score, evidence review, and priority fix plan.
+      </p>
+
+      <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {MODEL_ENDPOINTS.map((m) => (
+          <div
+            key={m.provider}
+            className={`flex flex-col rounded-lg border border-white/10 ${m.accent} border-t-2 bg-ink-900/60 p-5 shadow-card backdrop-blur-sm`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2.5">
+                <ProviderMark provider={m.provider} size={26} />
+                <span className="font-display text-base font-semibold text-white">
+                  {m.name}
+                </span>
+              </span>
+              <span
+                aria-hidden
+                className="inline-block h-1.5 w-1.5 rounded-full bg-cyan motion-safe:animate-pulseSoft"
+              />
+            </div>
+            <p className="mt-4 text-[15px] font-medium leading-[1.5] text-white/85">
+              {m.question}
+            </p>
+            <p className="mono-data mt-3 text-[10.5px] font-semibold uppercase leading-[1.5] tracking-[0.16em] text-white/45">
+              {m.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-6 max-w-3xl text-sm leading-[1.6] text-white/50">
+        Google AI Overviews readiness is evaluated as a derived visibility
+        signal based on crawlability, structured data, entity clarity, content
+        depth, and trust evidence.
+      </p>
+
+      <div className="mt-10 flex flex-col gap-4 border-t border-white/[0.08] pt-7 sm:flex-row sm:items-center sm:justify-between">
+        <p className="max-w-2xl text-[17px] font-medium leading-[1.5] text-white/80">
+          If AI systems cannot clearly identify, verify, and source your
+          business, they are less likely to recommend it.
+        </p>
+        <Link
+          href="/order"
+          className="text-sm font-medium text-accent underline-offset-4 transition-colors hover:underline"
+        >
+          Run AI Visibility Audit
+        </Link>
+      </div>
+    </Section>
   );
 }
 
