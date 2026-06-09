@@ -135,8 +135,15 @@ const FAQS = [
     a: "More people now ask AI for a recommendation before they ever open a search engine. If AI can’t read your business clearly, it confidently recommends a competitor instead of you.",
   },
   {
-    q: "Is this just SEO?",
-    a: "No. SEO is about ranking in Google’s search results. This is about whether AI systems can understand and trust your business enough to recommend it. They’re related, but they’re not the same checks.",
+    q: "How is the GeoViz score calculated?",
+    a: [
+      "GeoViz scores how clearly AI systems can understand, verify, and recommend your business based on several visibility signals. These include crawl access, structured data, business identity clarity, content depth, trust evidence, brand consistency, and direct testing across major AI systems.",
+      "We do not publish the exact weighting formula, but every report shows the major categories behind the score and the specific issues lowering visibility.",
+    ],
+  },
+  {
+    q: "Is this just an SEO score?",
+    a: "No. GeoViz is not a traditional SEO score or keyword ranking report. It measures whether AI systems can read your business, understand what you do, verify who you are, and confidently reference or recommend you in AI-generated answers.",
   },
   {
     q: "What makes GeoViz different from other AI search tools?",
@@ -669,7 +676,8 @@ function PricingBullet({
   );
 }
 
-function FaqItem({ q, a }: { q: string; a: string }) {
+function FaqItem({ q, a }: { q: string; a: string | string[] }) {
+  const paragraphs = Array.isArray(a) ? a : [a];
   return (
     <li>
       <details className="group py-6 [&_summary::-webkit-details-marker]:hidden">
@@ -684,9 +692,14 @@ function FaqItem({ q, a }: { q: string; a: string }) {
             +
           </span>
         </summary>
-        <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/65">
-          {a}
-        </p>
+        {paragraphs.map((para, i) => (
+          <p
+            key={i}
+            className="mt-4 max-w-2xl text-base leading-relaxed text-white/65"
+          >
+            {para}
+          </p>
+        ))}
       </details>
     </li>
   );
