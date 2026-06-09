@@ -140,7 +140,10 @@ function CoverPage({ model }: { model: ReportModel }) {
       <dl className="rd-cover-foot">
         <CoverFootCell k="Generated" v={fmtDate(m.meta.generatedAt)} />
         <CoverFootCell k="Report ID" v={m.meta.reportId} />
-        <CoverFootCell k="Review status" v="Human Reviewed" />
+        <CoverFootCell
+          k="Review status"
+          v={m.meta.reviewed ? "Human Reviewed" : "Automated Audit"}
+        />
       </dl>
     </Page>
   );
@@ -175,7 +178,12 @@ function ExecutivePage({ model, reportId }: { model: ReportModel; reportId: stri
 
       <div className="rd-stat-row">
         <Stat accent="amber" k="Overall" v={overall} note={m.score.band} />
-        <Stat accent="blue" k="Audit confidence" v={conf} note="Human reviewed" />
+        <Stat
+          accent="blue"
+          k="Audit confidence"
+          v={conf}
+          note={m.meta.reviewed ? "Human reviewed" : "Automated audit"}
+        />
         <Stat
           accent="green"
           k="Strongest signal"
@@ -396,6 +404,9 @@ function DiagnosticsPage({ model, reportId }: { model: ReportModel; reportId: st
       <div className="rd-interp">
         <h3 className="rd-interp-title">Score interpretation</h3>
         <p className="rd-interp-body">{m.scoreInterpretation}</p>
+        {m.scoreNote ? (
+          <p className="rd-interp-note">{m.scoreNote}</p>
+        ) : null}
       </div>
     </Page>
   );

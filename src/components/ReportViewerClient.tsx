@@ -29,12 +29,15 @@ export function ReportViewerClient({
   nameInconsistency = null,
   websiteUrl,
   reportGeneratedAt = null,
+  reviewed = false,
   deterministicScore = null,
   reportContext = null,
 }: {
   markdown: string;
   orderId?: string;
   businessLabel?: string;
+  /** True only when the order is operator-approved (reviewStatus === "approved"). */
+  reviewed?: boolean;
   /** Phase B3 — surfaced on the cover when sources disagree. */
   nameInconsistency?: {
     primary: string;
@@ -97,6 +100,7 @@ export function ReportViewerClient({
             websiteUrl={websiteUrl ?? ""}
             reportMarkdown={markdown}
             reportGeneratedAt={reportGeneratedAt}
+            reviewed={reviewed}
             deterministicScore={deterministicScore}
             context={ctxWithIdentity}
           />

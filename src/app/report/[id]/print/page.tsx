@@ -157,6 +157,7 @@ export default async function PrintPage({
       websiteUrl={order.websiteUrl}
       reportMarkdown={order.reportMarkdown}
       reportGeneratedAt={order.reportGeneratedAt}
+      reviewed={order.reviewStatus === "approved"}
       deterministicScore={order.intelligence?.deterministicScore ?? null}
       context={contextWithIdentity}
     />

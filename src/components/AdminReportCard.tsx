@@ -1102,6 +1102,7 @@ export function AdminReportCard({
               reportGeneratedAt={
                 reportGeneratedAt ? new Date(reportGeneratedAt) : null
               }
+              reviewed={reviewStatus === "approved"}
               deterministicScore={deterministicScore}
               reportContext={reportContext}
             />

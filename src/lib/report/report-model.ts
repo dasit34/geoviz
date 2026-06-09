@@ -50,6 +50,10 @@ export type ReportModelMeta = {
   website: string;
   generatedAt: Date | null;
   reviewedBy: string;
+  /** True only when an operator actually approved the report (reviewStatus
+   *  === "approved"). Drives the cover "Human Reviewed" vs "Automated Audit"
+   *  label so the badge never overstates a manual review that didn't happen. */
+  reviewed: boolean;
   /** "Top 25% (dental)" / "Industry benchmark forming" */
   cohort: string | null;
 };
@@ -199,6 +203,11 @@ export type ReportModel = {
    * Extraction as strong AI visibility.
    */
   scoreInterpretation: string;
+  /** Page-5 callout shown ONLY when access/extraction are high but
+   *  recommendation readiness + trust are low and the band is "Needs Work" —
+   *  explains why an access-driven baseline still lands mid-score. Null
+   *  otherwise. */
+  scoreNote: string | null;
   /** True when at least one cross-model validator passed. */
   hasProviders: boolean;
   /** True when preflight signals were available to populate Evidence Reviewed. */
@@ -433,6 +442,35 @@ function buildScoreInterpretation(
 
   // Access and recommendation signals are both reasonably strong.
   return `${businessName} is accessible to AI systems and sends reasonably clear identity and trust signals. Closing the remaining gaps above raises how confidently AI systems can recommend it when customers ask who to choose.`;
+}
+
+/**
+ * Page-5 callout for the specific case where a business is in "Needs Work"
+ * because access/extraction lift the baseline while recommendation readiness +
+ * trust stay weak. Same access/rec computation as buildScoreInterpretation;
+ * returns null outside that pattern so the note only appears when it's the
+ * honest explanation for the band. Display only — no scoring impact.
+ */
+function buildScoreNote(
+  band: string,
+  categories: ReportModelCategory[],
+): string | null {
+  const get = (k: CategoryKey): number | null =>
+    categories.find((c) => c.key === k)?.score ?? null;
+  const mean = (...vals: Array<number | null>): number | null => {
+    const nums = vals.filter((v): v is number => v !== null);
+    return nums.length
+      ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length)
+      : null;
+  };
+  const access = mean(get("crawler"), get("tech"));
+  const rec = mean(get("schema"), get("brand"), get("trust"));
+  const accessHigh = access !== null && access >= 65;
+  const recLow = rec !== null && rec < 60;
+  if (band === "Needs Work" && accessHigh && recLow) {
+    return "Access and extraction raise the baseline score, but low recommendation readiness and trust evidence are the primary reasons this business remains in Needs Work.";
+  }
+  return null;
 }
 
 function toneForPct(pct: number): Tone {
@@ -718,6 +756,8 @@ export type BuildReportModelInput = {
   website: string;
   generatedAt: Date | null;
   reviewedBy?: string;
+  /** True only when an operator approved the report (reviewStatus === "approved"). */
+  reviewed?: boolean;
   /** Canonical score (from getCanonicalScore) for display categories. */
   score: ReportScore;
   /** The deterministic engine output (buckets, findings, fixes). */
@@ -1135,6 +1175,7 @@ export function buildReportModel(
     input.resolvedBusinessName,
     categories,
   );
+  const scoreNote = buildScoreNote(band, categories);
 
   return {
     meta: {
@@ -1145,6 +1186,7 @@ export function buildReportModel(
       website: input.website,
       generatedAt: input.generatedAt,
       reviewedBy: input.reviewedBy ?? "GeoViz Intelligence Team",
+      reviewed: input.reviewed ?? false,
       cohort: input.context?.cohortCellValue ?? null,
     },
     score: {
@@ -1165,6 +1207,7 @@ export function buildReportModel(
     fixes,
     businessImpact,
     scoreInterpretation,
+    scoreNote,
     // True when ANY provider produced usable data (drives the page-level
     // "verdicts not run" note). UNAVAILABLE = no data for that provider.
     hasProviders: providers.some((p) => p.verdict !== "UNAVAILABLE"),
@@ -1185,6 +1228,8 @@ export type RenderModelInputs = {
   websiteUrl: string;
   reportMarkdown: string | null;
   reportGeneratedAt: Date | null;
+  /** True only when an operator approved this report (reviewStatus === "approved"). */
+  reviewed?: boolean;
   deterministicScore: unknown;
   /** AuditReportContext: aiValidations + percentile/cohort/confidence + nameInconsistency + preflight. */
   context?: {
@@ -1258,6 +1303,7 @@ export function buildReportModelFromRender(
     nameAlternates: input.context?.nameInconsistency?.alternates ?? [],
     website: input.websiteUrl,
     generatedAt: input.reportGeneratedAt,
+    reviewed: input.reviewed ?? false,
     score,
     deterministic: isDeterministic(input.deterministicScore)
       ? input.deterministicScore

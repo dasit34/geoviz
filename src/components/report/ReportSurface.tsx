@@ -27,6 +27,7 @@ export function ReportSurface({
   websiteUrl,
   reportMarkdown,
   reportGeneratedAt,
+  reviewed = false,
   deterministicScore = null,
   context,
 }: {
@@ -35,6 +36,8 @@ export function ReportSurface({
   websiteUrl: string;
   reportMarkdown: string;
   reportGeneratedAt: Date | null;
+  /** True only when an operator approved this report (reviewStatus === "approved"). */
+  reviewed?: boolean;
   deterministicScore?: unknown;
   context?: AuditReportContext;
 }) {
@@ -44,6 +47,7 @@ export function ReportSurface({
     websiteUrl,
     reportMarkdown,
     reportGeneratedAt,
+    reviewed,
     deterministicScore,
     context: context
       ? {

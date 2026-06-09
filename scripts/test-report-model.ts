@@ -275,6 +275,39 @@ check("deterministic narration is category-specific (not one repeated line)", ()
   assert.equal(new Set(hurts).size, hurts.length, "whyItHurts lines should differ per category");
 });
 
+// ── review label + score note (product-quality pass) ────────────────
+check("meta.reviewed defaults false; reflects the input flag", () => {
+  assert.equal(buildReportModel(makeInput())!.meta.reviewed, false);
+  assert.equal(buildReportModel(makeInput({ reviewed: true }))!.meta.reviewed, true);
+});
+
+check("scoreNote fires for Needs Work + high access / low recommendation", () => {
+  // Default fixture: crawler 20/20 + tech 9/10 (access high), schema/brand/trust
+  // low, band Needs Work → the access-vs-recommendation note appears.
+  const m = buildReportModel(makeInput())!;
+  assert.equal(m.score.band, "Needs Work");
+  assert.match(m.scoreNote ?? "", /Access and extraction raise the baseline score/);
+  assert.match(m.scoreNote ?? "", /remains in Needs Work/);
+});
+
+check("scoreNote is null when recommendation signals are strong", () => {
+  const strong = makeInput({
+    score: {
+      overall: 78,
+      status: "Competitive",
+      categories: [
+        { key: "schema", label: "", short: "", tooltip: "", max: 25, score: 22 },
+        { key: "crawler", label: "", short: "", tooltip: "", max: 20, score: 20 },
+        { key: "trust", label: "", short: "", tooltip: "", max: 20, score: 16 },
+        { key: "content", label: "", short: "", tooltip: "", max: 15, score: 11 },
+        { key: "brand", label: "", short: "", tooltip: "", max: 10, score: 8 },
+        { key: "tech", label: "", short: "", tooltip: "", max: 10, score: 9 },
+      ],
+    } as unknown as ReportScore,
+  });
+  assert.equal(buildReportModel(strong)!.scoreNote, null);
+});
+
 // ── parseNarration (Phase 2 plumbing) ───────────────────────────────
 check("parseNarration extracts a valid embedded block", () => {
   const md = '# Report\n<!--GEOVIZ_NARRATION {"executiveHeadline":"Custom.","diagnostics":{"trust.no_reviews":{"problem":"P"}}} -->\nmore';

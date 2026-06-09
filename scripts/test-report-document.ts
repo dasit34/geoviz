@@ -113,6 +113,20 @@ check("cover primary gap uses the issue title, not the raw-evidence problem stri
   assert.doesNotMatch(DOC, /const gap =\s*\n\s*m\.diagnostics\[0\]\?\.problem/);
 });
 
+check("cover review label is conditional on real review flag, not hardcoded", () => {
+  // "Human Reviewed" must be gated on m.meta.reviewed; the unreviewed branch
+  // reads "Automated Audit". No standalone hardcoded "Human Reviewed" value.
+  assert.match(DOC, /m\.meta\.reviewed \? "Human Reviewed" : "Automated Audit"/);
+  assert.match(DOC, /m\.meta\.reviewed \? "Human reviewed" : "Automated audit"/);
+  assert.doesNotMatch(DOC, /v="Human Reviewed"/, "cover must not hardcode the review label");
+  assert.doesNotMatch(DOC, /note="Human reviewed"/, "exec stat must not hardcode the review note");
+});
+
+check("Page 5 renders the conditional score note when present", () => {
+  assert.match(DOC, /m\.scoreNote \?/);
+  assert.match(DOC, /rd-interp-note/);
+});
+
 check("light/dark page system: dark cover + CTA, light interior", () => {
   // Page variant is applied via <Page variant="dark|light"> → rd-page-${variant}.
   assert.match(DOC, /variant="dark"/);
