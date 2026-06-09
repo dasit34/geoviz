@@ -181,6 +181,71 @@ check("genuine local business (local industry + provider location) → local cop
   assert.match(m.businessImpact, /nearby customer asks an AI who to hire/i);
 });
 
+check("non-local business → schema fix is generic (Organization/subtype), not a LocalBusiness prescription", () => {
+  const m = build({ industry: "ecommerce" })!;
+  const schemaFix = m.fixes.find((f) => /json-?ld|structured data/i.test(f.action))!;
+  assert.ok(schemaFix, "a schema fix should be present");
+  assert.match(schemaFix.action, /Organization, LocalBusiness, or the most accurate subtype/i, schemaFix.action);
+  assert.doesNotMatch(schemaFix.action, /Add (?:a )?LocalBusiness JSON-?LD (?:block|with)/i, schemaFix.action);
+});
+
+check("non-local business → structured-identity title drops the 'local business' framing", () => {
+  const m = build({ industry: "ecommerce" })!;
+  const schemaDiag = m.diagnostics.find((d) => d.category === "schema")!;
+  assert.match(schemaDiag.title, /Organization or business identity|business identity verification/i, schemaDiag.title);
+  assert.doesNotMatch(schemaDiag.title, /local business|LocalBusiness/i, schemaDiag.title);
+});
+
+check("genuine local business → schema fix KEEPS the LocalBusiness prescription", () => {
+  const m = build({
+    industry: "roofing",
+    providerOutputs: [
+      { provider: "openai", status: "passed", business_understanding_score: 49, would_recommend: "PARTIAL", industry_identified: "Roofing contractor", location_identified: "Toledo, OH", missing_facts: ["NAP"] },
+    ],
+  })!;
+  const schemaFix = m.fixes.find((f) => /json-?ld/i.test(f.action))!;
+  assert.match(schemaFix.action, /LocalBusiness JSON-?LD/i, schemaFix.action);
+});
+
+check("entity-consistency (NAP) issue explanation is distinct from third-party-trust", () => {
+  // Two trust-category findings — NAP-consistency + reviews — must NOT render
+  // the same "why it hurts" paragraph (they used to, both keyed by category).
+  const det = {
+    overall_score: 50, band: "Needs Work",
+    category_scores: {
+      schema: { score: 10, max: 25, reason: "ok", signals: [], issues: [], evidence_used: [], category_confidence: 0 },
+      crawler: { score: 18, max: 20, reason: "ok", signals: [], issues: [], evidence_used: [], category_confidence: 0 },
+      trust: { score: 5, max: 20, reason: "Inconsistent NAP; few reviews", signals: [], issues: [], evidence_used: [], category_confidence: 0 },
+      content: { score: 9, max: 15, reason: "ok", signals: [], issues: [], evidence_used: [], category_confidence: 0 },
+      brand: { score: 5, max: 10, reason: "ok", signals: [], issues: [], evidence_used: [], category_confidence: 0 },
+      tech: { score: 8, max: 10, reason: "ok", signals: [], issues: [], evidence_used: [], category_confidence: 0 },
+    },
+    evidence_summary: { preflight_ok: true, schema_validated: true, crawlability_audited: true, entity_checked: true, ingest_present: true, render_attempted: true },
+    top_3_findings: [
+      { id: "f1", severity: "critical", category: "trust", message: "Name / phone / address inconsistent between surfaces" },
+      { id: "f2", severity: "warning", category: "trust", message: "Few third-party reviews or citations found" },
+      { id: "f3", severity: "warning", category: "content", message: "Thin homepage content" },
+    ],
+    top_3_recommended_fixes: [
+      { id: "fx1", for_finding: "f1", action: "Reconcile name, phone, and address across surfaces.", impact: "high" },
+      { id: "fx2", for_finding: "f2", action: "Surface review signals on the homepage.", impact: "medium" },
+      { id: "fx3", for_finding: "f3", action: "Expand homepage content.", impact: "medium" },
+    ],
+  } as unknown as DeterministicScore;
+  const m = buildReportModel({
+    reportId: "GEO-NAP", orderId: "nap", resolvedBusinessName: "Acme", nameAlternates: [],
+    website: "https://acme.com", generatedAt: null,
+    score: { overall: 50, status: "Needs Work", categories: CATS({ schema: 10, crawler: 18, trust: 5, content: 9, brand: 5, tech: 8 }) } as unknown as ReportScore,
+    deterministic: det, providerOutputs: null, preflightSignals: null, industryNormalized: "ecommerce",
+  })!;
+  const nap = m.diagnostics.find((d) => /inconsistent between surfaces/i.test(d.title))!;
+  const reviews = m.diagnostics.find((d) => /reviews or citations/i.test(d.title))!;
+  assert.ok(nap && reviews, "both NAP and reviews diagnostics present");
+  assert.match(nap.whyItHurts, /consistent name, contact, and identity|one trusted entity/i, nap.whyItHurts);
+  assert.match(reviews.whyItHurts, /third-party trust/i, reviews.whyItHurts);
+  assert.notEqual(nap.whyItHurts, reviews.whyItHurts);
+});
+
 check("provider site fetch-failure flagged (no false site conclusions)", () => {
   const m = build({
     providerOutputs: [
@@ -261,7 +326,13 @@ check("JSON-LD blocks detected → identity title says 'incomplete', never 'No �
     reportId: "GEO-SHIELD", orderId: "shield", resolvedBusinessName: "Shield Exteriors",
     nameAlternates: [], website: "https://shield.com", generatedAt: null,
     score: { overall: 50, status: "Needs Work", categories: CATS({ schema: 5, crawler: 20, trust: 3, content: 9, brand: 4, tech: 10 }) } as unknown as ReportScore,
-    deterministic: det, providerOutputs: null, preflightSignals: pf, industryNormalized: "roofing",
+    deterministic: det,
+    // A roofing business WITH a model-identified location → treated as local,
+    // so the title keeps the "local business" framing.
+    providerOutputs: [
+      { provider: "openai", status: "passed", business_understanding_score: 60, would_recommend: "PARTIAL", industry_identified: "Roofing contractor", location_identified: "Dayton, OH", missing_facts: ["NAP"] },
+    ],
+    preflightSignals: pf, industryNormalized: "roofing",
   })!;
   assert.equal(m.diagnostics[0].title, "Existing JSON-LD is incomplete for local business verification");
   const schemaFix = m.fixes.find((f) => f.action.includes("LocalBusiness JSON-LD"))!;
@@ -275,11 +346,23 @@ check("JSON-LD blocks detected → identity title says 'incomplete', never 'No �
   assert.doesNotMatch(blob, /No (?:LocalBusiness or Organization )?JSON-?LD block/i, blob);
 });
 
-check("no JSON-LD blocks → identity title says 'No complete LocalBusiness or Organization identity block'", () => {
-  // leathery-shaped fixture: no blocks detected at all.
+check("no JSON-LD blocks (non-local) → identity title says 'No complete Organization or business identity block'", () => {
+  // leathery-shaped fixture: no blocks at all + ecommerce (non-local) → the
+  // title leads with Organization, never forces "LocalBusiness" framing.
   const m = build({})!;
   const schemaDiag = m.diagnostics.find((d) => d.category === "schema");
   assert.ok(schemaDiag, "expected a schema diagnostic");
+  assert.equal(schemaDiag!.title, "No complete Organization or business identity block");
+});
+
+check("no JSON-LD blocks (local) → identity title keeps 'No complete LocalBusiness or Organization identity block'", () => {
+  const m = build({
+    industry: "roofing",
+    providerOutputs: [
+      { provider: "openai", status: "passed", business_understanding_score: 49, would_recommend: "PARTIAL", industry_identified: "Roofing contractor", location_identified: "Toledo, OH", missing_facts: ["NAP"] },
+    ],
+  })!;
+  const schemaDiag = m.diagnostics.find((d) => d.category === "schema");
   assert.equal(schemaDiag!.title, "No complete LocalBusiness or Organization identity block");
 });
 

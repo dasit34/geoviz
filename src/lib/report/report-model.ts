@@ -338,6 +338,19 @@ const SCHEMA_WHY_GENERAL =
   "When a customer asks an AI assistant which business to choose in this category, the model needs a confirmed business identity to name. Without it, AI systems skip you and cite a competitor they can verify.";
 const SCHEMA_FIX_IMPACT_GENERAL =
   "AI tools can now confirm who you are and what you do — the minimum required to appear in an AI recommendation.";
+// Non-local schema fix action — never prescribes "LocalBusiness" for an
+// ecommerce / SaaS / general business; lets the implementer pick the accurate
+// schema.org subtype (Organization, SoftwareApplication, ProfessionalService…).
+const SCHEMA_FIX_GENERAL_ACTION =
+  "Add JSON-LD structured data describing the business as Organization, LocalBusiness, or the most accurate subtype.";
+
+// Entity-consistency (name/phone/address) "why it hurts" — distinct from the
+// third-party-trust explanation. Both NAP-consistency and reviews findings live
+// in the `trust` category, so without this they'd render the same paragraph.
+const ENTITY_CONSISTENCY_WHY =
+  "AI systems rely on consistent name, contact, and identity details across the site. Conflicting or incomplete identity signals make it harder to resolve the business as one trusted entity.";
+const NAP_MSG_RE =
+  /name\s*[/,]\s*phone\s*[/,]\s*address|inconsistent (?:between|across) surfaces|\bnap\b|consistent name/i;
 
 // Normalized industry slugs that represent local / service-area businesses
 // (mirrors src/lib/intelligence/industry-taxonomy.ts).
@@ -465,11 +478,20 @@ function schemaBlocksDetected(
   return false;
 }
 
-/** Canonical structured-identity issue title — never says "no JSON-LD" when blocks exist. */
-function structuredIdentityTitle(blocksDetected: boolean): string {
+/**
+ * Canonical structured-identity issue title — never says "no JSON-LD" when
+ * blocks exist, and never forces "local business" wording onto a non-local
+ * (ecommerce / SaaS / general) business, where Organization is the right frame.
+ */
+function structuredIdentityTitle(blocksDetected: boolean, isLocal: boolean): string {
+  if (isLocal) {
+    return blocksDetected
+      ? "Existing JSON-LD is incomplete for local business verification"
+      : "No complete LocalBusiness or Organization identity block";
+  }
   return blocksDetected
-    ? "Existing JSON-LD is incomplete for local business verification"
-    : "No complete LocalBusiness or Organization identity block";
+    ? "Existing JSON-LD is incomplete for business identity verification"
+    : "No complete Organization or business identity block";
 }
 
 /**
@@ -482,9 +504,10 @@ function displayFindingTitle(
   message: string,
   category: CategoryKey,
   blocksDetected: boolean,
+  isLocal: boolean,
 ): string {
   if (category === "schema" && SCHEMA_IDENTITY_MSG_RE.test(message)) {
-    return structuredIdentityTitle(blocksDetected);
+    return structuredIdentityTitle(blocksDetected, isLocal);
   }
   return message;
 }
@@ -774,6 +797,34 @@ function detectFetchFailed(o: ProviderShape): boolean {
   return FETCH_FAIL_RE.test(blobs);
 }
 
+/**
+ * Normalize the YES / PARTIAL / NO pill from validator output. The raw
+ * `would_recommend` is a blunt signal — a model that clearly identified the
+ * business but flagged missing trust/identity fields sometimes emits a flat
+ * NO, which reads as "didn't understand you" rather than "understood but
+ * incomplete". We soften that to PARTIAL. This is a DISPLAY interpretation of
+ * validator output only — it never touches the canonical GeoViz score (the
+ * understanding score + main gap still surface the real disagreement).
+ *
+ * NO     = the model couldn't identify what the business does (no "reads as"),
+ *          the site failed to load, OR understanding is very low (<25).
+ * PARTIAL= the model named the business/category but is missing identity,
+ *          trust, or recommendation-critical detail.
+ * YES    = an explicit validator YES with a confirmed identity read.
+ */
+function deriveVerdict(
+  raw: string | undefined,
+  understanding: number | null,
+  businessType: string | null,
+  fetchFailed: boolean,
+): ProviderVerdict {
+  const hasIdentity = !fetchFailed && !!businessType;
+  const veryLow = typeof understanding === "number" && understanding < 25;
+  if (raw === "YES" && hasIdentity) return "YES";
+  if (!hasIdentity || veryLow) return "NO";
+  return "PARTIAL";
+}
+
 const PROVIDER_DISPLAY: Record<string, string> = {
   openai: "ChatGPT",
   claude: "Claude",
@@ -826,30 +877,26 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
     const mainGap =
       (o.missing_facts ?? []).map((s) => s.trim()).find((s) => s.length > 0) ??
       null;
-    const verdict =
-      o.would_recommend === "YES" ||
-      o.would_recommend === "PARTIAL" ||
-      o.would_recommend === "NO"
-        ? (o.would_recommend as ProviderVerdict)
-        : ("PARTIAL" as ProviderVerdict);
     const us =
       typeof o.business_understanding_score === "number" &&
       Number.isFinite(o.business_understanding_score)
         ? Math.max(0, Math.min(100, Math.round(o.business_understanding_score)))
         : null;
+    const businessType = meaningfulField(o.industry_identified);
+    const fetchFailed = detectFetchFailed(o);
     return {
       provider: p,
       display,
       status: o.status ?? "passed",
-      verdict,
-      businessType: meaningfulField(o.industry_identified),
+      verdict: deriveVerdict(o.would_recommend, us, businessType, fetchFailed),
+      businessType,
       location: meaningfulField(o.location_identified),
       topServices: services,
       mainGap,
       reason: o.recommendation_reason?.trim() || null,
       understandingScore: us,
       recommendationReadiness: asConfidence(o.recommendation_confidence),
-      fetchFailed: detectFetchFailed(o),
+      fetchFailed,
     };
   });
 }
@@ -981,10 +1028,14 @@ export function buildReportModel(
     const n = narration?.diagnostics?.[f.id];
     const detReason = det?.category_scores?.[f.category]?.reason;
     const why =
-      f.category === "schema" && !isLocal ? SCHEMA_WHY_GENERAL : WHY_IT_HURTS[f.category];
+      f.category === "schema" && !isLocal
+        ? SCHEMA_WHY_GENERAL
+        : NAP_MSG_RE.test(f.message)
+          ? ENTITY_CONSISTENCY_WHY
+          : WHY_IT_HURTS[f.category];
     return {
       rank: i + 1,
-      title: displayFindingTitle(f.message, f.category, blocksDetected),
+      title: displayFindingTitle(f.message, f.category, blocksDetected, isLocal),
       severity: f.severity,
       category: f.category,
       problem: n?.problem ?? detReason ?? f.message,
@@ -1003,8 +1054,19 @@ export function buildReportModel(
     // actually audited; otherwise soften to "verify crawl access" so we never
     // recommend editing a robots.txt we never inspected.
     const rawAction = n?.action ?? fx.action;
+    // Display-layer action overrides (frozen fixes-table text is untouched):
+    //  · crawler — soften robots.txt specifics when crawl was never audited.
+    //  · schema  — for non-local businesses, don't prescribe "LocalBusiness";
+    //              let the implementer pick the accurate schema.org subtype.
     const action =
-      cat === "crawler" && !crawlAudited && !n?.action ? SOFT_CRAWL_ACTION : rawAction;
+      cat === "crawler" && !crawlAudited && !n?.action
+        ? SOFT_CRAWL_ACTION
+        : cat === "schema" &&
+            !isLocal &&
+            !n?.action &&
+            /json-?ld|localbusiness|structured data/i.test(rawAction)
+          ? SCHEMA_FIX_GENERAL_ACTION
+          : rawAction;
     const impactCopy =
       cat === "schema" && !isLocal ? SCHEMA_FIX_IMPACT_GENERAL : FIX_BUSINESS_IMPACT[cat];
     // Issue headline = the linked finding (what's wrong); distinct from the
@@ -1012,7 +1074,7 @@ export function buildReportModel(
     // headline never says "No JSON-LD block" when blocks were detected. Fall
     // back to the category gap label so title and body never repeat.
     const issue = finding
-      ? displayFindingTitle(finding.message, finding.category, blocksDetected).trim()
+      ? displayFindingTitle(finding.message, finding.category, blocksDetected, isLocal).trim()
       : `${CATEGORY_LABEL[cat].label} gap`;
     return {
       rank: i + 1,

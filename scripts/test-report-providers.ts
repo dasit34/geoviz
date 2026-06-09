@@ -90,6 +90,34 @@ check("at least one card shows a status (verdict) and an understanding score", (
   assert.equal(gemini.businessType, "Roofing contractor");
 });
 
+check("model understood the business (reads-as + mid score) but emitted NO → softened to PARTIAL", () => {
+  // The Claude case: would_recommend=NO with a valid "reads as" and understanding
+  // ~45 should NOT show a flat NO — it understood the category but missed
+  // identity/trust detail → PARTIAL.
+  const m = buildWith([
+    { provider: "claude", status: "passed", business_understanding_score: 45, would_recommend: "NO", industry_identified: "AI visibility and search analytics software", location_identified: null, services_identified: [], missing_facts: ["Confirmed entity identity fields"], recommendation_confidence: "low" },
+  ]);
+  const claude = m!.providers.find((p) => p.provider === "claude")!;
+  assert.equal(claude.understandingScore, 45);
+  assert.equal(claude.businessType, "AI visibility and search analytics software");
+  assert.equal(claude.verdict, "PARTIAL", "45 + valid reads-as must be PARTIAL, not NO");
+});
+
+check("genuinely low understanding (<25) stays NO even with a reads-as", () => {
+  const m = buildWith([
+    { provider: "gemini", status: "passed", business_understanding_score: 17, would_recommend: "NO", industry_identified: "Software", location_identified: null, services_identified: [], missing_facts: ["x"], recommendation_confidence: "low" },
+  ]);
+  assert.equal(m!.providers.find((p) => p.provider === "gemini")!.verdict, "NO");
+});
+
+check("no reads-as at all → NO (model could not identify the business)", () => {
+  const m = buildWith([
+    { provider: "openai", status: "passed", business_understanding_score: 55, would_recommend: "PARTIAL", services_identified: [], missing_facts: ["everything"], recommendation_confidence: "low" },
+  ]);
+  // industry_identified absent → no identity basis → NO regardless of score.
+  assert.equal(m!.providers.find((p) => p.provider === "openai")!.verdict, "NO");
+});
+
 check("NO outputs → still 4 cards, all UNAVAILABLE, never a blank gap", () => {
   const m = buildWith(null);
   assert.ok(m, "model still builds without providers");

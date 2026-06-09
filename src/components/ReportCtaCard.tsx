@@ -40,7 +40,7 @@ export function ReportCtaCard({
         </p>
 
         <div className="cta-card-badges">
-          <span className="cta-card-badge cta-card-badge-price">$497 one-time</span>
+          <span className="cta-card-badge cta-card-badge-price">Starting at $497</span>
           <span className="cta-card-badge cta-card-badge-meta">3–5 business days</span>
         </div>
 
