@@ -153,6 +153,10 @@
   max-width: 62ch;
 }
 .rd-note { font-size: 14.5px; color: var(--l-muted); }
+/* Clarifying notes that separate model scores / access scores from
+   recommendation readiness. */
+.rd-prov-note { margin: 10px 0 0; line-height: 1.5; font-size: 13.5px; }
+.rd-bars-note { margin: -12px 0 22px; line-height: 1.5; font-size: 13.5px; }
 
 /* tone text */
 .rd-v-ok { color: var(--c-green); }
@@ -364,15 +368,15 @@
 .rd-prov-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 13px;
-  margin-bottom: 18px;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 .rd-prov {
   background: var(--l-card);
   border: 1px solid var(--l-border);
   border-top-width: 3px;
   border-radius: 12px;
-  padding: 15px 17px;
+  padding: 12px 17px;
 }
 .rd-prov-openai { border-top-color: #10a37f; }
 .rd-prov-claude { border-top-color: #d97757; }
@@ -382,7 +386,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 11px;
+  margin-bottom: 8px;
 }
 .rd-prov-name {
   display: inline-flex;
@@ -394,7 +398,7 @@
   color: var(--l-ink);
 }
 .rd-prov-na { font-size: 14px; color: var(--l-faint); margin: 4px 0 0; }
-.rd-prov-body { display: flex; flex-direction: column; gap: 9px; }
+.rd-prov-body { display: flex; flex-direction: column; gap: 7px; }
 .rd-prov-field { display: flex; flex-direction: column; gap: 3px; }
 .rd-prov-k {
   font-family: var(--rd-mono);
@@ -414,7 +418,8 @@
 .rd-readiness-strip {
   background: var(--d-page);
   border-radius: 12px;
-  padding: 14px 20px;
+  padding: 12px 20px;
+  margin-top: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;

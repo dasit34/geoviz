@@ -191,6 +191,14 @@ export type ReportModel = {
   diagnostics: ReportModelDiagnostic[];
   fixes: ReportModelFix[];
   businessImpact: string;
+  /**
+   * Page-5 "Score interpretation" prose. Distinct from `businessImpact`
+   * (the Page-8 projected outcome): this explains why a high access score
+   * can coexist with a low overall score — access ≠ recommendation
+   * readiness — so customers don't misread a 100 Crawl Access / Content
+   * Extraction as strong AI visibility.
+   */
+  scoreInterpretation: string;
   /** True when at least one cross-model validator passed. */
   hasProviders: boolean;
   /** True when preflight signals were available to populate Evidence Reviewed. */
@@ -204,8 +212,9 @@ const CATEGORY_LABEL: Record<CategoryKey, { label: string; tooltip: string }> = 
     tooltip: "How clearly AI systems can identify who you are and what you do.",
   },
   crawler: {
-    label: "Technical Access",
-    tooltip: "Whether AI systems can access and understand your website content.",
+    label: "Crawl Access",
+    tooltip:
+      "Whether AI systems can reach your website. High access means crawlers are not blocked — it does not mean the business is verified or recommended.",
   },
   trust: {
     label: "Trust Signals",
@@ -223,9 +232,9 @@ const CATEGORY_LABEL: Record<CategoryKey, { label: string; tooltip: string }> = 
       "Whether AI can confidently identify your business as one consistent entity across the web.",
   },
   tech: {
-    label: "AI Readability",
+    label: "Content Extraction",
     tooltip:
-      "How easily AI systems can retrieve and interpret your site structure and content.",
+      "Whether AI systems can cleanly parse your page text and structure. Clean extraction is necessary, but not sufficient for being recommended.",
   },
 };
 
@@ -354,6 +363,65 @@ function detectIsLocal(
   return providers.some((p) => !!p.location && p.location.trim().length > 0);
 }
 
+/** "a", "a and b", "a, b, and c". */
+function humanList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+/**
+ * Page-5 "Score interpretation" copy. Built from the normalized category
+ * scores so the prose matches the bars. The message customers must not miss:
+ * access (Crawl Access + Content Extraction) is necessary but NOT the same as
+ * recommendation readiness (structured identity + entity consistency + trust
+ * evidence). A site can score 100 on access and still be a weak recommendation
+ * candidate — that's the exact confusion this copy resolves.
+ */
+function buildScoreInterpretation(
+  businessName: string,
+  categories: ReportModelCategory[],
+): string {
+  const get = (k: CategoryKey): number | null =>
+    categories.find((c) => c.key === k)?.score ?? null;
+  const mean = (...vals: Array<number | null>): number | null => {
+    const nums = vals.filter((v): v is number => v !== null);
+    return nums.length
+      ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length)
+      : null;
+  };
+  const access = mean(get("crawler"), get("tech"));
+  const schema = get("schema");
+  const brand = get("brand");
+  const trust = get("trust");
+  const rec = mean(schema, brand, trust);
+
+  const accessHigh = access !== null && access >= 65;
+  const recLow = rec !== null && rec < 60;
+
+  // The headline case the relabel exists to fix: clean access, weak
+  // recommendation signals (e.g. 100 access but ~50 overall).
+  if (accessHigh && recLow) {
+    const weak: string[] = [];
+    if (schema !== null && schema < 60) weak.push("weak structured identity");
+    if (brand !== null && brand < 60) weak.push("inconsistent business signals");
+    if (trust !== null && trust < 60) weak.push("low third-party trust evidence");
+    const weakList =
+      weak.length > 0
+        ? humanList(weak)
+        : "gaps in structured identity, business signals, and trust evidence";
+    return `${businessName} is accessible to AI systems, but access is not the same as recommendation readiness. The site can be crawled and extracted cleanly, but ${weakList} reduce confidence when AI systems decide who to recommend.`;
+  }
+
+  // Access itself is the limiting factor.
+  if (access !== null && access < 65) {
+    return `AI systems cannot fully reach or parse ${businessName}'s site, which limits how much they can understand and how confidently they can recommend it. Improving crawl access and content extraction is the foundation the rest of the score builds on.`;
+  }
+
+  // Access and recommendation signals are both reasonably strong.
+  return `${businessName} is accessible to AI systems and sends reasonably clear identity and trust signals. Closing the remaining gaps above raises how confidently AI systems can recommend it when customers ask who to choose.`;
+}
+
 function toneForPct(pct: number): Tone {
   return categoryToneFromRatio(pct / 100);
 }
@@ -365,6 +433,60 @@ function isPreflight(v: unknown): v is PreflightSignals {
     "fetchOk" in (v as object) &&
     "engineVersion" in (v as object)
   );
+}
+
+// A schema-category finding whose message is about structured identity /
+// JSON-LD. The frozen scoring engine can phrase this as "No LocalBusiness or
+// Organization JSON-LD block" even when JSON-LD blocks DO exist (it means no
+// *complete* identity block) — which contradicts the Evidence page's "2 blocks
+// found". We normalize the customer-facing title in the display layer only.
+const SCHEMA_IDENTITY_MSG_RE =
+  /json-?ld|structured data|localbusiness|organization|schema/i;
+
+/**
+ * True when the audit actually detected JSON-LD blocks on the page. Prefers the
+ * preflight count (authoritative) and falls back to parsing the deterministic
+ * schema reason ("Detected 2 JSON-LD block(s)"). Never reads scoring; display
+ * signal only.
+ */
+function schemaBlocksDetected(
+  det: DeterministicScore | null,
+  preflight: unknown,
+): boolean {
+  if (isPreflight(preflight) && preflight.fetchOk && preflight.schema) {
+    const c = (preflight.schema as { rawJsonLdCount?: number }).rawJsonLdCount;
+    if (typeof c === "number") return c > 0;
+  }
+  const reason = det?.category_scores?.schema?.reason ?? "";
+  const m =
+    reason.match(/(\d+)\s*(?:json-?ld\s*)?block/i) ??
+    reason.match(/detected\s+(\d+)/i);
+  if (m) return parseInt(m[1], 10) > 0;
+  return false;
+}
+
+/** Canonical structured-identity issue title — never says "no JSON-LD" when blocks exist. */
+function structuredIdentityTitle(blocksDetected: boolean): string {
+  return blocksDetected
+    ? "Existing JSON-LD is incomplete for local business verification"
+    : "No complete LocalBusiness or Organization identity block";
+}
+
+/**
+ * Customer-facing finding title. For structured-identity schema findings, swaps
+ * the engine's raw message for the normalized title so the cover, Executive
+ * Summary, Top Issues, and Priority Fix Plan never contradict the Evidence page.
+ * All other findings pass through unchanged.
+ */
+function displayFindingTitle(
+  message: string,
+  category: CategoryKey,
+  blocksDetected: boolean,
+): string {
+  if (category === "schema" && SCHEMA_IDENTITY_MSG_RE.test(message)) {
+    return structuredIdentityTitle(blocksDetected);
+  }
+  return message;
 }
 
 /**
@@ -815,19 +937,19 @@ export function buildReportModel(
         ),
         mkReadiness(
           "structured-data",
-          "Structured Data Readiness",
+          "Structured Identity",
           catPct("schema"),
           "LocalBusiness identity fields in the page source",
         ),
         mkReadiness(
           "entity",
-          "Entity Recognition Signals",
+          "Entity Consistency",
           catPct("brand"),
           "Consistent business name + identity across surfaces",
         ),
         mkReadiness(
           "citation-trust",
-          "Citation & Trust Signals",
+          "Trust Evidence",
           catPct("trust"),
           "Reviews, credentials, and verifiable trust markers",
         ),
@@ -853,6 +975,7 @@ export function buildReportModel(
     "Verify that AI and search crawlers can access the public homepage (crawl access was not confirmed in this audit).";
 
   // ── Diagnostics (which 3 + severity come from the engine) ────────
+  const blocksDetected = schemaBlocksDetected(det, input.preflightSignals);
   const findings = det?.top_3_findings ?? [];
   const diagnostics: ReportModelDiagnostic[] = findings.map((f, i) => {
     const n = narration?.diagnostics?.[f.id];
@@ -861,7 +984,7 @@ export function buildReportModel(
       f.category === "schema" && !isLocal ? SCHEMA_WHY_GENERAL : WHY_IT_HURTS[f.category];
     return {
       rank: i + 1,
-      title: f.message,
+      title: displayFindingTitle(f.message, f.category, blocksDetected),
       severity: f.severity,
       category: f.category,
       problem: n?.problem ?? detReason ?? f.message,
@@ -885,9 +1008,12 @@ export function buildReportModel(
     const impactCopy =
       cat === "schema" && !isLocal ? SCHEMA_FIX_IMPACT_GENERAL : FIX_BUSINESS_IMPACT[cat];
     // Issue headline = the linked finding (what's wrong); distinct from the
-    // action (the exact fix). Fall back to the category gap label so the card
-    // title and body never repeat the same sentence.
-    const issue = finding?.message?.trim() || `${CATEGORY_LABEL[cat].label} gap`;
+    // action (the exact fix). Normalize structured-identity findings so the
+    // headline never says "No JSON-LD block" when blocks were detected. Fall
+    // back to the category gap label so title and body never repeat.
+    const issue = finding
+      ? displayFindingTitle(finding.message, finding.category, blocksDetected).trim()
+      : `${CATEGORY_LABEL[cat].label} gap`;
     return {
       rank: i + 1,
       issue: issue === action ? `${CATEGORY_LABEL[cat].label} gap` : issue,
@@ -930,7 +1056,7 @@ export function buildReportModel(
           ],
     strongestSignal,
     weakestSignal,
-    strongestLabel: strongest?.label ?? "Technical Access",
+    strongestLabel: strongest?.label ?? "Crawl Access",
     weakestLabel: weakest?.label ?? "Trust Signals",
   };
 
@@ -942,6 +1068,11 @@ export function buildReportModel(
   const businessImpact =
     narration?.businessImpact ??
     `Your real-world reputation is stronger than the signals your website currently sends to AI tools. Closing the gaps above gives AI systems the confirmed identity, trust, and content they need to recommend ${input.resolvedBusinessName} ${closingClause}.`;
+
+  const scoreInterpretation = buildScoreInterpretation(
+    input.resolvedBusinessName,
+    categories,
+  );
 
   return {
     meta: {
@@ -971,6 +1102,7 @@ export function buildReportModel(
     diagnostics,
     fixes,
     businessImpact,
+    scoreInterpretation,
     // True when ANY provider produced usable data (drives the page-level
     // "verdicts not run" note). UNAVAILABLE = no data for that provider.
     hasProviders: providers.some((p) => p.verdict !== "UNAVAILABLE"),

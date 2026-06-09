@@ -200,6 +200,89 @@ check("present platform data → grid renders (hasProviders true, no fallback)",
   assert.equal(m.hasProviders, true);
 });
 
+check("diagnostic labels are access-honest (Crawl Access / Content Extraction)", () => {
+  const m = build({})!;
+  const labels = m.categories.map((c) => c.label);
+  assert.ok(labels.includes("Crawl Access"), `crawler label should be 'Crawl Access', got ${labels.join(", ")}`);
+  assert.ok(labels.includes("Content Extraction"), `tech label should be 'Content Extraction'`);
+  assert.ok(!labels.includes("Technical Access"), "old 'Technical Access' label must be gone");
+  assert.ok(!labels.includes("AI Readability"), "old 'AI Readability' label must be gone");
+});
+
+check("high access + low recommendation signals → interpretation warns access ≠ recommendation", () => {
+  // crawler 20/20 + tech 10/10 = 100 access; schema/trust/brand low.
+  const m = build({
+    cats: CATS({ crawler: 20, tech: 10, schema: 4, trust: 3, brand: 2, content: 3 }),
+  })!;
+  assert.match(m.scoreInterpretation, /access is not the same as recommendation readiness/i);
+  assert.match(m.scoreInterpretation, /Leathery/);
+  // The P5 interpretation must NOT be the P8 projected-outcome copy.
+  assert.notEqual(m.scoreInterpretation, m.businessImpact);
+});
+
+check("readiness strip labels are recommendation-distinct (Structured Identity / Trust Evidence)", () => {
+  const m = build({})!;
+  const rlabels = m.readiness.map((r) => r.label);
+  assert.ok(rlabels.includes("Structured Identity"), `got ${rlabels.join(", ")}`);
+  assert.ok(rlabels.includes("Entity Consistency"));
+  assert.ok(rlabels.includes("Trust Evidence"));
+  assert.ok(rlabels.includes("Google AI Overviews Readiness"));
+});
+
+check("JSON-LD blocks detected → identity title says 'incomplete', never 'No … JSON-LD block'", () => {
+  // Shield-shaped: engine finding says "No LocalBusiness or Organization JSON-LD
+  // block" but preflight detected 2 blocks → must read as incomplete, not absent.
+  const det = {
+    overall_score: 50, band: "Needs Work",
+    category_scores: {
+      schema: { score: 5, max: 25, signals: [], issues: [], reason: "Detected 2 JSON-LD block(s)", evidence_used: [], category_confidence: 0 },
+      crawler: { score: 20, max: 20, signals: [], issues: [], reason: "ok", evidence_used: [], category_confidence: 0 },
+      trust: { score: 3, max: 20, signals: [], issues: [], reason: "inconsistent", evidence_used: [], category_confidence: 0 },
+      content: { score: 9, max: 15, signals: [], issues: [], reason: "ok", evidence_used: [], category_confidence: 0 },
+      brand: { score: 4, max: 10, signals: [], issues: [], reason: "varies", evidence_used: [], category_confidence: 0 },
+      tech: { score: 10, max: 10, signals: [], issues: [], reason: "ok", evidence_used: [], category_confidence: 0 },
+    },
+    evidence_summary: { preflight_ok: true, schema_validated: true, crawlability_audited: true, entity_checked: true, ingest_present: true, render_attempted: false },
+    top_3_findings: [
+      { id: "s1", severity: "critical", category: "schema", message: "No LocalBusiness or Organization JSON-LD block" },
+      { id: "t1", severity: "warning", category: "trust", message: "Name / phone / address inconsistent between surfaces" },
+      { id: "b1", severity: "warning", category: "brand", message: "Business name varies across schema / homepage / footer" },
+    ],
+    top_3_recommended_fixes: [
+      { id: "fx1", for_finding: "s1", action: "Add a LocalBusiness JSON-LD block with name, address, telephone, url, and geo coordinates.", impact: "high" },
+    ],
+  } as unknown as DeterministicScore;
+  const pf = {
+    ok: true, fetchOk: true, fetchError: null, fetchedUrl: "https://shield.com",
+    readability: null, schema: { rawJsonLdCount: 2, missingFields: ["address", "telephone"] },
+    crawlability: null, entityConsistency: null, engineVersion: "v1", runDurationMs: 10,
+  } as unknown;
+  const m = buildReportModel({
+    reportId: "GEO-SHIELD", orderId: "shield", resolvedBusinessName: "Shield Exteriors",
+    nameAlternates: [], website: "https://shield.com", generatedAt: null,
+    score: { overall: 50, status: "Needs Work", categories: CATS({ schema: 5, crawler: 20, trust: 3, content: 9, brand: 4, tech: 10 }) } as unknown as ReportScore,
+    deterministic: det, providerOutputs: null, preflightSignals: pf, industryNormalized: "roofing",
+  })!;
+  assert.equal(m.diagnostics[0].title, "Existing JSON-LD is incomplete for local business verification");
+  const schemaFix = m.fixes.find((f) => f.action.includes("LocalBusiness JSON-LD"))!;
+  assert.equal(schemaFix.issue, "Existing JSON-LD is incomplete for local business verification");
+  // No surface may claim there is no JSON-LD block when 2 were detected.
+  const blob = [
+    m.diagnostics[0].title,
+    ...m.diagnostics.map((d) => d.title),
+    ...m.fixes.map((f) => f.issue),
+  ].join(" | ");
+  assert.doesNotMatch(blob, /No (?:LocalBusiness or Organization )?JSON-?LD block/i, blob);
+});
+
+check("no JSON-LD blocks → identity title says 'No complete LocalBusiness or Organization identity block'", () => {
+  // leathery-shaped fixture: no blocks detected at all.
+  const m = build({})!;
+  const schemaDiag = m.diagnostics.find((d) => d.category === "schema");
+  assert.ok(schemaDiag, "expected a schema diagnostic");
+  assert.equal(schemaDiag!.title, "No complete LocalBusiness or Organization identity block");
+});
+
 console.log(`[report-consistency] passed=${passed} failed=${failed}`);
 if (failed > 0) {
   for (const f of failures) console.log(`  ✗ ${f}`);

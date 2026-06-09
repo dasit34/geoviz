@@ -230,7 +230,7 @@ check("fix metadata is deterministic (difficulty/foundationFix/unlocks)", () => 
 
 check("executive summary derives strongest/weakest deterministically", () => {
   const m = buildReportModel(makeInput())!;
-  assert.match(m.executive.strongestSignal, /Technical Access|AI Readability/);
+  assert.match(m.executive.strongestSignal, /Crawl Access|Content Extraction/);
   assert.match(m.executive.weakestSignal, /Trust Signals/);
   assert.equal(m.executive.summaryBullets.length, 3);
 });

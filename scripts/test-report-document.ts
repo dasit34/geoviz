@@ -105,6 +105,14 @@ check("cover score renders as clean HTML text (no SVG gauge dual-text)", () => {
   assert.doesNotMatch(DOC, /ScoreGauge/, "cover must not use the SVG gauge (text-extraction garble)");
 });
 
+check("cover primary gap uses the issue title, not the raw-evidence problem string", () => {
+  // The cover 'gap' must read diagnostics[0]?.title (customer-facing) and never
+  // diagnostics[0]?.problem (which can fall back to a raw evidence reason like
+  // "Detected 2 JSON-LD block(s)").
+  assert.match(DOC, /const gap =\s*\n\s*m\.diagnostics\[0\]\?\.title/);
+  assert.doesNotMatch(DOC, /const gap =\s*\n\s*m\.diagnostics\[0\]\?\.problem/);
+});
+
 check("light/dark page system: dark cover + CTA, light interior", () => {
   // Page variant is applied via <Page variant="dark|light"> → rd-page-${variant}.
   assert.match(DOC, /variant="dark"/);

@@ -85,8 +85,11 @@ function Page({
 function CoverPage({ model }: { model: ReportModel }) {
   const m = model;
   const overall = typeof m.score.overall === "number" ? m.score.overall : null;
+  // Use the customer-facing issue TITLE, never the raw evidence string
+  // (diagnostics[0].problem can fall back to a deterministic reason like
+  // "Detected 2 JSON-LD block(s)", which is evidence, not a gap).
   const gap =
-    m.diagnostics[0]?.problem ??
+    m.diagnostics[0]?.title ??
     m.executive.weakestSignal ??
     "Identity and trust signals need strengthening for AI recommendation.";
   return (
@@ -259,6 +262,12 @@ function PlatformsPage({ model, reportId }: { model: ReportModel; reportId: stri
         </p>
       ) : null}
 
+      <p className="rd-note rd-prov-note">
+        Model results measure how clearly each AI system understood and could
+        recommend the business. Site diagnostics (page 5) measure the underlying
+        website signals that influence those results.
+      </p>
+
       {m.readiness.length > 0 ? <ReadinessStrip readiness={m.readiness} /> : null}
     </Page>
   );
@@ -379,9 +388,14 @@ function DiagnosticsPage({ model, reportId }: { model: ReportModel; reportId: st
           <Bar key={c.key} category={c} />
         ))}
       </div>
+      <p className="rd-note rd-bars-note">
+        Crawl Access and Content Extraction show that AI systems can reach and
+        parse the site. They do not mean the business is verified, trusted, or
+        likely to be recommended.
+      </p>
       <div className="rd-interp">
         <h3 className="rd-interp-title">Score interpretation</h3>
-        <p className="rd-interp-body">{m.businessImpact}</p>
+        <p className="rd-interp-body">{m.scoreInterpretation}</p>
       </div>
     </Page>
   );
@@ -542,12 +556,11 @@ function understandingTone(score: number | null): Tone {
 }
 
 function readinessShort(label: string): string {
-  return label
-    .replace(/\s*Readiness$/i, "")
-    .replace(/\s*Signals$/i, "")
-    .replace(/\s*Factors$/i, "")
-    .replace("Google AI Overviews", "AI Overviews")
-    .trim();
+  // Readiness-factor labels are now authored as the exact text to display
+  // (e.g. "Google AI Overviews Readiness", "Structured Identity", "Trust
+  // Evidence") so customers don't confuse them with the Page-5 site
+  // diagnostics. Show them verbatim; the strip wraps if needed.
+  return label.trim();
 }
 
 function prettyUrl(url: string): string {
