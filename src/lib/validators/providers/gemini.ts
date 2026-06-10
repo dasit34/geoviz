@@ -35,8 +35,18 @@
  */
 
 import { readApiKey } from "../apiKey";
+import {
+  CAPTURE_PROMPT_VERSION,
+  COMPETITIVE_TIMEOUT_MS,
+  buildCompetitivePrompt,
+  competitiveCaptureEnabled,
+  normalizeCompetitive,
+  parseDomains,
+  type CompetitiveParsed,
+} from "../capture";
 import type {
   AiValidator,
+  CompetitiveCapture,
   ConfidenceLevel,
   NormalizedValidationOutput,
   ValidationInput,
@@ -52,6 +62,97 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const GEMINI_TIMEOUT_MS = 15_000;
 const GEMINI_TEMPERATURE = 0.1;
+
+// Buyer-intent competitive capture (AI Answer Graph). OpenAPI-dialect
+// schema (uppercase type names). Capture-only — never fed to consensus/scoring.
+const GEMINI_COMPETITIVE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    inferred_category: { type: "STRING" },
+    inferred_location: { type: "STRING" },
+    answer: { type: "STRING" },
+    businesses: { type: "ARRAY", items: { type: "STRING" } },
+    subject_named: { type: "BOOLEAN" },
+  },
+  required: [
+    "inferred_category",
+    "inferred_location",
+    "answer",
+    "businesses",
+    "subject_named",
+  ],
+} as const;
+
+async function runGeminiCompetitive(
+  input: ValidationInput,
+): Promise<CompetitiveCapture> {
+  const { system, user } = buildCompetitivePrompt(input);
+  const retrievedAt = new Date().toISOString();
+  try {
+    const response = await fetch(GEMINI_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": readApiKey("GEMINI_API_KEY")!,
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: user }] }],
+        generationConfig: {
+          temperature: GEMINI_TEMPERATURE,
+          responseMimeType: "application/json",
+          responseSchema: GEMINI_COMPETITIVE_SCHEMA,
+        },
+      }),
+      signal: AbortSignal.timeout(COMPETITIVE_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      return normalizeCompetitive({
+        parsed: null,
+        rawResponse: "",
+        model: GEMINI_MODEL,
+        modelVersion: null,
+        queryText: user,
+        retrievedAt,
+        status: "failed",
+        error: `HTTP ${response.status}`,
+      });
+    }
+    const data = (await response.json()) as {
+      modelVersion?: string;
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    let parsed: CompetitiveParsed | null = null;
+    try {
+      parsed = text ? (JSON.parse(text) as CompetitiveParsed) : null;
+    } catch {
+      parsed = null;
+    }
+    return normalizeCompetitive({
+      parsed,
+      rawResponse: text,
+      model: GEMINI_MODEL,
+      modelVersion: data.modelVersion ?? null,
+      queryText: user,
+      retrievedAt,
+      status: parsed ? "passed" : "failed",
+      error: parsed ? null : "competitive parse failed",
+    });
+  } catch (err) {
+    const e = err as Error;
+    return normalizeCompetitive({
+      parsed: null,
+      rawResponse: "",
+      model: GEMINI_MODEL,
+      modelVersion: null,
+      queryText: user,
+      retrievedAt,
+      status: "failed",
+      error: e.message ?? String(err),
+    });
+  }
+}
 
 // OpenAPI 3.0 schema (Gemini's expected shape — uppercase type names,
 // distinct from OpenAI's JSON Schema). Structured-output mode pins
@@ -267,6 +368,13 @@ export const GeminiValidator: AiValidator = {
       return MOCK_RESPONSE;
     }
 
+    // Buyer-intent competitive query, concurrent with the main call.
+    // Capture-only; fail-soft; never alters the validator status/score.
+    const competitivePromise: Promise<CompetitiveCapture | null> =
+      competitiveCaptureEnabled()
+        ? runGeminiCompetitive(input)
+        : Promise.resolve(null);
+
     try {
       const { system, user } = buildPrompt(input);
       const response = await fetch(GEMINI_ENDPOINT, {
@@ -294,7 +402,9 @@ export const GeminiValidator: AiValidator = {
         );
       }
 
+      const mainRetrievedAt = new Date().toISOString();
       const data = (await response.json()) as {
+        modelVersion?: string;
         candidates?: Array<{
           content?: { parts?: Array<{ text?: string }> };
           finishReason?: string;
@@ -379,6 +489,15 @@ export const GeminiValidator: AiValidator = {
         services_identified: asOptionalStringArray(parsed.services_identified),
         would_recommend: asYesPartialNo(parsed.would_recommend),
         recommendation_reason: asNonEmptyString(parsed.recommendation_reason),
+        // ─── AI Answer Graph capture (additive, never alters status/score) ──
+        model: GEMINI_MODEL,
+        model_version: data.modelVersion ?? null,
+        prompt_text: `${system}\n\n${user}`,
+        prompt_version: CAPTURE_PROMPT_VERSION,
+        raw_response_text: text,
+        answer_retrieved_at: mainRetrievedAt,
+        cited_source_domains: parseDomains(asStringArray(parsed.cited_sources)),
+        competitive: await competitivePromise,
       };
     } catch (err) {
       const e = err as Error;

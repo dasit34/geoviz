@@ -22,6 +22,7 @@
 
 import { VALIDATOR_REGISTRY } from "./registry";
 import { devLog } from "./devLog";
+import { CAPTURE_VERSION } from "./capture";
 import type {
   NormalizedValidationOutput,
   ValidationInput,
@@ -56,6 +57,7 @@ export async function runAiValidationLayer(
   const result: ValidationLayerResult = {
     outputs,
     ran_at: new Date().toISOString(),
+    capture_version: CAPTURE_VERSION,
   };
 
   // Dev-only log per scaffold contract. No-op in production. Never

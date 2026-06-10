@@ -37,8 +37,18 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 import { readApiKey } from "../apiKey";
+import {
+  CAPTURE_PROMPT_VERSION,
+  COMPETITIVE_TIMEOUT_MS,
+  buildCompetitivePrompt,
+  competitiveCaptureEnabled,
+  normalizeCompetitive,
+  parseDomains,
+  type CompetitiveParsed,
+} from "../capture";
 import type {
   AiValidator,
+  CompetitiveCapture,
   ConfidenceLevel,
   NormalizedValidationOutput,
   ValidationInput,
@@ -54,6 +64,104 @@ const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 const CLAUDE_TIMEOUT_MS = 15_000;
 const CLAUDE_MAX_TOKENS = 1024;
 const CLAUDE_TEMPERATURE = 0.1;
+// Competitive capture (AI Answer Graph) — slightly larger budget since
+// the model names several businesses plus a natural answer.
+const COMPETITIVE_MAX_TOKENS = 1536;
+const COMPETITIVE_TOOL_NAME = "report_competitive_set";
+const COMPETITIVE_INPUT_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    inferred_category: { type: "string" },
+    inferred_location: { type: "string" },
+    answer: {
+      type: "string",
+      description: "Natural consumer-facing answer naming the businesses.",
+    },
+    businesses: {
+      type: "array",
+      items: { type: "string" },
+      description: "Specific business names you named.",
+    },
+    subject_named: {
+      type: "boolean",
+      description: "True if the subject business is among them.",
+    },
+  },
+  required: [
+    "inferred_category",
+    "inferred_location",
+    "answer",
+    "businesses",
+    "subject_named",
+  ],
+};
+
+// Buyer-intent competitive query — captured for the AI Answer Graph, never
+// fed into the consensus index or shown to customers. Fail-soft: any error
+// becomes a `status:"failed"` CompetitiveCapture, never thrown.
+async function runClaudeCompetitive(
+  input: ValidationInput,
+): Promise<CompetitiveCapture> {
+  const { system, user } = buildCompetitivePrompt(input);
+  const retrievedAt = new Date().toISOString();
+  try {
+    const client = new Anthropic({ apiKey: readApiKey("ANTHROPIC_API_KEY")! });
+    const response = await client.messages.create(
+      {
+        model: CLAUDE_MODEL,
+        max_tokens: COMPETITIVE_MAX_TOKENS,
+        temperature: CLAUDE_TEMPERATURE,
+        system,
+        tools: [
+          {
+            name: COMPETITIVE_TOOL_NAME,
+            description:
+              "Report which businesses an AI would name for the subject's category and area.",
+            input_schema: COMPETITIVE_INPUT_SCHEMA,
+          },
+        ],
+        tool_choice: { type: "tool", name: COMPETITIVE_TOOL_NAME },
+        messages: [{ role: "user", content: user }],
+      },
+      { signal: AbortSignal.timeout(COMPETITIVE_TIMEOUT_MS) },
+    );
+    const toolUse = response.content.find((b) => b.type === "tool_use");
+    if (!toolUse || toolUse.type !== "tool_use") {
+      return normalizeCompetitive({
+        parsed: null,
+        rawResponse: "",
+        model: CLAUDE_MODEL,
+        modelVersion: response.model ?? null,
+        queryText: user,
+        retrievedAt,
+        status: "failed",
+        error: "no tool_use block",
+      });
+    }
+    return normalizeCompetitive({
+      parsed: toolUse.input as CompetitiveParsed,
+      rawResponse: JSON.stringify(toolUse.input),
+      model: CLAUDE_MODEL,
+      modelVersion: response.model ?? null,
+      queryText: user,
+      retrievedAt,
+      status: "passed",
+      error: null,
+    });
+  } catch (err) {
+    const e = err as Error;
+    return normalizeCompetitive({
+      parsed: null,
+      rawResponse: "",
+      model: CLAUDE_MODEL,
+      modelVersion: null,
+      queryText: user,
+      retrievedAt,
+      status: "failed",
+      error: e.message ?? String(err),
+    });
+  }
+}
 
 const VALIDATOR_TOOL_NAME = "report_validator_findings";
 const VALIDATOR_INPUT_SCHEMA = {
@@ -321,6 +429,14 @@ export const ClaudeValidator: AiValidator = {
       return MOCK_RESPONSE;
     }
 
+    // Fire the buyer-intent competitive query concurrently with the main
+    // validation call so it adds ~0 to wall-clock (both share one timeout
+    // window). Capture-only; never affects the validator status/score.
+    const competitivePromise: Promise<CompetitiveCapture | null> =
+      competitiveCaptureEnabled()
+        ? runClaudeCompetitive(input)
+        : Promise.resolve(null);
+
     try {
       const { system, user } = buildPrompt(input);
       const client = new Anthropic({
@@ -363,6 +479,7 @@ export const ClaudeValidator: AiValidator = {
         );
       }
 
+      const mainRetrievedAt = new Date().toISOString();
       const parsed = toolUse.input as ClaudeToolInput;
 
       // Defensive post-parse sanity check. Tool-use with input_schema
@@ -407,6 +524,15 @@ export const ClaudeValidator: AiValidator = {
         services_identified: asOptionalStringArray(parsed.services_identified),
         would_recommend: asYesPartialNo(parsed.would_recommend),
         recommendation_reason: asNonEmptyString(parsed.recommendation_reason),
+        // ─── AI Answer Graph capture (additive, never alters status/score) ──
+        model: CLAUDE_MODEL,
+        model_version: response.model ?? null,
+        prompt_text: `${system}\n\n${user}`,
+        prompt_version: CAPTURE_PROMPT_VERSION,
+        raw_response_text: JSON.stringify(toolUse.input),
+        answer_retrieved_at: mainRetrievedAt,
+        cited_source_domains: parseDomains(asStringArray(parsed.cited_sources)),
+        competitive: await competitivePromise,
       };
     } catch (err) {
       if (err instanceof Anthropic.APIError) {

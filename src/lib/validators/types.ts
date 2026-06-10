@@ -42,6 +42,51 @@ export type NormalizedValidationOutput = {
   services_identified?: string[];
   would_recommend?: "YES" | "PARTIAL" | "NO";
   recommendation_reason?: string;
+  // ─── AI Answer Graph capture layer (additive; all optional) ─────────
+  // Future-value ("moat") data recorded on every audit. NOT read by the
+  // consensus layer, NOT customer-facing, NOT involved in scoring. Legacy
+  // records lack these. See `./capture.ts`.
+  /** Exact model id used for the validation call (e.g. "gpt-4.1-mini"). */
+  model?: string;
+  /** Resolved/snapshot model id from the API response, when exposed; else null. */
+  model_version?: string | null;
+  /** Exact prompt sent for the validation call (system + user, verbatim). */
+  prompt_text?: string;
+  /** Versions the capture prompt set, e.g. "capture@1.0.0". */
+  prompt_version?: string;
+  /** Full verbatim model response for the validation call (vs. the short raw_summary). */
+  raw_response_text?: string;
+  /** ISO timestamp of when this answer was retrieved. */
+  answer_retrieved_at?: string;
+  /** Bare hostnames parsed from cited_sources (derive-at-capture). */
+  cited_source_domains?: string[];
+  /** Buyer-intent competitive query capture (which businesses the model names). */
+  competitive?: CompetitiveCapture | null;
+};
+
+/**
+ * Captured output of the buyer-intent "competitive" query — the model's
+ * answer to "who are the best providers in this category/area" plus whether
+ * the subject business was named. Stored inside `aiValidations`; never
+ * rendered to customers and never fed into the consensus index.
+ */
+export type CompetitiveCapture = {
+  /** The competitive prompt sent (verbatim-ish; user portion). */
+  query_text: string;
+  prompt_version: string;
+  /** Verbatim provider output for the competitive query (durable, re-parseable). */
+  raw_response: string;
+  inferred_category: string | null;
+  inferred_location: string | null;
+  /** Business names the model named for the category/area. */
+  entities: string[];
+  /** Whether the subject business was among them (null when unknown). */
+  business_named: boolean | null;
+  model: string;
+  model_version: string | null;
+  retrieved_at: string;
+  status: ValidationStatus;
+  error: string | null;
 };
 
 /**
@@ -86,4 +131,6 @@ export type AiValidator = {
 export type ValidationLayerResult = {
   outputs: NormalizedValidationOutput[];
   ran_at: string;
+  /** Capture-layer version stamp for future ETL. Optional on legacy records. */
+  capture_version?: string;
 };

@@ -37,8 +37,18 @@
  */
 
 import { readApiKey } from "../apiKey";
+import {
+  CAPTURE_PROMPT_VERSION,
+  COMPETITIVE_TIMEOUT_MS,
+  buildCompetitivePrompt,
+  competitiveCaptureEnabled,
+  normalizeCompetitive,
+  parseDomains,
+  type CompetitiveParsed,
+} from "../capture";
 import type {
   AiValidator,
+  CompetitiveCapture,
   ConfidenceLevel,
   NormalizedValidationOutput,
   ValidationInput,
@@ -52,6 +62,105 @@ const OPENAI_MODEL = "gpt-4.1-mini";
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 const OPENAI_TIMEOUT_MS = 15_000;
 const OPENAI_TEMPERATURE = 0.1;
+
+// Buyer-intent competitive capture (AI Answer Graph). Strict JSON schema
+// mirrors the validator path. Capture-only — never fed to consensus/scoring.
+const OPENAI_COMPETITIVE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "inferred_category",
+    "inferred_location",
+    "answer",
+    "businesses",
+    "subject_named",
+  ],
+  properties: {
+    inferred_category: { type: "string" },
+    inferred_location: { type: "string" },
+    answer: { type: "string" },
+    businesses: { type: "array", items: { type: "string" } },
+    subject_named: { type: "boolean" },
+  },
+} as const;
+
+async function runOpenAICompetitive(
+  input: ValidationInput,
+): Promise<CompetitiveCapture> {
+  const { system, user } = buildCompetitivePrompt(input);
+  const retrievedAt = new Date().toISOString();
+  try {
+    const response = await fetch(OPENAI_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${readApiKey("OPENAI_API_KEY")!}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "geoviz_competitive_capture",
+            strict: true,
+            schema: OPENAI_COMPETITIVE_SCHEMA,
+          },
+        },
+        temperature: OPENAI_TEMPERATURE,
+      }),
+      signal: AbortSignal.timeout(COMPETITIVE_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      return normalizeCompetitive({
+        parsed: null,
+        rawResponse: "",
+        model: OPENAI_MODEL,
+        modelVersion: null,
+        queryText: user,
+        retrievedAt,
+        status: "failed",
+        error: `HTTP ${response.status}`,
+      });
+    }
+    const data = (await response.json()) as {
+      model?: string;
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = data.choices?.[0]?.message?.content ?? "";
+    let parsed: CompetitiveParsed | null = null;
+    try {
+      parsed = content ? (JSON.parse(content) as CompetitiveParsed) : null;
+    } catch {
+      parsed = null;
+    }
+    return normalizeCompetitive({
+      parsed,
+      rawResponse: content,
+      model: OPENAI_MODEL,
+      modelVersion: data.model ?? null,
+      queryText: user,
+      retrievedAt,
+      status: parsed ? "passed" : "failed",
+      error: parsed ? null : "competitive parse failed",
+    });
+  } catch (err) {
+    const e = err as Error;
+    return normalizeCompetitive({
+      parsed: null,
+      rawResponse: "",
+      model: OPENAI_MODEL,
+      modelVersion: null,
+      queryText: user,
+      retrievedAt,
+      status: "failed",
+      error: e.message ?? String(err),
+    });
+  }
+}
 
 // Strict JSON Schema enforced server-side by OpenAI's structured-outputs
 // response format. Guarantees: every key in `required` is present, no
@@ -277,6 +386,13 @@ export const OpenAIValidator: AiValidator = {
       return MOCK_RESPONSE;
     }
 
+    // Buyer-intent competitive query, concurrent with the main call.
+    // Capture-only; fail-soft; never alters the validator status/score.
+    const competitivePromise: Promise<CompetitiveCapture | null> =
+      competitiveCaptureEnabled()
+        ? runOpenAICompetitive(input)
+        : Promise.resolve(null);
+
     try {
       const { system, user } = buildPrompt(input);
       const response = await fetch(OPENAI_ENDPOINT, {
@@ -311,7 +427,9 @@ export const OpenAIValidator: AiValidator = {
         );
       }
 
+      const mainRetrievedAt = new Date().toISOString();
       const data = (await response.json()) as {
+        model?: string;
         choices?: Array<{
           message?: { content?: string; refusal?: string | null };
         }>;
@@ -388,6 +506,15 @@ export const OpenAIValidator: AiValidator = {
         services_identified: asOptionalStringArray(parsed.services_identified),
         would_recommend: asYesPartialNo(parsed.would_recommend),
         recommendation_reason: asNonEmptyString(parsed.recommendation_reason),
+        // ─── AI Answer Graph capture (additive, never alters status/score) ──
+        model: OPENAI_MODEL,
+        model_version: data.model ?? null,
+        prompt_text: `${system}\n\n${user}`,
+        prompt_version: CAPTURE_PROMPT_VERSION,
+        raw_response_text: content,
+        answer_retrieved_at: mainRetrievedAt,
+        cited_source_domains: parseDomains(asStringArray(parsed.cited_sources)),
+        competitive: await competitivePromise,
       };
     } catch (err) {
       const e = err as Error;
