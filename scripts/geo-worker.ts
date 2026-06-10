@@ -77,6 +77,14 @@ const TIMEOUT_MS_VALID =
   Number.isFinite(TIMEOUT_MS_PARSED) && TIMEOUT_MS_PARSED >= 30_000;
 const TIMEOUT_MS = TIMEOUT_MS_VALID ? TIMEOUT_MS_PARSED : TIMEOUT_MS_DEFAULT;
 const POLL_MS = Number(process.env.GEO_WORKER_POLL_MS ?? 12_000); // loop-mode poll cadence
+// Hard cap for the intelligence/validator persist step, which now runs BEFORE
+// the report is marked "generated". A hung provider/render can never block
+// completion or the worker loop: on timeout we proceed to mark generated (the
+// markdown is valid) and the delivery guard blocks delivery if validators are
+// missing.
+const INTEL_PERSIST_CAP_MS = Number(
+  process.env.GEO_INTEL_PERSIST_CAP_MS ?? 180_000,
+);
 const LOOP_MODE =
   process.env.GEO_WORKER_LOOP === "true" || process.argv.includes("--loop");
 // "api"  (production default — direct Anthropic SDK call, full 6-section audit)
@@ -2065,6 +2073,56 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
         `[geo-cost-debug] DB write payload orderId=${candidate.id} keys=${Object.keys(usageData).join(",")} payloadJson=${JSON.stringify(usageData)}`,
       );
 
+      // ── Persist intelligence (cross-model validators) BEFORE marking the
+      // report "generated". The print route treats a present `reportMarkdown`
+      // as "ready"; writing the markdown only AFTER `aiValidations` is persisted
+      // means a fresh audit never renders with empty/UNAVAILABLE model cards in
+      // the gap before validators land. Bounded by a hard cap so a hung
+      // provider/render can never block completion or the worker loop — on
+      // timeout we still mark generated (markdown is valid) and the delivery
+      // guard blocks delivery when validators are missing. persist is
+      // fail-soft (never throws); this is belt-and-suspenders.
+      const calOperatorTags = parseCalibrationNotes(candidate.adminNotes);
+      const operatorIndustry = calOperatorTags?.industry ?? null;
+      const operatorBenchmarkTag = calOperatorTags?.benchmarkTag ?? null;
+      if (operatorIndustry || operatorBenchmarkTag) {
+        log(
+          `[geo-benchmark] operator tag applied orderId=${candidate.id} industry=${operatorIndustry ?? "(none)"} benchmarkTag=${operatorBenchmarkTag ?? "(none)"}`,
+        );
+      }
+      log(`[geo-worker] validating (cross-model) orderId=${candidate.id}`);
+      try {
+        const intel = await Promise.race([
+          persistAuditIntelligence({
+            orderId: candidate.id,
+            businessName: candidate.businessName,
+            websiteUrl: candidate.websiteUrl,
+            competitorUrl: candidate.competitorUrl,
+            reportMarkdown: sanitizedMarkdown,
+            industryRaw: operatorIndustry,
+            benchmarkTag: operatorBenchmarkTag,
+          }),
+          new Promise<{ ok: false; reason: string }>((resolve) =>
+            setTimeout(
+              () => resolve({ ok: false, reason: "persist_timeout" }),
+              INTEL_PERSIST_CAP_MS,
+            ),
+          ),
+        ]);
+        if (intel.ok) {
+          log(`[geo-worker] intelligence persisted orderId=${candidate.id}`);
+        } else {
+          logErr(
+            `[geo-worker] intelligence persist incomplete orderId=${candidate.id} reason=${intel.reason} (non-fatal — report still completes; delivery guard blocks if validators missing)`,
+          );
+        }
+      } catch (err) {
+        logErr(
+          `[geo-worker] intelligence persist threw orderId=${candidate.id} (non-fatal):`,
+          err,
+        );
+      }
+
       try {
         const saved = await prisma.auditOrder.update({
           where: { id: candidate.id },
@@ -2118,51 +2176,9 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
           );
         }
 
-        // V2 data foundation — write the normalized intelligence row.
-        // Wrapped in try/catch so a failure here NEVER breaks the
-        // customer report flow (which has already been durably saved
-        // above) or the operator notification (which fires below).
-        // `persistAuditIntelligence` itself never throws — this is
-        // belt-and-suspenders. See `src/lib/audit-intelligence.ts`.
-        // Lift operator-supplied benchmark tagging out of adminNotes
-        // (if any). When the bulk-queue POST persisted operator
-        // industry / benchmarkTag into the calibration JSON, pass
-        // them through so the intelligence row records the operator's
-        // choice instead of the inferred industry. Absent / null on
-        // the parsed result leaves the existing inference path
-        // unchanged — fully backwards compatible.
-        const calOperatorTags = parseCalibrationNotes(candidate.adminNotes);
-        const operatorIndustry = calOperatorTags?.industry ?? null;
-        const operatorBenchmarkTag = calOperatorTags?.benchmarkTag ?? null;
-        if (operatorIndustry || operatorBenchmarkTag) {
-          log(
-            `[geo-benchmark] operator tag applied orderId=${candidate.id} industry=${operatorIndustry ?? "(none)"} benchmarkTag=${operatorBenchmarkTag ?? "(none)"}`,
-          );
-        }
-
-        try {
-          const intel = await persistAuditIntelligence({
-            orderId: candidate.id,
-            businessName: candidate.businessName,
-            websiteUrl: candidate.websiteUrl,
-            competitorUrl: candidate.competitorUrl,
-            reportMarkdown: sanitizedMarkdown,
-            industryRaw: operatorIndustry,
-            benchmarkTag: operatorBenchmarkTag,
-          });
-          if (intel.ok) {
-            log(`[geo-worker] intelligence persisted orderId=${candidate.id}`);
-          } else {
-            logErr(
-              `[geo-worker] intelligence persist failed orderId=${candidate.id} reason=${intel.reason} (non-fatal)`,
-            );
-          }
-        } catch (err) {
-          logErr(
-            `[geo-worker] intelligence persist threw orderId=${candidate.id} (non-fatal):`,
-            err,
-          );
-        }
+        // Intelligence (cross-model validators) was already persisted ABOVE,
+        // before this "generated" write — so the report is only customer-ready
+        // with model results in hand (no transient UNAVAILABLE cards).
 
         // Operator notification — internal "report ready for review"
         // ping. The function never throws; logs success/failure
