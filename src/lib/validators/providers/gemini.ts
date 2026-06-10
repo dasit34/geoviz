@@ -34,6 +34,7 @@
  *   suite hermetic (no real Gemini calls during `npm test`).
  */
 
+import { readApiKey } from "../apiKey";
 import type {
   AiValidator,
   ConfidenceLevel,
@@ -89,9 +90,7 @@ const GEMINI_RESPONSE_SCHEMA = {
 } as const;
 
 function missingKeys(): string[] {
-  return REQUIRED_ENV_VARS.filter(
-    (k) => typeof process.env[k] !== "string" || process.env[k]!.length === 0,
-  );
+  return REQUIRED_ENV_VARS.filter((k) => readApiKey(k) === null);
 }
 
 const MOCK_RESPONSE: NormalizedValidationOutput = {
@@ -274,7 +273,7 @@ export const GeminiValidator: AiValidator = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": process.env.GEMINI_API_KEY!,
+          "x-goog-api-key": readApiKey("GEMINI_API_KEY")!,
         },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },

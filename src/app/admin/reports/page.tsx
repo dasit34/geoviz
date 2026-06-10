@@ -9,6 +9,11 @@ import {
 } from "@/lib/report-access";
 import { checkPageRateLimit } from "@/lib/rate-limit";
 import { RateLimitedNotice } from "@/components/RateLimitedNotice";
+import {
+  classifyProviderFailure,
+  isModelTestingComplete,
+} from "@/lib/report/model-testing";
+import { CALIBRATION_PREFIX } from "@/lib/calibration";
 import { headers } from "next/headers";
 import { costTone, type CostTone } from "@/lib/pricing";
 import { buildReportContext } from "@/lib/intelligence/build-report-context";
@@ -389,20 +394,33 @@ export default async function AdminReportsPage({
               // Null when the consensus gate is off for this order's
               // worker run.
               const aiLayer = o.intelligence?.aiValidations as
-                | { outputs?: Array<{ provider: string; status: string }> }
+                | { outputs?: Array<Record<string, unknown>> }
                 | null;
+              const isTestOrder = (o.businessName ?? "").startsWith(
+                CALIBRATION_PREFIX,
+              );
               const validatorTelemetry =
                 aiLayer && Array.isArray(aiLayer.outputs)
                   ? {
                       providers: aiLayer.outputs.map((x) => ({
-                        name: x.provider,
-                        status: x.status,
+                        name: String(x.provider ?? ""),
+                        status: String(x.status ?? ""),
+                        reason: classifyProviderFailure(x),
                       })),
                       consensusComputed:
                         o.intelligence?.consensusIndex !== null &&
                         o.intelligence?.consensusIndex !== undefined,
+                      modelTestingIncomplete:
+                        !isTestOrder &&
+                        !isModelTestingComplete(o.intelligence?.aiValidations),
                     }
-                  : null;
+                  : {
+                      // No validator data at all → model testing incomplete
+                      // for a real order (legacy/null aiValidations).
+                      providers: [],
+                      consensusComputed: false,
+                      modelTestingIncomplete: !isTestOrder,
+                    };
               return (
               <AdminReportCard
                 key={o.id}

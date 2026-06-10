@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { applyApiRateLimit } from "@/lib/rate-limit";
 import { sendCustomerSuccessEmail } from "@/lib/customer-emails";
+import { isModelTestingComplete } from "@/lib/report/model-testing";
+import { CALIBRATION_PREFIX } from "@/lib/calibration";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -32,6 +34,7 @@ export async function POST(
     reviewStatus?: unknown;
     adminNotes?: unknown;
     qualityScore?: unknown;
+    allowIncompleteModels?: unknown;
   } = {};
   try {
     body = (await req.json().catch(() => ({}))) as typeof body;
@@ -74,6 +77,7 @@ export async function POST(
 
   const order = await prisma.auditOrder.findUnique({
     where: { id: params.id },
+    include: { intelligence: { select: { aiValidations: true } } },
   });
   if (!order) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -97,12 +101,31 @@ export async function POST(
   // reviewStatus check (must have been non-approved) plus the
   // !reportSentToCustomerAt guard. Failures here are non-fatal —
   // the operator can still hit the manual Send Report button.
+  // Never auto-send a real paid report whose cross-model AI testing returned
+  // NO usable results, unless the admin explicitly overrides. The approval is
+  // still recorded; the operator must then send explicitly (with the
+  // incomplete override). [CAL]/test orders are exempt.
+  const allowIncompleteModels = body.allowIncompleteModels === true;
+  const isTestOrder = (order.businessName ?? "").startsWith(CALIBRATION_PREFIX);
+  const modelTestingComplete = isModelTestingComplete(
+    order.intelligence?.aiValidations,
+  );
+  const modelGateBlocks =
+    !isTestOrder && !allowIncompleteModels && !modelTestingComplete;
+
   const shouldAutoSend =
     reviewStatus === "approved" &&
     order.reviewStatus !== "approved" &&
     order.reportStatus === "generated" &&
     !order.reportSentToCustomerAt &&
-    EMAIL_RE.test(order.email);
+    EMAIL_RE.test(order.email) &&
+    !modelGateBlocks;
+
+  if (modelGateBlocks && reviewStatus === "approved") {
+    console.warn(
+      `[admin-review] orderId=${order.id} approved but auto-send SKIPPED — model testing incomplete (0 usable cross-model results)`,
+    );
+  }
 
   if (shouldAutoSend) {
     try {
@@ -138,5 +161,7 @@ export async function POST(
     reviewStatus: updated.reviewStatus,
     adminNotes: updated.adminNotes,
     qualityScore: updated.qualityScore,
+    modelTesting: modelTestingComplete ? "complete" : "incomplete",
+    autoSendSkippedReason: modelGateBlocks ? "model_testing_incomplete" : null,
   });
 }

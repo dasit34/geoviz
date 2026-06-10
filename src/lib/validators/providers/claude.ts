@@ -36,6 +36,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 
+import { readApiKey } from "../apiKey";
 import type {
   AiValidator,
   ConfidenceLevel,
@@ -137,9 +138,7 @@ const VALIDATOR_INPUT_SCHEMA = {
 };
 
 function missingKeys(): string[] {
-  return REQUIRED_ENV_VARS.filter(
-    (k) => typeof process.env[k] !== "string" || process.env[k]!.length === 0,
-  );
+  return REQUIRED_ENV_VARS.filter((k) => readApiKey(k) === null);
 }
 
 const MOCK_RESPONSE: NormalizedValidationOutput = {
@@ -325,7 +324,7 @@ export const ClaudeValidator: AiValidator = {
     try {
       const { system, user } = buildPrompt(input);
       const client = new Anthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
+        apiKey: readApiKey("ANTHROPIC_API_KEY")!,
       });
 
       const response = await client.messages.create(

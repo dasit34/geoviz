@@ -36,6 +36,7 @@
  *   suite hermetic (no real OpenAI calls during `npm test`).
  */
 
+import { readApiKey } from "../apiKey";
 import type {
   AiValidator,
   ConfidenceLevel,
@@ -92,9 +93,7 @@ const OPENAI_JSON_SCHEMA = {
 } as const;
 
 function missingKeys(): string[] {
-  return REQUIRED_ENV_VARS.filter(
-    (k) => typeof process.env[k] !== "string" || process.env[k]!.length === 0,
-  );
+  return REQUIRED_ENV_VARS.filter((k) => readApiKey(k) === null);
 }
 
 const MOCK_RESPONSE: NormalizedValidationOutput = {
@@ -284,7 +283,7 @@ export const OpenAIValidator: AiValidator = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          Authorization: `Bearer ${readApiKey("OPENAI_API_KEY")!}`,
         },
         body: JSON.stringify({
           model: OPENAI_MODEL,

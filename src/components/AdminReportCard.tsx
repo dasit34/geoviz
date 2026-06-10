@@ -71,8 +71,10 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
  * opening the DB.
  */
 export type ValidatorTelemetry = {
-  providers: Array<{ name: string; status: string }>;
+  providers: Array<{ name: string; status: string; reason?: string }>;
   consensusComputed: boolean;
+  /** True when 0 of the 4 real models returned usable data (non-[CAL] order). */
+  modelTestingIncomplete?: boolean;
 } | null;
 
 export function AdminReportCard({
@@ -399,7 +401,7 @@ export function AdminReportCard({
     }
   };
 
-  const onSend = async (force = false) => {
+  const onSend = async (force = false, allowIncompleteModels = false) => {
     const recipient = (confirmedAddress ?? recipientEmail).trim().toLowerCase();
     if (
       !force &&
@@ -415,6 +417,7 @@ export function AdminReportCard({
     try {
       const res = await post(`/api/admin/orders/${order.id}/send-report`, {
         ...(force ? { force: true } : {}),
+        ...(allowIncompleteModels ? { allowIncompleteModels: true } : {}),
         recipientEmail: recipient,
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -425,6 +428,7 @@ export function AdminReportCard({
         resendId?: string | null;
         error?: string;
         message?: string;
+        modelTesting?: string;
       };
       if (res.ok) {
         setTone("ok");
@@ -435,6 +439,19 @@ export function AdminReportCard({
           sentTo: data.to ?? recipient,
           sentCc: data.cc ?? null,
         });
+      } else if (res.status === 409 && data.modelTesting === "incomplete") {
+        // Delivery blocked: no cross-model results. Offer an explicit override.
+        setTone("warn");
+        setMessage(data.error ?? "Model testing incomplete.");
+        if (
+          confirm(
+            "Model testing incomplete — no cross-model AI results were captured for this audit.\n\nSend this incomplete report to the customer anyway?",
+          )
+        ) {
+          setSending(false);
+          await onSend(true, true);
+          return;
+        }
       } else if (res.status === 409) {
         setTone("warn");
         setMessage(data.message ?? data.error ?? "Already sent.");
@@ -1533,16 +1550,33 @@ function ValidatorTelemetryStrip({ telemetry }: { telemetry: ValidatorTelemetry 
       </div>
     );
   }
+  // Validator outputs name Claude "claude"; this strip keys on "anthropic" —
+  // alias both so Claude's status + reason resolve.
+  const ALIAS: Record<string, string> = { claude: "anthropic", anthropic: "claude" };
   const byProvider: Record<string, string> = {};
+  const reasonByProvider: Record<string, string> = {};
   for (const p of telemetry.providers) {
-    if (typeof p.name === "string") byProvider[p.name] = p.status;
+    if (typeof p.name === "string") {
+      byProvider[p.name] = p.status;
+      if (p.reason) reasonByProvider[p.name] = p.reason;
+      if (ALIAS[p.name]) {
+        byProvider[ALIAS[p.name]] = p.status;
+        if (p.reason) reasonByProvider[ALIAS[p.name]] = p.reason;
+      }
+    }
   }
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-white/[0.06] px-5 py-2 text-[11px] text-white/55">
+      {telemetry.modelTestingIncomplete ? (
+        <span className="inline-flex items-center gap-1 rounded border border-severity-critical/40 bg-severity-critical/10 px-1.5 py-0.5 font-semibold uppercase tracking-wide text-severity-critical">
+          ⚠ Model testing incomplete
+        </span>
+      ) : null}
       <span className="text-white/40">Validators:</span>
       {PROVIDER_ORDER.map((p) => {
         const status = byProvider[p] ?? "—";
         const display = PROVIDER_DISPLAY[p] ?? p;
+        const reason = reasonByProvider[p];
         const mark =
           status === "passed"
             ? "✓"
@@ -1563,10 +1597,13 @@ function ValidatorTelemetryStrip({ telemetry }: { telemetry: ValidatorTelemetry 
           <span
             key={p}
             className="inline-flex items-baseline gap-1"
-            title={`${display}: ${status}`}
+            title={`${display}: ${status}${reason && reason !== "OK" ? ` — ${reason}` : ""}`}
           >
             <span className={`font-mono ${toneClass}`}>{mark}</span>
             <span>{display}</span>
+            {reason && reason !== "OK" ? (
+              <span className="text-white/35">({reason})</span>
+            ) : null}
           </span>
         );
       })}

@@ -39,6 +39,7 @@ import {
 } from "@/lib/parse-report";
 import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
 import { buildCustomerQuestions } from "@/lib/report/customer-questions";
+import { providerHasUsableData } from "@/lib/report/model-testing";
 
 export type Tone = "ok" | "warn" | "bad" | "muted";
 
@@ -892,13 +893,7 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
     // showed a card for any present output; mirror that so partial/degraded
     // runs still surface. Only when there's NO output (or a hard error with no
     // data) do we mark the provider UNAVAILABLE.
-    const hasData =
-      !!o &&
-      (o.status === "passed" ||
-        typeof o.business_understanding_score === "number" ||
-        !!o.would_recommend ||
-        (Array.isArray(o.missing_facts) && o.missing_facts.length > 0) ||
-        !!o.industry_identified);
+    const hasData = providerHasUsableData(o);
     if (!hasData) {
       return {
         provider: p,

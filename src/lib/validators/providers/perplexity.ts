@@ -41,6 +41,7 @@
  *   making a network call. Production must NEVER set this.
  */
 
+import { readApiKey } from "../apiKey";
 import type {
   AiValidator,
   ConfidenceLevel,
@@ -97,9 +98,7 @@ const PERPLEXITY_JSON_SCHEMA = {
 } as const;
 
 function missingKeys(): string[] {
-  return REQUIRED_ENV_VARS.filter(
-    (k) => typeof process.env[k] !== "string" || process.env[k]!.length === 0,
-  );
+  return REQUIRED_ENV_VARS.filter((k) => readApiKey(k) === null);
 }
 
 const MOCK_RESPONSE: NormalizedValidationOutput = {
@@ -311,7 +310,7 @@ export const PerplexityValidator: AiValidator = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+          Authorization: `Bearer ${readApiKey("PERPLEXITY_API_KEY")!}`,
         },
         body: JSON.stringify({
           model: PERPLEXITY_MODEL,

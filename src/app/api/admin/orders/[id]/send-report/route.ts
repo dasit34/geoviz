@@ -10,6 +10,8 @@ import {
 } from "@/lib/scoring/format-score";
 import { resolveBusinessName } from "@/lib/intelligence/resolve-business-name";
 import { applyApiRateLimit } from "@/lib/rate-limit";
+import { isModelTestingComplete } from "@/lib/report/model-testing";
+import { CALIBRATION_PREFIX } from "@/lib/calibration";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,13 +36,16 @@ export async function POST(
   }
 
   let force = false;
+  let allowIncompleteModels = false;
   let recipientOverride: string | undefined;
   try {
     const body = (await req.json().catch(() => ({}))) as {
       force?: boolean;
+      allowIncompleteModels?: boolean;
       recipientEmail?: unknown;
     };
     force = body.force === true;
+    allowIncompleteModels = body.allowIncompleteModels === true;
     if (typeof body.recipientEmail === "string") {
       recipientOverride = body.recipientEmail.trim().toLowerCase();
     }
@@ -96,6 +101,29 @@ export async function POST(
         error:
           "Report has not been approved. Mark the review approved before sending.",
         reviewStatus: order.reviewStatus,
+      },
+      { status: 409 },
+    );
+  }
+
+  // Model-testing completeness gate: never deliver a real paid report whose
+  // cross-model AI testing returned NO usable results (all four models
+  // unavailable/failed) as a complete audit, unless the admin explicitly
+  // overrides ("Send anyway (incomplete)"). [CAL]/test orders are exempt.
+  const isTestOrder = (order.businessName ?? "").startsWith(CALIBRATION_PREFIX);
+  if (
+    !isTestOrder &&
+    !allowIncompleteModels &&
+    !isModelTestingComplete(order.intelligence?.aiValidations)
+  ) {
+    console.warn(
+      `[admin-send] orderId=${order.id} blocked — model testing incomplete (0 usable cross-model results)`,
+    );
+    return NextResponse.json(
+      {
+        error:
+          "Model testing incomplete — no cross-model AI results were captured for this audit. Re-run model testing, or resend with the incomplete override.",
+        modelTesting: "incomplete",
       },
       { status: 409 },
     );
