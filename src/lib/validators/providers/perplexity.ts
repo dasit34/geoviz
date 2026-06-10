@@ -42,8 +42,18 @@
  */
 
 import { readApiKey } from "../apiKey";
+import {
+  CAPTURE_PROMPT_VERSION,
+  COMPETITIVE_TIMEOUT_MS,
+  buildCompetitivePrompt,
+  competitiveCaptureEnabled,
+  normalizeCompetitive,
+  parseDomains,
+  type CompetitiveParsed,
+} from "../capture";
 import type {
   AiValidator,
+  CompetitiveCapture,
   ConfidenceLevel,
   NormalizedValidationOutput,
   ValidationInput,
@@ -57,6 +67,102 @@ const PERPLEXITY_MODEL = "sonar";
 const PERPLEXITY_ENDPOINT = "https://api.perplexity.ai/chat/completions";
 const PERPLEXITY_TIMEOUT_MS = 15_000;
 const PERPLEXITY_TEMPERATURE = 0.1;
+
+// Buyer-intent competitive capture (AI Answer Graph). Perplexity is
+// search-grounded, so its competitive set reflects real retrieval.
+// Capture-only — never fed to consensus/scoring.
+const PERPLEXITY_COMPETITIVE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "inferred_category",
+    "inferred_location",
+    "answer",
+    "businesses",
+    "subject_named",
+  ],
+  properties: {
+    inferred_category: { type: "string" },
+    inferred_location: { type: "string" },
+    answer: { type: "string" },
+    businesses: { type: "array", items: { type: "string" } },
+    subject_named: { type: "boolean" },
+  },
+} as const;
+
+async function runPerplexityCompetitive(
+  input: ValidationInput,
+): Promise<CompetitiveCapture> {
+  const { system, user } = buildCompetitivePrompt(input);
+  const retrievedAt = new Date().toISOString();
+  try {
+    const response = await fetch(PERPLEXITY_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${readApiKey("PERPLEXITY_API_KEY")!}`,
+      },
+      body: JSON.stringify({
+        model: PERPLEXITY_MODEL,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: { schema: PERPLEXITY_COMPETITIVE_SCHEMA },
+        },
+        temperature: PERPLEXITY_TEMPERATURE,
+      }),
+      signal: AbortSignal.timeout(COMPETITIVE_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      return normalizeCompetitive({
+        parsed: null,
+        rawResponse: "",
+        model: PERPLEXITY_MODEL,
+        modelVersion: null,
+        queryText: user,
+        retrievedAt,
+        status: "failed",
+        error: `HTTP ${response.status}`,
+      });
+    }
+    const data = (await response.json()) as {
+      model?: string;
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = data.choices?.[0]?.message?.content ?? "";
+    let parsed: CompetitiveParsed | null = null;
+    try {
+      parsed = content ? (JSON.parse(content) as CompetitiveParsed) : null;
+    } catch {
+      parsed = null;
+    }
+    return normalizeCompetitive({
+      parsed,
+      rawResponse: content,
+      model: PERPLEXITY_MODEL,
+      modelVersion: data.model ?? null,
+      queryText: user,
+      retrievedAt,
+      status: parsed ? "passed" : "failed",
+      error: parsed ? null : "competitive parse failed",
+    });
+  } catch (err) {
+    const e = err as Error;
+    return normalizeCompetitive({
+      parsed: null,
+      rawResponse: "",
+      model: PERPLEXITY_MODEL,
+      modelVersion: null,
+      queryText: user,
+      retrievedAt,
+      status: "failed",
+      error: e.message ?? String(err),
+    });
+  }
+}
 
 // JSON Schema enforced server-side by Perplexity's structured-outputs
 // response format (Tier 3+ accounts). Mirrors the OpenAI validator
@@ -304,6 +410,13 @@ export const PerplexityValidator: AiValidator = {
       return MOCK_RESPONSE;
     }
 
+    // Buyer-intent competitive query, concurrent with the main call.
+    // Capture-only; fail-soft; never alters the validator status/score.
+    const competitivePromise: Promise<CompetitiveCapture | null> =
+      competitiveCaptureEnabled()
+        ? runPerplexityCompetitive(input)
+        : Promise.resolve(null);
+
     try {
       const { system, user } = buildPrompt(input);
       const response = await fetch(PERPLEXITY_ENDPOINT, {
@@ -334,7 +447,9 @@ export const PerplexityValidator: AiValidator = {
         );
       }
 
+      const mainRetrievedAt = new Date().toISOString();
       const data = (await response.json()) as {
+        model?: string;
         choices?: Array<{
           message?: { content?: string };
           finish_reason?: string | null;
@@ -417,6 +532,15 @@ export const PerplexityValidator: AiValidator = {
         services_identified: asOptionalStringArray(parsed.services_identified),
         would_recommend: asYesPartialNo(parsed.would_recommend),
         recommendation_reason: asNonEmptyString(parsed.recommendation_reason),
+        // ─── AI Answer Graph capture (additive, never alters status/score) ──
+        model: PERPLEXITY_MODEL,
+        model_version: data.model ?? null,
+        prompt_text: `${system}\n\n${user}`,
+        prompt_version: CAPTURE_PROMPT_VERSION,
+        raw_response_text: content,
+        answer_retrieved_at: mainRetrievedAt,
+        cited_source_domains: parseDomains(mergedCitations),
+        competitive: await competitivePromise,
       };
     } catch (err) {
       const e = err as Error;
