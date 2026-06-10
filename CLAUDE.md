@@ -185,6 +185,19 @@ incrementally automatable.
   propose + (with approval) deploy changes to the layer based on
   monitoring deltas. See `## Automation & Action Module (V3)`.
 
+**Future recurring product — "AI Visibility Monitoring" (NOT built
+now).** The natural subscription evolution of the audit. Potential
+tabs: Visibility · Customer Questions · Mentions & Citations ·
+Sources AI Can Cite · Topics / Services · Competitors. The
+"Customer Questions Tested" surface (shipped on the audit/report
+today — buyer-intent questions per business) and the "Evidence AI
+Can Cite" concept (the monitorable evolution of the report's
+"Evidence Reviewed — What AI Had To Read" page) become recurring
+monitoring features here. Do NOT build this, monthly prompt
+tracking, or a SaaS dashboard now — the core flow stays the **$97
+AI Visibility Audit + Starting-at-$497 GEO Foundation Fix**. Build
+only on explicit request.
+
 **What this is NOT.** The AI Visibility Layer is **not** an attempt
 to rebuild customer websites. We are not a CMS. We are not a site
 builder. We're a thin, focused, machine-readable context layer that

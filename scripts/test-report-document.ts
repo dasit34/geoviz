@@ -127,6 +127,14 @@ check("Page 5 renders the conditional score note when present", () => {
   assert.match(DOC, /rd-interp-note/);
 });
 
+check("Page 4 renders Customer Questions Tested from the model (not 'prompts')", () => {
+  assert.match(DOC, /Customer Questions Tested/);
+  assert.match(DOC, /m\.customerQuestions/);
+  assert.doesNotMatch(DOC, /\bprompts?\b/i, "customer copy must not use the word 'prompt(s)'");
+  // Evidence subtitle surfaced
+  assert.match(DOC, /What AI Had To Read/);
+});
+
 check("light/dark page system: dark cover + CTA, light interior", () => {
   // Page variant is applied via <Page variant="dark|light"> → rd-page-${variant}.
   assert.match(DOC, /variant="dark"/);

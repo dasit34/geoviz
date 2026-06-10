@@ -358,6 +358,61 @@ check("single-provider name is NOT enough for consensus (needs >= 2)", () => {
   assert.equal(r.source, "domain", "should fall to domain without 2-provider agreement");
 });
 
+// ── slogan-name guard ───────────────────────────────────────────────
+check("slogan H1 with exclamation is rejected → order name wins", () => {
+  const r = resolveBusinessName({
+    intelligence: {
+      preflightSignals: preflight({ homepageName: "Your Home Deserves The BEST!" }),
+    },
+    order: {
+      businessName: "Efficient Systems",
+      email: "info@efficientsystems.com",
+      websiteUrl: "https://efficientsystems.com",
+    },
+  });
+  assert.equal(r.name, "Efficient Systems", `got "${r.name}"`);
+  assert.equal(r.source, "order");
+});
+
+check("schema org name beats a slogan H1", () => {
+  const r = resolveBusinessName({
+    intelligence: {
+      preflightSignals: preflight({
+        schemaName: "Efficient Systems",
+        homepageName: "Your Home Deserves The BEST!",
+      }),
+    },
+    order: { businessName: null, email: null, websiteUrl: "https://efficientsystems.com" },
+  });
+  assert.equal(r.name, "Efficient Systems");
+  assert.equal(r.source, "schema");
+});
+
+check("slogan-only (no order/schema) → domain fallback, never the slogan", () => {
+  const r = resolveBusinessName({
+    intelligence: {
+      preflightSignals: preflight({ homepageName: "Transform Your Business Today!" }),
+    },
+    order: { businessName: null, email: null, websiteUrl: "https://transformco.com" },
+  });
+  assert.equal(r.source, "domain", `got source ${r.source} / name ${r.name}`);
+  assert.doesNotMatch(r.name, /transform your business/i);
+});
+
+check("real names are NOT flagged as slogans", () => {
+  for (const [name, expectSource] of [
+    ["Rick's Affordable Heating", "homepage"],
+    ["Cleveland Smile Center", "homepage"],
+  ] as const) {
+    const r = resolveBusinessName({
+      intelligence: { preflightSignals: preflight({ homepageName: name }) },
+      order: { businessName: null, email: null, websiteUrl: "https://example.com" },
+    });
+    assert.equal(r.name, name, `"${name}" must survive the slogan gate`);
+    assert.equal(r.source, expectSource);
+  }
+});
+
 if (failed > 0) {
   console.log(
     `[business-name-resolution] FAILED — passed=${passed} failed=${failed}`,

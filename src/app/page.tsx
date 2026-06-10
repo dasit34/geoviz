@@ -226,6 +226,9 @@ export default function Page() {
       {/* ── MULTI-MODEL CREDIBILITY (supporting block, unnumbered) ── */}
       <MultiModelTesting />
 
+      {/* ── CUSTOMER QUESTIONS (buyer-intent, unnumbered) ── */}
+      <WouldAIRecommend />
+
       {/* ── PRIMER · the shift (editorial context, unnumbered) ── */}
       <Section tone="light">
         <div className="flex items-center gap-3.5">
@@ -771,6 +774,69 @@ function MultiModelTesting() {
         >
           Run AI Visibility Audit
         </Link>
+      </div>
+    </Section>
+  );
+}
+
+// Buyer-intent examples for the homepage "Customer Questions Tested" card.
+// Illustrative marketing samples (NOT per-business) — concrete, no template
+// brackets, no "prompts" wording.
+const EXAMPLE_CUSTOMER_QUESTIONS = [
+  "Who are the best roofers near Toledo?",
+  "Can you recommend an emergency dentist near me?",
+  "Is this business trustworthy?",
+  "Which company should I call for a burst pipe?",
+  "What local business should I choose for AC repair?",
+];
+
+/**
+ * Customer-questions conversion beat (unnumbered) — frames the audit around the
+ * real buying-intent questions customers ask AI, then routes to /order. Pairs
+ * with MultiModelTesting above. Defensible language; "questions", never
+ * "prompts".
+ */
+function WouldAIRecommend() {
+  return (
+    <Section>
+      <SectionIndex n={0} label="Customer questions tested" />
+      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,52%)_minmax(0,48%)] lg:gap-16">
+        <div>
+          <SectionHeading>
+            Would AI recommend you when customers ask who to hire?
+          </SectionHeading>
+          <p className="mt-5 max-w-xl text-lg leading-[1.55] text-white/70">
+            GeoViz tests the real questions customers ask ChatGPT, Claude,
+            Perplexity, Gemini, and Google AI Overviews before choosing a local
+            business. Then we show what AI understood, what it missed, and what
+            needs to be fixed.
+          </p>
+          <div className="mt-8">
+            <Link href="/order" className="btn-primary text-base">
+              Run Your AI Visibility Audit
+              <span aria-hidden>→</span>
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-white/10 bg-ink-900/60 p-6 shadow-card backdrop-blur-sm sm:p-7">
+          <p className="section-eyebrow">Customer Questions Tested</p>
+          <ul className="mt-5 flex flex-col gap-3.5">
+            {EXAMPLE_CUSTOMER_QUESTIONS.map((q) => (
+              <li key={q} className="flex items-start gap-3">
+                <span
+                  aria-hidden
+                  className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-cyan/40 font-mono text-[11px] font-semibold text-cyan"
+                >
+                  ?
+                </span>
+                <span className="text-[15px] leading-[1.45] text-white/85">
+                  {q}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </Section>
   );

@@ -38,6 +38,7 @@ import {
   categoryToneFromRatio,
 } from "@/lib/parse-report";
 import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
+import { buildCustomerQuestions } from "@/lib/report/customer-questions";
 
 export type Tone = "ok" | "warn" | "bad" | "muted";
 
@@ -208,6 +209,10 @@ export type ReportModel = {
    *  explains why an access-driven baseline still lands mid-score. Null
    *  otherwise. */
   scoreNote: string | null;
+  /** Buyer-intent "Customer Questions Tested" (up to 5) — the real questions a
+   *  customer would ask an AI before choosing this business. Deterministically
+   *  derived from name / industry / detected city + services. Display only. */
+  customerQuestions: string[];
   /** True when at least one cross-model validator passed. */
   hasProviders: boolean;
   /** True when preflight signals were available to populate Evidence Reviewed. */
@@ -1177,6 +1182,27 @@ export function buildReportModel(
   );
   const scoreNote = buildScoreNote(band, categories);
 
+  // "Customer Questions Tested" — buyer-intent questions derived from the
+  // already-detected city/services. City = the first model-identified location
+  // (never invented); services = de-duplicated across providers.
+  const detectedCity =
+    providers.map((p) => p.location).find((l) => !!l && l.trim().length > 0) ??
+    null;
+  const detectedServices = Array.from(
+    new Set(providers.flatMap((p) => p.topServices).map((s) => s.trim())),
+  ).filter((s) => s.length > 0);
+  const detectedBusinessType =
+    providers.map((p) => p.businessType).find((b) => !!b && b.trim().length > 0) ??
+    null;
+  const customerQuestions = buildCustomerQuestions({
+    businessName: input.resolvedBusinessName,
+    industrySlug: input.industryNormalized,
+    city: detectedCity,
+    services: detectedServices,
+    businessType: detectedBusinessType,
+    isLocal,
+  });
+
   return {
     meta: {
       reportId: input.reportId,
@@ -1208,6 +1234,7 @@ export function buildReportModel(
     businessImpact,
     scoreInterpretation,
     scoreNote,
+    customerQuestions,
     // True when ANY provider produced usable data (drives the page-level
     // "verdicts not run" note). UNAVAILABLE = no data for that provider.
     hasProviders: providers.some((p) => p.verdict !== "UNAVAILABLE"),

@@ -155,8 +155,8 @@
 .rd-note { font-size: 14.5px; color: var(--l-muted); }
 /* Clarifying notes that separate model scores / access scores from
    recommendation readiness. */
-.rd-prov-note { margin: 10px 0 0; line-height: 1.5; font-size: 13.5px; }
-.rd-bars-note { margin: -12px 0 22px; line-height: 1.5; font-size: 13.5px; }
+.rd-prov-note { margin: 7px 0 0; line-height: 1.45; font-size: 13px; }
+.rd-bars-note { margin: -8px 0 16px; line-height: 1.45; font-size: 13px; }
 
 /* tone text */
 .rd-v-ok { color: var(--c-green); }
@@ -376,7 +376,7 @@
   border: 1px solid var(--l-border);
   border-top-width: 3px;
   border-radius: 12px;
-  padding: 12px 17px;
+  padding: 10px 14px;
 }
 .rd-prov-openai { border-top-color: #10a37f; }
 .rd-prov-claude { border-top-color: #d97757; }
@@ -398,7 +398,7 @@
   color: var(--l-ink);
 }
 .rd-prov-na { font-size: 14px; color: var(--l-faint); margin: 4px 0 0; }
-.rd-prov-body { display: flex; flex-direction: column; gap: 7px; }
+.rd-prov-body { display: flex; flex-direction: column; gap: 6px; }
 .rd-prov-field { display: flex; flex-direction: column; gap: 3px; }
 .rd-prov-k {
   font-family: var(--rd-mono);
@@ -413,17 +413,27 @@
   font-weight: 700;
   line-height: 1;
 }
-.rd-prov-v { font-size: 14px; color: var(--l-ink); line-height: 1.45; }
+/* Clamp variable "reads as"/"main gap" text to 2 lines so a verbose audit
+   cannot balloon a provider card and overflow the page. */
+.rd-prov-v {
+  font-size: 14px;
+  color: var(--l-ink);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 
 .rd-readiness-strip {
   background: var(--d-page);
   border-radius: 12px;
-  padding: 12px 20px;
-  margin-top: 12px;
+  padding: 10px 16px;
+  margin-top: 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 .rd-readiness-strip-title {
@@ -463,9 +473,75 @@
 }
 .rd-ev-desc { font-size: 14px; color: var(--l-muted); }
 
+/* Evidence Reviewed subtitle ("What AI Had To Read") under the page title */
+.rd-title-sub {
+  font-family: var(--rd-mono, var(--rd-display));
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-orange);
+  margin: -2px 0 4px;
+}
+
+/* Customer Questions Tested (compact card, top of Page 4) */
+.rd-questions {
+  background: var(--l-card);
+  border: 1px solid var(--l-border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+.rd-questions-title {
+  font-family: var(--rd-display);
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 2px;
+  color: var(--l-ink);
+}
+.rd-questions-sub { font-size: 12.5px; color: var(--l-muted); margin: 0 0 9px; }
+.rd-questions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.rd-questions-item {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--l-ink);
+  padding-left: 20px;
+  position: relative;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.rd-questions-item::before {
+  content: "?";
+  position: absolute;
+  left: 0;
+  top: -1px;
+  font-weight: 700;
+  color: var(--c-orange);
+}
+.rd-questions-foot {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--l-muted);
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--l-border);
+}
+/* P4 evidence rows tighten to make room for the questions card (8-page fit) */
+.rd-ev { gap: 8px; }
+.rd-ev-row { padding: 10px 20px; }
+
 /* ════════════════ P5 · DIAGNOSTICS (light) ════════════════ */
-.rd-bars { display: flex; flex-direction: column; gap: 22px; margin-bottom: 30px; }
-.rd-bar { display: flex; flex-direction: column; gap: 8px; }
+.rd-bars { display: flex; flex-direction: column; gap: 15px; margin-bottom: 18px; }
+.rd-bar { display: flex; flex-direction: column; gap: 7px; }
 .rd-bar-top { display: flex; align-items: baseline; justify-content: space-between; }
 .rd-bar-label {
   font-family: var(--rd-display);
@@ -490,22 +566,22 @@
   background: var(--l-card);
   border: 1px solid var(--l-border);
   border-radius: 14px;
-  padding: 24px 26px;
+  padding: 16px 20px;
 }
 .rd-interp-title {
   font-family: var(--rd-display);
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 700;
-  margin: 0 0 10px;
+  margin: 0 0 6px;
   color: var(--l-ink);
 }
-.rd-interp-body { font-size: 15px; line-height: 1.6; color: var(--l-muted); margin: 0; }
+.rd-interp-body { font-size: 14.5px; line-height: 1.5; color: var(--l-muted); margin: 0; }
 .rd-interp-note {
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 13.5px;
+  line-height: 1.45;
   color: var(--l-ink);
-  margin: 12px 0 0;
-  padding-top: 12px;
+  margin: 8px 0 0;
+  padding-top: 8px;
   border-top: 1px solid var(--l-border);
   font-weight: 500;
 }
@@ -745,7 +821,11 @@
     border-radius: 0;
     border: none;
     padding: 4mm 4mm 8mm;
-    min-height: 261mm;
+    /* Fixed one-sheet height + clip: a logical page can NEVER spill a block
+       onto a blank physical page (the orphan-page bug). Content is tightened
+       below so it fits 261mm and the clip never triggers visibly. */
+    height: 261mm;
+    overflow: hidden;
     break-before: page;
     page-break-before: always;
     -webkit-print-color-adjust: exact;

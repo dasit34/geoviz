@@ -290,6 +290,15 @@ check("scoreNote fires for Needs Work + high access / low recommendation", () =>
   assert.match(m.scoreNote ?? "", /remains in Needs Work/);
 });
 
+check("model carries 5 customer questions derived from the business", () => {
+  const m = buildReportModel(makeInput())!;
+  assert.ok(Array.isArray(m.customerQuestions), "customerQuestions is an array");
+  assert.equal(m.customerQuestions.length, 5, "five questions shown");
+  assert.equal(new Set(m.customerQuestions).size, 5, "questions are unique");
+  // never leaks a template placeholder
+  assert.doesNotMatch(m.customerQuestions.join(" | "), /[{}]|undefined/);
+});
+
 check("scoreNote is null when recommendation signals are strong", () => {
   const strong = makeInput({
     score: {

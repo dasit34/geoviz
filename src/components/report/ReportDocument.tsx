@@ -353,7 +353,26 @@ function EvidencePage({ model, reportId }: { model: ReportModel; reportId: strin
   return (
     <Page variant="light">
       <PageHead context="WHAT AI HAD TO READ" n="04" />
+
+      {m.customerQuestions.length > 0 ? (
+        <section className="rd-questions">
+          <h2 className="rd-questions-title">Customer Questions Tested</h2>
+          <ul className="rd-questions-list">
+            {m.customerQuestions.slice(0, 5).map((q) => (
+              <li key={q} className="rd-questions-item">
+                {q}
+              </li>
+            ))}
+          </ul>
+          <p className="rd-questions-foot">
+            These questions test whether AI systems can identify, understand,
+            trust, and recommend the business in real buying situations.
+          </p>
+        </section>
+      ) : null}
+
       <h1 className="rd-title">Evidence Reviewed</h1>
+      <p className="rd-title-sub">What AI Had To Read</p>
       <p className="rd-sub">
         {m.hasEvidence
           ? "The signals GeoViz inspected on your site before scoring — this is what makes the audit defensible."

@@ -232,6 +232,34 @@ function isJunkName(name: string): boolean {
  *   - contains "serving" / "specializing" (service-area phrasing);
  *   - names two or more US states (a service-area list, not a name).
  */
+// Marketing/imperative/2nd-person lead words that begin a slogan, not a
+// business name ("Your Home …", "Discover …", "Transform …").
+const SLOGAN_LEAD_WORDS = new Set<string>([
+  "your", "get", "discover", "transform", "elevate", "experience", "welcome",
+  "unlock", "upgrade", "trust", "choose", "switch", "grow",
+]);
+
+/**
+ * True when a candidate reads as a tagline/slogan rather than a business name —
+ * so a homepage H1 like "Your Home Deserves The BEST!" never becomes the report
+ * name. Conservative: only trips on 3+ word phrases, so short brand names
+ * ("Best Buy", "Efficient Systems") are never flagged. A rejected candidate
+ * just cascades to the next source (order name / schema / domain), so a rare
+ * false positive is low-harm.
+ */
+function looksLikeSlogan(name: string): boolean {
+  const n = normalize(name);
+  if (!n) return false;
+  const words = n.split(/\s+/);
+  if (words.length < 3) return false;
+  if (/[!?]\s*$/.test(n)) return true; // ends with ! / ?
+  const lead = words[0].toLowerCase().replace(/[^a-z']/g, "");
+  if (SLOGAN_LEAD_WORDS.has(lead)) return true;
+  if (/\bdeserve/i.test(n)) return true; // "you deserve", "your home deserves"
+  if (/\byou(?:r)?\b[\s\S]*\bbest\b/i.test(n)) return true;
+  return false;
+}
+
 function isPlausibleBusinessName(name: string): boolean {
   const n = normalize(name);
   if (!n) return false;
@@ -239,6 +267,9 @@ function isPlausibleBusinessName(name: string): boolean {
   // Generic page titles ("Home", "Welcome") — the homepage <title>/<h1>
   // of a poorly-tagged site, not a business name.
   if (GENERIC_TITLES.has(n.toLowerCase())) return false;
+  // Slogan/tagline H1/title text ("Your Home Deserves The BEST!") — secondary
+  // evidence at best, never the hero name.
+  if (looksLikeSlogan(n)) return false;
   const words = n.split(/\s+/);
   if (words.length > 6) return false;
   if (n.length > 55) return false;
