@@ -39,6 +39,16 @@ export function ReportCtaCard({
           business with confidence.
         </p>
 
+        <p className="cta-card-includes-label">What&rsquo;s included</p>
+        <ul className="cta-card-includes">
+          <li>Structured data installation</li>
+          <li>Business identity cleanup</li>
+          <li>NAP consistency cleanup</li>
+          <li>Homepage &amp; service content guidance</li>
+          <li>Citation &amp; readiness improvements</li>
+          <li>Follow-up verification audit</li>
+        </ul>
+
         <div className="cta-card-badges">
           <span className="cta-card-badge cta-card-badge-price">Starting at $497</span>
           <span className="cta-card-badge cta-card-badge-meta">3–5 business days</span>

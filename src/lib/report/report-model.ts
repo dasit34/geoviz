@@ -110,6 +110,12 @@ export type ReportModelProvider = {
   recommendationReadiness: Confidence;
   /** True when this model could not load/render the site during its test. */
   fetchFailed: boolean;
+  /** Other businesses this model named for the category/area (capped). */
+  competitors: string[];
+  /** Source domains this model drew on for its answer (capped). */
+  citationDomains: string[];
+  /** True when this model named the business itself among the options. */
+  mentioned: boolean;
 };
 
 export type ReportModelDiagnostic = {
@@ -183,6 +189,29 @@ export type ReadinessFactor = {
   basis: string;
 };
 
+/**
+ * Cross-Model Intelligence summary (Page 4). Derived ENTIRELY from the
+ * already-captured per-provider validator + competitive data + the consensus
+ * roll-up. Display only — no scoring, no new data. Counts are "of 4" across the
+ * four directly-tested models (ChatGPT/Claude/Gemini/Perplexity).
+ */
+export type ReportModelCrossModel = {
+  modelsTested: number;
+  recognizedCount: number;
+  mentionedCount: number;
+  recommendedCount: number;
+  /** Aggregated, frequency-ranked citation domains across models (capped). */
+  topCitedDomains: string[];
+  /** Most common reason models could not place the business; null when none. */
+  mainSkipReason: string | null;
+  /** Consensus headline label (e.g. "Moderate Visibility"); null when absent. */
+  consensusLabel: string | null;
+  /** Cross-model agreement label (e.g. "Strong"); null when absent. */
+  consensusAgreement: string | null;
+  /** Providers that passed, per the consensus roll-up; null when absent. */
+  providersPassed: number | null;
+};
+
 export type ReportModel = {
   meta: ReportModelMeta;
   score: ReportModelScore;
@@ -214,6 +243,8 @@ export type ReportModel = {
    *  customer would ask an AI before choosing this business. Deterministically
    *  derived from name / industry / detected city + services. Display only. */
   customerQuestions: string[];
+  /** Cross-Model Intelligence summary (Page 4). Display only. */
+  crossModel: ReportModelCrossModel;
   /** True when at least one cross-model validator passed. */
   hasProviders: boolean;
   /** True when preflight signals were available to populate Evidence Reviewed. */
@@ -418,7 +449,8 @@ function buildScoreInterpretation(
       ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length)
       : null;
   };
-  const access = mean(get("crawler"), get("tech"));
+  const crawler = get("crawler");
+  const access = mean(crawler, get("tech"));
   const schema = get("schema");
   const brand = get("brand");
   const trust = get("trust");
@@ -441,9 +473,16 @@ function buildScoreInterpretation(
     return `${businessName} is accessible to AI systems, but access is not the same as recommendation readiness. The site can be crawled and extracted cleanly, but ${weakList} reduce confidence when AI systems decide who to recommend.`;
   }
 
-  // Access itself is the limiting factor.
+  // Access is part of the limiting factor — but separate "the site is hard to
+  // reach" from "the site is reachable, yet offers little useful data". A high
+  // Crawl Access bar must never read as "AI cannot reach the site" (the
+  // contradiction this split resolves). Wording only; the math is unchanged.
   if (access !== null && access < 65) {
-    return `AI systems cannot fully reach or parse ${businessName}'s site, which limits how much they can understand and how confidently they can recommend it. Improving crawl access and content extraction is the foundation the rest of the score builds on.`;
+    const reachable = crawler !== null && crawler >= 65;
+    if (reachable) {
+      return `${businessName}'s site is reachable by AI systems, but they find little useful identity, content, and trust information to work with — which limits how well they can understand the business and how confidently they can recommend it. Strengthening structured identity, content depth, and trust signals is the foundation the rest of the score builds on.`;
+    }
+    return `AI crawlers have trouble fully reaching and parsing ${businessName}'s site, which limits how much they can understand and how confidently they can recommend it. Improving crawl access and content extraction is the foundation the rest of the score builds on.`;
   }
 
   // Access and recommendation signals are both reasonably strong.
@@ -770,6 +809,8 @@ export type BuildReportModelInput = {
   deterministic: DeterministicScore | null;
   /** Validator layer outputs[] (already structured). */
   providerOutputs: unknown;
+  /** Cross-model consensus roll-up (display only) → Page-4 headline. */
+  consensusIndex?: unknown;
   /** Percentile/cohort/confidence (from buildReportContext). */
   context?: {
     percentileCopy?: string | null;
@@ -808,6 +849,13 @@ type ProviderShape = {
   recommendation_confidence?: string | null;
   raw_summary?: string;
   error?: string | null;
+  // AI Answer Graph capture (optional; legacy outputs lack these).
+  cited_source_domains?: string[];
+  competitive?: {
+    entities?: string[];
+    business_named?: boolean | null;
+    status?: string;
+  } | null;
 };
 
 function asConfidence(v: unknown): Confidence {
@@ -908,6 +956,9 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
         understandingScore: null,
         recommendationReadiness: null,
         fetchFailed: false,
+        competitors: [],
+        citationDomains: [],
+        mentioned: false,
       };
     }
     const services = (o.services_identified ?? [])
@@ -937,8 +988,95 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
       understandingScore: us,
       recommendationReadiness: asConfidence(o.recommendation_confidence),
       fetchFailed,
+      competitors: (o.competitive?.entities ?? [])
+        .map((s) => (typeof s === "string" ? s.trim() : ""))
+        .filter((s) => s.length > 0)
+        .slice(0, 4),
+      citationDomains: (o.cited_source_domains ?? [])
+        .map((s) => (typeof s === "string" ? s.trim() : ""))
+        .filter((s) => s.length > 0)
+        .slice(0, 4),
+      mentioned: o.competitive?.business_named === true,
     };
   });
+}
+
+/** Read the optional consensus roll-up defensively (display fields only). */
+function readConsensusSummary(ci: unknown): {
+  label: string | null;
+  agreement: string | null;
+  passed: number | null;
+} {
+  if (!ci || typeof ci !== "object") {
+    return { label: null, agreement: null, passed: null };
+  }
+  const c = ci as Record<string, unknown>;
+  const label = typeof c.verdict === "string" ? c.verdict : null;
+  const agreement =
+    typeof c.model_agreement === "string" ? c.model_agreement : null;
+  const am = c.agreement_metrics;
+  const passed =
+    am &&
+    typeof am === "object" &&
+    typeof (am as Record<string, unknown>).providers_passed === "number"
+      ? (am as Record<string, number>).providers_passed
+      : null;
+  return { label, agreement, passed };
+}
+
+/**
+ * Build the Page-4 "Cross-Model Intelligence" summary from the already-built
+ * provider rows + the consensus roll-up. Pure + deterministic; display only.
+ * Mirrors the `buildCustomerQuestions` integration pattern.
+ */
+function buildCrossModelSummary(
+  providers: ReportModelProvider[],
+  consensusIndex: unknown,
+): ReportModelCrossModel {
+  const tested = providers.filter((p) => p.verdict !== "UNAVAILABLE");
+  const recognizedCount = tested.filter(
+    (p) =>
+      !p.fetchFailed &&
+      (!!p.businessType ||
+        (p.understandingScore !== null && p.understandingScore >= 25)),
+  ).length;
+  const mentionedCount = providers.filter((p) => p.mentioned).length;
+  const recommendedCount = providers.filter((p) => p.verdict === "YES").length;
+
+  // Aggregate citation domains across models, frequency-ranked.
+  const domainCounts = new Map<string, number>();
+  for (const p of providers) {
+    for (const d of p.citationDomains) {
+      domainCounts.set(d, (domainCounts.get(d) ?? 0) + 1);
+    }
+  }
+  const topCitedDomains = [...domainCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([d]) => d);
+
+  // Most common gap among models that tested but did not fully recommend.
+  const gapCounts = new Map<string, number>();
+  for (const p of tested) {
+    if (p.verdict === "YES") continue;
+    if (p.mainGap) gapCounts.set(p.mainGap, (gapCounts.get(p.mainGap) ?? 0) + 1);
+  }
+  const mainSkipReason =
+    [...gapCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  const consensus = readConsensusSummary(consensusIndex);
+
+  return {
+    modelsTested: tested.length,
+    recognizedCount,
+    mentionedCount,
+    recommendedCount,
+    topCitedDomains,
+    mainSkipReason,
+    consensusLabel: consensus.label,
+    consensusAgreement: consensus.agreement,
+    providersPassed: consensus.passed,
+  };
 }
 
 /**
@@ -1198,6 +1336,8 @@ export function buildReportModel(
     isLocal,
   });
 
+  const crossModel = buildCrossModelSummary(providers, input.consensusIndex);
+
   return {
     meta: {
       reportId: input.reportId,
@@ -1230,6 +1370,7 @@ export function buildReportModel(
     scoreInterpretation,
     scoreNote,
     customerQuestions,
+    crossModel,
     // True when ANY provider produced usable data (drives the page-level
     // "verdicts not run" note). UNAVAILABLE = no data for that provider.
     hasProviders: providers.some((p) => p.verdict !== "UNAVAILABLE"),
@@ -1260,6 +1401,7 @@ export type RenderModelInputs = {
     confidenceLabel?: string | null;
     confidenceReason?: string | null;
     aiValidations?: unknown;
+    consensusIndex?: unknown;
     nameInconsistency?: { primary: string; alternates: string[] } | null;
     preflightSignals?: unknown;
     industryNormalized?: string | null;
@@ -1331,6 +1473,7 @@ export function buildReportModelFromRender(
       ? input.deterministicScore
       : null,
     providerOutputs,
+    consensusIndex: input.context?.consensusIndex ?? null,
     context: {
       percentileCopy: input.context?.percentileCopy ?? null,
       cohortCellValue: input.context?.cohortCellValue ?? null,
