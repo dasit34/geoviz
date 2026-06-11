@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ReportViewerClient } from "./ReportViewerClient";
 import { resolveBusinessName } from "@/lib/intelligence/resolve-business-name";
 import { parseReportScore, scoreTone } from "@/lib/parse-report-score";
@@ -210,6 +211,13 @@ export function AdminReportCard({
     [order.id, reportStatus],
   );
 
+  // Display-only: refresh the server-rendered validator telemetry after the
+  // report is generated (see effect below). `validatorTelemetry` is a server
+  // prop the status poll does not carry; the ref-backed counter bounds the
+  // number of refreshes so a genuinely-incomplete audit never loops.
+  const router = useRouter();
+  const telemetryRefreshes = useRef(0);
+
   // Poll the GET endpoint every 5s while the row is queued or running so
   // the dashboard auto-reconciles with whatever the worker writes back.
   // Stops automatically the moment status becomes terminal (generated /
@@ -267,6 +275,32 @@ export function AdminReportCard({
       clearInterval(id);
     };
   }, [reportStatus, order.id, adminKey, applyOrderUpdate]);
+
+  // The cross-model validator data (`aiValidations` + `consensusIndex`) is
+  // persisted by the worker ~30s AFTER `reportStatus` flips to "generated",
+  // and the status poll above stops at "generated". `validatorTelemetry` is a
+  // server-computed prop that the poll never refreshes — so a card watched
+  // through an audit would keep showing a stale "⚠ incomplete / ? / consensus
+  // not computed" strip even though the data has landed. Refresh the server
+  // props (re-runs the force-dynamic page → recomputes the telemetry from
+  // fresh DB) until the strip is populated. Display-only: no scoring, worker,
+  // capture, or report-model code is touched. Bounded + self-terminating.
+  useEffect(() => {
+    if (reportStatus !== "generated") {
+      telemetryRefreshes.current = 0;
+      return;
+    }
+    const populated =
+      !!validatorTelemetry &&
+      !validatorTelemetry.modelTestingIncomplete &&
+      validatorTelemetry.consensusComputed;
+    if (populated || telemetryRefreshes.current >= 8) return; // done, or ~64s cap
+    const t = setTimeout(() => {
+      telemetryRefreshes.current += 1;
+      router.refresh();
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [reportStatus, validatorTelemetry, router]);
 
   const post = (
     path: string,
