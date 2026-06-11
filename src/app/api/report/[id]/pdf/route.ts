@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { buildPdfBaseUrl, generateAuditPdf } from "@/lib/generate-pdf";
-import { logReportAccessAttempt } from "@/lib/report-access";
+import { logReportAccessAttempt, validateAdminAccess } from "@/lib/report-access";
 import { applyApiRateLimit } from "@/lib/rate-limit";
 
 /**
@@ -38,18 +38,29 @@ export async function GET(
   req: Request,
   { params }: { params: { id: string } },
 ) {
-  // Rate limit FIRST — PDF generation is the most expensive route in
-  // the app (~20–40s of headless Chromium per call). 5 hits per 5 min
+  // Operator/preview downloads carry a valid admin key (the admin "Download
+  // PDF" button + preview). Exempt them from the per-IP limiter so an operator
+  // iterating on a report doesn't trip the public cap. Public/email links carry
+  // no key and stay rate-limited.
+  const url = new URL(req.url);
+  const adminKey =
+    url.searchParams.get("key") ?? req.headers.get("x-admin-secret") ?? undefined;
+  const isAdmin = validateAdminAccess(adminKey).ok;
+
+  // Rate limit FIRST (public hits only) — PDF generation is the most expensive
+  // route in the app (~20–40s of headless Chromium per call). 5 hits per 5 min
   // per IP is generous for a real customer (they download once, maybe
   // re-download once). Blocks runaway scripts before they can launch a
   // chromium instance.
-  const limited = applyApiRateLimit({
-    req,
-    routeKey: "api:pdf",
-    limit: 5,
-    windowMs: 5 * 60_000,
-  });
-  if (limited) return limited;
+  if (!isAdmin) {
+    const limited = applyApiRateLimit({
+      req,
+      routeKey: "api:pdf",
+      limit: 5,
+      windowMs: 5 * 60_000,
+    });
+    if (limited) return limited;
+  }
 
   // Auth: anyone with the URL can download. Order IDs are 25-char cuids
   // (~120 bits of entropy) so URL-as-token is the access model. Same as
