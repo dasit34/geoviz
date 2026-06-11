@@ -18,7 +18,7 @@ import { GeoVizMark } from "@/components/brand/GeoVizMark";
  * ReportDocument — the single production report template, rebuilt to the
  * approved Figma spec (`public/references/geoviz-report-template.pdf`).
  *
- * 9 pages: dark-navy Cover (P1) + CTA (P9); light interior (P2–P8).
+ * 8 pages: dark-navy Cover (P1) + CTA (P8); light interior (P2–P7).
  * Premium, spacious, customer-facing. Consumes ONE deterministic
  * `ReportModel` — no scoring/data logic here, pure presentation. Same
  * component drives admin preview and the PDF (parity by construction).
@@ -30,8 +30,7 @@ export function ReportDocument({ model }: { model: ReportModel }) {
     <article className="rd">
       <CoverPage model={m} />
       <ExecutivePage model={m} reportId={reportId} />
-      <PlatformsPage model={m} reportId={reportId} />
-      <CrossModelIntelligencePage model={m} reportId={reportId} />
+      <AIIntelligencePage model={m} reportId={reportId} />
       <EvidencePage model={m} reportId={reportId} />
       <DiagnosticsPage model={m} reportId={reportId} />
       <IssuesPage model={m} reportId={reportId} />
@@ -243,91 +242,150 @@ function Callout({
   );
 }
 
-// ── P3 · AI Platform Results ────────────────────────────────────────
-function PlatformsPage({ model, reportId }: { model: ReportModel; reportId: string }) {
+// ── P3 · AI Intelligence (consolidated model results + cross-model insight) ──
+function AIIntelligencePage({ model }: { model: ReportModel; reportId: string }) {
   const m = model;
+  const cm = m.crossModel;
   return (
     <Page variant="light">
-      <PageHead context="DIRECTLY TESTED AI SYSTEMS" n="03" />
-      <h1 className="rd-title">AI Platform Results</h1>
+      <PageHead context="CROSS-MODEL AI INTELLIGENCE" n="03" />
+      <h1 className="rd-title">AI Intelligence</h1>
       <p className="rd-sub">
-        What each AI model understood, what it missed, and whether it could
-        confidently recommend the business.
+        How ChatGPT, Claude, Gemini, and Perplexity answered when a customer
+        asked who to choose — what they understood, who they recommended, who
+        they named instead, and the sources they trusted.
       </p>
 
-      {/* Always render all four named platforms — directly testing ChatGPT,
-          Claude, Gemini, and Perplexity is a core GeoViz proof point. Cards
-          without a captured validator response render in an honest
-          "Not captured" state (never fabricated). */}
-      <div className="rd-prov-grid">
-        {m.providers.map((p) => (
-          <PlatformCard key={p.provider} provider={p} />
-        ))}
-      </div>
       {!m.hasProviders ? (
         <p className="rd-note rd-prov-note">
-          Live cross-model verdicts were not run for this audit. Each platform is
-          shown above with the data captured at audit time.
+          AI models were not tested for this audit. This section populates once a
+          cross-model check has run.
         </p>
-      ) : null}
+      ) : (
+        <>
+          {/* Consensus headline band */}
+          <div className="rd-stat-row">
+            <Stat
+              accent="blue"
+              k="Consensus"
+              v={cm.consensusLabel ?? `${cm.recognizedCount}/4 understood`}
+              note={
+                cm.consensusAgreement
+                  ? `${cm.consensusAgreement} agreement across models`
+                  : "across the four tested models"
+              }
+            />
+            <Stat
+              accent="amber"
+              k="Mentioned"
+              v={`${cm.mentionedCount} of 4`}
+              note="named your business in their answer"
+            />
+            <Stat
+              accent="green"
+              k="Recommended"
+              v={`${cm.recommendedCount} of 4`}
+              note="would suggest it to a customer today"
+            />
+          </div>
 
-      <p className="rd-note rd-prov-note">
-        Model results measure how clearly each AI system understood and could
-        recommend the business. Site diagnostics (page 5) measure the underlying
-        website signals that influence those results.
-      </p>
+          {/* One dense model matrix (replaces two card grids) */}
+          <table className="rd-matrix">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Verdict</th>
+                <th>Understands</th>
+                <th>Confidence</th>
+                <th>Names you</th>
+                <th>Top competitor named</th>
+                <th>Sources</th>
+              </tr>
+            </thead>
+            <tbody>
+              {m.providers.map((p) => (
+                <ModelMatrixRow key={p.provider} provider={p} />
+              ))}
+            </tbody>
+          </table>
 
-      {m.readiness.length > 0 ? <ReadinessStrip readiness={m.readiness} /> : null}
+          {/* Competitor displacement — the conversion-critical insight */}
+          {cm.topCompetitor ? (
+            <Callout
+              kind="issue"
+              label="COMPETITIVE DISPLACEMENT"
+              title={`${cm.topCompetitor.name} appears in ${cm.topCompetitor.count} of 4 AI answers`}
+              body={`Your business is named in ${cm.mentionedCount} of 4. When customers ask AI who to choose, the businesses AI names — not just the ones that rank — win the introduction.`}
+            />
+          ) : null}
+
+          {/* Bottleneck conclusion → bridge to the fix */}
+          {cm.bottleneckDimension && cm.strongestDimension ? (
+            <p className="rd-note rd-prov-note">
+              Across models, your {cm.strongestDimension.label} reads clearly, but{" "}
+              {cm.bottleneckDimension.label} is the weakest shared signal — and
+              it&rsquo;s what holds back a confident recommendation.
+              {cm.topCitedDomains.length > 0
+                ? ` Sources AI leaned on: ${cm.topCitedDomains.slice(0, 4).join(", ")}.`
+                : ""}
+            </p>
+          ) : cm.mainSkipReason ? (
+            <p className="rd-note rd-prov-note">
+              Main reason AI held back: {cm.mainSkipReason}.
+              {cm.topCitedDomains.length > 0
+                ? ` Sources AI leaned on: ${cm.topCitedDomains.slice(0, 4).join(", ")}.`
+                : ""}
+            </p>
+          ) : (
+            <p className="rd-note rd-prov-note">
+              These results reflect a single point-in-time test. AI answers shift
+              as your business signals — and the web around you — change.
+            </p>
+          )}
+        </>
+      )}
     </Page>
   );
 }
 
-function PlatformCard({ provider }: { provider: ReportModelProvider }) {
+function ModelMatrixRow({ provider }: { provider: ReportModelProvider }) {
   const p = provider;
-  const unavailable = p.verdict === "UNAVAILABLE";
-  const readsAs = [p.businessType, p.location].filter(Boolean).join(" · ");
-  return (
-    <div className={`rd-prov rd-prov-${p.provider}`}>
-      <div className="rd-prov-head">
-        <span className="rd-prov-name">
-          <ProviderMark provider={p.provider} size={18} />
+  if (p.verdict === "UNAVAILABLE") {
+    return (
+      <tr className="rd-matrix-unavail">
+        <td className="rd-matrix-model">
+          <ProviderMark provider={p.provider} size={15} />
           {p.display}
-        </span>
-        <Pill {...verdictPill(p.verdict)} />
-      </div>
-      {unavailable ? (
-        <p className="rd-prov-na">No response captured for this audit.</p>
-      ) : p.fetchFailed ? (
-        <div className="rd-prov-body">
-          <div className="rd-prov-field">
-            <span className="rd-prov-k">Understanding</span>
-            <span className={`rd-prov-score rd-v-${understandingTone(p.understandingScore)}`}>
-              {p.understandingScore === null ? "—" : p.understandingScore}
-            </span>
-          </div>
-          <p className="rd-prov-na">
-            {p.display} could not access or render enough content during this test.
-          </p>
-        </div>
-      ) : (
-        <div className="rd-prov-body">
-          <div className="rd-prov-field">
-            <span className="rd-prov-k">Understanding</span>
-            <span className={`rd-prov-score rd-v-${understandingTone(p.understandingScore)}`}>
-              {p.understandingScore === null ? "—" : p.understandingScore}
-            </span>
-          </div>
-          <div className="rd-prov-field">
-            <span className="rd-prov-k">Reads as</span>
-            <span className="rd-prov-v">{readsAs || "Recognized as a business"}</span>
-          </div>
-          <div className="rd-prov-field">
-            <span className="rd-prov-k">Main gap</span>
-            <span className="rd-prov-v">{p.mainGap ?? "No critical gap flagged"}</span>
-          </div>
-        </div>
-      )}
-    </div>
+        </td>
+        <td colSpan={6} className="rd-matrix-na">
+          No response captured for this audit.
+        </td>
+      </tr>
+    );
+  }
+  const conf = p.recommendationReadiness;
+  const confTone =
+    conf === "high" ? "ok" : conf === "medium" ? "warn" : conf === "low" ? "bad" : "muted";
+  const vp = verdictPill(p.verdict);
+  return (
+    <tr>
+      <td className="rd-matrix-model">
+        <ProviderMark provider={p.provider} size={15} />
+        {p.display}
+      </td>
+      <td>
+        <span className={`rd-pill rd-pill-${vp.tone}`}>{vp.label}</span>
+      </td>
+      <td className={`rd-matrix-num rd-v-${understandingTone(p.understandingScore)}`}>
+        {p.understandingScore ?? "—"}
+      </td>
+      <td className={`rd-v-${confTone}`}>{conf ? conf.toUpperCase() : "—"}</td>
+      <td className={`rd-v-${p.mentioned ? "ok" : "muted"}`}>
+        {p.mentioned ? "Yes" : "No"}
+      </td>
+      <td className="rd-matrix-comp">{p.competitors[0] ?? "—"}</td>
+      <td className="rd-matrix-num">{p.citationDomains.length || "—"}</td>
+    </tr>
   );
 }
 
@@ -348,184 +406,12 @@ function ReadinessStrip({ readiness }: { readiness: ReadinessFactor[] }) {
   );
 }
 
-// ── P4 · Cross-Model Intelligence ───────────────────────────────────
-function CrossModelIntelligencePage({
-  model,
-}: {
-  model: ReportModel;
-  reportId: string;
-}) {
-  const m = model;
-  const cm = m.crossModel;
-  return (
-    <Page variant="light">
-      <PageHead context="WHAT THE AI MODELS SAID" n="04" />
-      <h1 className="rd-title">Cross-Model Intelligence</h1>
-      <p className="rd-sub">
-        How the four leading AI assistants answered when a customer asked who to
-        choose — who they named, who they recommended, and the sources they
-        leaned on.
-      </p>
-
-      {!m.hasProviders ? (
-        <p className="rd-note rd-prov-note">
-          AI models were not tested for this audit. This page populates once a
-          cross-model check has run.
-        </p>
-      ) : (
-        <>
-          <div className="rd-stat-row">
-            <Stat
-              accent="blue"
-              k="Recognized by"
-              v={`${cm.recognizedCount} of 4`}
-              note="models understood the business"
-            />
-            <Stat
-              accent="amber"
-              k="Mentioned by"
-              v={`${cm.mentionedCount} of 4`}
-              note="models named it among the options"
-            />
-            <Stat
-              accent="green"
-              k="Recommended by"
-              v={`${cm.recommendedCount} of 4`}
-              note="models would suggest it today"
-            />
-          </div>
-
-          {cm.consensusLabel || cm.topCitedDomains.length > 0 ? (
-            <div className="rd-cmi-meta">
-              {cm.consensusLabel ? (
-                <div className="rd-cmi-meta-item">
-                  <span className="rd-prov-k">AI Visibility Consensus</span>
-                  <span className="rd-cmi-meta-v">
-                    {cm.consensusLabel}
-                    {cm.consensusAgreement
-                      ? ` · ${cm.consensusAgreement} agreement`
-                      : ""}
-                  </span>
-                </div>
-              ) : null}
-              {cm.topCitedDomains.length > 0 ? (
-                <div className="rd-cmi-meta-item">
-                  <span className="rd-prov-k">Top cited sources</span>
-                  <span className="rd-chips">
-                    {cm.topCitedDomains.map((d) => (
-                      <span key={d} className="rd-chip rd-chip-muted">
-                        {d}
-                      </span>
-                    ))}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className="rd-prov-grid">
-            {m.providers.map((p) => (
-              <CrossModelCard key={p.provider} provider={p} />
-            ))}
-          </div>
-
-          {cm.mainSkipReason ? (
-            <Callout
-              kind="issue"
-              label="WHY AI HESITATES"
-              title="Main reason AI skipped this business"
-              body={cm.mainSkipReason}
-            />
-          ) : cm.recommendedCount > 0 ? (
-            <p className="rd-note rd-prov-note">
-              Every model that could place the business was willing to recommend
-              it — a strong position to build on.
-            </p>
-          ) : null}
-
-          <p className="rd-note rd-prov-note">
-            These results reflect a single point-in-time test. AI answers shift
-            as your business signals — and the web around you — change.
-          </p>
-        </>
-      )}
-    </Page>
-  );
-}
-
-function CrossModelCard({ provider }: { provider: ReportModelProvider }) {
-  const p = provider;
-  if (p.verdict === "UNAVAILABLE") {
-    return (
-      <div className={`rd-prov rd-prov-${p.provider}`}>
-        <div className="rd-prov-head">
-          <span className="rd-prov-name">
-            <ProviderMark provider={p.provider} size={18} />
-            {p.display}
-          </span>
-          <Pill {...verdictPill(p.verdict)} />
-        </div>
-        <p className="rd-prov-na">No response captured for this audit.</p>
-      </div>
-    );
-  }
-  return (
-    <div className={`rd-prov rd-prov-${p.provider}`}>
-      <div className="rd-prov-head">
-        <span className="rd-prov-name">
-          <ProviderMark provider={p.provider} size={18} />
-          {p.display}
-        </span>
-        <Pill {...verdictPill(p.verdict)} />
-      </div>
-      <div className="rd-prov-body">
-        <div className="rd-prov-field">
-          <span className="rd-prov-k">Named your business</span>
-          <span className={`rd-prov-v rd-v-${p.mentioned ? "ok" : "muted"}`}>
-            {p.mentioned
-              ? "Yes — included in its answer"
-              : "Not named in its answer"}
-          </span>
-        </div>
-        <div className="rd-prov-field">
-          <span className="rd-prov-k">Also mentioned</span>
-          {p.competitors.length > 0 ? (
-            <span className="rd-chips">
-              {p.competitors.map((c) => (
-                <span key={c} className="rd-chip">
-                  {c}
-                </span>
-              ))}
-            </span>
-          ) : (
-            <span className="rd-prov-v">—</span>
-          )}
-        </div>
-        <div className="rd-prov-field">
-          <span className="rd-prov-k">Sources used</span>
-          {p.citationDomains.length > 0 ? (
-            <span className="rd-chips">
-              {p.citationDomains.map((d) => (
-                <span key={d} className="rd-chip rd-chip-muted">
-                  {d}
-                </span>
-              ))}
-            </span>
-          ) : (
-            <span className="rd-prov-v">No external sources cited</span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── P5 · Evidence Reviewed ──────────────────────────────────────────
+// ── P4 · Evidence Reviewed ──────────────────────────────────────────
 function EvidencePage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="WHAT AI HAD TO READ" n="05" />
+      <PageHead context="WHAT AI HAD TO READ" n="04" />
 
       {m.customerQuestions.length > 0 ? (
         <section className="rd-questions">
@@ -572,12 +458,12 @@ function EvidenceRow({ row }: { row: ReportModelEvidence }) {
   );
 }
 
-// ── P6 · Visibility Diagnostics ─────────────────────────────────────
+// ── P5 · Visibility Diagnostics ─────────────────────────────────────
 function DiagnosticsPage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="WHERE THE SCORE COMES FROM" n="06" />
+      <PageHead context="WHERE THE SCORE COMES FROM" n="05" />
       <h1 className="rd-title">Visibility Diagnostics</h1>
       <p className="rd-sub">
         The six signals behind the score — readable in under a minute, no
@@ -600,6 +486,7 @@ function DiagnosticsPage({ model, reportId }: { model: ReportModel; reportId: st
           <p className="rd-interp-note">{m.scoreNote}</p>
         ) : null}
       </div>
+      {m.readiness.length > 0 ? <ReadinessStrip readiness={m.readiness} /> : null}
     </Page>
   );
 }
@@ -624,12 +511,12 @@ function Bar({ category }: { category: ReportModelCategory }) {
   );
 }
 
-// ── P7 · Top Issues ─────────────────────────────────────────────────
+// ── P6 · Top Issues ─────────────────────────────────────────────────
 function IssuesPage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="CRITICAL VISIBILITY GAPS" n="07" />
+      <PageHead context="CRITICAL VISIBILITY GAPS" n="06" />
       <h1 className="rd-title">Top Issues</h1>
       <p className="rd-sub">
         The few issues that most directly affect whether AI systems recommend
@@ -659,12 +546,12 @@ function IssueCard({ diag }: { diag: ReportModelDiagnostic }) {
   );
 }
 
-// ── P8 · Priority Fix Plan ──────────────────────────────────────────
+// ── P7 · Priority Fix Plan ──────────────────────────────────────────
 function FixesPage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="WHAT TO FIX FIRST" n="08" />
+      <PageHead context="WHAT TO FIX FIRST" n="07" />
       <h1 className="rd-title">Priority Fix Plan</h1>
       <p className="rd-sub">
         Each fix connects directly to business impact and the GeoViz Foundation
@@ -700,14 +587,14 @@ function FixCard({ fix }: { fix: ReportModelFix }) {
   );
 }
 
-// ── P9 · Strategic Action Plan + Foundation Fix CTA ─────────────────
+// ── P8 · Strategic Action Plan + Foundation Fix CTA ─────────────────
 function ActionPage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="dark">
       <header className="rd-head rd-head-cover">
         <Logo dark />
-        <span className="rd-head-num">09</span>
+        <span className="rd-head-num">08</span>
       </header>
       <p className="rd-cta-eyebrow">Foundation Fix</p>
       <h1 className="rd-action-title">Strategic Action Plan</h1>
