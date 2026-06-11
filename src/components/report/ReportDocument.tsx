@@ -18,7 +18,7 @@ import { GeoVizMark } from "@/components/brand/GeoVizMark";
  * ReportDocument — the single production report template, rebuilt to the
  * approved Figma spec (`public/references/geoviz-report-template.pdf`).
  *
- * 8 pages: dark-navy Cover (P1) + CTA (P8); light interior (P2–P7).
+ * 9 pages: dark-navy Cover (P1) + CTA (P9); light interior (P2–P8).
  * Premium, spacious, customer-facing. Consumes ONE deterministic
  * `ReportModel` — no scoring/data logic here, pure presentation. Same
  * component drives admin preview and the PDF (parity by construction).
@@ -31,6 +31,7 @@ export function ReportDocument({ model }: { model: ReportModel }) {
       <CoverPage model={m} />
       <ExecutivePage model={m} reportId={reportId} />
       <PlatformsPage model={m} reportId={reportId} />
+      <CrossModelIntelligencePage model={m} reportId={reportId} />
       <EvidencePage model={m} reportId={reportId} />
       <DiagnosticsPage model={m} reportId={reportId} />
       <IssuesPage model={m} reportId={reportId} />
@@ -347,12 +348,184 @@ function ReadinessStrip({ readiness }: { readiness: ReadinessFactor[] }) {
   );
 }
 
-// ── P4 · Evidence Reviewed ──────────────────────────────────────────
+// ── P4 · Cross-Model Intelligence ───────────────────────────────────
+function CrossModelIntelligencePage({
+  model,
+}: {
+  model: ReportModel;
+  reportId: string;
+}) {
+  const m = model;
+  const cm = m.crossModel;
+  return (
+    <Page variant="light">
+      <PageHead context="WHAT THE AI MODELS SAID" n="04" />
+      <h1 className="rd-title">Cross-Model Intelligence</h1>
+      <p className="rd-sub">
+        How the four leading AI assistants answered when a customer asked who to
+        choose — who they named, who they recommended, and the sources they
+        leaned on.
+      </p>
+
+      {!m.hasProviders ? (
+        <p className="rd-note rd-prov-note">
+          AI models were not tested for this audit. This page populates once a
+          cross-model check has run.
+        </p>
+      ) : (
+        <>
+          <div className="rd-stat-row">
+            <Stat
+              accent="blue"
+              k="Recognized by"
+              v={`${cm.recognizedCount} of 4`}
+              note="models understood the business"
+            />
+            <Stat
+              accent="amber"
+              k="Mentioned by"
+              v={`${cm.mentionedCount} of 4`}
+              note="models named it among the options"
+            />
+            <Stat
+              accent="green"
+              k="Recommended by"
+              v={`${cm.recommendedCount} of 4`}
+              note="models would suggest it today"
+            />
+          </div>
+
+          {cm.consensusLabel || cm.topCitedDomains.length > 0 ? (
+            <div className="rd-cmi-meta">
+              {cm.consensusLabel ? (
+                <div className="rd-cmi-meta-item">
+                  <span className="rd-prov-k">AI Visibility Consensus</span>
+                  <span className="rd-cmi-meta-v">
+                    {cm.consensusLabel}
+                    {cm.consensusAgreement
+                      ? ` · ${cm.consensusAgreement} agreement`
+                      : ""}
+                  </span>
+                </div>
+              ) : null}
+              {cm.topCitedDomains.length > 0 ? (
+                <div className="rd-cmi-meta-item">
+                  <span className="rd-prov-k">Top cited sources</span>
+                  <span className="rd-chips">
+                    {cm.topCitedDomains.map((d) => (
+                      <span key={d} className="rd-chip rd-chip-muted">
+                        {d}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="rd-prov-grid">
+            {m.providers.map((p) => (
+              <CrossModelCard key={p.provider} provider={p} />
+            ))}
+          </div>
+
+          {cm.mainSkipReason ? (
+            <Callout
+              kind="issue"
+              label="WHY AI HESITATES"
+              title="Main reason AI skipped this business"
+              body={cm.mainSkipReason}
+            />
+          ) : cm.recommendedCount > 0 ? (
+            <p className="rd-note rd-prov-note">
+              Every model that could place the business was willing to recommend
+              it — a strong position to build on.
+            </p>
+          ) : null}
+
+          <p className="rd-note rd-prov-note">
+            These results reflect a single point-in-time test. AI answers shift
+            as your business signals — and the web around you — change.
+          </p>
+        </>
+      )}
+    </Page>
+  );
+}
+
+function CrossModelCard({ provider }: { provider: ReportModelProvider }) {
+  const p = provider;
+  if (p.verdict === "UNAVAILABLE") {
+    return (
+      <div className={`rd-prov rd-prov-${p.provider}`}>
+        <div className="rd-prov-head">
+          <span className="rd-prov-name">
+            <ProviderMark provider={p.provider} size={18} />
+            {p.display}
+          </span>
+          <Pill {...verdictPill(p.verdict)} />
+        </div>
+        <p className="rd-prov-na">No response captured for this audit.</p>
+      </div>
+    );
+  }
+  return (
+    <div className={`rd-prov rd-prov-${p.provider}`}>
+      <div className="rd-prov-head">
+        <span className="rd-prov-name">
+          <ProviderMark provider={p.provider} size={18} />
+          {p.display}
+        </span>
+        <Pill {...verdictPill(p.verdict)} />
+      </div>
+      <div className="rd-prov-body">
+        <div className="rd-prov-field">
+          <span className="rd-prov-k">Named your business</span>
+          <span className={`rd-prov-v rd-v-${p.mentioned ? "ok" : "muted"}`}>
+            {p.mentioned
+              ? "Yes — included in its answer"
+              : "Not named in its answer"}
+          </span>
+        </div>
+        <div className="rd-prov-field">
+          <span className="rd-prov-k">Also mentioned</span>
+          {p.competitors.length > 0 ? (
+            <span className="rd-chips">
+              {p.competitors.map((c) => (
+                <span key={c} className="rd-chip">
+                  {c}
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span className="rd-prov-v">—</span>
+          )}
+        </div>
+        <div className="rd-prov-field">
+          <span className="rd-prov-k">Sources used</span>
+          {p.citationDomains.length > 0 ? (
+            <span className="rd-chips">
+              {p.citationDomains.map((d) => (
+                <span key={d} className="rd-chip rd-chip-muted">
+                  {d}
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span className="rd-prov-v">No external sources cited</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── P5 · Evidence Reviewed ──────────────────────────────────────────
 function EvidencePage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="WHAT AI HAD TO READ" n="04" />
+      <PageHead context="WHAT AI HAD TO READ" n="05" />
 
       {m.customerQuestions.length > 0 ? (
         <section className="rd-questions">
@@ -399,12 +572,12 @@ function EvidenceRow({ row }: { row: ReportModelEvidence }) {
   );
 }
 
-// ── P5 · Visibility Diagnostics ─────────────────────────────────────
+// ── P6 · Visibility Diagnostics ─────────────────────────────────────
 function DiagnosticsPage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="WHERE THE SCORE COMES FROM" n="05" />
+      <PageHead context="WHERE THE SCORE COMES FROM" n="06" />
       <h1 className="rd-title">Visibility Diagnostics</h1>
       <p className="rd-sub">
         The six signals behind the score — readable in under a minute, no
@@ -451,12 +624,12 @@ function Bar({ category }: { category: ReportModelCategory }) {
   );
 }
 
-// ── P6 · Top Issues ─────────────────────────────────────────────────
+// ── P7 · Top Issues ─────────────────────────────────────────────────
 function IssuesPage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="CRITICAL VISIBILITY GAPS" n="06" />
+      <PageHead context="CRITICAL VISIBILITY GAPS" n="07" />
       <h1 className="rd-title">Top Issues</h1>
       <p className="rd-sub">
         The few issues that most directly affect whether AI systems recommend
@@ -486,12 +659,12 @@ function IssueCard({ diag }: { diag: ReportModelDiagnostic }) {
   );
 }
 
-// ── P7 · Priority Fix Plan ──────────────────────────────────────────
+// ── P8 · Priority Fix Plan ──────────────────────────────────────────
 function FixesPage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="WHAT TO FIX FIRST" n="07" />
+      <PageHead context="WHAT TO FIX FIRST" n="08" />
       <h1 className="rd-title">Priority Fix Plan</h1>
       <p className="rd-sub">
         Each fix connects directly to business impact and the GeoViz Foundation
@@ -527,14 +700,14 @@ function FixCard({ fix }: { fix: ReportModelFix }) {
   );
 }
 
-// ── P8 · Strategic Action Plan + Foundation Fix CTA ─────────────────
+// ── P9 · Strategic Action Plan + Foundation Fix CTA ─────────────────
 function ActionPage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="dark">
       <header className="rd-head rd-head-cover">
         <Logo dark />
-        <span className="rd-head-num">08</span>
+        <span className="rd-head-num">09</span>
       </header>
       <p className="rd-cta-eyebrow">Foundation Fix</p>
       <h1 className="rd-action-title">Strategic Action Plan</h1>
