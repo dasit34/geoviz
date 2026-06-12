@@ -4,6 +4,7 @@ import { Footer } from "@/components/Footer";
 import { VisibilitySignalField } from "@/components/VisibilitySignalField";
 import { ScoringExamplePanel } from "@/components/ScoringExamplePanel";
 import { ProviderMark } from "@/components/report/BrandMarks";
+import { RevealOnView } from "@/components/RevealOnView";
 
 /**
  * Homepage — C2 Command Center rebuild. Presentation-only.
@@ -104,18 +105,23 @@ const MODEL_ENDPOINTS = [
 ];
 
 const FIX_SCOPE = [
-  "Machine-readable business identity",
-  "AI retrieval readiness",
-  "Cross-platform consistency alignment",
-  "Before/after AI Visibility re-check",
+  "LocalBusiness / Organization schema",
+  "NAP (name, address, phone) consistency cleanup",
+  "AI-readable business profile",
+  "Service and location clarity",
+  "FAQ / entity structure",
+  "Trust signal surfacing",
+  "Post-fix re-audit",
 ];
 
 const AUDIT_BULLETS = [
-  "Cross-model AI Visibility analysis with a single readiness read",
-  "The top 3 issues making you invisible to AI",
-  "The top 3 fixes, ranked by impact",
-  "Reviewed by a human before delivery",
-  "Professional PDF intelligence brief",
+  "Your AI Visibility Score (0–100)",
+  "Customer Questions Tested — the real buying questions AI was asked",
+  "ChatGPT, Claude, Gemini & Perplexity results",
+  "Google AI Overviews readiness",
+  "Evidence Reviewed — what AI could actually read",
+  "Top visibility gaps holding you back",
+  "Priority Fix Plan, ranked by impact",
 ];
 
 const FOUNDATION_BULLETS = [
@@ -163,6 +169,9 @@ export default function Page() {
   return (
     <main>
       <Header />
+      {/* One global IntersectionObserver drives [data-reveal] fade-ins
+          (reduced-motion-safe; see globals.css). Client island, renders null. */}
+      <RevealOnView />
 
       {/* ── HERO · operational dateline · illuminated signal field ── */}
       <section className="relative overflow-hidden border-b border-white/[0.06]">
@@ -187,18 +196,18 @@ export default function Page() {
               Visibility is no longer just ranking. It’s interpretation.
             </p>
             <Thesis className="text-[2rem] leading-[1.1] sm:text-5xl sm:leading-[1.12] lg:text-[3.6rem]">
-              Search is shifting from links to answers. We measure
-              whether AI recommends your business.
+              Would AI recommend your business when customers ask
+              who to hire?
             </Thesis>
             <p className="mt-5 max-w-lg text-base leading-[1.55] text-white/75 sm:mt-7 sm:text-lg sm:leading-[1.6]">
-              ChatGPT, Claude, Gemini, and Perplexity each read your
-              business differently. Our audit shows how clearly they
-              can understand, trust, and surface you to a customer.
+              GeoViz tests real customer questions across major AI
+              systems and shows whether your business can be found,
+              understood, trusted, and recommended.
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 sm:mt-9 sm:gap-x-6 sm:gap-y-4">
               <Link href="/order" className="btn-primary text-base">
-                Run AI Visibility Audit
+                Run Your AI Visibility Audit — $97
                 <span aria-hidden>→</span>
               </Link>
               <Link
@@ -209,6 +218,9 @@ export default function Page() {
               </Link>
             </div>
 
+            <p className="mt-5 text-sm font-medium text-white/55 sm:text-[15px]">
+              The fix is optional. Knowing where you stand is not.
+            </p>
           </div>
 
           <div className="relative">
@@ -226,6 +238,40 @@ export default function Page() {
       {/* ── MULTI-MODEL CREDIBILITY (supporting block, unnumbered) ── */}
       <MultiModelTesting />
 
+      {/* ── EDUCATION · check before you spend (major section) ── */}
+      <section className="relative border-y border-white/[0.06] bg-ink-900/40">
+        <div className="absolute inset-0 -z-10 grid-bg opacity-30" />
+        <div
+          className="container-page py-16 sm:py-24"
+          data-reveal
+        >
+          <p className="section-eyebrow">Start here</p>
+          <h2 className="h2 mt-4 max-w-3xl">
+            Before you spend more on SEO or ads, check if AI can
+            recommend you.
+          </h2>
+          <div className="mt-6 grid max-w-3xl gap-5 text-[17px] leading-[1.6] text-white/70">
+            <p>
+              Businesses are already spending money to get found online.
+              But if ChatGPT, Claude, Gemini, Perplexity, or Google AI
+              Overviews cannot understand who you are, what you do, where
+              you serve, and why you should be trusted, that money may not
+              translate into AI recommendations.
+            </p>
+            <p className="text-white/90">
+              GeoViz gives you a quick, plain-English audit of where you
+              stand.
+            </p>
+          </div>
+          <div className="mt-8">
+            <Link href="/order" className="btn-primary text-base">
+              Run Your AI Visibility Audit — $97
+              <span aria-hidden>→</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ── CUSTOMER QUESTIONS (buyer-intent, unnumbered) ── */}
       <WouldAIRecommend />
 
@@ -238,14 +284,14 @@ export default function Page() {
           <span className="h-px w-7 bg-graphite-400/30" aria-hidden />
         </div>
         <Thesis tone="light" className="mt-7 max-w-3xl text-3xl sm:text-4xl">
-          AI search is changing how businesses get discovered.
+          Google is no longer the only search box that matters.
         </Thesis>
         <div className="mt-8 grid max-w-3xl gap-5 text-[17px] leading-[1.6] text-graphite-700">
           <p>
-            Customers are increasingly receiving synthesized answers
-            instead of scrolling through lists of links. Visibility
-            now depends on whether AI systems can correctly
-            interpret, trust, and retrieve your business information.
+            Customers are asking AI who to hire. Instead of scrolling
+            a list of links, they get one synthesized answer — and
+            your visibility now depends on whether AI systems can
+            correctly interpret, trust, and retrieve your business.
           </p>
           <p>
             Local businesses are particularly affected as AI
@@ -280,8 +326,13 @@ export default function Page() {
         </p>
 
         <div className="mt-14 grid gap-px overflow-hidden rounded-lg border border-cream-200 bg-cream-200 md:grid-cols-2 lg:grid-cols-5">
-          {DIMENSIONS.map((d) => (
-            <div key={d.label} className="bg-cream-100 p-6">
+          {DIMENSIONS.map((d, i) => (
+            <div
+              key={d.label}
+              className="bg-cream-100 p-6"
+              data-reveal
+              style={{ transitionDelay: `${i * 70}ms` }}
+            >
               <p className="text-sm font-semibold uppercase tracking-[0.12em] text-graphite-900">
                 {d.label}
               </p>
@@ -339,14 +390,19 @@ export default function Page() {
         </p>
         <div className="mt-10 grid gap-14 lg:grid-cols-[minmax(0,46%)_minmax(0,54%)] lg:gap-16">
           <div>
-            <SectionHeading>Installed for you.</SectionHeading>
+            <SectionHeading>
+              Know what is broken. Then decide if you want us to fix it.
+            </SectionHeading>
             <p className="mt-5 text-lg leading-[1.55] text-white/70">
-              We build the AI visibility infrastructure that addresses
-              the underlying technical, trust, and discoverability gaps
-              surfaced in your audit — then re-check how AI systems
-              read your business.
+              The audit shows the gaps. The GEO Foundation Fix repairs
+              the website and entity signals AI systems need to verify
+              and recommend you — addressing the{" "}
+              underlying technical, trust, and discoverability gaps{" "}
+              surfaced in your audit, then re-checking how AI reads
+              your business.
             </p>
             <div className="mt-7 inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-white/10 bg-white/[0.03] px-4 py-2 text-sm">
+              <span className="text-white/65">Starting at</span>
               <span className="mono-data font-semibold text-white">
                 $497
               </span>
@@ -437,6 +493,9 @@ export default function Page() {
                 Foundation Fix
               </p>
               <div className="mt-5 flex items-baseline gap-3">
+                <span className="text-sm font-medium text-graphite-500">
+                  Starting at
+                </span>
                 <span className="mono-data text-4xl font-bold tracking-tight text-graphite-900">
                   $497
                 </span>
@@ -733,7 +792,7 @@ function MultiModelTesting() {
         {MODEL_ENDPOINTS.map((m) => (
           <div
             key={m.provider}
-            className={`flex flex-col rounded-lg border border-white/10 ${m.accent} border-t-2 bg-ink-900/60 p-5 shadow-card backdrop-blur-sm`}
+            className={`flex flex-col rounded-lg border border-white/10 ${m.accent} border-t-2 bg-ink-900/60 p-5 shadow-card backdrop-blur-sm transition-[border-color,box-shadow] duration-200 hover:border-white/25 hover:shadow-glow`}
           >
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2.5">
@@ -783,11 +842,10 @@ function MultiModelTesting() {
 // Illustrative marketing samples (NOT per-business) — concrete, no template
 // brackets, no "prompts" wording.
 const EXAMPLE_CUSTOMER_QUESTIONS = [
-  "Who are the best roofers near Toledo?",
-  "Can you recommend an emergency dentist near me?",
-  "Is this business trustworthy?",
-  "Which company should I call for a burst pipe?",
-  "What local business should I choose for AC repair?",
+  "Who should I call for this near me?",
+  "Who is trustworthy and well reviewed?",
+  "Who handles this service in my area?",
+  "Which local business should I choose?",
 ];
 
 /**
@@ -803,17 +861,18 @@ function WouldAIRecommend() {
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,52%)_minmax(0,48%)] lg:gap-16">
         <div>
           <SectionHeading>
-            Would AI recommend you when customers ask who to hire?
+            Every local business needs an AI visibility checkup.
           </SectionHeading>
           <p className="mt-5 max-w-xl text-lg leading-[1.55] text-white/70">
-            GeoViz tests the real questions customers ask ChatGPT, Claude,
-            Perplexity, Gemini, and Google AI Overviews before choosing a local
-            business. Then we show what AI understood, what it missed, and what
-            needs to be fixed.
+            Customers are asking AI questions like these before they choose
+            who to hire. GeoViz tests those real buying questions across
+            ChatGPT, Claude, Gemini, Perplexity, and Google AI Overviews — then
+            shows what AI understood, what it missed, and what is blocking your
+            business from being recommended.
           </p>
           <div className="mt-8">
             <Link href="/order" className="btn-primary text-base">
-              Run Your AI Visibility Audit
+              Run Your AI Visibility Audit — $97
               <span aria-hidden>→</span>
             </Link>
           </div>
@@ -822,8 +881,13 @@ function WouldAIRecommend() {
         <div className="rounded-lg border border-white/10 bg-ink-900/60 p-6 shadow-card backdrop-blur-sm sm:p-7">
           <p className="section-eyebrow">Customer Questions Tested</p>
           <ul className="mt-5 flex flex-col gap-3.5">
-            {EXAMPLE_CUSTOMER_QUESTIONS.map((q) => (
-              <li key={q} className="flex items-start gap-3">
+            {EXAMPLE_CUSTOMER_QUESTIONS.map((q, i) => (
+              <li
+                key={q}
+                className="flex items-start gap-3"
+                data-reveal
+                style={{ transitionDelay: `${i * 80}ms` }}
+              >
                 <span
                   aria-hidden
                   className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-cyan/40 font-mono text-[11px] font-semibold text-cyan"
