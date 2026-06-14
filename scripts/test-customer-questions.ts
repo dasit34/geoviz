@@ -108,6 +108,50 @@ check("deterministic — same input yields identical output", () => {
   );
 });
 
+check("vowel-sound business noun → 'an AI …', never 'a AI …'", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "GeoViz",
+    industrySlug: null,
+    city: null,
+    services: [],
+    businessType: "AI visibility intelligence service",
+    isLocal: false,
+  });
+  const blob = ok(qs);
+  assert.doesNotMatch(blob, /\ba AI\b/, blob); // the reported grammar bug
+  assert.ok(/\ban AI visibility intelligence service\b/.test(blob), blob);
+});
+
+check("sentence-like detected service never leaks into a question", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "GeoViz",
+    industrySlug: null,
+    city: null,
+    // The exact garbage detection from the reviewed PDF.
+    services: ["testing business visibility across major AI systems"],
+    businessType: "AI visibility intelligence service",
+    isLocal: false,
+  });
+  const blob = ok(qs);
+  assert.doesNotMatch(blob, /testing business visibility across major AI systems/i, blob);
+  // Falls back to the business-type noun → reads naturally.
+  assert.ok(/recommend a reliable AI visibility intelligence service\?/i.test(blob), blob);
+});
+
+check("local + vowel service → 'recommend an …', grammatical", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "Acme",
+    industrySlug: null,
+    city: "Toledo, OH",
+    services: ["awning install"],
+    businessType: "Awning company",
+    isLocal: true,
+  });
+  const blob = ok(qs);
+  assert.doesNotMatch(blob, /recommend a awning/i, blob);
+  assert.ok(/recommend an awning install company/i.test(blob), blob);
+});
+
 console.log(`[customer-questions] passed=${passed} failed=${failed}`);
 if (failed > 0) {
   for (const f of failures) console.log(f);

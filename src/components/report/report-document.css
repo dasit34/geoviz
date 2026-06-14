@@ -599,25 +599,30 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  counter-reset: rd-q;
 }
 .rd-questions-item {
   font-size: 13px;
   line-height: 1.35;
   color: var(--l-ink);
-  padding-left: 20px;
+  padding-left: 22px;
   position: relative;
+  counter-increment: rd-q;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
+/* Numbered marker — reads as a tested checklist, not an uncertain "?". */
 .rd-questions-item::before {
-  content: "?";
+  content: counter(rd-q) ".";
   position: absolute;
   left: 0;
-  top: -1px;
-  font-weight: 700;
-  color: var(--c-orange);
+  top: 0;
+  font-family: var(--rd-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--l-muted);
 }
 .rd-questions-foot {
   font-size: 12px;
