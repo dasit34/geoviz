@@ -71,11 +71,11 @@ const NODES: Node[] = [
 ];
 
 const EMIT_X = 180;
-const EMIT_Y = 134;
+const EMIT_Y = 174;
 const NODE_X = 360;
 const NODE_W = 176;
 const NODE_H = 44;
-const NODE_TOP = [70, 126, 182, 238, 294]; // top-left y of each node card
+const NODE_TOP = [64, 120, 176, 232, 288]; // top-left y of each node card
 const nodeCenterY = (i: number) => NODE_TOP[i] + NODE_H / 2;
 
 /** Distinct inline glyph for AI Overviews (an "answer block" + accent spark). */
@@ -156,13 +156,13 @@ export function VisibilitySignalField({
         {/* emit glow (pulses as signals leave) */}
         <circle cx={EMIT_X} cy={EMIT_Y} r="13" fill={C.accent} opacity="0.16" className="motion-safe:animate-pulseSoft" />
         <g>
-          <rect x="24" y="92" width="156" height="84" rx="10" fill="rgba(255,106,26,0.06)" stroke={C.accent} strokeWidth="1.25" />
-          <text x="40" y="118" fontSize="13" fontWeight="700" fill="#ffffff">
+          <rect x="24" y="132" width="156" height="84" rx="10" fill="rgba(255,106,26,0.06)" stroke={C.accent} strokeWidth="1.25" />
+          <text x="40" y="158" fontSize="13" fontWeight="700" fill="#ffffff">
             Your Business
           </text>
-          <rect x="40" y="130" width="98" height="5" rx="2.5" fill="rgba(255,255,255,0.16)" />
-          <rect x="40" y="142" width="66" height="5" rx="2.5" fill="rgba(255,255,255,0.10)" />
-          <text x="40" y="166" fontSize="9.5" letterSpacing="0.6" fill={C.muted} fontFamily="var(--rd-mono, ui-monospace), monospace">
+          <rect x="40" y="170" width="98" height="5" rx="2.5" fill="rgba(255,255,255,0.16)" />
+          <rect x="40" y="182" width="66" height="5" rx="2.5" fill="rgba(255,255,255,0.10)" />
+          <text x="40" y="206" fontSize="9.5" letterSpacing="0.6" fill={C.muted} fontFamily="var(--rd-mono, ui-monospace), monospace">
             LOCAL SERVICE · 1 LOCATION
           </text>
           <circle cx={EMIT_X} cy={EMIT_Y} r="4" fill={C.accent} className="motion-safe:animate-pulseSoft" />
@@ -170,7 +170,7 @@ export function VisibilitySignalField({
 
         {/* ── Signal status chips (business side) ────────────────── */}
         {CHECKS.map((c, i) => {
-          const y = 192 + i * 30;
+          const y = 230 + i * 30;
           const blocked = c.tone === "muted";
           return (
             <g
