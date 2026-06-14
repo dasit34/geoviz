@@ -222,6 +222,14 @@ function Stat({
   );
 }
 
+/** Join display names into readable prose: ["A"]→"A", ["A","B"]→"A and B",
+ *  ["A","B","C"]→"A, B, and C". */
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
 function Callout({
   kind,
   label,
@@ -298,7 +306,7 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
                 <th>Understands</th>
                 <th>Confidence</th>
                 <th>Names you</th>
-                <th>Top competitor named</th>
+                <th>Top entity named</th>
                 <th>Sources</th>
               </tr>
             </thead>
@@ -309,10 +317,22 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
             </tbody>
           </table>
 
-          {/* Competitor displacement — the conversion-critical insight. Headline
-              claims a count only when one competitor truly leads; ties and
-              single mentions are phrased without a fabricated "N of 4". */}
-          {cm.topCompetitor || (cm.competitorsTied && cm.competitorsTied.length > 0) ? (
+          {/* Entity Name Consistency — the audited business was recognized under
+              multiple name spellings (not real competitors). Takes priority over
+              the competitive-displacement card so same-business variants are never
+              framed as competition. */}
+          {cm.entityNameVariants && cm.entityNameVariants.length >= 2 ? (
+            <Callout
+              kind="issue"
+              label="ENTITY NAME CONSISTENCY"
+              title={`AI recognized this business in ${cm.mentionedCount} of 4 answers, but used inconsistent name variants.`}
+              body={`Models referred to the business as ${joinNames(cm.entityNameVariants)}. AI can identify the business, but the entity name should be standardized so AI systems recognize one consistent brand.${
+                cm.recommendedCount < cm.mentionedCount
+                  ? " AI systems recognized the business, but did not confidently recommend it."
+                  : ""
+              }`}
+            />
+          ) : cm.topCompetitor || (cm.competitorsTied && cm.competitorsTied.length > 0) ? (
             <Callout
               kind="issue"
               label="COMPETITIVE DISPLACEMENT"

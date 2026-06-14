@@ -212,6 +212,48 @@ check("single leader named by >=2 (not unanimous) → count matches the table", 
   assert.deepEqual(cm.topCompetitor, { name: "Acme", count: 2 });
 });
 
+// ── Entity name consistency: same-business name variants must NOT be framed as
+// competitive displacement. Audited business is "Rock Roofing LLC" /
+// rockroofingohio.com (per buildWith).
+check("same-business name variants → Entity Name Consistency, not displacement", () => {
+  const m = buildWithComps({
+    openai: ["Rock Roofing"],
+    claude: ["Rock Roofing LLC"],
+    gemini: ["RockRoofing"],
+    perplexity: ["Rock Roofing Inc"],
+  });
+  const cm = m!.crossModel;
+  assert.equal(cm.topCompetitor, null, "variants must not produce a competitor leader");
+  assert.equal(cm.competitorsTied, null, "variants must not be tied competitors");
+  assert.ok(
+    cm.entityNameVariants && cm.entityNameVariants.length >= 2,
+    `expected ≥2 name variants, got ${JSON.stringify(cm.entityNameVariants)}`,
+  );
+});
+
+check("a real competitor leader among variants still yields displacement", () => {
+  const m = buildWithComps({
+    openai: ["Acme Roofing"],
+    claude: ["Acme Roofing"],
+    gemini: ["Rock Roofing"], // same-business variant — excluded
+    perplexity: ["Rock Roofing LLC"], // same-business variant — excluded
+  });
+  const cm = m!.crossModel;
+  assert.deepEqual(cm.topCompetitor, { name: "Acme Roofing", count: 2 }, "real competitor leads");
+  assert.equal(cm.entityNameVariants, null, "displacement wins → no entity-consistency card");
+});
+
+check("unrelated competitors are NOT over-normalized into the business", () => {
+  const m = buildWithComps({
+    openai: ["BrightLocal"],
+    claude: ["Yelp"],
+    gemini: ["Angi"],
+    perplexity: ["BBB"],
+  });
+  const cm = m!.crossModel;
+  assert.equal(cm.entityNameVariants, null, "none of these are the audited business");
+});
+
 console.log(`[report-providers] passed=${passed} failed=${failed}`);
 if (failed > 0) {
   for (const f of failures) console.log(`  ✗ ${f}`);

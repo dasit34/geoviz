@@ -41,23 +41,62 @@ const VERTICAL_QUESTION_PROFILES: Record<string, VerticalProfile> = {
   home_services: { noun: "home service companies", singular: "home service company", urgentProblem: "an urgent home repair", service: "this service" },
 };
 
+/** Construction/service nouns that are uncountable — never pluralized, so a
+ *  question never reads "best sidings" / "best roofings". */
+const UNCOUNTABLE_NOUNS = new Set([
+  "siding", "roofing", "remodeling", "remodelling", "fencing", "flooring",
+  "framing", "decking", "plumbing", "paving", "landscaping", "contracting",
+  "consulting", "marketing", "insurance", "software", "analytics", "hvac",
+]);
+
+/** Collapse a long detected business-type phrase to its head noun so generated
+ *  questions stay short and natural. "home remodeling contractor specializing in
+ *  windows, doors, roofing, and siding" → "home remodeling contractor". */
+function simplifyBusinessType(phrase: string): string {
+  let t = phrase.trim();
+  // Drop a trailing qualifier clause ("… specializing in …", "… offering …").
+  t = t.split(
+    /\s+(?:specializing|specialising|specializes|specialises|offering|providing|serving|focused|focusing)\b/i,
+  )[0];
+  // Drop a trailing list clause introduced by a comma or dash.
+  t = t.split(/[,—–]| - /)[0];
+  t = t.replace(/\s+/g, " ").trim();
+  // Still long? Keep the head noun phrase (last 3 words — the noun usually
+  // trails: "… remodeling contractor").
+  const words = t.split(" ");
+  if (words.length > 4) t = words.slice(-3).join(" ");
+  return t.trim();
+}
+
+/** Pluralize ONLY the last word of a noun phrase ("home remodeling contractor"
+ *  → "home remodeling contractors"), leaving uncountable trailing nouns alone. */
+function pluralizeLastWord(phrase: string): string {
+  const words = phrase.split(" ");
+  const i = words.length - 1;
+  const last = words[i];
+  if (!last || UNCOUNTABLE_NOUNS.has(last.toLowerCase())) return phrase;
+  words[i] = /(s|sh|ch|x|z)$/i.test(last)
+    ? `${last}es`
+    : /[^aeiou]y$/i.test(last)
+      ? `${last.slice(0, -1)}ies`
+      : `${last}s`;
+  return words.join(" ");
+}
+
 /** Strip a trailing/leading article and tidy a detected "reads as" business
- *  type into a usable noun ("an AI visibility intelligence service" → "AI
- *  visibility intelligence services"). Best-effort; falls back to a generic. */
+ *  type into a usable noun. Long phrases are simplified to a head noun, and
+ *  pluralization acts on the last word only ("home remodeling contractor
+ *  specializing in …, siding" → singular "home remodeling contractor", plural
+ *  "home remodeling contractors"). Best-effort; falls back to a generic. */
 function nounFromBusinessType(businessType: string | null): { noun: string; singular: string } {
   const fallback = { noun: "businesses like this", singular: "business" };
   if (!businessType) return fallback;
-  let t = businessType.trim().replace(/^(an?|the)\s+/i, "").trim();
+  let t = simplifyBusinessType(businessType.trim().replace(/^(an?|the)\s+/i, "").trim());
   if (!t) return fallback;
   // Lowercase the leading word unless it looks like an acronym (AI, SaaS, HVAC).
   if (!/^[A-Z]{2,}/.test(t)) t = t.charAt(0).toLowerCase() + t.slice(1);
   const singular = t;
-  // Naive pluralization for the "best X" phrasing.
-  const noun = /(s|sh|ch|x|z)$/i.test(t)
-    ? `${t}es`
-    : /[^aeiou]y$/i.test(t)
-      ? `${t.slice(0, -1)}ies`
-      : `${t}s`;
+  const noun = pluralizeLastWord(t);
   return { noun, singular };
 }
 

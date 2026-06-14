@@ -217,6 +217,11 @@ export type ReportModelCrossModel = {
   /** Tied/named competitors when there is no single leader — display names, no
    *  count. Null when `topCompetitor` is set or no competitor was named. */
   competitorsTied: string[] | null;
+  /** Distinct same-business name spellings the models used (e.g. "Weathertight
+   *  Corp" / "Weather Tight Corporation") when the audited business was named
+   *  under ≥2 inconsistent variants and there is no true-competitor leader.
+   *  Drives the "Entity Name Consistency" card; null otherwise. */
+  entityNameVariants: string[] | null;
   /** Strongest consensus dimension (e.g. identity); null when absent. */
   strongestDimension: { label: string; score: number } | null;
   /** Weakest consensus dimension — the recommendation bottleneck; null when absent. */
@@ -1070,9 +1075,41 @@ function readConsensusSummary(ci: unknown): {
  * provider rows + the consensus roll-up. Pure + deterministic; display only.
  * Mirrors the `buildCustomerQuestions` integration pattern.
  */
+/** Normalize a business name for same-entity comparison: lowercase, drop common
+ *  legal/business suffixes, strip all non-alphanumerics. "Weathertight Corp",
+ *  "Weather Tight Corporation", and "Weather Tight" all collapse to
+ *  "weathertight". Exact-match only downstream — never fuzzy — so unrelated
+ *  companies are not over-normalized into the audited business. */
+function sameBizKey(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(
+      /\b(corp|corporation|inc|incorporated|llc|l\.l\.c|co|company|ltd|limited|plc|group)\b/g,
+      "",
+    )
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+/** Root token of a domain for same-entity comparison ("www.weathertightcorp.com"
+ *  → sameBizKey("weathertightcorp") → "weathertight"). Empty string when no
+ *  usable host is found. */
+function domainSameBizKey(website: string): string {
+  const host = website
+    .trim()
+    .replace(/^[a-z]+:\/\//i, "")
+    .replace(/^www\./i, "")
+    .split(/[/?#]/)[0]
+    ?.split(".")[0];
+  return host ? sameBizKey(host) : "";
+}
+
 function buildCrossModelSummary(
   providers: ReportModelProvider[],
   consensusIndex: unknown,
+  businessName: string,
+  nameAlternates: string[],
+  website: string,
 ): ReportModelCrossModel {
   const tested = providers.filter((p) => p.verdict !== "UNAVAILABLE");
   const recognizedCount = tested.filter(
@@ -1105,15 +1142,41 @@ function buildCrossModelSummary(
   const mainSkipReason =
     [...gapCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
-  // Competitor displacement, counted from the SAME competitor shown per model
-  // in the matrix (each model's top-named competitor — competitors[0]) so the
-  // headline can never disagree with the table the customer sees. Light
-  // normalization merges spelling/case variants ("Semrush" / "SEMrush",
-  // "… Realty"); the shortest original spelling is shown.
+  // Each model's top-named entity (competitors[0]) is the SAME value the matrix
+  // shows, so the insight card can never disagree with the table. But that
+  // entity is often a name variant of the AUDITED business (e.g. "Weathertight
+  // Corp" / "Weather Tight Corporation"), not a real competitor — counting those
+  // as "competitive displacement" is wrong. Split same-business variants from
+  // true competitors before deriving the card.
+  const auditedKeys = new Set(
+    [businessName, ...nameAlternates]
+      .map((n) => sameBizKey(n ?? ""))
+      .filter((k) => k.length >= 3),
+  );
+  const domainKey = domainSameBizKey(website);
+  if (domainKey.length >= 3) auditedKeys.add(domainKey);
+  const isSameBusiness = (display: string): boolean => {
+    const k = sameBizKey(display);
+    return k.length >= 3 && auditedKeys.has(k); // exact normalized match only
+  };
+
+  // Distinct same-business name spellings the models used (for the Entity Name
+  // Consistency card), in first-seen order.
+  const variantSeen = new Set<string>();
+  const entityVariants: string[] = [];
+  // True competitors → frequency-ranked, spelling-normalized (shortest shown).
   const compAgg = new Map<string, { display: string; count: number }>();
   for (const p of providers) {
     const display = p.competitors[0]?.trim();
     if (!display) continue;
+    if (isSameBusiness(display)) {
+      const vk = display.toLowerCase().replace(/\s+/g, " ").trim();
+      if (!variantSeen.has(vk)) {
+        variantSeen.add(vk);
+        entityVariants.push(display);
+      }
+      continue;
+    }
     const key = display
       .toLowerCase()
       .replace(/\b(realty|realtors|real estate|llc|inc|group|team|services|company|co)\b/g, "")
@@ -1131,16 +1194,19 @@ function buildCrossModelSummary(
   const ranked = [...compAgg.values()].sort((a, b) => b.count - a.count);
   const maxCount = ranked[0]?.count ?? 0;
   const leaders = ranked.filter((c) => c.count === maxCount);
-  // A confident "appears in N of 4" headline only when ONE competitor leads and
-  // ≥2 models named it. Never claim a count on a tie or a single mention.
+  // A confident "appears in N of 4" headline only when ONE *true competitor*
+  // leads and ≥2 models named it. Never claim a count on a tie or single mention.
   const topCompetitor =
     leaders.length === 1 && maxCount >= 2
       ? { name: leaders[0].display, count: maxCount }
       : null;
-  // Otherwise surface the named competitors without a fabricated count; the
-  // renderer phrases ties ("A and B …") vs. a generic mention.
   const competitorsTied =
     !topCompetitor && ranked.length > 0 ? leaders.map((c) => c.display) : null;
+  // Entity Name Consistency: the audited business was named under ≥2 inconsistent
+  // spellings, and there is no clear true-competitor leader → surface naming
+  // inconsistency instead of fake "competitive displacement".
+  const entityNameVariants =
+    !topCompetitor && entityVariants.length >= 2 ? entityVariants : null;
 
   const consensus = readConsensusSummary(consensusIndex);
 
@@ -1156,6 +1222,7 @@ function buildCrossModelSummary(
     providersPassed: consensus.passed,
     topCompetitor,
     competitorsTied,
+    entityNameVariants,
     strongestDimension: consensus.strongest,
     bottleneckDimension: consensus.bottleneck,
   };
@@ -1418,7 +1485,13 @@ export function buildReportModel(
     isLocal,
   });
 
-  const crossModel = buildCrossModelSummary(providers, input.consensusIndex);
+  const crossModel = buildCrossModelSummary(
+    providers,
+    input.consensusIndex,
+    input.resolvedBusinessName,
+    input.nameAlternates,
+    input.website,
+  );
 
   return {
     meta: {

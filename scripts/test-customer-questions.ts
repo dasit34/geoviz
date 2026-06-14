@@ -152,6 +152,27 @@ check("local + vowel service → 'recommend an …', grammatical", () => {
   assert.ok(/recommend an awning install company/i.test(blob), blob);
 });
 
+check("long 'specializing in …, siding' type → simplified, plural-correct, no 'sidings'", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "Weathertight Corp",
+    industrySlug: null,
+    city: null,
+    services: [],
+    businessType:
+      "home remodeling contractor specializing in windows, doors, roofing, and siding",
+    isLocal: false,
+  });
+  const blob = ok(qs);
+  assert.doesNotMatch(blob, /sidings/i, blob); // the reported defect
+  assert.doesNotMatch(blob, /specializing in/i, "long qualifier must be dropped");
+  assert.ok(/best home remodeling contractors/i.test(blob), `plural head noun: ${blob}`);
+  assert.doesNotMatch(blob, /best home remodeling contractor\b(?!s)/i, "must be plural after 'best'");
+  // Questions should be short — no question over ~12 words.
+  for (const q of qs) {
+    assert.ok(q.split(/\s+/).length <= 13, `question too long: "${q}"`);
+  }
+});
+
 console.log(`[customer-questions] passed=${passed} failed=${failed}`);
 if (failed > 0) {
   for (const f of failures) console.log(f);
