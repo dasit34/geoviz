@@ -78,6 +78,27 @@ function lowerLead(s: string): string {
   return t.charAt(0).toLowerCase() + t.slice(1);
 }
 
+/** Pick "a" / "an" for the word that follows. Vowel-sound aware, with acronym
+ *  handling: an initialism whose first letter is spoken with a leading vowel
+ *  sound ("AI", "HVAC", "MRI") takes "an"; "roofer" takes "a". Keeps generated
+ *  questions grammatical regardless of the detected business noun. */
+function indefiniteArticle(nextWord: string): "a" | "an" {
+  const first = nextWord.trim().split(/\s+/)[0] ?? "";
+  if (!first) return "a";
+  // Initialism (2+ caps): decide by the spoken name of its first letter.
+  if (/^[A-Z]{2,}/.test(first)) return /^[AEFHILMNORSX]/.test(first) ? "an" : "a";
+  return /^[aeiou]/i.test(first) ? "an" : "a";
+}
+
+/** A detected service is only usable in "recommend a {service}" phrasing when it
+ *  reads as a short noun phrase. Long, sentence-like detections (e.g. "testing
+ *  business visibility across major AI systems") are rejected so the question
+ *  falls back to the vertical / business-type noun instead of leaking a phrase. */
+function usableService(s: string): boolean {
+  const t = s.trim();
+  return t.length > 0 && t.length <= 28 && t.split(/\s+/).length <= 3;
+}
+
 export type CustomerQuestionInput = {
   businessName: string;
   industrySlug: string | null | undefined;
@@ -97,7 +118,7 @@ export type CustomerQuestionInput = {
 export function buildCustomerQuestions(input: CustomerQuestionInput): string[] {
   const name = input.businessName?.trim() || "this business";
   const city = cityPhrase(input.city);
-  const service = input.services.find((s) => s.trim().length > 0)?.trim() ?? null;
+  const service = input.services.find((s) => usableService(s))?.trim() ?? null;
 
   const profile = input.industrySlug
     ? VERTICAL_QUESTION_PROFILES[input.industrySlug]
@@ -118,7 +139,7 @@ export function buildCustomerQuestions(input: CustomerQuestionInput): string[] {
 
   if (input.isLocal && city) {
     add(`Who are the best ${noun} near ${city}?`);
-    add(`Can you recommend a ${svc} company in ${city}?`);
+    add(`Can you recommend ${indefiniteArticle(svc)} ${svc} company in ${city}?`);
     add(`Is ${name} a trustworthy ${singular}?`);
     if (urgent) add(`Who should I call for ${urgent} near ${city}?`);
     add(`Which ${noun} should I consider near ${city}?`);
@@ -130,11 +151,13 @@ export function buildCustomerQuestions(input: CustomerQuestionInput): string[] {
     if (urgent) add(`Who should I call for ${urgent} nearby?`);
     add(`Which ${noun} should I consider?`);
   } else {
-    // Non-local / general business — category-neutral, no city.
+    // Non-local / general business — category-neutral, no city. Questions
+    // revolve around the business-type noun (a detected service phrase here is
+    // often plural/sentence-like and reads wrong after "a reliable …").
     add(`Who are the best ${noun} to consider?`);
-    add(`Can you recommend a reliable ${svc}?`);
+    add(`Can you recommend a reliable ${singular}?`);
     add(`Is ${name} trustworthy and legitimate?`);
-    add(`What should I look for when choosing a ${singular}?`);
+    add(`What should I look for when choosing ${indefiniteArticle(singular)} ${singular}?`);
     add(`Which ${noun} should I consider?`);
   }
 

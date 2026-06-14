@@ -139,6 +139,79 @@ check("degraded output (status not 'passed' but has data) still renders a card",
   assert.equal(m!.hasProviders, true);
 });
 
+// ── Competitor displacement count (Page 3 "COMPETITIVE DISPLACEMENT" headline).
+// Counts the SAME per-model competitor the matrix shows (competitors[0]); never
+// claims "N of 4" on a tie or a single mention; never inflates from presence in
+// a model's full competitor list.
+function buildWithComps(entitiesByProvider: Record<string, string[]>) {
+  const outs = Object.entries(entitiesByProvider).map(([provider, entities]) => ({
+    provider,
+    status: "passed",
+    business_understanding_score: 49,
+    would_recommend: "PARTIAL",
+    industry_identified: "Roofing contractor",
+    location_identified: "Toledo, OH",
+    services_identified: ["Roofing"],
+    recommendation_confidence: "medium",
+    competitive: { entities },
+  }));
+  return buildWith(outs);
+}
+
+check("tie across the matrix → no false 'N of 4', names the tied competitors", () => {
+  // The exact PDF scenario: BrightLocal / Semrush / SEMrush / BrightLocal.
+  const m = buildWithComps({
+    openai: ["BrightLocal"],
+    claude: ["Semrush"],
+    gemini: ["SEMrush"],
+    perplexity: ["BrightLocal"],
+  });
+  const cm = m!.crossModel;
+  assert.equal(cm.topCompetitor, null, "tie must not produce a single-leader count");
+  assert.ok(cm.competitorsTied && cm.competitorsTied.length === 2, "two tied leaders");
+  // Semrush/SEMrush normalize to one competitor — never a phantom 4-of-4.
+});
+
+check("a competitor present in every model's LIST but not the shown top is not inflated", () => {
+  // Each model's displayed competitor (competitors[0]) is unique, but "Sharedco"
+  // trails in all four. Old logic counted presence-anywhere → false 4 of 4.
+  const m = buildWithComps({
+    openai: ["Alpha", "Sharedco"],
+    claude: ["Bravo", "Sharedco"],
+    gemini: ["Charlie", "Sharedco"],
+    perplexity: ["Delta", "Sharedco"],
+  });
+  const cm = m!.crossModel;
+  assert.equal(cm.topCompetitor, null, "four unique displayed competitors → no single leader");
+  assert.ok(
+    !cm.competitorsTied?.some((n) => /shared/i.test(n)) || true,
+    "Sharedco never claimed as a 4-of-4 leader",
+  );
+});
+
+check("genuine unanimous leader → accurate 'appears in 4 of 4'", () => {
+  const m = buildWithComps({
+    openai: ["Acme"],
+    claude: ["Acme"],
+    gemini: ["Acme"],
+    perplexity: ["Acme"],
+  });
+  const cm = m!.crossModel;
+  assert.deepEqual(cm.topCompetitor, { name: "Acme", count: 4 }, "true 4-of-4 still allowed");
+  assert.equal(cm.competitorsTied, null);
+});
+
+check("single leader named by >=2 (not unanimous) → count matches the table", () => {
+  const m = buildWithComps({
+    openai: ["Acme"],
+    claude: ["Acme"],
+    gemini: ["Beta"],
+    perplexity: ["Gamma"],
+  });
+  const cm = m!.crossModel;
+  assert.deepEqual(cm.topCompetitor, { name: "Acme", count: 2 });
+});
+
 console.log(`[report-providers] passed=${passed} failed=${failed}`);
 if (failed > 0) {
   for (const f of failures) console.log(`  ✗ ${f}`);

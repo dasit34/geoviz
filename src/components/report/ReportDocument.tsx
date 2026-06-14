@@ -309,12 +309,20 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
             </tbody>
           </table>
 
-          {/* Competitor displacement — the conversion-critical insight */}
-          {cm.topCompetitor ? (
+          {/* Competitor displacement — the conversion-critical insight. Headline
+              claims a count only when one competitor truly leads; ties and
+              single mentions are phrased without a fabricated "N of 4". */}
+          {cm.topCompetitor || (cm.competitorsTied && cm.competitorsTied.length > 0) ? (
             <Callout
               kind="issue"
               label="COMPETITIVE DISPLACEMENT"
-              title={`${cm.topCompetitor.name} appears in ${cm.topCompetitor.count} of 4 AI answers`}
+              title={
+                cm.topCompetitor
+                  ? `${cm.topCompetitor.name} appears in ${cm.topCompetitor.count} of 4 AI answers`
+                  : cm.competitorsTied!.length === 2
+                    ? `${cm.competitorsTied![0]} and ${cm.competitorsTied![1]} appeared most often across the AI answers`
+                    : "Competitors were named across the AI answers"
+              }
               body={`Your business is named in ${cm.mentionedCount} of 4. When customers ask AI who to choose, the businesses AI names — not just the ones that rank — win the introduction.`}
             />
           ) : null}

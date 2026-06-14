@@ -210,8 +210,13 @@ export type ReportModelCrossModel = {
   consensusAgreement: string | null;
   /** Providers that passed, per the consensus roll-up; null when absent. */
   providersPassed: number | null;
-  /** Competitor named by the most models (displacement signal); null when none. */
+  /** Competitor named by the most models (displacement signal). Set only when a
+   *  single competitor leads and ≥2 models named it; null on a tie or single
+   *  mention (see `competitorsTied`). */
   topCompetitor: { name: string; count: number } | null;
+  /** Tied/named competitors when there is no single leader — display names, no
+   *  count. Null when `topCompetitor` is set or no competitor was named. */
+  competitorsTied: string[] | null;
   /** Strongest consensus dimension (e.g. identity); null when absent. */
   strongestDimension: { label: string; score: number } | null;
   /** Weakest consensus dimension — the recommendation bottleneck; null when absent. */
@@ -357,7 +362,7 @@ const FIX_META: Record<
 // repeated template sentence.
 const WHY_IT_HURTS: Record<CategoryKey, string> = {
   schema:
-    "When a customer asks an AI assistant for a local option, the model needs a confirmed business identity to name. Without it, AI systems skip you and cite a competitor they can verify.",
+    "When a customer asks an AI assistant for a local option, the model needs a confirmed business identity to name. Without it, AI systems may skip you and favor a competitor they can verify.",
   crawler:
     "If AI systems can't reliably reach or read the page, none of your other signals matter — the content simply isn't in the answer.",
   trust:
@@ -387,7 +392,7 @@ const FIX_BUSINESS_IMPACT: Record<CategoryKey, string> = {
 // local / service-area business, so we never force "nearby customer" / "local
 // option" / "where you operate" wording onto an ecommerce/general/unknown site.
 const SCHEMA_WHY_GENERAL =
-  "When a customer asks an AI assistant which business to choose in this category, the model needs a confirmed business identity to name. Without it, AI systems skip you and cite a competitor they can verify.";
+  "When a customer asks an AI assistant which business to choose in this category, the model needs a confirmed business identity to name. Without it, AI systems may skip you and favor a competitor they can verify.";
 const SCHEMA_FIX_IMPACT_GENERAL =
   "AI tools can now confirm who you are and what you do — the minimum required to appear in an AI recommendation.";
 // Non-local schema fix action — never prescribes "LocalBusiness" for an
@@ -1100,35 +1105,42 @@ function buildCrossModelSummary(
   const mainSkipReason =
     [...gapCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
-  // Competitor displacement: how many models named each competitor. Light
-  // normalization merges name variants ("Keller Williams" / "… Realty"); the
-  // shortest original spelling is shown. Deduped per model.
+  // Competitor displacement, counted from the SAME competitor shown per model
+  // in the matrix (each model's top-named competitor — competitors[0]) so the
+  // headline can never disagree with the table the customer sees. Light
+  // normalization merges spelling/case variants ("Semrush" / "SEMrush",
+  // "… Realty"); the shortest original spelling is shown.
   const compAgg = new Map<string, { display: string; count: number }>();
   for (const p of providers) {
-    const seen = new Set<string>();
-    for (const raw of p.competitors) {
-      const display = raw.trim();
-      if (!display) continue;
-      const key = display
-        .toLowerCase()
-        .replace(/\b(realty|realtors|real estate|llc|inc|group|team|services|company|co)\b/g, "")
-        .replace(/[^a-z0-9]+/g, " ")
-        .trim();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      const existing = compAgg.get(key);
-      if (existing) {
-        existing.count += 1;
-        if (display.length < existing.display.length) existing.display = display;
-      } else {
-        compAgg.set(key, { display, count: 1 });
-      }
+    const display = p.competitors[0]?.trim();
+    if (!display) continue;
+    const key = display
+      .toLowerCase()
+      .replace(/\b(realty|realtors|real estate|llc|inc|group|team|services|company|co)\b/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+    if (!key) continue;
+    const existing = compAgg.get(key);
+    if (existing) {
+      existing.count += 1;
+      if (display.length < existing.display.length) existing.display = display;
+    } else {
+      compAgg.set(key, { display, count: 1 });
     }
   }
-  const topEntry = [...compAgg.values()].sort((a, b) => b.count - a.count)[0];
-  const topCompetitor = topEntry
-    ? { name: topEntry.display, count: topEntry.count }
-    : null;
+  const ranked = [...compAgg.values()].sort((a, b) => b.count - a.count);
+  const maxCount = ranked[0]?.count ?? 0;
+  const leaders = ranked.filter((c) => c.count === maxCount);
+  // A confident "appears in N of 4" headline only when ONE competitor leads and
+  // ≥2 models named it. Never claim a count on a tie or a single mention.
+  const topCompetitor =
+    leaders.length === 1 && maxCount >= 2
+      ? { name: leaders[0].display, count: maxCount }
+      : null;
+  // Otherwise surface the named competitors without a fabricated count; the
+  // renderer phrases ties ("A and B …") vs. a generic mention.
+  const competitorsTied =
+    !topCompetitor && ranked.length > 0 ? leaders.map((c) => c.display) : null;
 
   const consensus = readConsensusSummary(consensusIndex);
 
@@ -1143,6 +1155,7 @@ function buildCrossModelSummary(
     consensusAgreement: consensus.agreement,
     providersPassed: consensus.passed,
     topCompetitor,
+    competitorsTied,
     strongestDimension: consensus.strongest,
     bottleneckDimension: consensus.bottleneck,
   };
