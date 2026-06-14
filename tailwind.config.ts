@@ -101,11 +101,26 @@ const config: Config = {
           "0%":   { transform: "rotate(0deg)" },
           "100%": { transform: "rotate(360deg)" },
         },
+        // Traveling signal dash for the hero "AI Recommendation Test Field"
+        // connection lines — reads as a pulse leaving the business toward
+        // each AI system. Continuous, not flashy.
+        signalDash: {
+          "0%":   { strokeDashoffset: "0" },
+          "100%": { strokeDashoffset: "-14" },
+        },
+        // Status-chip fade-in (staggered via per-chip animationDelay). Opacity
+        // only (no transform) so it is safe on SVG <g> across browsers.
+        chipIn: {
+          "0%":   { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
       },
       animation: {
         pulseSoft: "pulseSoft 3s ease-in-out infinite",
         floatY: "floatY 6s ease-in-out infinite",
         radarSweep: "radarSweep 12s linear infinite",
+        signalDash: "signalDash 1.4s linear infinite",
+        chipIn: "chipIn 0.5s ease-out both",
       },
     },
   },
