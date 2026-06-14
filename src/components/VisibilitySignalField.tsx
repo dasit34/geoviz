@@ -163,7 +163,7 @@ export function VisibilitySignalField({
           <rect x="40" y="170" width="98" height="5" rx="2.5" fill="rgba(255,255,255,0.16)" />
           <rect x="40" y="182" width="66" height="5" rx="2.5" fill="rgba(255,255,255,0.10)" />
           <text x="40" y="206" fontSize="9.5" letterSpacing="0.6" fill={C.muted} fontFamily="var(--rd-mono, ui-monospace), monospace">
-            LOCAL SERVICE · 1 LOCATION
+            LOCAL · 1 LOCATION
           </text>
           <circle cx={EMIT_X} cy={EMIT_Y} r="4" fill={C.accent} className="motion-safe:animate-pulseSoft" />
         </g>
