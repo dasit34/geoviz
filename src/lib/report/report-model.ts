@@ -210,6 +210,12 @@ export type ReportModelCrossModel = {
   consensusAgreement: string | null;
   /** Providers that passed, per the consensus roll-up; null when absent. */
   providersPassed: number | null;
+  /** Competitor named by the most models (displacement signal); null when none. */
+  topCompetitor: { name: string; count: number } | null;
+  /** Strongest consensus dimension (e.g. identity); null when absent. */
+  strongestDimension: { label: string; score: number } | null;
+  /** Weakest consensus dimension — the recommendation bottleneck; null when absent. */
+  bottleneckDimension: { label: string; score: number } | null;
 };
 
 export type ReportModel = {
@@ -1002,13 +1008,25 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
 }
 
 /** Read the optional consensus roll-up defensively (display fields only). */
+/** Friendly labels for the six consensus dimensions. */
+const DIMENSION_LABELS: Record<string, string> = {
+  business_identity: "business identity",
+  schema_quality: "structured data",
+  trust_signals: "trust signals",
+  service_clarity: "service clarity",
+  coverage_depth: "content depth",
+  recommendation_readiness: "recommendation readiness",
+};
+
 function readConsensusSummary(ci: unknown): {
   label: string | null;
   agreement: string | null;
   passed: number | null;
+  strongest: { label: string; score: number } | null;
+  bottleneck: { label: string; score: number } | null;
 } {
   if (!ci || typeof ci !== "object") {
-    return { label: null, agreement: null, passed: null };
+    return { label: null, agreement: null, passed: null, strongest: null, bottleneck: null };
   }
   const c = ci as Record<string, unknown>;
   const label = typeof c.verdict === "string" ? c.verdict : null;
@@ -1021,7 +1039,25 @@ function readConsensusSummary(ci: unknown): {
     typeof (am as Record<string, unknown>).providers_passed === "number"
       ? (am as Record<string, number>).providers_passed
       : null;
-  return { label, agreement, passed };
+
+  // Strongest + weakest of the six consensus dimensions (display only).
+  let strongest: { label: string; score: number } | null = null;
+  let bottleneck: { label: string; score: number } | null = null;
+  const dims = c.dimensions;
+  if (dims && typeof dims === "object") {
+    for (const [key, val] of Object.entries(dims as Record<string, unknown>)) {
+      const score =
+        val && typeof val === "object" &&
+        typeof (val as Record<string, unknown>).score === "number"
+          ? (val as Record<string, number>).score
+          : null;
+      if (score === null) continue;
+      const label = DIMENSION_LABELS[key] ?? key.replace(/_/g, " ");
+      if (!strongest || score > strongest.score) strongest = { label, score };
+      if (!bottleneck || score < bottleneck.score) bottleneck = { label, score };
+    }
+  }
+  return { label, agreement, passed, strongest, bottleneck };
 }
 
 /**
@@ -1064,6 +1100,36 @@ function buildCrossModelSummary(
   const mainSkipReason =
     [...gapCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
+  // Competitor displacement: how many models named each competitor. Light
+  // normalization merges name variants ("Keller Williams" / "… Realty"); the
+  // shortest original spelling is shown. Deduped per model.
+  const compAgg = new Map<string, { display: string; count: number }>();
+  for (const p of providers) {
+    const seen = new Set<string>();
+    for (const raw of p.competitors) {
+      const display = raw.trim();
+      if (!display) continue;
+      const key = display
+        .toLowerCase()
+        .replace(/\b(realty|realtors|real estate|llc|inc|group|team|services|company|co)\b/g, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      const existing = compAgg.get(key);
+      if (existing) {
+        existing.count += 1;
+        if (display.length < existing.display.length) existing.display = display;
+      } else {
+        compAgg.set(key, { display, count: 1 });
+      }
+    }
+  }
+  const topEntry = [...compAgg.values()].sort((a, b) => b.count - a.count)[0];
+  const topCompetitor = topEntry
+    ? { name: topEntry.display, count: topEntry.count }
+    : null;
+
   const consensus = readConsensusSummary(consensusIndex);
 
   return {
@@ -1076,6 +1142,9 @@ function buildCrossModelSummary(
     consensusLabel: consensus.label,
     consensusAgreement: consensus.agreement,
     providersPassed: consensus.passed,
+    topCompetitor,
+    strongestDimension: consensus.strongest,
+    bottleneckDimension: consensus.bottleneck,
   };
 }
 

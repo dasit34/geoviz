@@ -462,6 +462,61 @@
   color: var(--l-ink);
 }
 
+/* AI Intelligence model matrix (P3) — one dense table, replaces two card grids. */
+.rd-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 6px;
+  font-size: 12.5px;
+}
+.rd-matrix thead th {
+  font-family: var(--rd-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--l-faint);
+  text-align: left;
+  font-weight: 600;
+  padding: 0 9px 8px;
+  border-bottom: 1px solid var(--l-border);
+  white-space: nowrap;
+}
+.rd-matrix tbody td {
+  padding: 9px;
+  border-bottom: 1px solid var(--l-border);
+  vertical-align: middle;
+  color: var(--l-ink);
+}
+.rd-matrix tbody tr:last-child td {
+  border-bottom: none;
+}
+.rd-matrix-model {
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 13px;
+}
+.rd-matrix-model svg {
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.rd-matrix-num {
+  font-family: var(--rd-mono);
+  font-weight: 700;
+  font-size: 14px;
+}
+.rd-matrix-comp {
+  font-size: 12px;
+  color: var(--l-muted);
+  max-width: 160px;
+}
+.rd-matrix-na {
+  color: var(--l-faint);
+  font-style: italic;
+}
+.rd-matrix .rd-pill {
+  font-size: 9px;
+}
+
 .rd-readiness-strip {
   background: var(--d-page);
   border-radius: 12px;
@@ -907,5 +962,5 @@
   /* keep cards/rows from splitting across pages */
   .rd-stat, .rd-callout, .rd-prov, .rd-ev-row, .rd-bar, .rd-issue, .rd-fix,
   .rd-readiness-strip, .rd-impl, .rd-outcome-card, .rd .cta-card,
-  .rd-interp, .rd-cmi-meta { break-inside: avoid; page-break-inside: avoid; }
+  .rd-interp, .rd-cmi-meta, .rd-matrix { break-inside: avoid; page-break-inside: avoid; }
 }

@@ -43,7 +43,7 @@ check("fixed 8-page order (Figma template)", () => {
   const order = [
     "CoverPage",
     "ExecutivePage",
-    "PlatformsPage",
+    "AIIntelligencePage",
     "EvidencePage",
     "DiagnosticsPage",
     "IssuesPage",
@@ -59,7 +59,7 @@ check("fixed 8-page order (Figma template)", () => {
   // each page title is present
   for (const t of [
     "Executive Summary",
-    "AI Platform Results",
+    "AI Intelligence",
     "Evidence Reviewed",
     "Visibility Diagnostics",
     "Top Issues",
@@ -154,11 +154,14 @@ check("Evidence Reviewed page renders inspected signals from preflight", () => {
   assert.match(MODEL, /preflightSignals/);
 });
 
-check("provider cards show verdict + understanding + reads-as + main gap", () => {
-  assert.match(DOC, /PlatformCard/);
-  assert.match(DOC, /Understanding/);
-  assert.match(DOC, /Reads as/);
-  assert.match(DOC, /Main gap/);
+check("model matrix shows verdict + understanding + confidence + names-you + sources", () => {
+  // P3 consolidated into one dense matrix (one row per model) — replaces the
+  // two prior card grids. Assert the matrix + its per-model columns.
+  assert.match(DOC, /ModelMatrixRow/);
+  assert.match(DOC, /rd-matrix/);
+  assert.match(DOC, /Understands/);
+  assert.match(DOC, /Names you/);
+  assert.match(DOC, /Top competitor named/);
   assert.match(DOC, /verdictPill/);
 });
 
