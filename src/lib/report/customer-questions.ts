@@ -138,6 +138,54 @@ function usableService(s: string): boolean {
   return t.length > 0 && t.length <= 28 && t.split(/\s+/).length <= 3;
 }
 
+const SUPPLIER_RE =
+  /\b(supply|supplies|supplier|suppliers|distribution|distributor|distributors|wholesale|wholesaler|wholesalers|materials|building products)\b/i;
+
+/** A supplier / distributor / wholesaler / materials business sells products —
+ *  it is NOT a contractor who performs the trade, so it must not get
+ *  "best roofers"-style contractor questions. Detected from the business name
+ *  or the model-detected "reads as" type. */
+function isSupplierBusiness(name: string, businessType: string | null): boolean {
+  return SUPPLIER_RE.test(name) || (businessType ? SUPPLIER_RE.test(businessType) : false);
+}
+
+const SUPPLY_CATEGORY_RE =
+  /\b([a-z][a-z-]+)\s+(?:supply|supplies|materials|distribution|distributors?|wholesale|wholesalers?)\b/i;
+const TRADE_ADJECTIVES = new Set([
+  "roofing", "hvac", "plumbing", "electrical", "flooring", "lumber", "masonry",
+  "concrete", "paint", "hardware", "landscaping", "building", "industrial",
+]);
+
+/** Category adjective for supplier phrasing: the word before the supply keyword
+ *  in the name ("Beacon Roofing Supply" → "roofing"); else a known trade slug;
+ *  else the neutral "building products". */
+function supplierCategory(name: string, slug: string | null | undefined): string {
+  const m = name.match(SUPPLY_CATEGORY_RE);
+  if (m && m[1] && m[1].toLowerCase() !== "the") return m[1].toLowerCase();
+  if (slug && TRADE_ADJECTIVES.has(slug.toLowerCase())) return slug.toLowerCase();
+  return "building products";
+}
+
+/** Buyer-intent questions for a supplier/distributor — products, not a trade. */
+function buildSupplierQuestions(
+  name: string,
+  category: string,
+  city: string | null,
+): string[] {
+  const isGeneric = category === "building products";
+  const catPlural = isGeneric ? "building products suppliers" : `${category} supply companies`;
+  const materialsSupplier = isGeneric ? "building products supplier" : `${category} materials supplier`;
+  const materialsPhrase = isGeneric ? "building products" : `${category} materials`;
+  const near = city ? `near ${city}` : "near me";
+  return [
+    `Who are the best ${catPlural} ${near}?`,
+    `Where can I buy reliable ${materialsPhrase}?`,
+    `Is ${name} trustworthy and legitimate?`,
+    `What should I look for when choosing ${indefiniteArticle(materialsSupplier)} ${materialsSupplier}?`,
+    `Which ${catPlural} should I compare?`,
+  ];
+}
+
 export type CustomerQuestionInput = {
   businessName: string;
   industrySlug: string | null | undefined;
@@ -157,6 +205,17 @@ export type CustomerQuestionInput = {
 export function buildCustomerQuestions(input: CustomerQuestionInput): string[] {
   const name = input.businessName?.trim() || "this business";
   const city = cityPhrase(input.city);
+
+  // Supplier / distributor / wholesaler / materials businesses are not
+  // contractors — give them product-buying questions, never "best roofers".
+  if (isSupplierBusiness(name, input.businessType)) {
+    return buildSupplierQuestions(
+      name,
+      supplierCategory(name, input.industrySlug),
+      city,
+    );
+  }
+
   const service = input.services.find((s) => usableService(s))?.trim() ?? null;
 
   const profile = input.industrySlug

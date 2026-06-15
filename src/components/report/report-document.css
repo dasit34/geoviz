@@ -783,15 +783,15 @@
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.05;
-  margin: 0 0 30px;
+  margin: 0 0 22px;
   color: #fff;
 }
 .rd-outcome-card {
   background: var(--d-panel);
   border: 1px solid var(--d-border);
   border-radius: 14px;
-  padding: 26px 28px;
-  margin-bottom: 22px;
+  padding: 20px 28px;
+  margin-bottom: 16px;
 }
 .rd-outcome-label {
   font-family: var(--rd-mono);

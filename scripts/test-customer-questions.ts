@@ -173,6 +173,52 @@ check("long 'specializing in …, siding' type → simplified, plural-correct, n
   }
 });
 
+check("supplier/distributor → supplier language, never 'roofer'", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "Beacon Roofing Supply",
+    industrySlug: "roofing", // would otherwise force the roofing-contractor profile
+    city: null,
+    services: [],
+    businessType: "Roofing supply distributor",
+    isLocal: false,
+  });
+  const blob = ok(qs);
+  assert.equal(qs.length, 5, blob);
+  assert.doesNotMatch(blob, /\broofers?\b/i, `must not call a supplier a roofer: ${blob}`);
+  assert.ok(/roofing supply companies/i.test(blob), `supplier noun: ${blob}`);
+  assert.ok(/roofing materials supplier/i.test(blob), `materials-supplier noun: ${blob}`);
+  assert.ok(/where can i buy reliable roofing materials\?/i.test(blob), `buy-materials question: ${blob}`);
+  assert.ok(/is Beacon Roofing Supply trustworthy and legitimate\?/i.test(blob), blob);
+});
+
+check("supplier detection works off the business name alone", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "Acme Building Supply",
+    industrySlug: null,
+    city: "Dayton, OH",
+    services: [],
+    businessType: null,
+    isLocal: true,
+  });
+  const blob = ok(qs);
+  assert.ok(/building supply companies near Dayton, OH/i.test(blob), blob);
+  assert.doesNotMatch(blob, /\broofers?\b/i, blob);
+});
+
+check("non-supplier roofing business still gets contractor questions (no regression)", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "Rock Roofing",
+    industrySlug: "roofing",
+    city: null,
+    services: ["Roof repair"],
+    businessType: "Roofing contractor",
+    isLocal: false,
+  });
+  const blob = ok(qs);
+  assert.ok(/best roofers/i.test(blob), `contractor stays a roofer: ${blob}`);
+  assert.doesNotMatch(blob, /supply compan/i, blob);
+});
+
 console.log(`[customer-questions] passed=${passed} failed=${failed}`);
 if (failed > 0) {
   for (const f of failures) console.log(f);
