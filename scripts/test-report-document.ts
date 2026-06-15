@@ -161,7 +161,7 @@ check("model matrix shows verdict + understanding + confidence + names-you + sou
   assert.match(DOC, /rd-matrix/);
   assert.match(DOC, /Understands/);
   assert.match(DOC, /Names you/);
-  assert.match(DOC, /Top competitor named/);
+  assert.match(DOC, /Top entity named/);
   assert.match(DOC, /verdictPill/);
 });
 

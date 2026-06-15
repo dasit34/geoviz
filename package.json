@@ -45,6 +45,7 @@
     "test:report-model": "tsx scripts/test-report-model.ts",
     "test:report-document": "tsx scripts/test-report-document.ts",
     "test:report-providers": "tsx scripts/test-report-providers.ts",
+    "test:sample-audit": "tsx scripts/test-sample-audit.ts",
     "test:report-consistency": "tsx scripts/test-report-consistency.ts",
     "test:payload-hash-parity": "tsx scripts/test-payload-hash-parity.ts",
     "test:eyebrow-consistency": "tsx scripts/test-eyebrow-consistency.ts",

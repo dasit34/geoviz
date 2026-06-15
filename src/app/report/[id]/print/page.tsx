@@ -8,6 +8,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { logReportAccessAttempt } from "@/lib/report-access";
 import { checkPageRateLimit } from "@/lib/rate-limit";
+import { isSampleAudit } from "@/lib/sample-audit";
 import { RateLimitedNotice } from "@/components/RateLimitedNotice";
 import { buildReportContext } from "@/lib/intelligence/build-report-context";
 import { resolveBusinessName } from "@/lib/intelligence/resolve-business-name";
@@ -54,7 +55,17 @@ export default async function PrintPage({
     windowMs: 5 * 60_000,
   });
   if (rl.blocked) {
-    return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+    // Public sample reports must never 429 — they're marketing surfaces with
+    // no per-user state. Only on the blocked path do one cheap stripeSessionId
+    // lookup to let samples through; real orders stay throttled and the
+    // happy-path/anti-CUID-fishing behavior is unchanged.
+    const sampleProbe = await prisma.auditOrder.findUnique({
+      where: { id: params.id },
+      select: { stripeSessionId: true },
+    });
+    if (!isSampleAudit(sampleProbe?.stripeSessionId)) {
+      return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+    }
   }
 
   const order = await prisma.auditOrder.findUnique({

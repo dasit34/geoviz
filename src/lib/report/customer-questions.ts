@@ -41,23 +41,62 @@ const VERTICAL_QUESTION_PROFILES: Record<string, VerticalProfile> = {
   home_services: { noun: "home service companies", singular: "home service company", urgentProblem: "an urgent home repair", service: "this service" },
 };
 
+/** Construction/service nouns that are uncountable — never pluralized, so a
+ *  question never reads "best sidings" / "best roofings". */
+const UNCOUNTABLE_NOUNS = new Set([
+  "siding", "roofing", "remodeling", "remodelling", "fencing", "flooring",
+  "framing", "decking", "plumbing", "paving", "landscaping", "contracting",
+  "consulting", "marketing", "insurance", "software", "analytics", "hvac",
+]);
+
+/** Collapse a long detected business-type phrase to its head noun so generated
+ *  questions stay short and natural. "home remodeling contractor specializing in
+ *  windows, doors, roofing, and siding" → "home remodeling contractor". */
+function simplifyBusinessType(phrase: string): string {
+  let t = phrase.trim();
+  // Drop a trailing qualifier clause ("… specializing in …", "… offering …").
+  t = t.split(
+    /\s+(?:specializing|specialising|specializes|specialises|offering|providing|serving|focused|focusing)\b/i,
+  )[0];
+  // Drop a trailing list clause introduced by a comma or dash.
+  t = t.split(/[,—–]| - /)[0];
+  t = t.replace(/\s+/g, " ").trim();
+  // Still long? Keep the head noun phrase (last 3 words — the noun usually
+  // trails: "… remodeling contractor").
+  const words = t.split(" ");
+  if (words.length > 4) t = words.slice(-3).join(" ");
+  return t.trim();
+}
+
+/** Pluralize ONLY the last word of a noun phrase ("home remodeling contractor"
+ *  → "home remodeling contractors"), leaving uncountable trailing nouns alone. */
+function pluralizeLastWord(phrase: string): string {
+  const words = phrase.split(" ");
+  const i = words.length - 1;
+  const last = words[i];
+  if (!last || UNCOUNTABLE_NOUNS.has(last.toLowerCase())) return phrase;
+  words[i] = /(s|sh|ch|x|z)$/i.test(last)
+    ? `${last}es`
+    : /[^aeiou]y$/i.test(last)
+      ? `${last.slice(0, -1)}ies`
+      : `${last}s`;
+  return words.join(" ");
+}
+
 /** Strip a trailing/leading article and tidy a detected "reads as" business
- *  type into a usable noun ("an AI visibility intelligence service" → "AI
- *  visibility intelligence services"). Best-effort; falls back to a generic. */
+ *  type into a usable noun. Long phrases are simplified to a head noun, and
+ *  pluralization acts on the last word only ("home remodeling contractor
+ *  specializing in …, siding" → singular "home remodeling contractor", plural
+ *  "home remodeling contractors"). Best-effort; falls back to a generic. */
 function nounFromBusinessType(businessType: string | null): { noun: string; singular: string } {
   const fallback = { noun: "businesses like this", singular: "business" };
   if (!businessType) return fallback;
-  let t = businessType.trim().replace(/^(an?|the)\s+/i, "").trim();
+  let t = simplifyBusinessType(businessType.trim().replace(/^(an?|the)\s+/i, "").trim());
   if (!t) return fallback;
   // Lowercase the leading word unless it looks like an acronym (AI, SaaS, HVAC).
   if (!/^[A-Z]{2,}/.test(t)) t = t.charAt(0).toLowerCase() + t.slice(1);
   const singular = t;
-  // Naive pluralization for the "best X" phrasing.
-  const noun = /(s|sh|ch|x|z)$/i.test(t)
-    ? `${t}es`
-    : /[^aeiou]y$/i.test(t)
-      ? `${t.slice(0, -1)}ies`
-      : `${t}s`;
+  const noun = pluralizeLastWord(t);
   return { noun, singular };
 }
 
@@ -99,6 +138,54 @@ function usableService(s: string): boolean {
   return t.length > 0 && t.length <= 28 && t.split(/\s+/).length <= 3;
 }
 
+const SUPPLIER_RE =
+  /\b(supply|supplies|supplier|suppliers|distribution|distributor|distributors|wholesale|wholesaler|wholesalers|materials|building products)\b/i;
+
+/** A supplier / distributor / wholesaler / materials business sells products —
+ *  it is NOT a contractor who performs the trade, so it must not get
+ *  "best roofers"-style contractor questions. Detected from the business name
+ *  or the model-detected "reads as" type. */
+function isSupplierBusiness(name: string, businessType: string | null): boolean {
+  return SUPPLIER_RE.test(name) || (businessType ? SUPPLIER_RE.test(businessType) : false);
+}
+
+const SUPPLY_CATEGORY_RE =
+  /\b([a-z][a-z-]+)\s+(?:supply|supplies|materials|distribution|distributors?|wholesale|wholesalers?)\b/i;
+const TRADE_ADJECTIVES = new Set([
+  "roofing", "hvac", "plumbing", "electrical", "flooring", "lumber", "masonry",
+  "concrete", "paint", "hardware", "landscaping", "building", "industrial",
+]);
+
+/** Category adjective for supplier phrasing: the word before the supply keyword
+ *  in the name ("Beacon Roofing Supply" → "roofing"); else a known trade slug;
+ *  else the neutral "building products". */
+function supplierCategory(name: string, slug: string | null | undefined): string {
+  const m = name.match(SUPPLY_CATEGORY_RE);
+  if (m && m[1] && m[1].toLowerCase() !== "the") return m[1].toLowerCase();
+  if (slug && TRADE_ADJECTIVES.has(slug.toLowerCase())) return slug.toLowerCase();
+  return "building products";
+}
+
+/** Buyer-intent questions for a supplier/distributor — products, not a trade. */
+function buildSupplierQuestions(
+  name: string,
+  category: string,
+  city: string | null,
+): string[] {
+  const isGeneric = category === "building products";
+  const catPlural = isGeneric ? "building products suppliers" : `${category} supply companies`;
+  const materialsSupplier = isGeneric ? "building products supplier" : `${category} materials supplier`;
+  const materialsPhrase = isGeneric ? "building products" : `${category} materials`;
+  const near = city ? `near ${city}` : "near me";
+  return [
+    `Who are the best ${catPlural} ${near}?`,
+    `Where can I buy reliable ${materialsPhrase}?`,
+    `Is ${name} trustworthy and legitimate?`,
+    `What should I look for when choosing ${indefiniteArticle(materialsSupplier)} ${materialsSupplier}?`,
+    `Which ${catPlural} should I compare?`,
+  ];
+}
+
 export type CustomerQuestionInput = {
   businessName: string;
   industrySlug: string | null | undefined;
@@ -118,6 +205,17 @@ export type CustomerQuestionInput = {
 export function buildCustomerQuestions(input: CustomerQuestionInput): string[] {
   const name = input.businessName?.trim() || "this business";
   const city = cityPhrase(input.city);
+
+  // Supplier / distributor / wholesaler / materials businesses are not
+  // contractors — give them product-buying questions, never "best roofers".
+  if (isSupplierBusiness(name, input.businessType)) {
+    return buildSupplierQuestions(
+      name,
+      supplierCategory(name, input.industrySlug),
+      city,
+    );
+  }
+
   const service = input.services.find((s) => usableService(s))?.trim() ?? null;
 
   const profile = input.industrySlug
