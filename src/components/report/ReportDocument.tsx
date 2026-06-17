@@ -312,7 +312,11 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
             </thead>
             <tbody>
               {m.providers.map((p) => (
-                <ModelMatrixRow key={p.provider} provider={p} />
+                <ModelMatrixRow
+                  key={p.provider}
+                  provider={p}
+                  businessName={m.meta.businessName}
+                />
               ))}
             </tbody>
           </table>
@@ -376,7 +380,13 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
   );
 }
 
-function ModelMatrixRow({ provider }: { provider: ReportModelProvider }) {
+function ModelMatrixRow({
+  provider,
+  businessName,
+}: {
+  provider: ReportModelProvider;
+  businessName: string;
+}) {
   const p = provider;
   if (p.verdict === "UNAVAILABLE") {
     return (
@@ -411,7 +421,14 @@ function ModelMatrixRow({ provider }: { provider: ReportModelProvider }) {
       <td className={`rd-v-${p.mentioned ? "ok" : "muted"}`}>
         {p.mentioned ? "Yes" : "No"}
       </td>
-      <td className="rd-matrix-comp">{p.competitors[0] ?? "—"}</td>
+      {/* When a model named the audited business ("Names you" = Yes), show the
+          business itself here — the model DID name it. Showing a competitor in
+          this cell on a Yes row reads as if the competitor is the audited
+          business. Competitors still surface in the Competitive Displacement
+          card below (which aggregates competitors[0] independently). */}
+      <td className="rd-matrix-comp">
+        {p.mentioned ? businessName : (p.competitors[0] ?? "—")}
+      </td>
       <td className="rd-matrix-num">{p.citationDomains.length || "—"}</td>
     </tr>
   );
