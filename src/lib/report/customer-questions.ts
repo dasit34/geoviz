@@ -100,12 +100,35 @@ function nounFromBusinessType(businessType: string | null): { noun: string; sing
   return { noun, singular };
 }
 
-/** Pick the city token for phrasing. Keeps the detected location verbatim
- *  (e.g. "Toledo, OH" / "Northwest Ohio") but trims a trailing "area"/"region"/
- *  "metro" so "near {city}" doesn't read "near Northwest Ohio area". */
+/** Pick the city token for phrasing. Keeps a real detected location verbatim
+ *  (e.g. "Toledo, OH" / "Northwest Ohio") but sanitizes the model-supplied
+ *  string so internal caveats never leak into a customer-facing question:
+ *   • Strips parenthetical asides — a model sometimes returns
+ *     "Ohio (inferred from business name; service area not specified)".
+ *   • Cuts a trailing caveat clause after ;/:/dash (NOT comma — keeps the
+ *     state in "Toledo, OH").
+ *   • Trims a trailing "area"/"region"/"metro" so "near {city}" doesn't read
+ *     "near Northwest Ohio area".
+ *   • Returns null when only caveat residue remains, so phrasing falls back to
+ *     the area-neutral form rather than inventing or leaking a location. */
 function cityPhrase(city: string | null): string | null {
-  const t = (city ?? "").trim().replace(/\s+(area|region|metro)\.?$/i, "").trim();
-  return t.length > 0 ? t : null;
+  let t = (city ?? "").trim();
+  // Drop parenthetical caveats first (the caveat carries its own ; and would
+  // otherwise survive the separator split below).
+  t = t.replace(/\s*\([^)]*\)/g, " ").replace(/\s*\([^)]*$/, "");
+  // Cut a trailing caveat clause introduced by a separator — comma excluded so
+  // "Toledo, OH" keeps its state.
+  t = t.split(/[;:–—]| - /)[0] ?? "";
+  t = t.replace(/\s+(area|region|metro)\.?$/i, "").replace(/\s+/g, " ").trim();
+  // Reject caveat-only / non-location residue.
+  if (
+    !t ||
+    !/[a-z]/i.test(t) ||
+    /^(not|no|inferred|unknown|unspecified|n\/?a)\b/i.test(t)
+  ) {
+    return null;
+  }
+  return t;
 }
 
 /** Lowercase the leading character of a detected service so it reads naturally

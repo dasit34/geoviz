@@ -219,6 +219,55 @@ check("non-supplier roofing business still gets contractor questions (no regress
   assert.doesNotMatch(blob, /supply compan/i, blob);
 });
 
+check("model-supplied location with an inline caveat is cleaned to the bare city", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "Air Right Ohio",
+    industrySlug: "hvac",
+    // The exact debug-style location from the reviewed Air Right PDF.
+    city: "Ohio (inferred from business name; specific service area not specified on the site)",
+    services: [],
+    businessType: "HVAC company",
+    isLocal: true,
+  });
+  const blob = ok(qs);
+  assert.equal(qs.length, 5, blob);
+  // No parenthetical / debug wording leaks into any question.
+  assert.doesNotMatch(blob, /\(/, `no open paren: ${blob}`);
+  assert.doesNotMatch(blob, /inferred|not specified|service area/i, `no caveat text: ${blob}`);
+  // The real detected location survives, area-neutral fallback NOT used.
+  assert.ok(/best HVAC companies near Ohio\?/i.test(blob), blob);
+  assert.doesNotMatch(blob, /your area|nearby/i, "a real city was detected — keep it");
+});
+
+check("comma-separated city with state is preserved (not split on the comma)", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "Rock Roofing",
+    industrySlug: "roofing",
+    city: "Toledo, OH (service area approximate)",
+    services: [],
+    businessType: "Roofing contractor",
+    isLocal: true,
+  });
+  const blob = ok(qs);
+  assert.ok(/near Toledo, OH\?/i.test(blob), `state kept, caveat dropped: ${blob}`);
+  assert.doesNotMatch(blob, /\(|approximate/i, blob);
+});
+
+check("caveat-only location → area-neutral fallback, never leaks the caveat", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "Some HVAC Co",
+    industrySlug: "hvac",
+    city: "(inferred from business name; not specified on the site)",
+    services: [],
+    businessType: "HVAC company",
+    isLocal: true,
+  });
+  const blob = ok(qs);
+  assert.equal(qs.length, 5, blob);
+  assert.ok(/your area|nearby/i.test(blob), `falls back to area-neutral: ${blob}`);
+  assert.doesNotMatch(blob, /\(|inferred|not specified/i, blob);
+});
+
 console.log(`[customer-questions] passed=${passed} failed=${failed}`);
 if (failed > 0) {
   for (const f of failures) console.log(f);

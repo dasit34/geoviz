@@ -29,7 +29,9 @@ import { applyApiRateLimit } from "@/lib/rate-limit";
  *
  * Rate limiting: this route is admin-gated (`ADMIN_SECRET`) so abuse
  * surface is small. A worker-side guard already prevents duplicate
- * concurrent runs on the same order. No per-IP throttle needed here.
+ * concurrent runs on the same order. The per-IP throttle applies ONLY to
+ * unauthenticated callers — a valid admin key (operator QA batches, paid
+ * audit generation) is never throttled.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,18 +40,23 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string } },
 ) {
-  const limited = applyApiRateLimit({
-    req,
-    routeKey: "api:admin:run-audit",
-    limit: 60,
-    windowMs: 5 * 60_000,
-  });
-  if (limited) return limited;
-
   const fp = getDbFingerprint();
   const dbHost = fp ? fp.fingerprint : null;
 
+  // Auth-gate before throttling. The operator's manual QA batch carries a valid
+  // admin key and must never 429 on its own audit runs (mirrors the PDF route's
+  // admin exemption). Only UNauthenticated callers are rate-limited — that keeps
+  // the route protected against anonymous CUID fishing / abuse without
+  // throttling legitimate paid/operator audit generation.
   if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
+    const limited = applyApiRateLimit({
+      req,
+      routeKey: "api:admin:run-audit",
+      limit: 60,
+      windowMs: 5 * 60_000,
+    });
+    if (limited) return limited;
+
     console.warn(`[admin-audit] unauthorized request for orderId=${params.id}`);
     return NextResponse.json(
       { success: false, error: "Unauthorized", dbHost },
