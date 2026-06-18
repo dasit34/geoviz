@@ -22,14 +22,24 @@ export function RateLimitedNotice({
       <section className="container-page py-24">
         <div className="mx-auto max-w-md rounded-lg border border-amber-300/30 bg-amber-300/[0.06] p-8 text-center">
           <p className="pill border-amber-300/30 bg-amber-300/10 text-amber-200">
-            429
+            One moment
           </p>
-          <h1 className="h2 mt-4">Too many requests.</h1>
+          <h1 className="h2 mt-4">We&rsquo;re processing a few audits right now.</h1>
           <p className="muted mt-3 text-sm">
             Please wait a moment and try again.
           </p>
           <p className="mt-4 text-xs text-white/55">
             You can retry in about <strong>{waitLabel}</strong>.
+          </p>
+          <p className="mt-4 text-xs text-white/55">
+            Still stuck? Email{" "}
+            <a
+              href="mailto:support@geoviz.ai"
+              className="text-accent hover:underline"
+            >
+              support@geoviz.ai
+            </a>
+            .
           </p>
         </div>
       </section>

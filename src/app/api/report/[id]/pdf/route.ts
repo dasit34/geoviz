@@ -48,15 +48,17 @@ export async function GET(
   const isAdmin = validateAdminAccess(adminKey).ok;
 
   // Rate limit FIRST (public hits only) — PDF generation is the most expensive
-  // route in the app (~20–40s of headless Chromium per call). 5 hits per 5 min
-  // per IP is generous for a real customer (they download once, maybe
-  // re-download once). Blocks runaway scripts before they can launch a
-  // chromium instance.
+  // route in the app (~20–40s of headless Chromium per call). 12 hits per 5 min
+  // per IP keeps report *downloading* more forgiving than audit *generation*
+  // (checkout is 5/10min), so a real customer who views + downloads + re-shares
+  // their own report during normal use never 429s — while still blocking runaway
+  // scripts before they can launch a chromium instance. Admin downloads bypass
+  // this entirely (operator iteration).
   if (!isAdmin) {
     const limited = applyApiRateLimit({
       req,
       routeKey: "api:pdf",
-      limit: 5,
+      limit: 12,
       windowMs: 5 * 60_000,
     });
     if (limited) return limited;

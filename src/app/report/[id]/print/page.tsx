@@ -161,6 +161,15 @@ export default async function PrintPage({
         } as AuditReportContext)
       : undefined;
 
+  // Report opened — success-path telemetry (the failure paths above already
+  // log via logReportAccessAttempt). Order ID is a CUID token; never logs
+  // markdown, score, business name, or email.
+  logReportAccessAttempt({
+    route: "/report/[id]/print",
+    orderId: order.id,
+    outcome: "served",
+  });
+
   return (
     <ReportSurface
       orderId={order.id}

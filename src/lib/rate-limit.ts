@@ -162,10 +162,11 @@ function logRateLimitBlock(opts: {
  *     limit: 5, windowMs: 5 * 60_000 });
  *   if (limited) return limited;
  *
- * The 429 body is the branded copy the user spec requires:
- *   `"Too many requests. Please wait a moment and try again."`
- * Plus a `retryAfterSec` field and a real `Retry-After` HTTP header
- * so well-behaved clients back off automatically.
+ * The 429 body is customer-safe copy (no raw "Too many requests."):
+ *   `"We're processing a few audits right now. Please wait a moment
+ *   and try again."` plus a `support` contact, a `retryAfterSec`
+ * field, and a real `Retry-After` HTTP header so well-behaved clients
+ * back off automatically.
  */
 export function applyApiRateLimit(opts: {
   req: Request;
@@ -190,8 +191,10 @@ export function applyApiRateLimit(opts: {
   });
   return NextResponse.json(
     {
-      error: "Too many requests. Please wait a moment and try again.",
+      error:
+        "We're processing a few audits right now. Please wait a moment and try again.",
       retryAfterSec: result.retryAfterSec,
+      support: "support@geoviz.ai",
     },
     {
       status: 429,

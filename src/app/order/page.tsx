@@ -15,6 +15,10 @@ export default function OrderPage({
 }: {
   searchParams?: { websiteUrl?: string; email?: string };
 }) {
+  // Funnel telemetry — order page viewed. Server-rendered (force-dynamic), so
+  // this logs once per view. No PII; just the funnel-entry signal.
+  console.log("[order-page] viewed");
+
   const stripeReady = isStripeConfigured();
   const testBypassEnabled = process.env.NODE_ENV !== "production";
 
