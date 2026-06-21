@@ -4,6 +4,7 @@ import {
 } from "@/components/AuditReportContent";
 import { ReportDocument } from "@/components/report/ReportDocument";
 import { buildReportModelFromRender } from "@/lib/report/report-model";
+import { normalizeReportModel } from "@/lib/report/reportDataNormalizer";
 import "@/components/report/report-document.css";
 
 /**
@@ -41,7 +42,7 @@ export function ReportSurface({
   deterministicScore?: unknown;
   context?: AuditReportContext;
 }) {
-  const model = buildReportModelFromRender({
+  const rawModel = buildReportModelFromRender({
     orderId,
     businessLabel,
     websiteUrl,
@@ -62,6 +63,7 @@ export function ReportSurface({
         }
       : null,
   });
+  const model = rawModel ? normalizeReportModel(rawModel) : null;
 
   // Use the new fixed-template design whenever the deterministic engine
   // gave us real structured content (buckets/diagnostics/fixes). Legacy

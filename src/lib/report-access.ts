@@ -22,8 +22,9 @@
  *      the table even though the query-param transport already exposes
  *      the secret to anyone with the URL.
  *   2. `logReportAccessAttempt(...)` — structured single-line server
- *      log used by every report route on a failed / not-served path
- *      (`not_found`, `not_ready`, `render_failed`, `blocked`). Never
+ *      log used by every report route to record the access outcome
+ *      (`served` on success; `not_found`, `not_ready`, `render_failed`,
+ *      `blocked` otherwise). Never
  *      echoes the secret, the report markdown, the score, or the
  *      customer email — only the route, the order ID (already a CUID
  *      token, never sensitive on its own), and the outcome.
@@ -115,8 +116,8 @@ export function validateAdminAccess(
  * What it DOES log:
  *   • `route` — which surface decided to block.
  *   • `orderId` — already a CUID token, public-on-purpose in the URL.
- *   • `outcome` — one of `not_found` / `not_ready` / `render_failed`
- *     / `blocked`.
+ *   • `outcome` — one of `served` / `not_found` / `not_ready` /
+ *     `render_failed` / `blocked`.
  *   • `reason` — caller-supplied short string. For admin blocks this
  *     is the `AdminAccessReason` enum.
  *   • `recvLen` / `expLen` — query-key lengths for admin diagnostics
@@ -125,7 +126,7 @@ export function validateAdminAccess(
 export function logReportAccessAttempt(args: {
   route: string;
   orderId?: string | null;
-  outcome: "not_found" | "not_ready" | "render_failed" | "blocked";
+  outcome: "not_found" | "not_ready" | "render_failed" | "blocked" | "served";
   reason?: string;
   receivedLength?: number;
   expectedLength?: number;

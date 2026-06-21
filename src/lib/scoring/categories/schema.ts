@@ -138,12 +138,33 @@ export function scoreSchema(evidence: Evidence): CategoryScoreInternal {
 
   if (s.missing_fields.length > 0) {
     signals.push(`Missing fields: ${s.missing_fields.join(", ")}`);
+    const FIELD_LABELS: Record<string, string> = {
+      url: "website address",
+      geo: "location coordinates",
+      telephone: "phone number",
+      name: "business name",
+      address: "street address",
+      openingHours: "business hours",
+      openingHoursSpecification: "business hours",
+      priceRange: "price range",
+      email: "email address",
+      description: "business description",
+      sameAs: "directory profile links",
+      aggregateRating: "customer rating",
+      logo: "business logo",
+      image: "business image",
+      streetAddress: "street address",
+      addressLocality: "city",
+      addressRegion: "state or region",
+      postalCode: "postal code",
+    };
+    const humanFields = s.missing_fields.map((f: string) => FIELD_LABELS[f] ?? f);
     issues.push({
       id: "schema.missing_required_fields",
       severity: "warning",
       category_key: "schema",
       weight: max,
-      message: `Required entity fields missing: ${s.missing_fields.join(", ")}`,
+      message: `Business profile missing required fields: ${humanFields.join(", ")}`,
     });
   }
 

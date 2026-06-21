@@ -1,5 +1,6 @@
 import type {
   ReportModel,
+  ReportModelBucket,
   ReportModelCategory,
   ReportModelProvider,
   ReportModelEvidence,
@@ -42,9 +43,6 @@ export function ReportDocument({ model }: { model: ReportModel }) {
 
 // ── Shared chrome ───────────────────────────────────────────────────
 function Logo({ dark, strap }: { dark?: boolean; strap?: boolean }) {
-  // The real constellation mark (light ring + orange signal) is designed for
-  // dark surfaces, so on light pages it sits inside a navy tile (matching the
-  // brand favicon) to stay legible. Never a text/placeholder approximation.
   return (
     <span className={`rd-logo${dark ? " rd-logo-dark" : ""}`}>
       <span className="rd-logo-tile">
@@ -85,9 +83,6 @@ function Page({
 function CoverPage({ model }: { model: ReportModel }) {
   const m = model;
   const overall = typeof m.score.overall === "number" ? m.score.overall : null;
-  // Use the customer-facing issue TITLE, never the raw evidence string
-  // (diagnostics[0].problem can fall back to a deterministic reason like
-  // "Detected 2 JSON-LD block(s)", which is evidence, not a gap).
   const gap =
     m.diagnostics[0]?.title ??
     m.executive.weakestSignal ??
@@ -99,18 +94,7 @@ function CoverPage({ model }: { model: ReportModel }) {
         <span className="rd-head-num">01</span>
       </header>
 
-      <div className="rd-cover-hero">
-        <p className="rd-cover-eyebrow">AI Visibility Intelligence Report</p>
-        <h1 className="rd-cover-title">
-          AI Visibility
-          <br />
-          Intelligence Report
-        </h1>
-        <p className="rd-cover-sub">
-          How clearly AI search tools can understand, trust, and recommend this
-          business.
-        </p>
-      </div>
+      <p className="rd-cover-eyebrow">AI VISIBILITY INTELLIGENCE REPORT</p>
 
       <div className="rd-cover-panel">
         <h2 className="rd-cover-biz">{m.meta.businessName}</h2>
@@ -131,6 +115,16 @@ function CoverPage({ model }: { model: ReportModel }) {
             {m.score.band}
           </span>
         </div>
+        <p className="rd-cover-percentile">
+          {m.score.percentileCopy ?? bandContextLine(m.score.band)}
+        </p>
+        {m.buckets.length > 0 ? (
+          <div className="rd-buckets">
+            {m.buckets.map((b) => (
+              <BucketCell key={b.key} bucket={b} />
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <p className="rd-cover-gap">
@@ -149,6 +143,16 @@ function CoverPage({ model }: { model: ReportModel }) {
   );
 }
 
+function BucketCell({ bucket }: { bucket: ReportModelBucket }) {
+  const b = bucket;
+  return (
+    <div className="rd-bucket">
+      <span className="rd-bucket-k">{b.label}</span>
+      <span className={`rd-bucket-v rd-v-${b.tone}`}>{b.pct}%</span>
+    </div>
+  );
+}
+
 function CoverFootCell({ k, v }: { k: string; v: string }) {
   return (
     <div className="rd-cover-foot-cell">
@@ -161,42 +165,73 @@ function CoverFootCell({ k, v }: { k: string; v: string }) {
 // ── P2 · Executive Summary ──────────────────────────────────────────
 function ExecutivePage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
+  const cm = m.crossModel;
   const overall = typeof m.score.overall === "number" ? String(m.score.overall) : "—";
   const conf = m.score.confidenceLabel
     ? m.score.confidenceLabel.replace(/^Audit completeness:\s*/i, "")
     : "—";
   const issue = m.diagnostics[0];
-  const fix = m.fixes[0];
+  const hasBullets = m.executive.summaryBullets.length > 0;
+  const BASELINE_SIGNALS = ["crawl access", "content extraction"];
+  const isBaseline = BASELINE_SIGNALS.some((s) =>
+    m.executive.strongestLabel.toLowerCase().includes(s),
+  );
   return (
     <Page variant="light">
       <PageHead context="BRIEFING" n="02" />
       <h1 className="rd-title">Executive Summary</h1>
       <p className="rd-sub">
-        What AI systems understand about {m.meta.businessName} today — in plain
-        business language, before the diagnostics.
+        The bottom line — what AI systems currently understand about{" "}
+        {m.meta.businessName}.
       </p>
 
       <div className="rd-stat-row">
-        <Stat accent="amber" k="Overall" v={overall} note={m.score.band} />
+        {m.hasProviders ? (
+          <Stat
+            accent="amber"
+            k="AI Recommendation"
+            v={`${cm.recommendedCount} of 4`}
+            note={m.score.band}
+          />
+        ) : (
+          <Stat accent="amber" k="Overall" v={overall} note={m.score.band} />
+        )}
         <Stat
           accent="blue"
-          k="Audit confidence"
+          k="Data coverage"
           v={conf}
-          note={m.meta.reviewed ? "Human reviewed" : "Automated audit"}
+          note={m.meta.reviewed ? "Human reviewed" : "Audit complete"}
         />
         <Stat
           accent="green"
           k="Strongest signal"
           v={m.executive.strongestLabel}
-          note="Highest-scoring area"
+          note={isBaseline ? "Baseline — not a differentiator" : "Highest-scoring area"}
         />
       </div>
 
+      {hasBullets ? (
+        <>
+          <p className="rd-exec-label">INTELLIGENCE SUMMARY</p>
+          <ul className="rd-exec-list">
+            {m.executive.summaryBullets.map((bullet, i) => (
+              <li key={i} className="rd-exec-item">
+                <span className="rd-exec-dot" />
+                <span className="rd-exec-text">{bullet}</span>
+              </li>
+            ))}
+          </ul>
+          {m.executive.weakestSignal ? (
+            <div className="rd-exec-gap">
+              <span className="rd-exec-gap-label">WIDEST GAP</span>
+              {m.executive.weakestSignal}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
       {issue ? (
         <Callout kind="issue" label="Top issue" title={issue.title} body={issue.whyItHurts} />
-      ) : null}
-      {fix ? (
-        <Callout kind="fix" label="First fix" title={fix.title} body={fix.businessImpact} />
       ) : null}
     </Page>
   );
@@ -250,7 +285,7 @@ function Callout({
   );
 }
 
-// ── P3 · AI Intelligence (consolidated model results + cross-model insight) ──
+// ── P3 · AI Intelligence ────────────────────────────────────────────
 function AIIntelligencePage({ model }: { model: ReportModel; reportId: string }) {
   const m = model;
   const cm = m.crossModel;
@@ -271,7 +306,6 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
         </p>
       ) : (
         <>
-          {/* Consensus headline band */}
           <div className="rd-stat-row">
             <Stat
               accent="blue"
@@ -290,14 +324,26 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
               note="named your business in their answer"
             />
             <Stat
-              accent="green"
+              accent={cm.recommendedCount === 0 ? "amber" : cm.recommendedCount >= 3 ? "green" : "blue"}
               k="Recommended"
               v={`${cm.recommendedCount} of 4`}
-              note="would suggest it to a customer today"
+              note={
+                cm.recommendedCount === 0
+                  ? "no AI would suggest you to a customer"
+                  : "would suggest it to a customer today"
+              }
             />
           </div>
 
-          {/* One dense model matrix (replaces two card grids) */}
+          {cm.recommendedCount === 0 && cm.mentionedCount > 0 ? (
+            <Callout
+              kind="issue"
+              label="KEY FINDING"
+              title={`AI systems know who ${m.meta.businessName} is — but none of them recommend you.`}
+              body={`${cm.mentionedCount} of 4 AI models named your business when asked. Zero of 4 would recommend you to a customer today. Being found is not the same as being chosen — and the gap between those two is what this report addresses.`}
+            />
+          ) : null}
+
           <table className="rd-matrix">
             <thead>
               <tr>
@@ -321,10 +367,17 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
             </tbody>
           </table>
 
-          {/* Entity Name Consistency — the audited business was recognized under
-              multiple name spellings (not real competitors). Takes priority over
-              the competitive-displacement card so same-business variants are never
-              framed as competition. */}
+          {cm.topCitedDomains.length > 0 ? (
+            <div className="rd-sources">
+              <span className="rd-sources-label">SOURCES AI RELIED ON</span>
+              <div className="rd-chips">
+                {cm.topCitedDomains.slice(0, 4).map((d) => (
+                  <span key={d} className="rd-chip">{d}</span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {cm.entityNameVariants && cm.entityNameVariants.length >= 2 ? (
             <Callout
               kind="issue"
@@ -351,22 +404,18 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
             />
           ) : null}
 
-          {/* Bottleneck conclusion → bridge to the fix */}
-          {cm.bottleneckDimension && cm.strongestDimension ? (
+          {cm.recommendedCount === 0 && cm.mainSkipReason ? (
+            <Callout
+              kind="issue"
+              label="WHY AI DIDN'T RECOMMEND YOU"
+              title={cm.mainSkipReason}
+              body="This is the primary signal holding back a recommendation across all four AI systems tested. The fixes on pages 6 and 7 address this directly."
+            />
+          ) : cm.bottleneckDimension && cm.strongestDimension ? (
             <p className="rd-note rd-prov-note">
               Across models, your {cm.strongestDimension.label} reads clearly, but{" "}
               {cm.bottleneckDimension.label} is the weakest shared signal — and
               it&rsquo;s what holds back a confident recommendation.
-              {cm.topCitedDomains.length > 0
-                ? ` Sources AI leaned on: ${cm.topCitedDomains.slice(0, 4).join(", ")}.`
-                : ""}
-            </p>
-          ) : cm.mainSkipReason ? (
-            <p className="rd-note rd-prov-note">
-              Main reason AI held back: {cm.mainSkipReason}.
-              {cm.topCitedDomains.length > 0
-                ? ` Sources AI leaned on: ${cm.topCitedDomains.slice(0, 4).join(", ")}.`
-                : ""}
             </p>
           ) : (
             <p className="rd-note rd-prov-note">
@@ -396,7 +445,7 @@ function ModelMatrixRow({
           {p.display}
         </td>
         <td colSpan={6} className="rd-matrix-na">
-          No response captured for this audit.
+          Unavailable for this audit.
         </td>
       </tr>
     );
@@ -421,11 +470,6 @@ function ModelMatrixRow({
       <td className={`rd-v-${p.mentioned ? "ok" : "muted"}`}>
         {p.mentioned ? "Yes" : "No"}
       </td>
-      {/* When a model named the audited business ("Names you" = Yes), show the
-          business itself here — the model DID name it. Showing a competitor in
-          this cell on a Yes row reads as if the competitor is the audited
-          business. Competitors still surface in the Competitive Displacement
-          card below (which aggregates competitors[0] independently). */}
       <td className="rd-matrix-comp">
         {p.mentioned ? businessName : (p.competitors[0] ?? "—")}
       </td>
@@ -434,33 +478,20 @@ function ModelMatrixRow({
   );
 }
 
-function ReadinessStrip({ readiness }: { readiness: ReadinessFactor[] }) {
-  const items = readiness.slice(0, 4);
-  return (
-    <div className="rd-readiness-strip">
-      <span className="rd-readiness-strip-title">AI Search Readiness</span>
-      <div className="rd-readiness-strip-items">
-        {items.map((r) => (
-          <span key={r.key} className="rd-readiness-item">
-            {readinessShort(r.label)}:{" "}
-            <strong className={`rd-v-${r.tone}`}>{r.score ?? "—"}</strong>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ── P4 · Evidence Reviewed ──────────────────────────────────────────
 function EvidencePage({ model, reportId }: { model: ReportModel; reportId: string }) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="WHAT AI HAD TO READ" n="04" />
+      <PageHead context="AUDIT EVIDENCE" n="04" />
 
       {m.customerQuestions.length > 0 ? (
-        <section className="rd-questions">
-          <h2 className="rd-questions-title">Customer Questions Tested</h2>
+        <>
+          <h1 className="rd-title">Customer Questions Tested</h1>
+          <p className="rd-sub">
+            The buyer-intent questions we tested across AI systems for{" "}
+            {m.meta.businessName}.
+          </p>
           <ul className="rd-questions-list">
             {m.customerQuestions.slice(0, 5).map((q) => (
               <li key={q} className="rd-questions-item">
@@ -472,11 +503,12 @@ function EvidencePage({ model, reportId }: { model: ReportModel; reportId: strin
             These questions test whether AI systems can identify, understand,
             trust, and recommend the business in real buying situations.
           </p>
-        </section>
+          <div className="rd-page-divider" />
+        </>
       ) : null}
 
-      <h1 className="rd-title">Evidence Reviewed</h1>
-      <p className="rd-title-sub">What AI Had To Read</p>
+      <p className="rd-title-sub">EVIDENCE REVIEWED · WHAT AI HAD TO READ</p>
+      <h2 className="rd-ev-title">Signal Inventory</h2>
       <p className="rd-sub">
         {m.hasEvidence
           ? "The signals GeoViz inspected on your site before scoring — this is what makes the audit defensible."
@@ -511,8 +543,8 @@ function DiagnosticsPage({ model, reportId }: { model: ReportModel; reportId: st
       <PageHead context="WHERE THE SCORE COMES FROM" n="05" />
       <h1 className="rd-title">Visibility Diagnostics</h1>
       <p className="rd-sub">
-        The six signals behind the score — readable in under a minute, no
-        dashboard required.
+        The six signals AI systems use to decide whether to identify and
+        recommend your business.
       </p>
       <div className="rd-bars">
         {m.categories.map((c) => (
@@ -531,7 +563,7 @@ function DiagnosticsPage({ model, reportId }: { model: ReportModel; reportId: st
           <p className="rd-interp-note">{m.scoreNote}</p>
         ) : null}
       </div>
-      {m.readiness.length > 0 ? <ReadinessStrip readiness={m.readiness} /> : null}
+      {m.readiness.length > 0 ? <ReadinessGrid readiness={m.readiness} /> : null}
     </Page>
   );
 }
@@ -541,7 +573,17 @@ function Bar({ category }: { category: ReportModelCategory }) {
   return (
     <div className="rd-bar">
       <div className="rd-bar-top">
-        <span className="rd-bar-label">{category.label}</span>
+        <div className="rd-bar-label-col">
+          <div className="rd-bar-label-row">
+            <span className="rd-bar-label">{category.label}</span>
+            {category.weight ? (
+              <span className="rd-bar-weight">[{category.weight}%]</span>
+            ) : null}
+          </div>
+          {category.tooltip ? (
+            <p className="rd-bar-tip">{category.tooltip}</p>
+          ) : null}
+        </div>
         <span className={`rd-bar-val rd-v-${category.tone}`}>
           {category.score === null ? "—" : category.score}
         </span>
@@ -552,6 +594,25 @@ function Bar({ category }: { category: ReportModelCategory }) {
           style={{ width: `${Math.max(0, Math.min(100, Math.round(pct)))}%` }}
         />
       </div>
+    </div>
+  );
+}
+
+function ReadinessGrid({ readiness }: { readiness: ReadinessFactor[] }) {
+  const items = readiness.slice(0, 4);
+  return (
+    <div className="rd-readiness-grid">
+      {items.map((r) => (
+        <div key={r.key} className="rd-readiness-card">
+          <span className="rd-readiness-card-k">{r.label}</span>
+          <span className={`rd-readiness-card-v rd-v-${r.tone}`}>
+            {r.score ?? "—"}
+          </span>
+          {r.basis ? (
+            <span className="rd-readiness-card-basis">{r.basis}</span>
+          ) : null}
+        </div>
+      ))}
     </div>
   );
 }
@@ -567,7 +628,7 @@ function IssuesPage({ model, reportId }: { model: ReportModel; reportId: string 
         The few issues that most directly affect whether AI systems recommend
         this business.
       </p>
-      <div className="rd-issues">
+      <div className="rd-issues rd-issues-v2">
         {m.diagnostics.map((d) => (
           <IssueCard key={d.rank} diag={d} />
         ))}
@@ -580,13 +641,22 @@ function IssueCard({ diag }: { diag: ReportModelDiagnostic }) {
   const d = diag;
   const sevTone = severityTone(d.severity);
   return (
-    <div className="rd-issue">
+    <div className="rd-issue rd-issue-v2">
       <div className="rd-issue-head">
         <span className={`rd-issue-rank rd-v-${sevTone}`}>#{d.rank}</span>
         <span className="rd-issue-title">{d.title}</span>
         <Pill {...severityPill(d.severity)} />
       </div>
-      <p className="rd-issue-body">{d.whyItHurts}</p>
+      {d.problem ? (
+        <div className="rd-issue-problem">
+          <span className="rd-issue-problem-k">WHAT WAS FOUND</span>
+          <p className="rd-issue-problem-v">{d.problem}</p>
+        </div>
+      ) : null}
+      <div>
+        <span className="rd-issue-impact-k">WHY IT MATTERS</span>
+        <p className="rd-issue-impact-v">{d.whyItHurts}</p>
+      </div>
     </div>
   );
 }
@@ -602,7 +672,7 @@ function FixesPage({ model, reportId }: { model: ReportModel; reportId: string }
         Each fix connects directly to business impact and the GeoViz Foundation
         Fix.
       </p>
-      <div className="rd-fixes">
+      <div className="rd-fixes rd-fixes-v2">
         {m.fixes.map((f) => (
           <FixCard key={f.rank} fix={f} />
         ))}
@@ -610,8 +680,10 @@ function FixesPage({ model, reportId }: { model: ReportModel; reportId: string }
       <div className="rd-impl">
         <span className="rd-impl-title">Implementation path</span>
         <span className="rd-impl-body">
-          Foundation Fix eligible · Estimated 3–5 business days · Designed to
-          improve AI verification and citation readiness.
+          All {m.fixes.length} fixes above are addressed as a single Foundation
+          Fix engagement — one scope, done in 3–5 business days. When complete,
+          AI systems can confirm who {m.meta.businessName} is, where you operate,
+          and why to recommend you.
         </span>
       </div>
     </Page>
@@ -627,6 +699,41 @@ function FixCard({ fix }: { fix: ReportModelFix }) {
         <h3 className="rd-fix-title">{f.issue}</h3>
         <span className="rd-fix-exact-label">Exact fix</span>
         <p className="rd-fix-action">{f.action}</p>
+        <div className="rd-fix-meta">
+          {f.impact === "high" && (
+            <span className="rd-fix-pill rd-fix-pill-high">HIGH IMPACT</span>
+          )}
+          {f.impact === "medium" && (
+            <span className="rd-fix-pill rd-fix-pill-medium">MEDIUM IMPACT</span>
+          )}
+          {f.impact === "low" && (
+            <span className="rd-fix-pill rd-fix-pill-low">LOW IMPACT</span>
+          )}
+          {f.difficulty === "Easy" && (
+            <span className="rd-fix-pill rd-fix-pill-easy">EASY</span>
+          )}
+          {f.difficulty === "Moderate" && (
+            <span className="rd-fix-pill rd-fix-pill-moderate">MODERATE</span>
+          )}
+          {f.difficulty === "Technical" && (
+            <span className="rd-fix-pill rd-fix-pill-technical">TECHNICAL</span>
+          )}
+          {f.foundationFix && (
+            <span className="rd-fix-pill rd-fix-pill-foundation">
+              ■ Foundation Fix
+            </span>
+          )}
+        </div>
+        {f.unlocks.length > 0 ? (
+          <div className="rd-fix-unlocks">
+            <span className="rd-fix-unlocks-k">UNLOCKS</span>
+            <div className="rd-chips">
+              {f.unlocks.slice(0, 3).map((u) => (
+                <span key={u} className="rd-chip">{u}</span>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -644,9 +751,20 @@ function ActionPage({ model, reportId }: { model: ReportModel; reportId: string 
       <p className="rd-cta-eyebrow">Foundation Fix</p>
       <h1 className="rd-action-title">Strategic Action Plan</h1>
 
+      {m.score.percentileCopy ? (
+        <p className="rd-action-percentile">{m.score.percentileCopy}</p>
+      ) : null}
+
       <div className="rd-outcome-card">
         <span className="rd-outcome-label">Projected outcome</span>
         <p className="rd-outcome-body">{m.businessImpact}</p>
+        {(m.score.band === "Needs Work" || m.score.band === "At Risk") ? (
+          <p className="rd-outcome-note">
+            Businesses at the {m.score.band} level that complete a Foundation
+            Fix typically move into the Competitive range — the threshold where
+            AI systems begin recommending them in local searches.
+          </p>
+        ) : null}
       </div>
 
       <ReportCtaCard orderId={m.meta.orderId} businessLabel={m.meta.businessName} />
@@ -690,12 +808,13 @@ function understandingTone(score: number | null): Tone {
   return score >= 70 ? "ok" : score >= 40 ? "warn" : "bad";
 }
 
-function readinessShort(label: string): string {
-  // Readiness-factor labels are now authored as the exact text to display
-  // (e.g. "Google AI Overviews Readiness", "Structured Identity", "Trust
-  // Evidence") so customers don't confuse them with the Page-5 site
-  // diagnostics. Show them verbatim; the strip wraps if needed.
-  return label.trim();
+function bandContextLine(band: string): string {
+  if (band === "Invisible") return "AI systems cannot find or identify your business.";
+  if (band === "At Risk") return "AI systems struggle to verify who your business is.";
+  if (band === "Needs Work") return "AI systems find you, but are not recommending you to customers.";
+  if (band === "Competitive") return "AI systems are beginning to recommend your business.";
+  if (band === "AI-Ready") return "AI systems confidently recognize and recommend your business.";
+  return "AI systems find you, but are not recommending you to customers.";
 }
 
 function prettyUrl(url: string): string {

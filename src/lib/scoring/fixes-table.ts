@@ -22,23 +22,23 @@ type FixTemplate = {
 export const ISSUE_TO_FIX: Record<string, FixTemplate> = {
   // ── Schema (Structured Data) ───────────────────────────────────
   "schema.no_jsonld": {
-    action: "Add JSON-LD structured data describing the business (LocalBusiness or appropriate subtype).",
+    action: "Add a machine-readable business profile to your website (name, address, phone, services, and location). This is what AI systems read to identify and verify a local business.",
     impact: "high",
   },
   "schema.no_localbusiness": {
-    action: "Add a LocalBusiness JSON-LD block with name, address, telephone, url, and geo coordinates.",
+    action: "Add a structured business profile with your name, address, phone number, website URL, and location coordinates. AI systems require this to confirm your identity and recommend you for local searches.",
     impact: "high",
   },
   "schema.missing_required_fields": {
-    action: "Fill in the missing required entity fields (name, address, telephone, url) in the existing JSON-LD block.",
+    action: "Add the missing business details to your site's machine-readable business profile. AI systems check these fields before recommending a local business — without them, they skip to a competitor they can verify.",
     impact: "high",
   },
   "schema.malformed_fields": {
-    action: "Repair malformed JSON-LD fields so they validate against schema.org expectations (postalAddress sub-fields, telephone format, geo numeric values).",
+    action: "Fix the formatting errors in your site's business profile data so AI systems can read your address, phone number, and location without ambiguity.",
     impact: "medium",
   },
   "schema.no_faqpage": {
-    action: "Add an FAQPage JSON-LD block covering the most common customer questions about your service.",
+    action: "Add a FAQ section to your site that answers the most common customer questions in your service area. Structure it so AI systems can quote your answers directly.",
     impact: "medium",
   },
 
@@ -94,11 +94,11 @@ export const ISSUE_TO_FIX: Record<string, FixTemplate> = {
 
   // ── Brand / Entity ─────────────────────────────────────────────
   "brand.unresolved_entity": {
-    action: "Make the business name appear consistently in the page title, H1, header, footer, and JSON-LD so AI systems resolve a single entity.",
+    action: "Make your business name appear consistently in the page title, main heading, header, footer, and your site's business profile data so AI systems resolve a single trusted entity.",
     impact: "high",
   },
   "brand.no_sameas": {
-    action: "Add `sameAs` links in the LocalBusiness JSON-LD pointing to your Google Business Profile and authoritative directories.",
+    action: "Link your website's business profile to your Google Business Profile and authoritative directory listings so AI systems can confirm you are the same business across the web.",
     impact: "medium",
   },
 

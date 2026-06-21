@@ -40,6 +40,7 @@ import {
 import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
 import { buildCustomerQuestions } from "@/lib/report/customer-questions";
 import { providerHasUsableData } from "@/lib/report/model-testing";
+import { ISSUE_TO_FIX } from "@/lib/scoring/fixes-table";
 
 export type Tone = "ok" | "warn" | "bad" | "muted";
 
@@ -585,12 +586,12 @@ function schemaBlocksDetected(
 function structuredIdentityTitle(blocksDetected: boolean, isLocal: boolean): string {
   if (isLocal) {
     return blocksDetected
-      ? "Existing JSON-LD is incomplete for local business verification"
-      : "No complete LocalBusiness or Organization identity block";
+      ? "Existing structured data is incomplete for local business verification"
+      : "No complete business identity block found";
   }
   return blocksDetected
-    ? "Existing JSON-LD is incomplete for business identity verification"
-    : "No complete Organization or business identity block";
+    ? "Existing structured data is incomplete for business identity verification"
+    : "No complete organization or business identity block found";
 }
 
 /**
@@ -663,14 +664,14 @@ function buildEvidence(
     }
   }
 
-  // 2. JSON-LD schema blocks
+  // 2. Structured data blocks
   const s = pfOk ? p!.schema : null;
   {
-    const label = "JSON-LD schema blocks";
+    const label = "Structured data blocks";
     if (s) {
       rows.push(
         s.rawJsonLdCount === 0
-          ? L(label, "No JSON-LD structured data found", "fail")
+          ? L(label, "No structured business data found", "fail")
           : s.missingFields.length > 0
             ? L(label, `${s.rawJsonLdCount} block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields incomplete`, "warn")
             : L(label, `${s.rawJsonLdCount} block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields complete`, "pass"),
@@ -683,7 +684,7 @@ function buildEvidence(
         score === null
           ? L(label, "Not analyzed", "na")
           : /no json-?ld|0 block/i.test(reason) || score < 20
-            ? L(label, "0 JSON-LD blocks found on the homepage", "fail")
+            ? L(label, "No structured business data found on the homepage", "fail")
             : score < 60
               ? L(label, "Structured data present; identity fields incomplete", "warn")
               : L(label, "Structured data present", "pass"),
@@ -691,10 +692,10 @@ function buildEvidence(
     }
   }
 
-  // 3. NAP consistency
+  // 3. Name / address / phone consistency
   const e = pfOk ? p!.entityConsistency : null;
   {
-    const label = "NAP consistency";
+    const label = "Name, address & phone consistency";
     if (e) {
       rows.push(
         e.inconsistencies.length > 0
@@ -1313,7 +1314,7 @@ export function buildReportModel(
           "structured-data",
           "Structured Identity",
           catPct("schema"),
-          "LocalBusiness identity fields in the page source",
+          "Business identity fields in the page source",
         ),
         mkReadiness(
           "entity",
@@ -1380,7 +1381,10 @@ export function buildReportModel(
     // Crawler fix: only prescribe robots.txt specifics when crawlability was
     // actually audited; otherwise soften to "verify crawl access" so we never
     // recommend editing a robots.txt we never inspected.
-    const rawAction = n?.action ?? fx.action;
+    // Always prefer the CURRENT fixes-table text over the stored action — the
+    // stored deterministicScore may predate a fixes-table update (stale text).
+    const currentTableAction = ISSUE_TO_FIX[fx.for_finding]?.action;
+    const rawAction = n?.action ?? currentTableAction ?? fx.action;
     // Display-layer action overrides (frozen fixes-table text is untouched):
     //  · crawler — soften robots.txt specifics when crawl was never audited.
     //  · schema  — for non-local businesses, don't prescribe "LocalBusiness";
