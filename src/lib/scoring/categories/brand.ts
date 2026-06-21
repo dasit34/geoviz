@@ -63,7 +63,7 @@ export function scoreBrand(evidence: Evidence): CategoryScoreInternal {
       severity: "critical",
       category_key: "brand",
       weight: max,
-      message: "Business name not found in schema, homepage, or footer",
+      message: "Business name not found on website — AI cannot identify this business",
     });
     return build(1, signals, issues, 1.0);
   }
@@ -88,7 +88,7 @@ export function scoreBrand(evidence: Evidence): CategoryScoreInternal {
       severity: "warning",
       category_key: "brand",
       weight: max,
-      message: "Business name varies across schema / homepage / footer",
+      message: "Business name is inconsistent across website, business profile, and page headers",
     });
   } else {
     score = 3;

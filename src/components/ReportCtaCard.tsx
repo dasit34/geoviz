@@ -43,7 +43,7 @@ export function ReportCtaCard({
         <ul className="cta-card-includes">
           <li>Structured data installation</li>
           <li>Business identity cleanup</li>
-          <li>NAP consistency cleanup</li>
+          <li>Name, address &amp; phone alignment</li>
           <li>Homepage &amp; service content guidance</li>
           <li>Citation &amp; readiness improvements</li>
           <li>Follow-up verification audit</li>

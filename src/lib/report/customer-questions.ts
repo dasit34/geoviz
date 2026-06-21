@@ -47,7 +47,12 @@ const UNCOUNTABLE_NOUNS = new Set([
   "siding", "roofing", "remodeling", "remodelling", "fencing", "flooring",
   "framing", "decking", "plumbing", "paving", "landscaping", "contracting",
   "consulting", "marketing", "insurance", "software", "analytics", "hvac",
+  "goods", "decor", "furniture", "equipment", "merchandise",
 ]);
+
+/** Words that must not start a noun phrase — indicate a bad slice result
+ *  (e.g. "luxury home goods and decor retailer" → tail slice = "and decor retailer"). */
+const STOPWORD_START_RE = /^(?:and|or|the|an?\s|of|in|to|for|with|at|by|on|from)\b/i;
 
 /** Collapse a long detected business-type phrase to its head noun so generated
  *  questions stay short and natural. "home remodeling contractor specializing in
@@ -62,9 +67,25 @@ function simplifyBusinessType(phrase: string): string {
   t = t.split(/[,—–]| - /)[0];
   t = t.replace(/\s+/g, " ").trim();
   // Still long? Keep the head noun phrase (last 3 words — the noun usually
-  // trails: "… remodeling contractor").
+  // trails: "… remodeling contractor"). Guard against conjunctions at the
+  // slice boundary ("luxury home goods and decor retailer" → last-3 =
+  // "and decor retailer" which reads as garbage in a question).
   const words = t.split(" ");
-  if (words.length > 4) t = words.slice(-3).join(" ");
+  if (words.length > 4) {
+    const tail = words.slice(-3).join(" ");
+    if (STOPWORD_START_RE.test(tail)) {
+      // Last-3 starts with a stopword — find the last conjunction and take
+      // whatever precedes it (capped at 3 words), or fall back to first 2.
+      const conjIdx = words.reduce(
+        (last, w, i) => (/^(?:and|or)$/i.test(w) ? i : last),
+        -1,
+      );
+      const before = conjIdx > 0 ? words.slice(0, conjIdx) : words.slice(0, 2);
+      t = (before.length > 3 ? before.slice(-3) : before).join(" ");
+    } else {
+      t = tail;
+    }
+  }
   return t.trim();
 }
 
@@ -93,6 +114,11 @@ function nounFromBusinessType(businessType: string | null): { noun: string; sing
   if (!businessType) return fallback;
   let t = simplifyBusinessType(businessType.trim().replace(/^(an?|the)\s+/i, "").trim());
   if (!t) return fallback;
+  // Reject a phrase that still starts with a stopword/conjunction — this
+  // happens when the slicing heuristic can't find a clean noun head (e.g.
+  // a very short phrase where the conjunction IS the first word). The
+  // fallback produces grammatically correct questions even without a type.
+  if (STOPWORD_START_RE.test(t)) return fallback;
   // Lowercase the leading word unless it looks like an acronym (AI, SaaS, HVAC).
   if (!/^[A-Z]{2,}/.test(t)) t = t.charAt(0).toLowerCase() + t.slice(1);
   const singular = t;

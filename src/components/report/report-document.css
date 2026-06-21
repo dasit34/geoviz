@@ -296,6 +296,53 @@
   color: #d7deea;
 }
 
+/* Cover — bucket grid (4 AI-platform pillars below score row) */
+.rd-buckets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 24px;
+}
+.rd-bucket {
+  border: 1px solid var(--d-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rd-bucket-k {
+  font-family: var(--rd-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--d-muted);
+}
+.rd-bucket-v {
+  font-family: var(--rd-display);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* Bucket values on dark cover — tone overrides */
+.rd-page-dark .rd-bucket-v.rd-v-ok { color: var(--c-green-fill); }
+.rd-page-dark .rd-bucket-v.rd-v-warn { color: var(--c-amber); }
+.rd-page-dark .rd-bucket-v.rd-v-bad { color: var(--c-red); }
+.rd-page-dark .rd-bucket-v.rd-v-muted { color: var(--d-muted); }
+
+/* Cover — percentile copy below band pill */
+.rd-cover-percentile {
+  font-size: 14px;
+  font-style: italic;
+  color: var(--d-muted);
+  margin: 10px 0 0;
+}
+
 /* ════════════════ P2 · EXECUTIVE (light) ════════════════ */
 .rd-stat-row {
   display: grid;
@@ -363,6 +410,67 @@
   color: var(--l-ink);
 }
 .rd-callout-body { font-size: 15px; line-height: 1.6; color: var(--l-muted); margin: 0; }
+
+/* Executive Summary — intelligence bullets + gap highlight */
+.rd-exec-label {
+  font-family: var(--rd-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--l-faint);
+  margin: 0 0 10px;
+  display: block;
+}
+.rd-exec-list {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rd-exec-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.rd-exec-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-orange);
+  margin-top: 8px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rd-exec-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--l-ink);
+}
+.rd-exec-gap {
+  border-left: 3px solid var(--c-orange);
+  padding: 10px 14px;
+  background: rgba(255, 106, 26, 0.06);
+  border-radius: 0 8px 8px 0;
+  font-size: 15px;
+  color: var(--l-ink);
+  margin-bottom: 18px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rd-exec-gap-label {
+  font-family: var(--rd-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-orange);
+  display: block;
+  margin-bottom: 4px;
+}
 
 /* ════════════════ P3 · AI PLATFORMS (light) ════════════════ */
 .rd-prov-grid {
@@ -517,6 +625,24 @@
   font-size: 9px;
 }
 
+/* AI Intelligence — Sources AI Relied On chip row */
+.rd-sources {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0 6px;
+}
+.rd-sources-label {
+  font-family: var(--rd-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--l-faint);
+  flex: none;
+}
+
 .rd-readiness-strip {
   background: var(--d-page);
   border-radius: 12px;
@@ -632,21 +758,74 @@
   padding-top: 8px;
   border-top: 1px solid var(--l-border);
 }
+
+/* P4 — section divider between Questions and Evidence */
+.rd-page-divider {
+  height: 1px;
+  background: var(--l-border);
+  margin: 18px 0;
+}
+
+/* P4 — Evidence sub-section title (below rd-title-sub eyebrow) */
+.rd-ev-title {
+  font-family: var(--rd-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 4px 0 8px;
+  color: var(--l-ink);
+}
+
 /* P4 evidence rows tighten to make room for the questions card (8-page fit) */
 .rd-ev { gap: 8px; }
 .rd-ev-row { padding: 10px 20px; }
 
 /* ════════════════ P5 · DIAGNOSTICS (light) ════════════════ */
-.rd-bars { display: flex; flex-direction: column; gap: 15px; margin-bottom: 18px; }
+.rd-bars { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
 .rd-bar { display: flex; flex-direction: column; gap: 7px; }
-.rd-bar-top { display: flex; align-items: baseline; justify-content: space-between; }
+.rd-bar-top { display: flex; align-items: flex-start; justify-content: space-between; }
+.rd-bar-label-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.rd-bar-label-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+}
 .rd-bar-label {
   font-family: var(--rd-display);
   font-size: 16px;
   font-weight: 700;
   color: var(--l-ink);
 }
-.rd-bar-val { font-family: var(--rd-mono); font-size: 18px; font-weight: 700; }
+.rd-bar-weight {
+  font-family: var(--rd-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--l-faint);
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+}
+.rd-bar-tip {
+  font-size: 13px;
+  color: var(--l-muted);
+  margin: 1px 0 0;
+  max-width: 62ch;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.4;
+}
+.rd-bar-val { font-family: var(--rd-mono); font-size: 18px; font-weight: 700; flex: none; margin-left: 12px; }
 .rd-bar-track {
   height: 12px;
   border-radius: 999px;
@@ -683,6 +862,50 @@
   font-weight: 500;
 }
 
+/* P5 — AI Search Readiness grid (replaces ReadinessStrip) */
+.rd-readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+.rd-readiness-card {
+  background: var(--d-page);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rd-readiness-card-k {
+  font-family: var(--rd-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.55);
+}
+.rd-readiness-card-v {
+  font-family: var(--rd-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* Readiness card tone values — dark background, need override */
+.rd-readiness-card .rd-v-ok { color: var(--c-green-fill); }
+.rd-readiness-card .rd-v-warn { color: var(--c-amber); }
+.rd-readiness-card .rd-v-bad { color: var(--c-red); }
+.rd-readiness-card .rd-v-muted { color: rgba(226, 232, 240, 0.4); }
+.rd-readiness-card-basis {
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.4);
+  line-height: 1.4;
+}
+
 /* ════════════════ P6 · TOP ISSUES (light) ════════════════ */
 .rd-issues { display: flex; flex-direction: column; gap: 16px; }
 .rd-issue {
@@ -711,6 +934,45 @@
   color: var(--l-ink);
 }
 .rd-issue-body { font-size: 15px; line-height: 1.6; color: var(--l-muted); margin: 0; max-width: 70ch; }
+
+/* P6 v2 — issue card structured What / Why blocks */
+.rd-issues-v2 { gap: 12px; }
+.rd-issue-v2 { padding: 18px 22px; }
+.rd-issue-problem { margin: 0 0 12px; }
+.rd-issue-problem-k {
+  font-family: var(--rd-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--l-faint);
+  display: block;
+  margin-bottom: 4px;
+}
+.rd-issue-problem-v {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--l-ink);
+  margin: 0;
+}
+.rd-issue-impact-k {
+  font-family: var(--rd-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-orange);
+  display: block;
+  margin-bottom: 4px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rd-issue-impact-v {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--l-muted);
+  margin: 0;
+}
 
 /* ════════════════ P7 · PRIORITY FIX PLAN (light) ════════════════ */
 .rd-fixes { display: flex; flex-direction: column; gap: 16px; margin-bottom: 26px; }
@@ -748,6 +1010,65 @@
   color: var(--l-faint);
 }
 .rd-fix-action { font-size: 15px; line-height: 1.6; color: var(--l-muted); margin: 2px 0 0; }
+
+/* P7 v2 — fix metadata badges + unlocks chips */
+.rd-fixes-v2 { gap: 12px; }
+.rd-fix-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.rd-fix-pill {
+  font-family: var(--rd-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rd-fix-pill-high {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--c-green);
+}
+.rd-fix-pill-medium {
+  background: rgba(245, 166, 35, 0.14);
+  color: var(--c-amber);
+}
+.rd-fix-pill-low {
+  background: rgba(120, 130, 150, 0.12);
+  color: var(--l-muted);
+}
+.rd-fix-pill-easy,
+.rd-fix-pill-moderate,
+.rd-fix-pill-technical {
+  background: rgba(120, 130, 150, 0.12);
+  color: var(--l-muted);
+}
+.rd-fix-pill-foundation {
+  background: rgba(255, 106, 26, 0.12);
+  color: var(--c-orange);
+}
+.rd-fix-unlocks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.rd-fix-unlocks-k {
+  font-family: var(--rd-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--l-faint);
+  flex: none;
+}
 
 .rd-impl {
   background: var(--d-page);
@@ -806,6 +1127,25 @@
   line-height: 1.55;
   color: #eaf0fb;
   margin: 12px 0 0;
+}
+
+/* P8 — percentile copy above outcome card */
+.rd-action-percentile {
+  font-size: 14px;
+  font-style: italic;
+  color: var(--d-muted);
+  margin: -12px 0 16px;
+}
+
+/* P8 — projected trajectory note inside outcome card */
+.rd-outcome-note {
+  font-size: 13.5px;
+  font-style: italic;
+  color: var(--d-muted);
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--d-border);
+  line-height: 1.5;
 }
 
 /* CTA card — dark Foundation Fix offer (overrides print.css light styling
@@ -966,6 +1306,7 @@
   .rd-page:first-child { break-before: avoid; page-break-before: avoid; }
   /* keep cards/rows from splitting across pages */
   .rd-stat, .rd-callout, .rd-prov, .rd-ev-row, .rd-bar, .rd-issue, .rd-fix,
-  .rd-readiness-strip, .rd-impl, .rd-outcome-card, .rd .cta-card,
+  .rd-readiness-card, .rd-bucket, .rd-fix-pill, .rd-exec-gap,
+  .rd-impl, .rd-outcome-card, .rd .cta-card,
   .rd-interp, .rd-cmi-meta, .rd-matrix { break-inside: avoid; page-break-inside: avoid; }
 }
