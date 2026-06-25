@@ -79,14 +79,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const startOfWindow = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
   const rows = await prisma.auditOrder.findMany({
     where: {
-      createdAt: { gte: startOfWindow },
       businessName: { startsWith: "[CAL]" },
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
     take: 100,
     select: {
       id: true,

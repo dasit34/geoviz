@@ -448,7 +448,7 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
         return;
       }
       if (!data.results?.length) {
-        setCreateError("No [CAL] audits found in the last 24 hours.");
+        setCreateError("No [CAL] calibration audits found.");
         return;
       }
       const recovered: QaEntry[] = data.results.map((r) => ({
@@ -686,10 +686,10 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
               onClick={handleRecoverBatch}
               className="btn-ghost text-sm"
             >
-              Recover Today&apos;s Audits
+              Recover Last Batch
             </button>
             <p className="mt-1 text-xs text-white/40">
-              Loads existing [CAL] orders from the last 24 h — no new audits created, no API spend
+              Loads all existing [CAL] calibration orders — no new audits created, no API spend
             </p>
           </div>
         </form>
