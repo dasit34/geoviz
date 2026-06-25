@@ -67,7 +67,6 @@ const TERMINAL = new Set(["generated", "failed"]);
 const PDF_CONCURRENCY = 2;
 
 // Patterns checked against the fully-rendered HTML (post-normalization).
-// These catch issues the normalizer should have removed but didn't.
 const FORBIDDEN_RENDERED: Array<[RegExp, string]> = [
   [/json-?ld\s+block/i, "json-ld block in rendered HTML"],
   [/\blocalbusiness\b(?!\s+profile)/i, "LocalBusiness in rendered HTML"],
@@ -91,7 +90,10 @@ type SavedBatch = {
   results: QaEntry[];
 };
 
+// Explicitly saved by the operator (persists across New batch).
 const STORAGE_KEY = "geoviz:launch-qa:last-batch";
+// Auto-saved active session (cleared on New batch; restored on refresh).
+const SESSION_KEY = "geoviz:launch-qa:session";
 
 // ── HTML validation ───────────────────────────────────────────────────────────
 
@@ -107,7 +109,6 @@ async function validateReportHtml(orderId: string): Promise<HtmlValidationResult
     }
     const html = await res.text();
 
-    // Count <section class="rd-page ..."> elements (one per report page)
     const pageCount = (html.match(/<section[^>]*\brd-page\b/g) ?? []).length;
     const htmlIssues: string[] = [];
 
@@ -260,10 +261,6 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
         const data = (await res.json()) as PollResponse;
         if (!data.results) return;
 
-        // Collect newly-generated order IDs so we can trigger HTML validation
-        // after the synchronous state update. The toValidate array is populated
-        // as a side effect inside setEntries — intentional, works correctly even
-        // under React strict mode (duplicate calls are idempotent).
         const toValidate: string[] = [];
 
         setEntries((prev) => {
@@ -297,7 +294,6 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
           return next;
         });
 
-        // Kick off HTML validation for newly-generated orders
         for (const orderId of toValidate) {
           validateReportHtml(orderId).then((result) => {
             setEntries((cur) =>
@@ -332,22 +328,45 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
       return;
     }
     const ids = entries.map((e) => e.orderId);
-    poll(ids); // immediate first hit
+    poll(ids);
     pollRef.current = setInterval(() => poll(ids), 5000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [phase, poll]); // entries excluded — snapshot on polling start
 
-  // Load last saved batch from localStorage on mount
+  // ── Persistence ─────────────────────────────────────────────────────────────
+
+  // Restore saved batch + active session on mount.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setSavedBatch(JSON.parse(raw) as SavedBatch);
-    } catch {
-      // corrupted or storage unavailable
-    }
+    } catch {}
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (raw) {
+        const session = JSON.parse(raw) as { entries: QaEntry[]; phase: Phase };
+        if (session.entries?.length > 0) {
+          setEntries(session.entries);
+          // Resume polling if mid-batch; treat everything else as done.
+          const hasActive = session.entries.some((e) => !TERMINAL.has(e.status));
+          setPhase(hasActive && session.phase === "polling" ? "polling" : "done");
+        }
+      }
+    } catch {}
   }, []);
+
+  // Auto-save active session whenever entries or phase change.
+  useEffect(() => {
+    if (entries.length === 0) {
+      try { localStorage.removeItem(SESSION_KEY); } catch {}
+      return;
+    }
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ entries, phase }));
+    } catch {}
+  }, [entries, phase]);
 
   // ── Create ──────────────────────────────────────────────────────────────────
 
@@ -448,6 +467,14 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
     }
   }
 
+  function handleNewBatch() {
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
+    setPhase("idle");
+    setEntries([]);
+    setUrlText("");
+    setSkipped([]);
+  }
+
   // ── PDF check (max 2 concurrent) ────────────────────────────────────────────
 
   async function handleCheckPdfs() {
@@ -508,7 +535,9 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
   const pageFailCount = entries.filter(
     (e) => e.htmlStatus === "fail" && e.pageCount !== 8,
   ).length;
-  const malformedCount = entries.filter((e) => e.malformedTextDetected || e.htmlIssues.length > 0).length;
+  const malformedCount = entries.filter(
+    (e) => e.malformedTextDetected || e.htmlIssues.length > 0,
+  ).length;
   const categoryFallbackCount = entries.filter(
     (e) => e.categoryFallbackDetected,
   ).length;
@@ -522,12 +551,15 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
       e.malformedTextDetected ||
       e.categoryFallbackDetected,
   ).length;
+  const uncheckedPdfs = entries.filter(
+    (e) => e.status === "generated" && e.pdfStatus === "unchecked",
+  ).length;
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div>
-      {/* URL input form */}
+      {/* URL input form — only when idle or creating */}
       {(phase === "idle" || phase === "creating") && (
         <form onSubmit={handleStart} className="card p-6">
           <label className="block">
@@ -558,37 +590,76 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
               <p className="text-sm text-severity-critical">{createError}</p>
             )}
           </div>
-          {savedBatch && (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-md border border-white/10 bg-white/5 p-4">
-              <div>
-                <p className="text-xs text-white/50">Last batch saved</p>
-                <p className="mt-0.5 text-sm font-medium">
-                  {savedBatch.urls.length} URL{savedBatch.urls.length !== 1 ? "s" : ""}
-                  <span className="ml-2 text-xs text-white/40">
-                    {new Date(savedBatch.timestamp).toLocaleString()}
-                  </span>
-                </p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  onClick={handleRerunLastBatch}
-                  disabled={phase === "creating"}
-                  className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  ↺ Rerun Last Batch
-                </button>
-                <button
-                  type="button"
-                  onClick={handleViewLastResults}
-                  className="btn-ghost text-sm"
-                >
-                  View Last Results
-                </button>
-              </div>
-            </div>
-          )}
         </form>
+      )}
+
+      {/* Persistent toolbar — always visible when there is data or a saved batch */}
+      {(entries.length > 0 || savedBatch) && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] px-4 py-3">
+          {entries.length > 0 && (
+            <>
+              <button onClick={handleExportCsv} className="btn-ghost text-sm">
+                Export CSV
+              </button>
+              <button onClick={handleSaveBatch} className="btn-ghost text-sm">
+                {savedFlash ? "Saved ✓" : "Save Batch"}
+              </button>
+            </>
+          )}
+          {savedBatch && (
+            <>
+              <button
+                type="button"
+                onClick={handleRerunLastBatch}
+                disabled={phase === "creating"}
+                className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                ↺ Rerun Last Batch
+              </button>
+              <button
+                type="button"
+                onClick={handleViewLastResults}
+                className="btn-ghost text-sm"
+              >
+                View Last Results
+              </button>
+            </>
+          )}
+          {savedBatch && (
+            <span className="text-xs text-white/40">
+              Saved: {savedBatch.urls.length} URL{savedBatch.urls.length !== 1 ? "s" : ""} ·{" "}
+              {new Date(savedBatch.timestamp).toLocaleString()}
+            </span>
+          )}
+          {phase === "done" && (
+            <>
+              <span className="text-white/20">|</span>
+              <button
+                onClick={handleCheckPdfs}
+                disabled={pdfRunning || uncheckedPdfs === 0}
+                className="btn-primary text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {pdfRunning ? "Generating PDFs…" : "Check PDFs"}
+              </button>
+              {pdfFailCount > 0 && (
+                <span className="text-sm text-severity-critical">
+                  {pdfFailCount} PDF failure(s)
+                </span>
+              )}
+              {categoryFallbackCount > 0 && (
+                <span className="text-sm text-severity-warning">
+                  {categoryFallbackCount} category fallback(s)
+                </span>
+              )}
+              <button
+                onClick={handleNewBatch}
+                className="text-sm text-white/50 hover:text-white"
+              >
+                New batch
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       {/* Skipped URLs */}
@@ -639,52 +710,6 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
                   </p>
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* Action buttons */}
-          {phase === "done" && (
-            <div className="mb-5 flex flex-wrap items-center gap-3">
-              <button
-                onClick={handleCheckPdfs}
-                disabled={
-                  pdfRunning ||
-                  entries.filter(
-                    (e) =>
-                      e.status === "generated" && e.pdfStatus === "unchecked",
-                  ).length === 0
-                }
-                className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {pdfRunning ? "Generating PDFs…" : "Check PDFs"}
-              </button>
-              {pdfFailCount > 0 && (
-                <span className="text-sm text-severity-critical">
-                  {pdfFailCount} PDF failure(s)
-                </span>
-              )}
-              {categoryFallbackCount > 0 && (
-                <span className="text-sm text-severity-warning">
-                  {categoryFallbackCount} category fallback(s)
-                </span>
-              )}
-              <button onClick={handleExportCsv} className="btn-ghost">
-                Export CSV
-              </button>
-              <button onClick={handleSaveBatch} className="btn-ghost">
-                {savedFlash ? "Saved ✓" : "Save Batch"}
-              </button>
-              <button
-                onClick={() => {
-                  setPhase("idle");
-                  setEntries([]);
-                  setUrlText("");
-                  setSkipped([]);
-                }}
-                className="text-sm text-white/50 hover:text-white"
-              >
-                New batch
-              </button>
             </div>
           )}
 
