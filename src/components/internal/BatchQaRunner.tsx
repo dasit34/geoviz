@@ -236,6 +236,7 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
     [],
   );
   const [pdfRunning, setPdfRunning] = useState(false);
+  const [recheckRunning, setRecheckRunning] = useState(false);
   const [savedBatch, setSavedBatch] = useState<SavedBatch | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -434,6 +435,95 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
     await submitUrls(urls);
   }
 
+  async function handleRecoverBatch() {
+    setCreateError(null);
+    try {
+      const res = await fetch(
+        `/api/internal/recover-batch?key=${adminKey}`,
+        { headers: { "x-admin-secret": adminKey } },
+      );
+      const data = (await res.json()) as { results?: PollResponse["results"]; total?: number; error?: string };
+      if (!res.ok || data.error) {
+        setCreateError(data.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      if (!data.results?.length) {
+        setCreateError("No [CAL] audits found in the last 24 hours.");
+        return;
+      }
+      const recovered: QaEntry[] = data.results.map((r) => ({
+        ...r,
+        pdfStatus: "unchecked" as PdfStatus,
+        htmlStatus: "unchecked" as HtmlStatus,
+        pageCount: null,
+        htmlIssues: [],
+        categoryFallbackDetected: false,
+      }));
+      setEntries(recovered);
+      setSkipped([]);
+      setPhase("done");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Network error";
+      setCreateError(msg);
+    }
+  }
+
+  async function handleRecheckReports() {
+    setRecheckRunning(true);
+    const generated = entries.filter((e) => e.status === "generated");
+
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.status === "generated"
+          ? { ...e, htmlStatus: "checking", pageCount: null,
+              htmlIssues: [], categoryFallbackDetected: false, pdfStatus: "unchecked" }
+          : e,
+      ),
+    );
+
+    // HTML — concurrent
+    await Promise.all(
+      generated.map(async (entry) => {
+        const result = await validateReportHtml(entry.orderId);
+        setEntries((cur) =>
+          cur.map((ce) =>
+            ce.orderId === entry.orderId
+              ? { ...ce,
+                  htmlStatus: result.htmlIssues.length === 0 ? "pass" : "fail",
+                  pageCount: result.pageCount,
+                  htmlIssues: result.htmlIssues,
+                  categoryFallbackDetected: result.categoryFallbackDetected,
+                }
+              : ce,
+          ),
+        );
+      }),
+    );
+
+    // PDF — inlined (uses `generated` snapshot, avoids stale `entries` closure)
+    setPdfRunning(true);
+    for (let i = 0; i < generated.length; i += PDF_CONCURRENCY) {
+      const batch = generated.slice(i, i + PDF_CONCURRENCY);
+      setEntries((prev) =>
+        prev.map((e) =>
+          batch.some((b) => b.orderId === e.orderId) ? { ...e, pdfStatus: "generating" } : e,
+        ),
+      );
+      await Promise.all(
+        batch.map(async (entry) => {
+          const next = await fetch(`/api/report/${entry.orderId}/pdf`)
+            .then((r) => (r.ok ? "pass" : "fail"))
+            .catch(() => "fail") as PdfStatus;
+          setEntries((prev) =>
+            prev.map((e) => e.orderId === entry.orderId ? { ...e, pdfStatus: next } : e),
+          );
+        }),
+      );
+    }
+    setPdfRunning(false);
+    setRecheckRunning(false);
+  }
+
   async function handleRerunLastBatch() {
     if (!savedBatch) return;
     setPhase("creating");
@@ -590,6 +680,18 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
               <p className="text-sm text-severity-critical">{createError}</p>
             )}
           </div>
+          <div className="mt-5 border-t border-white/10 pt-4">
+            <button
+              type="button"
+              onClick={handleRecoverBatch}
+              className="btn-ghost text-sm"
+            >
+              Recover Today&apos;s Audits
+            </button>
+            <p className="mt-1 text-xs text-white/40">
+              Loads existing [CAL] orders from the last 24 h — no new audits created, no API spend
+            </p>
+          </div>
         </form>
       )}
 
@@ -615,6 +717,7 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
                 className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
               >
                 ↺ Rerun Last Batch
+                <span className="ml-1 text-[10px] text-white/40">(new audits)</span>
               </button>
               <button
                 type="button"
@@ -634,6 +737,13 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
           {phase === "done" && (
             <>
               <span className="text-white/20">|</span>
+              <button
+                onClick={handleRecheckReports}
+                disabled={recheckRunning || completed === 0}
+                className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {recheckRunning ? "Re-checking…" : "Re-check Reports"}
+              </button>
               <button
                 onClick={handleCheckPdfs}
                 disabled={pdfRunning || uncheckedPdfs === 0}
