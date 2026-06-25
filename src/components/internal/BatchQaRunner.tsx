@@ -16,6 +16,8 @@ type QaEntry = {
   score: number | null;
   band: string | null;
   reportUrl: string;
+  printUrl: string;   // /report/{id}/print — Puppeteer surface, QA target
+  pdfUrl: string;     // /api/report/{id}/pdf — PDF download link
   // server-side signals (from reportMarkdown)
   modelFailures: number;
   malformedTextDetected: boolean;
@@ -352,7 +354,13 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
       if (raw) {
         const session = JSON.parse(raw) as { entries: QaEntry[]; phase: Phase; batchId?: string };
         if (session.entries?.length > 0) {
-          setEntries(session.entries);
+          // Back-fill printUrl / pdfUrl for sessions saved before these fields existed.
+          const restoredEntries: QaEntry[] = session.entries.map((e: QaEntry) => ({
+            ...e,
+            printUrl: e.printUrl ?? `${e.reportUrl}/print`,
+            pdfUrl: e.pdfUrl ?? `/api/report/${e.orderId}/pdf`,
+          }));
+          setEntries(restoredEntries);
           if (session.batchId) setActiveBatchId(session.batchId);
           // Resume polling if mid-batch; treat everything else as done.
           const hasActive = session.entries.some((e) => !TERMINAL.has(e.status));
@@ -407,6 +415,8 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
         score: null,
         band: null,
         reportUrl: `/report/${id}`,
+        printUrl: `/report/${id}/print`,
+        pdfUrl: `/api/report/${id}/pdf`,
         modelFailures: 0,
         malformedTextDetected: false,
         validationIssues: [],
@@ -458,6 +468,8 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
       }
       const recovered: QaEntry[] = data.results.map((r) => ({
         ...r,
+        printUrl: `${r.reportUrl}/print`,
+        pdfUrl: `/api/report/${r.orderId}/pdf`,
         pdfStatus: "unchecked" as PdfStatus,
         htmlStatus: "unchecked" as HtmlStatus,
         pageCount: null,
@@ -751,6 +763,19 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
             <>
               <span className="text-white/20">|</span>
               <button
+                onClick={() => {
+                  entries
+                    .filter((e) => e.status === "generated")
+                    .forEach((e, i) => {
+                      setTimeout(() => window.open(e.printUrl, "_blank"), i * 150);
+                    });
+                }}
+                disabled={completed === 0}
+                className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Open All HTML ({completed})
+              </button>
+              <button
                 onClick={handleRecheckReports}
                 disabled={recheckRunning || completed === 0}
                 className="btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-50"
@@ -874,7 +899,7 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
                         <div className="max-w-[200px]">
                           {e.status === "generated" ? (
                             <a
-                              href={e.reportUrl}
+                              href={e.printUrl}
                               target="_blank"
                               rel="noreferrer"
                               className="block truncate font-mono text-xs text-accent hover:underline"
@@ -919,7 +944,21 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
                       <td className="px-3 py-3 text-center">{pagesBadge(e)}</td>
 
                       {/* PDF */}
-                      <td className="px-3 py-3 text-center">{pdfBadge(e.pdfStatus)}</td>
+                      <td className="px-3 py-3 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          {pdfBadge(e.pdfStatus)}
+                          {e.status === "generated" && (
+                            <a
+                              href={e.pdfUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[10px] text-accent/70 hover:text-accent hover:underline"
+                            >
+                              ↓ PDF
+                            </a>
+                          )}
+                        </div>
+                      </td>
 
                       {/* Category fallback */}
                       <td className="px-3 py-3 text-center">{catFallbackBadge(e)}</td>
