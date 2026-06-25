@@ -8,16 +8,34 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/internal/recover-batch
+ * GET /api/internal/recover-batch[?batchId=lqa_...]
  *
- * Finds [CAL] calibration orders created in the last 24 hours and returns
- * them in the same QaResult shape as the batch-qa polling endpoint.
+ * Returns [CAL] calibration orders so the operator can reload a completed
+ * Launch QA batch after a page refresh without creating new audits.
  *
- * Purpose: lets the operator reload a completed batch after a page refresh
- * without creating new audits or spending API budget.
+ * Priority:
+ * 1. If ?batchId= is supplied, return exactly those orders.
+ * 2. Else, find the most-recent calibrationBatchId and return all its orders.
+ * 3. Fallback (legacy orders without a batchId): return the most-recent 100
+ *    [CAL] orders by createdAt desc.
  *
  * Auth: x-admin-secret header or ?key= query param.
  */
+
+const SELECT = {
+  id: true,
+  websiteUrl: true,
+  businessName: true,
+  calibrationBatchId: true,
+  createdAt: true,
+  reportStatus: true,
+  reportMarkdown: true,
+  reportError: true,
+  failureReason: true,
+  intelligence: {
+    select: { deterministicScore: true, aiValidations: true },
+  },
+} as const;
 
 const FORBIDDEN_QA: Array<[RegExp, string]> = [
   [/json-?ld\s+block/i, "json-ld block"],
@@ -66,40 +84,21 @@ function countModelFailures(aiValidations: unknown): number {
   return 0;
 }
 
-export async function GET(req: Request) {
-  const limited = applyApiRateLimit({
-    req,
-    routeKey: "api:internal:recover-batch",
-    limit: 300,
-    windowMs: 5 * 60_000,
-  });
-  if (limited) return limited;
+type RowSelect = {
+  id: string;
+  websiteUrl: string;
+  businessName: string | null;
+  calibrationBatchId: string | null;
+  createdAt: Date;
+  reportStatus: string;
+  reportMarkdown: string | null;
+  reportError: string | null;
+  failureReason: string | null;
+  intelligence: { deterministicScore: unknown; aiValidations: unknown } | null;
+};
 
-  if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const rows = await prisma.auditOrder.findMany({
-    where: {
-      businessName: { startsWith: "[CAL]" },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    select: {
-      id: true,
-      websiteUrl: true,
-      businessName: true,
-      reportStatus: true,
-      reportMarkdown: true,
-      reportError: true,
-      failureReason: true,
-      intelligence: {
-        select: { deterministicScore: true, aiValidations: true },
-      },
-    },
-  });
-
-  const results = rows.map((row) => {
+function mapRows(rows: RowSelect[]) {
+  return rows.map((row) => {
     const isGenerated = row.reportStatus === "generated";
     const isFailed = row.reportStatus === "failed";
 
@@ -136,8 +135,72 @@ export async function GET(req: Request) {
       malformedTextDetected,
       validationIssues,
       error,
+      calibrationBatchId: row.calibrationBatchId,
+      createdAt: row.createdAt.toISOString(),
     };
   });
+}
 
-  return NextResponse.json({ results, total: rows.length });
+export async function GET(req: Request) {
+  const limited = applyApiRateLimit({
+    req,
+    routeKey: "api:internal:recover-batch",
+    limit: 300,
+    windowMs: 5 * 60_000,
+  });
+  if (limited) return limited;
+
+  if (!isValidAdminKey(readAdminKeyFromRequest(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const batchIdParam = searchParams.get("batchId");
+
+  let rows: RowSelect[];
+  let resolvedBatchId: string | null = null;
+
+  if (batchIdParam) {
+    // Explicit batchId — return exactly those orders
+    rows = await prisma.auditOrder.findMany({
+      where: { calibrationBatchId: batchIdParam },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      select: SELECT,
+    });
+    resolvedBatchId = batchIdParam;
+  } else {
+    // Find the most-recent batch that has a batchId
+    const latest = await prisma.auditOrder.findFirst({
+      where: {
+        businessName: { startsWith: "[CAL]" },
+        calibrationBatchId: { not: null },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { calibrationBatchId: true },
+    });
+
+    if (latest?.calibrationBatchId) {
+      rows = await prisma.auditOrder.findMany({
+        where: { calibrationBatchId: latest.calibrationBatchId },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+        select: SELECT,
+      });
+      resolvedBatchId = latest.calibrationBatchId;
+    } else {
+      // Legacy fallback: no batchId-tagged orders yet — return the 100
+      // most-recent [CAL] orders (today's batch will be at the top)
+      rows = await prisma.auditOrder.findMany({
+        where: { businessName: { startsWith: "[CAL]" } },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        select: SELECT,
+      });
+      resolvedBatchId = null;
+    }
+  }
+
+  const results = mapRows(rows);
+  return NextResponse.json({ results, total: results.length, batchId: resolvedBatchId });
 }

@@ -77,6 +77,10 @@ model AuditOrder {
   // when the order is healthy / queued / completed. See
   // `src/lib/customer-emails.ts` and `src/lib/customer-failure-mapping.ts`.
   customerFailureNotifiedAt  DateTime?
+  // Groups all AuditOrder rows created by one Launch QA batch submission.
+  // Null on historic rows and customer orders. Populated by the calibration
+  // POST route when queuing a batch via the Launch QA tool.
+  calibrationBatchId         String?
   createdAt                  DateTime      @default(now())
   updatedAt                  DateTime      @updatedAt
 

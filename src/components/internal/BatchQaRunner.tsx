@@ -35,6 +35,7 @@ type CalibrationResponse = {
   queued?: number;
   skipped?: number;
   skippedDetail?: Array<{ url: string; reason: string }>;
+  batchId?: string;
   error?: string;
 };
 
@@ -88,6 +89,7 @@ type SavedBatch = {
   timestamp: string;
   urls: string[];
   results: QaEntry[];
+  batchId?: string;
 };
 
 // Explicitly saved by the operator (persists across New batch).
@@ -239,6 +241,7 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
   const [recheckRunning, setRecheckRunning] = useState(false);
   const [savedBatch, setSavedBatch] = useState<SavedBatch | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function parseUrls(): string[] {
@@ -347,9 +350,10 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
       if (raw) {
-        const session = JSON.parse(raw) as { entries: QaEntry[]; phase: Phase };
+        const session = JSON.parse(raw) as { entries: QaEntry[]; phase: Phase; batchId?: string };
         if (session.entries?.length > 0) {
           setEntries(session.entries);
+          if (session.batchId) setActiveBatchId(session.batchId);
           // Resume polling if mid-batch; treat everything else as done.
           const hasActive = session.entries.some((e) => !TERMINAL.has(e.status));
           setPhase(hasActive && session.phase === "polling" ? "polling" : "done");
@@ -365,9 +369,9 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
       return;
     }
     try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ entries, phase }));
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ entries, phase, batchId: activeBatchId }));
     } catch {}
-  }, [entries, phase]);
+  }, [entries, phase, activeBatchId]);
 
   // ── Create ──────────────────────────────────────────────────────────────────
 
@@ -394,6 +398,7 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
         return;
       }
       setSkipped(data.skippedDetail ?? []);
+      if (data.batchId) setActiveBatchId(data.batchId);
       const initial: QaEntry[] = created.map(({ id, url }) => ({
         orderId: id,
         url,
@@ -442,7 +447,7 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
         `/api/internal/recover-batch?key=${adminKey}`,
         { headers: { "x-admin-secret": adminKey } },
       );
-      const data = (await res.json()) as { results?: PollResponse["results"]; total?: number; error?: string };
+      const data = (await res.json()) as { results?: PollResponse["results"]; total?: number; batchId?: string | null; error?: string };
       if (!res.ok || data.error) {
         setCreateError(data.error ?? `HTTP ${res.status}`);
         return;
@@ -461,6 +466,7 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
       }));
       setEntries(recovered);
       setSkipped([]);
+      if (data.batchId) setActiveBatchId(data.batchId);
       setPhase("done");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Network error";
@@ -546,6 +552,7 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
       timestamp: new Date().toISOString(),
       urls: entries.map((e) => e.url),
       results: entries,
+      batchId: activeBatchId ?? undefined,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(batch));
@@ -563,6 +570,7 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
     setEntries([]);
     setUrlText("");
     setSkipped([]);
+    setActiveBatchId(null);
   }
 
   // ── PDF check (max 2 concurrent) ────────────────────────────────────────────
@@ -732,6 +740,11 @@ export function BatchQaRunner({ adminKey }: { adminKey: string }) {
             <span className="text-xs text-white/40">
               Saved: {savedBatch.urls.length} URL{savedBatch.urls.length !== 1 ? "s" : ""} ·{" "}
               {new Date(savedBatch.timestamp).toLocaleString()}
+            </span>
+          )}
+          {activeBatchId && (
+            <span className="font-mono text-xs text-white/30" title="Batch ID">
+              {activeBatchId}
             </span>
           )}
           {phase === "done" && (

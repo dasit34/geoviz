@@ -188,6 +188,9 @@ export async function POST(req: Request) {
   const created: Array<{ id: string; url: string }> = [];
   const skipped: Array<{ url: string; reason: string }> = [];
   const now = new Date();
+  // One batchId per POST — groups all orders from this Launch QA submission
+  // so Recover Last Batch can return exactly this set without a time window.
+  const batchId = `lqa_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 
   for (const rawUrl of cleaned) {
     let websiteUrl: string;
@@ -232,6 +235,7 @@ export async function POST(req: Request) {
           reportStatus: "queued",
           reportQueuedAt: now,
           adminNotes: calNotes,
+          calibrationBatchId: batchId,
         },
       });
       created.push({ id: order.id, url: websiteUrl });
@@ -269,6 +273,7 @@ export async function POST(req: Request) {
     skipped: skipped.length,
     created,
     skippedDetail: skipped,
+    batchId,
   });
 }
 
