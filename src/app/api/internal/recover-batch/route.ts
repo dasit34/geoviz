@@ -189,14 +189,32 @@ export async function GET(req: Request) {
       });
       resolvedBatchId = latest.calibrationBatchId;
     } else {
-      // Legacy fallback: no batchId-tagged orders yet — return the 100
-      // most-recent [CAL] orders (today's batch will be at the top)
-      rows = await prisma.auditOrder.findMany({
+      // Legacy fallback (orders pre-date batchId): time-cluster around the
+      // most-recent [CAL] order. All orders in one batch submission land
+      // within milliseconds of each other; a 10-minute window reliably
+      // captures exactly that batch without pulling in older batches.
+      const latestOrder = await prisma.auditOrder.findFirst({
         where: { businessName: { startsWith: "[CAL]" } },
         orderBy: { createdAt: "desc" },
-        take: 100,
-        select: SELECT,
+        select: { createdAt: true },
       });
+
+      if (latestOrder) {
+        const clusterStart = new Date(
+          latestOrder.createdAt.getTime() - 10 * 60 * 1000,
+        );
+        rows = await prisma.auditOrder.findMany({
+          where: {
+            businessName: { startsWith: "[CAL]" },
+            createdAt: { gte: clusterStart },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 200,
+          select: SELECT,
+        });
+      } else {
+        rows = [];
+      }
       resolvedBatchId = null;
     }
   }
