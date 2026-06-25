@@ -398,6 +398,13 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
     null,
   );
 
+  // Toast notifications
+  const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+  function showToast(msg: string, type: "ok" | "err" = "ok") {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  }
+
   // ── Load batch list ──────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -540,6 +547,10 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
       const htmlFail = snapshot.filter((e) => e.htmlStatus === "fail").length;
       const pdfPass = snapshot.filter((e) => e.pdfStatus === "pass").length;
       const pdfFail = snapshot.filter((e) => e.pdfStatus === "fail").length;
+      showToast(
+        `Re-check done — HTML ${htmlPass}✓ ${htmlFail}✗ · PDF ${pdfPass}✓ ${pdfFail}✗`,
+        htmlFail > 0 || pdfFail > 0 ? "err" : "ok",
+      );
       void fetch(`/api/admin/report-qa/recheck-log?key=${adminKey}`, {
         method: "POST",
         headers: {
@@ -601,6 +612,9 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
     setRecheckRunning(false);
     setEntries((snap) => {
       setPatterns(detectPatterns(snap));
+      const hp = snap.filter((e) => e.htmlStatus === "pass").length;
+      const hf = snap.filter((e) => e.htmlStatus === "fail").length;
+      showToast(`HTML re-check done — ${hp}✓ ${hf}✗`, hf > 0 ? "err" : "ok");
       return snap;
     });
 
@@ -697,9 +711,14 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
             : e,
         ),
       );
-    } catch {
+      showToast("Saved ✓");
+    } catch (err) {
       setEntries((prev) =>
         prev.map((e) => (e.orderId === orderId ? { ...e, saving: false } : e)),
+      );
+      showToast(
+        `Failed to save${err instanceof Error ? `: ${err.message}` : " — check auth"}`,
+        "err",
       );
     }
   }
@@ -756,9 +775,17 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
   // ── Open all PDFs ────────────────────────────────────────────────────────
 
   function handleOpenAllPdfs() {
-    generatedEntries.forEach((e, i) => {
-      setTimeout(() => window.open(e.pdfUrl, "_blank"), i * 150);
+    let blocked = 0;
+    generatedEntries.forEach((e) => {
+      const win = window.open(e.pdfUrl, "_blank");
+      if (!win) blocked++;
     });
+    if (blocked > 0) {
+      showToast(
+        `${blocked} PDF tab(s) blocked — allow popups for this site`,
+        "err",
+      );
+    }
   }
 
   // ── Export QA Summary ────────────────────────────────────────────────────
@@ -878,6 +905,15 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
   // ── Render ───────────────────────────────────────────────────────────────
 
   const batchSelected = selectedBatchId !== undefined;
+
+  if (!adminKey) {
+    return (
+      <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <strong>Configuration error:</strong> ADMIN_SECRET is not set. Add it to
+        your environment variables — all QA API calls require it.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -1051,14 +1087,18 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
 
             <button
               onClick={() => {
-                entries
-                  .filter((e) => e.status === "generated")
-                  .forEach((e, i) => {
-                    setTimeout(
-                      () => window.open(e.printUrl, "_blank"),
-                      i * 150,
-                    );
-                  });
+                const toOpen = entries.filter((e) => e.status === "generated");
+                let blocked = 0;
+                toOpen.forEach((e) => {
+                  const win = window.open(e.printUrl, "_blank");
+                  if (!win) blocked++;
+                });
+                if (blocked > 0) {
+                  showToast(
+                    `${blocked} tab(s) blocked — allow popups for this site in your browser`,
+                    "err",
+                  );
+                }
               }}
               disabled={generated === 0}
               className="btn-ghost text-sm disabled:opacity-40"
@@ -1716,6 +1756,19 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast notifications */}
+      {toast && (
+        <div
+          className={`fixed bottom-4 right-4 z-[60] max-w-sm rounded-md px-4 py-2.5 text-sm font-medium shadow-lg ${
+            toast.type === "ok"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
+          {toast.msg}
         </div>
       )}
     </div>

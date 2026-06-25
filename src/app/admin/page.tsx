@@ -164,7 +164,10 @@ export default async function AdminPage({
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/internal/launch" className="btn-ghost text-sm">
+            <Link
+              href={`/internal/launch?key=${process.env.ADMIN_SECRET ?? ""}`}
+              className="btn-ghost text-sm"
+            >
               Launch QA
             </Link>
             <Link
