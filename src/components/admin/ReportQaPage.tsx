@@ -50,6 +50,44 @@ type QaEntry = {
 // - Store PDF snapshots to Vercel Blob: `report-snapshots/{orderId}/{timestamp}.pdf`.
 // - Compare page at /admin/report-qa/compare?a={snapshotId}&b={snapshotId}.
 
+// EXTENSION POINT: Audit drift monitoring — store checklist snapshots keyed by
+// {orderId}:{isoDate} in AuditIntelligence.calibrationNotes to detect template regressions.
+// EXTENSION POINT: Before/After comparison — capture pre-regen { pageCount, htmlIssues }
+// snapshot before each re-check; surface diff inline after re-check completes.
+// EXTENSION POINT: Monitoring subscriptions — POST /api/admin/report-qa/subscribe
+// { batchId, alertOn: ["html_fail","pdf_fail","score_change"] } → MonitoringSubscription table.
+
+// ── Checklist ─────────────────────────────────────────────────────────────────
+
+const CHECKLIST_ITEMS = [
+  "Cover page loads and looks professional",
+  "Business name and URL are correct",
+  "Overall score is believable for this site",
+  "Score breakdown adds up to overall score",
+  "Platform analysis section is complete",
+  "Recommendations are specific, not generic",
+  "No duplicate recommendation items",
+  "No broken formatting or layout issues",
+  "Charts and visual elements render correctly",
+  "HTML report renders in browser without errors",
+  "Print view (Ctrl+P) looks correct",
+  "PDF page breaks are clean and logical",
+  "GeoViz branding is consistent throughout",
+  "Report feels worth the $97 paid",
+] as const;
+
+type PatternSummary = {
+  totalIssues: number;
+  topIssues: string[];
+  categoryFallbackCount: number;
+  outlierLow: string[];
+  outlierHigh: string[];
+  missingPageCount: number;
+};
+
+type ReadinessLevel = "ready" | "minor_issues" | "not_ready";
+type ReadinessResult = { level: ReadinessLevel; label: string; reasons: string[] };
+
 // ── Validation helpers ────────────────────────────────────────────────────────
 
 // These patterns mirror the FORBIDDEN_QA list in recover-batch/route.ts.
@@ -156,6 +194,112 @@ function buildCsv(entries: QaEntry[]): string {
   return [headers.map(escape).join(","), ...rows].join("\n");
 }
 
+// ── Checklist + pattern helpers ───────────────────────────────────────────────
+
+function clKey(orderId: string) {
+  return `geoviz:qa-cl:${orderId}`;
+}
+
+function loadChecklist(orderId: string): boolean[] {
+  try {
+    const raw = localStorage.getItem(clKey(orderId));
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (
+        Array.isArray(parsed) &&
+        parsed.length === CHECKLIST_ITEMS.length
+      ) {
+        return parsed as boolean[];
+      }
+    }
+  } catch {}
+  return Array(CHECKLIST_ITEMS.length).fill(false) as boolean[];
+}
+
+function saveChecklist(orderId: string, items: boolean[]): void {
+  try {
+    localStorage.setItem(clKey(orderId), JSON.stringify(items));
+  } catch {}
+}
+
+function detectPatterns(entries: QaEntry[]): PatternSummary {
+  const counts: Record<string, number> = {};
+  let catFallback = 0;
+  let missingPages = 0;
+  const low: string[] = [];
+  const high: string[] = [];
+
+  for (const e of entries) {
+    if (e.status !== "generated") continue;
+    for (const iss of [...e.validationIssues, ...e.htmlIssues]) {
+      counts[iss] = (counts[iss] ?? 0) + 1;
+    }
+    if (e.categoryFallbackDetected) catFallback++;
+    if (e.score !== null && e.score < 20) low.push(e.url);
+    if (e.score !== null && e.score > 80) high.push(e.url);
+    if (
+      e.htmlStatus !== "unchecked" &&
+      e.pageCount !== null &&
+      e.pageCount !== 8
+    ) {
+      missingPages++;
+    }
+  }
+
+  const topIssues = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([iss, n]) => `${iss} (×${n})`);
+
+  return {
+    totalIssues: Object.values(counts).reduce((a, b) => a + b, 0),
+    topIssues,
+    categoryFallbackCount: catFallback,
+    outlierLow: low,
+    outlierHigh: high,
+    missingPageCount: missingPages,
+  };
+}
+
+function computeReadiness(
+  generated: number,
+  reviewed: number,
+  needsFix: number,
+  htmlFail: number,
+  pdfFail: number,
+  auditFailed: number,
+): ReadinessResult {
+  if (generated === 0) {
+    return {
+      level: "not_ready",
+      label: "🔴 Not Ready",
+      reasons: ["No generated reports"],
+    };
+  }
+  const reasons: string[] = [];
+  if (htmlFail > 0) reasons.push(`${htmlFail} HTML failure${htmlFail > 1 ? "s" : ""}`);
+  if (pdfFail > 0) reasons.push(`${pdfFail} PDF failure${pdfFail > 1 ? "s" : ""}`);
+  if (auditFailed > 0) reasons.push(`${auditFailed} audit failure${auditFailed > 1 ? "s" : ""}`);
+  if (needsFix > 0) reasons.push(`${needsFix} need${needsFix > 1 ? "" : "s"} fix`);
+  const unrev = generated - reviewed;
+  if (unrev > 0) reasons.push(`${unrev}/${generated} unreviewed`);
+
+  const critical = htmlFail + pdfFail + auditFailed;
+  const level: ReadinessLevel =
+    critical > 0
+      ? "not_ready"
+      : needsFix > 0 || reviewed < generated
+        ? "minor_issues"
+        : "ready";
+  const label =
+    level === "ready"
+      ? "🟢 Ready to Launch"
+      : level === "minor_issues"
+        ? "🟡 Minor Issues"
+        : "🔴 Not Ready";
+  return { level, label, reasons };
+}
+
 // ── Badges ────────────────────────────────────────────────────────────────────
 
 function htmlBadge(s: HtmlStatus, pageCount: number | null) {
@@ -243,6 +387,17 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
   const [pdfRunning, setPdfRunning] = useState(false);
   const [showRecheckConfirm, setShowRecheckConfirm] = useState(false);
 
+  // QA dashboard state
+  const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
+  const [checklists, setChecklists] = useState<Record<string, boolean[]>>({});
+  const [patterns, setPatterns] = useState<PatternSummary | null>(null);
+  const [showRegenConfirm, setShowRegenConfirm] = useState<
+    "html" | null
+  >(null);
+  const [lastRegeneratedAt, setLastRegeneratedAt] = useState<string | null>(
+    null,
+  );
+
   // ── Load batch list ──────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -272,6 +427,7 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
       setEntries([]);
       setEntriesError(null);
       setFilter("all");
+      setPatterns(null);
       setEntriesLoading(true);
 
       try {
@@ -377,8 +533,9 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
     // PDF check — max 2 concurrent.
     await runPdfChecks(generated.map((e) => e.orderId));
 
-    // Log the summary.
+    // Trigger pattern detection and log the summary.
     setEntries((snapshot) => {
+      setPatterns(detectPatterns(snapshot));
       const htmlPass = snapshot.filter((e) => e.htmlStatus === "pass").length;
       const htmlFail = snapshot.filter((e) => e.htmlStatus === "fail").length;
       const pdfPass = snapshot.filter((e) => e.pdfStatus === "pass").length;
@@ -402,7 +559,67 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
       return snapshot;
     });
 
+    setLastRegeneratedAt(new Date().toISOString());
     setRecheckRunning(false);
+  }
+
+  // ── HTML-only re-check ───────────────────────────────────────────────────
+
+  async function handleRegenHtml() {
+    setShowRegenConfirm(null);
+    setRecheckRunning(true);
+    const start = Date.now();
+    const gen = entries.filter((e) => e.status === "generated");
+
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.status === "generated" ? { ...e, htmlStatus: "checking" } : e,
+      ),
+    );
+
+    await Promise.all(
+      gen.map(async (entry) => {
+        const result = await validateReportHtml(entry.orderId);
+        setEntries((prev) =>
+          prev.map((e) =>
+            e.orderId === entry.orderId
+              ? {
+                  ...e,
+                  htmlStatus:
+                    result.htmlIssues.length === 0 ? "pass" : "fail",
+                  pageCount: result.pageCount,
+                  htmlIssues: result.htmlIssues,
+                  categoryFallbackDetected: result.categoryFallbackDetected,
+                }
+              : e,
+          ),
+        );
+      }),
+    );
+
+    setLastRegeneratedAt(new Date().toISOString());
+    setRecheckRunning(false);
+    setEntries((snap) => {
+      setPatterns(detectPatterns(snap));
+      return snap;
+    });
+
+    void fetch(`/api/admin/report-qa/recheck-log?key=${adminKey}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secret": adminKey,
+      },
+      body: JSON.stringify({
+        batchId: selectedBatchId ?? null,
+        total: gen.length,
+        htmlPass: 0,
+        htmlFail: 0,
+        pdfPass: 0,
+        pdfFail: 0,
+        durationMs: Date.now() - start,
+      }),
+    }).catch(() => {});
   }
 
   // ── PDF-only check ───────────────────────────────────────────────────────
@@ -500,6 +717,99 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
     URL.revokeObjectURL(url);
   }
 
+  // ── Checklist helpers ────────────────────────────────────────────────────
+
+  function getChecklist(orderId: string): boolean[] {
+    return checklists[orderId] ?? loadChecklist(orderId);
+  }
+
+  function toggleChecklistItem(orderId: string, idx: number) {
+    const current = getChecklist(orderId);
+    const next = current.map((v, i) => (i === idx ? !v : v));
+    setChecklists((prev) => ({ ...prev, [orderId]: next }));
+    saveChecklist(orderId, next);
+  }
+
+  // ── Overlay navigation ───────────────────────────────────────────────────
+
+  const generatedEntries = entries.filter((e) => e.status === "generated");
+
+  function openFocused(orderId: string) {
+    setFocusedOrderId(orderId);
+    if (!checklists[orderId]) {
+      setChecklists((prev) => ({
+        ...prev,
+        [orderId]: loadChecklist(orderId),
+      }));
+    }
+  }
+
+  function navFocused(dir: "prev" | "next") {
+    if (!focusedOrderId) return;
+    const idx = generatedEntries.findIndex((e) => e.orderId === focusedOrderId);
+    const next = dir === "prev" ? idx - 1 : idx + 1;
+    if (next >= 0 && next < generatedEntries.length) {
+      openFocused(generatedEntries[next].orderId);
+    }
+  }
+
+  // ── Open all PDFs ────────────────────────────────────────────────────────
+
+  function handleOpenAllPdfs() {
+    generatedEntries.forEach((e, i) => {
+      setTimeout(() => window.open(e.pdfUrl, "_blank"), i * 150);
+    });
+  }
+
+  // ── Export QA Summary ────────────────────────────────────────────────────
+
+  function handleExportQaSummary() {
+    const lines = [
+      "GeoViz Report QA Summary",
+      `Batch: ${selectedBatchId ?? "Legacy"}`,
+      `Exported: ${new Date().toISOString()}`,
+      lastRegeneratedAt ? `Last Re-check: ${lastRegeneratedAt}` : "",
+      "",
+      "URL,Score,Band,HTML,PDF,Review,Checklist,Issues",
+      ...entries.map((e) => {
+        const cl = getChecklist(e.orderId);
+        const done = cl.filter(Boolean).length;
+        return [
+          e.url,
+          e.score ?? "",
+          e.band ?? "",
+          e.htmlStatus,
+          e.pdfStatus,
+          e.reviewStatus,
+          `${done}/${CHECKLIST_ITEMS.length}`,
+          [...e.validationIssues, ...e.htmlIssues].join("; "),
+        ]
+          .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+          .join(",");
+      }),
+      ...(patterns
+        ? [
+            "",
+            "# Pattern Summary",
+            `Total issues: ${patterns.totalIssues}`,
+            `Category fallbacks: ${patterns.categoryFallbackCount}`,
+            `Wrong page count: ${patterns.missingPageCount}`,
+            "Top issues:",
+            ...patterns.topIssues.map((i) => `  - ${i}`),
+          ]
+        : []),
+    ];
+    const blob = new Blob([lines.filter(Boolean).join("\n")], {
+      type: "text/plain;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `qa-summary-${selectedBatchId ?? "legacy"}-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ── Filtering ────────────────────────────────────────────────────────────
 
   const filteredEntries = entries.filter((e) => {
@@ -525,26 +835,67 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
   const htmlFail = entries.filter((e) => e.htmlStatus === "fail").length;
   const pdfFail = entries.filter((e) => e.pdfStatus === "fail").length;
 
+  // Extended KPI stats
+  const passed = entries.filter(
+    (e) =>
+      e.reviewStatus === "approved" &&
+      e.htmlStatus === "pass" &&
+      e.pdfStatus === "pass",
+  ).length;
+  const dataIssues = entries.filter(
+    (e) => e.malformedTextDetected || e.validationIssues.length > 0,
+  ).length;
+  const templateIssues = entries.filter(
+    (e) => e.htmlIssues.length > 0 || e.categoryFallbackDetected,
+  ).length;
+  const scores = entries
+    .filter((e) => e.score !== null)
+    .map((e) => e.score!);
+  const avgScore =
+    scores.length
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : null;
+  const highScore = scores.length ? Math.max(...scores) : null;
+  const lowScore = scores.length ? Math.min(...scores) : null;
+  const readiness = computeReadiness(
+    generated,
+    reviewed,
+    needsFix,
+    htmlFail,
+    pdfFail,
+    failed,
+  );
+
+  // ── Focused entry ────────────────────────────────────────────────────────
+
+  const focusedEntry = focusedOrderId
+    ? (entries.find((e) => e.orderId === focusedOrderId) ?? null)
+    : null;
+  const focusedIdx = focusedOrderId
+    ? generatedEntries.findIndex((e) => e.orderId === focusedOrderId)
+    : -1;
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   const batchSelected = selectedBatchId !== undefined;
 
   return (
-    <div className="space-y-8">
-      {/* ── Safety banner ── */}
-      <div className="flex flex-wrap items-center gap-4 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm">
-        <span className="font-medium text-emerald-300">
-          Template QA loop — no LLM calls
-        </span>
-        <span className="pill bg-emerald-500/10 text-emerald-400 text-xs">
-          0 LLM calls estimated
-        </span>
-        <span className="pill bg-emerald-500/10 text-emerald-400 text-xs">
-          0 new AuditOrder records
-        </span>
-        <span className="pill bg-emerald-500/10 text-emerald-400 text-xs">
-          PDFs regenerated from existing audit data
-        </span>
+    <div className="space-y-6">
+      {/* ── Audit Safety ── */}
+      <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-5 py-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">
+          Audit Safety
+        </p>
+        <div className="mt-3 flex flex-wrap items-end gap-8">
+          <SafetyMetric label="LLM Calls" value="0" />
+          <SafetyMetric label="New Audit Orders" value="0" />
+          <SafetyMetric label="Worker Jobs" value="0" />
+          <span className="self-center text-xs text-white/40">
+            All actions re-render from stored{" "}
+            <code className="pill bg-white/5 text-[10px]">reportMarkdown</code>{" "}
+            only
+          </span>
+        </div>
       </div>
 
       {/* ── Batch list ── */}
@@ -611,9 +962,81 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
 
       {/* ── Batch detail ── */}
       {batchSelected && (
-        <section>
+        <section className="space-y-4">
+          {/* Launch Readiness */}
+          {entries.length > 0 && (
+            <div
+              className={`rounded-md border px-4 py-3 text-sm ${
+                readiness.level === "ready"
+                  ? "border-emerald-500/30 bg-emerald-500/5"
+                  : readiness.level === "minor_issues"
+                    ? "border-amber-400/30 bg-amber-400/5"
+                    : "border-red-500/30 bg-red-500/5"
+              }`}
+            >
+              <p className="font-semibold">{readiness.label}</p>
+              {readiness.reasons.length > 0 && (
+                <ul className="mt-1 flex flex-wrap gap-3">
+                  {readiness.reasons.map((r, i) => (
+                    <li key={i} className="text-xs text-white/60">
+                      • {r}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* Pattern Summary — appears after a re-check */}
+          {patterns && patterns.totalIssues > 0 && (
+            <div className="rounded-md border border-white/10 bg-white/[0.02] px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
+                Batch Pattern Detection
+              </p>
+              <div className="mt-2 grid gap-2 text-xs sm:grid-cols-4">
+                <div>
+                  <p className="text-white/40">Total issues</p>
+                  <p className="mono-data text-white/80">
+                    {patterns.totalIssues}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-white/40">Category fallbacks</p>
+                  <p className="mono-data text-white/80">
+                    {patterns.categoryFallbackCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-white/40">Wrong page count</p>
+                  <p className="mono-data text-white/80">
+                    {patterns.missingPageCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-white/40">Outlier scores</p>
+                  <p className="mono-data text-white/80">
+                    {patterns.outlierLow.length} low /{" "}
+                    {patterns.outlierHigh.length} high
+                  </p>
+                </div>
+              </div>
+              {patterns.topIssues.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {patterns.topIssues.map((iss, i) => (
+                    <span
+                      key={i}
+                      className="pill bg-severity-warning/10 text-severity-warning text-[10px]"
+                    >
+                      {iss}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Toolbar */}
-          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] px-4 py-3">
             <button
               onClick={() => setSelectedBatchId(undefined)}
               className="text-sm text-white/50 hover:text-white"
@@ -631,7 +1054,10 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
                 entries
                   .filter((e) => e.status === "generated")
                   .forEach((e, i) => {
-                    setTimeout(() => window.open(e.printUrl, "_blank"), i * 150);
+                    setTimeout(
+                      () => window.open(e.printUrl, "_blank"),
+                      i * 150,
+                    );
                   });
               }}
               disabled={generated === 0}
@@ -641,11 +1067,27 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
             </button>
 
             <button
+              onClick={handleOpenAllPdfs}
+              disabled={generated === 0}
+              className="btn-ghost text-sm disabled:opacity-40"
+            >
+              Open All PDFs ({generated})
+            </button>
+
+            <button
+              onClick={() => setShowRegenConfirm("html")}
+              disabled={recheckRunning || generated === 0}
+              className="btn-ghost text-sm disabled:opacity-40"
+            >
+              Regen HTML
+            </button>
+
+            <button
               onClick={() => setShowRecheckConfirm(true)}
               disabled={recheckRunning || generated === 0}
               className="btn-ghost text-sm disabled:opacity-40"
             >
-              {recheckRunning ? "Re-checking…" : "Re-check Reports"}
+              {recheckRunning ? "Running…" : "Regen Both"}
             </button>
 
             <button
@@ -663,9 +1105,50 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
             >
               Export CSV
             </button>
+
+            <button
+              onClick={handleExportQaSummary}
+              disabled={entries.length === 0}
+              className="btn-ghost text-sm disabled:opacity-40"
+            >
+              Export QA Summary
+            </button>
           </div>
 
-          {/* Re-check confirmation modal */}
+          {/* Regen HTML confirmation modal */}
+          {showRegenConfirm === "html" && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+              <div className="card w-full max-w-md space-y-4 p-6">
+                <h3 className="h3">Confirm HTML Re-render</h3>
+                <p className="text-sm text-white/70">
+                  Re-fetches HTML for{" "}
+                  <span className="font-semibold text-white">{generated}</span>{" "}
+                  reports. PDFs are unchanged.
+                </p>
+                <ul className="space-y-1 text-sm">
+                  <SafetyItem label="LLM calls" value="0" ok />
+                  <SafetyItem label="New AuditOrder records" value="0" ok />
+                  <SafetyItem label="PDF regeneration" value="skipped" ok />
+                </ul>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setShowRegenConfirm(null)}
+                    className="btn-ghost text-sm flex-1"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => void handleRegenHtml()}
+                    className="btn-primary text-sm flex-1"
+                  >
+                    Confirm HTML Only
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Re-check (both) confirmation modal */}
           {showRecheckConfirm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
               <div className="card w-full max-w-md space-y-4 p-6">
@@ -704,27 +1187,77 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
 
           {/* Loading / error */}
           {entriesLoading && (
-            <p className="muted text-sm py-8 text-center">
-              Loading batch…
-            </p>
+            <p className="muted py-8 text-center text-sm">Loading batch…</p>
           )}
           {entriesError && (
-            <p className="text-sm text-severity-critical py-4">{entriesError}</p>
+            <p className="py-4 text-sm text-severity-critical">
+              {entriesError}
+            </p>
           )}
 
           {!entriesLoading && entries.length > 0 && (
             <>
-              {/* KPI row */}
-              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-                {[
-                  { label: "Total", value: entries.length, tone: "" },
-                  { label: "Generated", value: generated, tone: generated === entries.length ? "text-emerald-300" : "text-severity-warning" },
-                  { label: "Failed", value: failed, tone: failed > 0 ? "text-severity-critical" : "text-white/40" },
-                  { label: "Reviewed", value: reviewed, tone: reviewed > 0 ? "text-emerald-300" : "text-white/40" },
-                  { label: "Needs Fix", value: needsFix, tone: needsFix > 0 ? "text-severity-warning" : "text-white/40" },
-                  { label: "HTML ✗", value: htmlFail, tone: htmlFail > 0 ? "text-severity-critical" : "text-white/40" },
-                  { label: "PDF ✗", value: pdfFail, tone: pdfFail > 0 ? "text-severity-critical" : "text-white/40" },
-                ].map((k) => (
+              {/* KPI row — 11 stats */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11">
+                {(
+                  [
+                    { label: "Total", value: entries.length, tone: "" },
+                    {
+                      label: "Generated",
+                      value: generated,
+                      tone:
+                        generated === entries.length
+                          ? "text-emerald-300"
+                          : "text-severity-warning",
+                    },
+                    {
+                      label: "Failed",
+                      value: failed,
+                      tone:
+                        failed > 0
+                          ? "text-severity-critical"
+                          : "text-white/40",
+                    },
+                    {
+                      label: "Reviewed",
+                      value: reviewed,
+                      tone:
+                        reviewed > 0 ? "text-emerald-300" : "text-white/40",
+                    },
+                    {
+                      label: "Passed",
+                      value: passed,
+                      tone: passed > 0 ? "text-emerald-300" : "text-white/40",
+                    },
+                    {
+                      label: "Needs Fix",
+                      value: needsFix,
+                      tone:
+                        needsFix > 0
+                          ? "text-severity-warning"
+                          : "text-white/40",
+                    },
+                    {
+                      label: "Data Issues",
+                      value: dataIssues,
+                      tone:
+                        dataIssues > 0
+                          ? "text-severity-warning"
+                          : "text-white/40",
+                    },
+                    {
+                      label: "Tmpl Issues",
+                      value: templateIssues,
+                      tone:
+                        templateIssues > 0
+                          ? "text-severity-warning"
+                          : "text-white/40",
+                    },
+                    { label: "Avg Score", value: avgScore ?? "—", tone: "" },
+                    { label: "High", value: highScore ?? "—", tone: "" },
+                    { label: "Low", value: lowScore ?? "—", tone: "" },
+                  ] as Array<{ label: string; value: number | string; tone: string }>
+                ).map((k) => (
                   <div
                     key={k.label}
                     className="rounded-md border border-white/10 bg-white/[0.02] px-3 py-3"
@@ -732,7 +1265,9 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
                     <p className="text-xs uppercase tracking-wide text-white/40">
                       {k.label}
                     </p>
-                    <p className={`mono-data mt-1 text-xl font-semibold ${k.tone}`}>
+                    <p
+                      className={`mono-data mt-1 text-xl font-semibold ${k.tone}`}
+                    >
                       {k.value}
                     </p>
                   </div>
@@ -740,7 +1275,7 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
               </div>
 
               {/* Filter chips */}
-              <div className="mb-4 flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
                 {(
                   [
                     ["all", "All"],
@@ -775,15 +1310,18 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
                       <th className="px-3 py-3 text-center">HTML</th>
                       <th className="px-3 py-3 text-center">PDF</th>
                       <th className="px-3 py-3 text-center">Review</th>
+                      <th className="px-3 py-3 text-center">Checklist</th>
                       <th className="px-3 py-3 text-left">Issues</th>
-                      <th className="px-3 py-3 text-left min-w-[220px]">Note</th>
+                      <th className="px-3 py-3 text-left min-w-[220px]">
+                        Note
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {filteredEntries.length === 0 && (
                       <tr>
                         <td
-                          colSpan={7}
+                          colSpan={8}
                           className="px-3 py-8 text-center text-sm text-white/40"
                         >
                           No reports match this filter.
@@ -797,8 +1335,8 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
                           e.reviewStatus === "needs_changes"
                             ? "bg-severity-warning/5"
                             : e.htmlStatus === "fail" || e.pdfStatus === "fail"
-                            ? "bg-severity-critical/5"
-                            : ""
+                              ? "bg-severity-critical/5"
+                              : ""
                         }
                       >
                         {/* Business / URL */}
@@ -901,6 +1439,35 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
                           </div>
                         </td>
 
+                        {/* Checklist */}
+                        <td className="px-3 py-3 text-center">
+                          {e.status === "generated" ? (
+                            (() => {
+                              const cl = getChecklist(e.orderId);
+                              const done = cl.filter(Boolean).length;
+                              const complete =
+                                done === CHECKLIST_ITEMS.length;
+                              return (
+                                <button
+                                  onClick={() => openFocused(e.orderId)}
+                                  className={`pill cursor-pointer text-[10px] hover:bg-white/10 ${
+                                    complete
+                                      ? "bg-emerald-500/15 text-emerald-300"
+                                      : done > 0
+                                        ? "bg-accent/10 text-accent"
+                                        : "bg-white/5 text-white/40"
+                                  }`}
+                                >
+                                  {done}/{CHECKLIST_ITEMS.length}
+                                  {complete ? " ✓" : ""}
+                                </button>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-white/20">—</span>
+                          )}
+                        </td>
+
                         {/* Issues */}
                         <td className="max-w-[180px] px-3 py-3">
                           {[
@@ -962,6 +1529,195 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
           )}
         </section>
       )}
+
+      {/* ── Focused report overlay ── */}
+      {focusedEntry && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 px-4 py-8">
+          <div className="card w-full max-w-2xl space-y-5">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-mono text-xs text-white/40">
+                  {focusedEntry.url}
+                </p>
+                <p className="mt-1 text-sm text-white/70">
+                  {focusedEntry.businessName?.replace(/^\[CAL\]\s*/, "") ?? "—"}
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {focusedEntry.score !== null && (
+                    <span className="mono-data text-lg font-semibold">
+                      {focusedEntry.score}
+                    </span>
+                  )}
+                  {focusedEntry.band && (
+                    <span className="pill bg-white/5 text-xs">
+                      {focusedEntry.band}
+                    </span>
+                  )}
+                  {reviewBadge(focusedEntry.reviewStatus)}
+                </div>
+              </div>
+              <button
+                onClick={() => setFocusedOrderId(null)}
+                className="shrink-0 text-xl text-white/40 hover:text-white"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quick links */}
+            <div className="flex flex-wrap gap-2 text-xs">
+              <a
+                href={focusedEntry.printUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="pill bg-white/5 hover:bg-white/10"
+              >
+                Open HTML ↗
+              </a>
+              <a
+                href={focusedEntry.pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="pill bg-white/5 hover:bg-white/10"
+              >
+                Open PDF ↗
+              </a>
+              <span className="pill bg-white/5 text-white/30">
+                {htmlBadge(focusedEntry.htmlStatus, focusedEntry.pageCount)}
+              </span>
+              <span className="pill bg-white/5 text-white/30">
+                {pdfBadge(focusedEntry.pdfStatus)}
+              </span>
+            </div>
+
+            {/* Checklist + Notes */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">
+                  Checklist —{" "}
+                  {getChecklist(focusedEntry.orderId).filter(Boolean).length}/
+                  {CHECKLIST_ITEMS.length}
+                </p>
+                <ul className="space-y-2">
+                  {CHECKLIST_ITEMS.map((item, i) => (
+                    <li key={i}>
+                      <label className="flex cursor-pointer items-start gap-2 text-xs text-white/70 hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={
+                            getChecklist(focusedEntry.orderId)[i] ?? false
+                          }
+                          onChange={() =>
+                            toggleChecklistItem(focusedEntry.orderId, i)
+                          }
+                          className="mt-0.5 accent-accent"
+                        />
+                        {item}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">
+                  Notes
+                </p>
+                <textarea
+                  value={focusedEntry.noteDraft}
+                  rows={9}
+                  placeholder="Admin note…"
+                  disabled={focusedEntry.saving}
+                  onChange={(ev) => {
+                    const draft = ev.target.value;
+                    setEntries((prev) =>
+                      prev.map((en) =>
+                        en.orderId === focusedEntry.orderId
+                          ? { ...en, noteDraft: draft }
+                          : en,
+                      ),
+                    );
+                  }}
+                  onBlur={() => {
+                    if (
+                      focusedEntry.noteDraft !==
+                      (focusedEntry.adminNotes ?? "")
+                    ) {
+                      void saveReview(
+                        focusedEntry.orderId,
+                        focusedEntry.reviewStatus,
+                        focusedEntry.noteDraft,
+                      );
+                    }
+                  }}
+                  className="input-field w-full text-xs"
+                />
+                {focusedEntry.saving && (
+                  <p className="mt-1 text-[10px] text-white/40">saving…</p>
+                )}
+              </div>
+            </div>
+
+            {/* Quick review actions */}
+            <div className="flex gap-2">
+              <button
+                onClick={() =>
+                  void saveReview(
+                    focusedEntry.orderId,
+                    "approved",
+                    focusedEntry.noteDraft,
+                  )
+                }
+                disabled={
+                  focusedEntry.saving ||
+                  focusedEntry.reviewStatus === "approved"
+                }
+                className="btn-ghost flex-1 text-sm disabled:opacity-40"
+              >
+                Mark Pass ✓
+              </button>
+              <button
+                onClick={() =>
+                  void saveReview(
+                    focusedEntry.orderId,
+                    "needs_changes",
+                    focusedEntry.noteDraft,
+                  )
+                }
+                disabled={
+                  focusedEntry.saving ||
+                  focusedEntry.reviewStatus === "needs_changes"
+                }
+                className="btn-ghost flex-1 text-sm disabled:opacity-40"
+              >
+                Mark Needs Fix ✗
+              </button>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex items-center justify-between border-t border-white/10 pt-3">
+              <button
+                onClick={() => navFocused("prev")}
+                disabled={focusedIdx <= 0}
+                className="btn-ghost text-sm disabled:opacity-30"
+              >
+                ← Prev
+              </button>
+              <span className="text-xs text-white/30">
+                {focusedIdx + 1} / {generatedEntries.length}
+              </span>
+              <button
+                onClick={() => navFocused("next")}
+                disabled={focusedIdx >= generatedEntries.length - 1}
+                className="btn-ghost text-sm disabled:opacity-30"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -981,10 +1737,10 @@ function Chip({
     tone === "ok"
       ? "text-emerald-300"
       : tone === "warn"
-      ? "text-severity-warning"
-      : tone === "err"
-      ? "text-severity-critical"
-      : "text-white/60";
+        ? "text-severity-warning"
+        : tone === "err"
+          ? "text-severity-critical"
+          : "text-white/60";
   return (
     <span className="pill bg-white/5 text-xs">
       {label}:{" "}
@@ -1010,5 +1766,22 @@ function SafetyItem({
       <span className="text-white/50">{label}:</span>
       <span>{value}</span>
     </li>
+  );
+}
+
+function SafetyMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-white/40">{label}</p>
+      <p className="mono-data text-2xl font-semibold text-emerald-300">
+        {value}
+      </p>
+    </div>
   );
 }
