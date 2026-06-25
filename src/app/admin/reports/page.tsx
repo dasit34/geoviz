@@ -255,6 +255,12 @@ export default async function AdminReportsPage({
             Launch QA
           </a>
           <a
+            href={`/admin/report-qa?key=${encodeURIComponent(key!)}`}
+            className="btn-ghost text-sm"
+          >
+            Report QA
+          </a>
+          <a
             href={`/admin/calibration?key=${encodeURIComponent(key!)}`}
             className="text-xs text-white/55 hover:text-white"
           >

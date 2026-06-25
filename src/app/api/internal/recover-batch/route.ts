@@ -32,6 +32,8 @@ const SELECT = {
   reportMarkdown: true,
   reportError: true,
   failureReason: true,
+  reviewStatus: true,
+  adminNotes: true,
   intelligence: {
     select: { deterministicScore: true, aiValidations: true },
   },
@@ -94,6 +96,8 @@ type RowSelect = {
   reportMarkdown: string | null;
   reportError: string | null;
   failureReason: string | null;
+  reviewStatus: string;
+  adminNotes: string | null;
   intelligence: { deterministicScore: unknown; aiValidations: unknown } | null;
 };
 
@@ -137,6 +141,8 @@ function mapRows(rows: RowSelect[]) {
       error,
       calibrationBatchId: row.calibrationBatchId,
       createdAt: row.createdAt.toISOString(),
+      reviewStatus: row.reviewStatus,
+      adminNotes: row.adminNotes,
     };
   });
 }

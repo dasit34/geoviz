@@ -167,6 +167,12 @@ export default async function AdminPage({
             <Link href="/internal/launch" className="btn-ghost text-sm">
               Launch QA
             </Link>
+            <Link
+              href={`/admin/report-qa?key=${process.env.ADMIN_SECRET ?? ""}`}
+              className="btn-ghost text-sm"
+            >
+              Report QA
+            </Link>
             <form action={logoutAction}>
               <button type="submit" className="btn-ghost text-sm">
                 Sign out
