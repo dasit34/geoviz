@@ -11,6 +11,7 @@ export function InternalShell({
   const k = encodeURIComponent(adminKey);
   const nav: Array<{ href: string; label: string }> = [
     { href: `/internal?key=${k}`, label: "Dashboard" },
+    { href: `/internal/launch?key=${k}`, label: "Launch QA" },
     { href: `/internal/run?key=${k}`, label: "Run / Bulk" },
     { href: `/admin/reports?key=${k}`, label: "Reports" },
     { href: `/admin/calibration?key=${k}`, label: "Calibration" },

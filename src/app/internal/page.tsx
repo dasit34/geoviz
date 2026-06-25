@@ -228,6 +228,9 @@ export default async function InternalDashboardPage({
         <Link href={`/internal/run?key=${k}`} className="btn-primary">
           Run / bulk-queue a test audit
         </Link>
+        <Link href={`/internal/launch?key=${k}`} className="btn-primary">
+          Launch QA
+        </Link>
         <Link href={`/admin/reports?key=${k}`} className="btn-ghost">
           Open reports console
         </Link>

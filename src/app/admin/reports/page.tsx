@@ -247,15 +247,20 @@ export default async function AdminReportsPage({
           to review it inline, mark it approved, then send it to the customer
           via email — all without leaving this page.
         </p>
-        <p className="mt-3 text-xs text-white/55">
-          Calibrating the rubric across many businesses?{" "}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <a
+            href={`/internal/launch?key=${encodeURIComponent(key!)}`}
+            className="btn-primary text-sm"
+          >
+            Launch QA
+          </a>
           <a
             href={`/admin/calibration?key=${encodeURIComponent(key!)}`}
-            className="text-accent hover:underline"
+            className="text-xs text-white/55 hover:text-white"
           >
-            Open the calibration harness →
+            Calibration harness →
           </a>
-        </p>
+        </div>
 
         {/* Today's cost summary — operator-facing strip. Internal
             only; never reaches a customer surface. Mobile: 2x2.

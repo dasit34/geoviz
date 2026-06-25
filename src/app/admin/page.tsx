@@ -163,11 +163,16 @@ export default async function AdminPage({
               Most recent first. Run the audit manually, then mark it complete.
             </p>
           </div>
-          <form action={logoutAction}>
-            <button type="submit" className="btn-ghost text-sm">
-              Sign out
-            </button>
-          </form>
+          <div className="flex items-center gap-3">
+            <Link href="/internal/launch" className="btn-ghost text-sm">
+              Launch QA
+            </Link>
+            <form action={logoutAction}>
+              <button type="submit" className="btn-ghost text-sm">
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
 
         {dbError ? (
