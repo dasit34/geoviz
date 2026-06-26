@@ -103,6 +103,10 @@ const FORBIDDEN_QA: Array<[RegExp, string]> = [
   [/\[object\s*Object\]/i, "[object Object]"],
   [/best and /i, "broken question template"],
   [/best or /i, "broken question template"],
+  // Keep in sync with FORBIDDEN_QA in recover-batch/route.ts
+  [/\[CAL\]/i, "[CAL] calibration label"],
+  [/defaulting to low/i, "defaulting-to-low fallback"],
+  [/\b0\s+homepage\s+words?\b/i, "0 homepage words"],
 ];
 
 const CATEGORY_FALLBACKS = [
@@ -1407,10 +1411,18 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
                           </div>
                         </td>
 
-                        {/* Score */}
+                        {/* Score — color-coded for outliers (< 25 red, > 80 amber) */}
                         <td className="px-3 py-3">
                           {e.score !== null ? (
-                            <span className="mono-data font-medium">
+                            <span
+                              className={`mono-data font-medium ${
+                                e.score < 25
+                                  ? "text-severity-critical"
+                                  : e.score > 80
+                                    ? "text-accent"
+                                    : ""
+                              }`}
+                            >
                               {e.score}
                               {e.band && (
                                 <span className="ml-1 text-xs text-white/40">

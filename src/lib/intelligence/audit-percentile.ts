@@ -9,7 +9,7 @@
  * Customer-facing claims require a cohort of ≥15 audits
  * (MIN_CUSTOMER_COHORT). Below that, the returned object reports
  * `bucket: "insufficient"` and the canonical fallback copy:
- *   "Industry benchmark forming for this cohort"
+ *   "Compared against the current GeoViz audit dataset"
  *
  * NEVER mutates. NEVER calls an LLM. NEVER reads from the worker
  * queue. NEVER touches Stripe / Resend / customer email.
@@ -96,7 +96,7 @@ export type AuditPercentile = {
    * Deterministic customer-facing one-liner. Never null. Templates:
    *   "Top 24% among roofing audits (n=42)"
    *   "Recommendation Readiness trails 78% of audited peers (n=42)"
-   *   "Industry benchmark forming for this cohort"
+   *   "Compared against the current GeoViz audit dataset"
    */
   copy: string;
 };
@@ -148,7 +148,7 @@ function copyForOverall(
     case "Bottom quartile":
       return `Bottom quartile among ${wherePhrase} (n=${cohortSize}).`;
     case "insufficient":
-      return "Industry benchmark forming for this cohort.";
+      return "Compared against the current GeoViz audit dataset.";
   }
 }
 
@@ -159,7 +159,7 @@ function copyForCategory(
   cohortSize: number,
   industrySlug: string | null,
 ): string {
-  if (bucket === "insufficient") return "Industry benchmark forming for this cohort.";
+  if (bucket === "insufficient") return "Compared against the current GeoViz audit dataset.";
   const label = SCORE_FIELD_LABEL[metric];
   const where = industryDisplay(industrySlug);
   const wherePhrase =
@@ -234,7 +234,7 @@ export async function getAuditPercentile(
       cohortSize: values.length,
       industrySlug: opts.industry,
       metric,
-      copy: "Industry benchmark forming for this cohort.",
+      copy: "Compared against the current GeoViz audit dataset.",
     };
   }
 
@@ -317,7 +317,7 @@ export async function getAuditPercentileBundle(
           cohortSize: 0,
           industrySlug: audit.industrySlug,
           metric: "overallScore",
-          copy: "Industry benchmark forming for this cohort.",
+          copy: "Compared against the current GeoViz audit dataset.",
         }
       : await getAuditPercentile({
           score: audit.overallScore,

@@ -178,6 +178,12 @@ function buildRows(preflight: PreflightShape | null): MetricRow[] {
       value: `${wordCount.toLocaleString()} words`,
       notAnalyzed: false,
     });
+  } else if (typeof wordCount === "number" && wordCount === 0) {
+    rows.push({
+      label: "Content analyzed",
+      value: "Homepage content could not be extracted — may require JavaScript rendering",
+      notAnalyzed: false,
+    });
   } else {
     rows.push({ label: "Content analyzed", ...NOT_ANALYZED });
   }

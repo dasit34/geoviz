@@ -1241,6 +1241,13 @@ const JARGON_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bGPTBot\b/g, "ChatGPT's reader"],
   [/\bllms-full\.txt\b/gi, "AI access guide"],
   [/\bNAP\b/g, "name, address, and phone"],
+  // Zero word-count phrases from preflight readability failures —
+  // replace with evidence-based explanations instead of misleading numbers.
+  [/\b0\s+homepage\s+words?\b/gi, "homepage content that could not be fully extracted"],
+  [/\b0\s+words?\s+(?:detected|found|extracted|identified)\b/gi,
+    "content that could not be fully extracted"],
+  // Scoring-model internal fallback phrase — never expose to customers.
+  [/defaulting to low\b/gi, "assessed as limited based on available signals"],
 ];
 
 export function swapTechnicalTerms(text: string): string {

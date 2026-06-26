@@ -39,6 +39,7 @@ const SELECT = {
   },
 } as const;
 
+// Keep in sync with validateReportHtml() FORBIDDEN_QA in ReportQaPage.tsx
 const FORBIDDEN_QA: Array<[RegExp, string]> = [
   [/json-?ld\s+block/i, "json-ld block"],
   [/\blocalbusiness\b/i, "LocalBusiness jargon"],
@@ -50,6 +51,10 @@ const FORBIDDEN_QA: Array<[RegExp, string]> = [
   [/\[object\s*Object\]/i, "[object Object]"],
   [/best and /i, "broken question template"],
   [/best or /i, "broken question template"],
+  // Production gate additions
+  [/\[CAL\]/i, "[CAL] calibration label"],
+  [/defaulting to low/i, "defaulting-to-low fallback"],
+  [/\b0\s+homepage\s+words?\b/i, "0 homepage words"],
 ];
 
 function checkMalformed(markdown: string | null): {

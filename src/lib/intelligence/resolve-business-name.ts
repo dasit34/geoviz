@@ -399,7 +399,11 @@ export function resolveBusinessName(
   // The customer's own input — trusted, but still reject a junk value
   // (a bot wall could have been captured upstream).
   const rawOrderName = input.order.businessName
-    ? titleCaseLoose(input.order.businessName)
+    ? titleCaseLoose(
+        // Strip [CAL] calibration prefix before title-casing so it never
+        // reaches the customer-facing report surface.
+        input.order.businessName.replace(/^\[CAL\]\s*/i, "").trim(),
+      )
     : null;
   const orderName = rawOrderName && !isJunkName(rawOrderName) ? rawOrderName : null;
   // Best-effort cross-model consensus — only used when on-site + order

@@ -788,8 +788,9 @@ function evidencePill(s: EvidenceStatus): { label: string; tone: Tone } {
   if (s === "pass") return { label: "PASS", tone: "ok" };
   if (s === "warn") return { label: "WARN", tone: "warn" };
   if (s === "fail") return { label: "FAIL", tone: "bad" };
-  if (s === "unconfirmed") return { label: "NOT CONFIRMED", tone: "muted" };
-  return { label: "NOT ANALYZED", tone: "muted" };
+  if (s === "unconfirmed") return { label: "UNKNOWN", tone: "muted" };
+  // "na" = signal not included in this audit scope
+  return { label: "NOT TESTED", tone: "muted" };
 }
 
 function severityPill(s: IssueSeverity): { label: string; tone: Tone } {

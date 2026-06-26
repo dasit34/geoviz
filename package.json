@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && prisma generate && next build",
+    "build": "npm run report:validate && prisma migrate deploy && prisma generate && next build",
+    "report:validate": "tsx scripts/validate-report-fixtures.ts",
+    "report:validate:live": "tsx scripts/validate-report-fixtures.ts --live",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
