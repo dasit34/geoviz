@@ -1,0 +1,25 @@
+{
+  "lastRunAt": "2026-07-01T13:27:25.135Z",
+  "cycle": 3,
+  "launchReady": true,
+  "pdfReliable": false,
+  "reports": {
+    "total": 25,
+    "generated": 25,
+    "htmlPass": 25,
+    "htmlFail": 0,
+    "pdfPass": 0,
+    "pdfFail": 0,
+    "pdfSkipped": true
+  },
+  "patterns": {
+    "totalPatternHits": 0,
+    "fallbackHits": 0,
+    "pageCountIssues": 0
+  },
+  "validators": {
+    "fixturePass": true,
+    "livePass": true
+  },
+  "failingReports": []
+}

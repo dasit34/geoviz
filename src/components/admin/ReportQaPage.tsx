@@ -88,6 +88,37 @@ type PatternSummary = {
 type ReadinessLevel = "ready" | "minor_issues" | "not_ready";
 type ReadinessResult = { level: ReadinessLevel; label: string; reasons: string[] };
 
+type LaunchLoopState = {
+  lastRunAt: string;
+  cycle: number;
+  launchReady: boolean;
+  pdfReliable: boolean;
+  reports: {
+    total: number;
+    generated: number;
+    htmlPass: number;
+    htmlFail: number;
+    pdfPass: number;
+    pdfFail: number;
+    pdfSkipped: boolean;
+  };
+  patterns: {
+    totalPatternHits: number;
+    fallbackHits: number;
+    pageCountIssues: number;
+  };
+  validators: {
+    fixturePass: boolean;
+    livePass: boolean;
+  };
+  failingReports: Array<{
+    orderId: string;
+    url: string;
+    htmlIssues: string[];
+    pdfError?: string;
+  }>;
+};
+
 // ── Validation helpers ────────────────────────────────────────────────────────
 
 // These patterns mirror the FORBIDDEN_QA list in recover-batch/route.ts.
@@ -402,12 +433,35 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
     null,
   );
 
+  // Launch validation state (read from launch-loop-state.json via API)
+  const [launchState, setLaunchState] = useState<LaunchLoopState | null>(null);
+  const [launchStateExists, setLaunchStateExists] = useState<boolean | null>(null);
+  const [showFailingReports, setShowFailingReports] = useState(false);
+
   // Toast notifications
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
   function showToast(msg: string, type: "ok" | "err" = "ok") {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   }
+
+  // ── Load launch validation state ─────────────────────────────────────────
+
+  useEffect(() => {
+    fetch(`/api/admin/launch-validation?key=${adminKey}`, {
+      headers: { "x-admin-secret": adminKey },
+    })
+      .then((r) => r.json())
+      .then((d: { exists: boolean; state?: LaunchLoopState }) => {
+        if (d.exists && d.state) {
+          setLaunchState(d.state);
+          setLaunchStateExists(true);
+        } else {
+          setLaunchStateExists(false);
+        }
+      })
+      .catch(() => setLaunchStateExists(false));
+  }, [adminKey]);
 
   // ── Load batch list ──────────────────────────────────────────────────────
 
@@ -936,6 +990,195 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
             only
           </span>
         </div>
+      </div>
+
+      {/* ── Launch Validation ── */}
+      <div className="rounded-md border border-white/10 bg-white/[0.02] px-5 py-4">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/50">
+            Launch Validation
+          </p>
+          {launchState && (
+            <span
+              className={`pill text-[10px] font-semibold ${
+                launchState.launchReady
+                  ? "bg-emerald-500/15 text-emerald-300"
+                  : "bg-severity-critical/15 text-severity-critical"
+              }`}
+            >
+              {launchState.launchReady ? "LAUNCH READY" : "NOT READY"}
+            </span>
+          )}
+        </div>
+
+        {launchStateExists === null && (
+          <p className="mt-3 text-xs text-white/40">Loading…</p>
+        )}
+
+        {launchStateExists === false && (
+          <div className="mt-3">
+            <p className="text-sm text-white/40">No validation results yet.</p>
+            <p className="mt-1 font-mono text-xs text-white/30">
+              Run: npm run launch:loop
+            </p>
+          </div>
+        )}
+
+        {launchState && launchStateExists && (
+          <div className="mt-4 space-y-4">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-white/40">
+              <span>
+                Last run:{" "}
+                <span className="mono-data text-white/60">
+                  {new Date(launchState.lastRunAt).toLocaleString()}
+                </span>
+              </span>
+              <span>
+                Cycle{" "}
+                <span className="mono-data text-white/60">
+                  {launchState.cycle}
+                </span>
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              {/* HTML */}
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] uppercase tracking-widest text-white/30">
+                  HTML
+                </p>
+                <span
+                  className={`pill text-[10px] ${
+                    launchState.reports.htmlFail === 0
+                      ? "bg-emerald-500/15 text-emerald-300"
+                      : "bg-severity-critical/15 text-severity-critical"
+                  }`}
+                >
+                  {launchState.reports.htmlPass}/{launchState.reports.generated}{" "}
+                  {launchState.reports.htmlFail === 0 ? "✓" : "✗"}
+                </span>
+              </div>
+
+              {/* PDF */}
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] uppercase tracking-widest text-white/30">
+                  PDF
+                </p>
+                {launchState.reports.pdfSkipped ? (
+                  <span className="pill bg-white/5 text-[10px] text-white/40">
+                    SKIPPED¹
+                  </span>
+                ) : (
+                  <span
+                    className={`pill text-[10px] ${
+                      launchState.reports.pdfFail === 0
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : "bg-severity-critical/15 text-severity-critical"
+                    }`}
+                  >
+                    {launchState.reports.pdfPass}/{launchState.reports.generated}{" "}
+                    {launchState.reports.pdfFail === 0 ? "✓" : "✗"}
+                  </span>
+                )}
+              </div>
+
+              {/* Patterns */}
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] uppercase tracking-widest text-white/30">
+                  Patterns
+                </p>
+                <span
+                  className={`pill text-[10px] ${
+                    launchState.patterns.totalPatternHits === 0 &&
+                    launchState.patterns.fallbackHits === 0
+                      ? "bg-emerald-500/15 text-emerald-300"
+                      : "bg-severity-critical/15 text-severity-critical"
+                  }`}
+                >
+                  {launchState.patterns.totalPatternHits +
+                    launchState.patterns.fallbackHits}{" "}
+                  hits{" "}
+                  {launchState.patterns.totalPatternHits === 0 &&
+                  launchState.patterns.fallbackHits === 0
+                    ? "✓"
+                    : "✗"}
+                </span>
+              </div>
+
+              {/* Validators */}
+              <div className="flex flex-col gap-1">
+                <p className="text-[10px] uppercase tracking-widest text-white/30">
+                  Validators
+                </p>
+                <div className="flex gap-1">
+                  <span
+                    className={`pill text-[10px] ${
+                      launchState.validators.fixturePass
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : "bg-severity-critical/15 text-severity-critical"
+                    }`}
+                  >
+                    Fix {launchState.validators.fixturePass ? "✓" : "✗"}
+                  </span>
+                  <span
+                    className={`pill text-[10px] ${
+                      launchState.validators.livePass
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : "bg-severity-critical/15 text-severity-critical"
+                    }`}
+                  >
+                    Live {launchState.validators.livePass ? "✓" : "✗"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {launchState.reports.pdfSkipped && (
+              <p className="text-[10px] text-white/30">
+                ¹ macOS dev — PDFs verified on Railway/Linux
+              </p>
+            )}
+
+            {launchState.failingReports.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setShowFailingReports((v) => !v)}
+                  className="text-xs text-severity-critical underline underline-offset-2"
+                >
+                  {showFailingReports ? "Hide" : "Show"}{" "}
+                  {launchState.failingReports.length} failing report
+                  {launchState.failingReports.length !== 1 ? "s" : ""}
+                </button>
+                {showFailingReports && (
+                  <ul className="mt-2 space-y-2">
+                    {launchState.failingReports.map((r) => (
+                      <li
+                        key={r.orderId}
+                        className="rounded border border-white/5 bg-white/[0.02] px-3 py-2 text-xs"
+                      >
+                        <span className="mono-data text-white/60">
+                          {r.url}
+                        </span>
+                        {r.htmlIssues.length > 0 && (
+                          <ul className="mt-1 list-disc pl-4 text-severity-critical">
+                            {r.htmlIssues.map((iss, i) => (
+                              <li key={i}>{iss}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {r.pdfError && (
+                          <p className="mt-1 text-severity-warning">
+                            PDF: {r.pdfError}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Batch list ── */}

@@ -257,6 +257,37 @@ interface PdfCheckResult {
   error?: string;
 }
 
+interface LaunchLoopState {
+  lastRunAt: string;
+  cycle: number;
+  launchReady: boolean;
+  pdfReliable: boolean;
+  reports: {
+    total: number;
+    generated: number;
+    htmlPass: number;
+    htmlFail: number;
+    pdfPass: number;
+    pdfFail: number;
+    pdfSkipped: boolean;
+  };
+  patterns: {
+    totalPatternHits: number;
+    fallbackHits: number;
+    pageCountIssues: number;
+  };
+  validators: {
+    fixturePass: boolean;
+    livePass: boolean;
+  };
+  failingReports: Array<{
+    orderId: string;
+    url: string;
+    htmlIssues: string[];
+    pdfError?: string;
+  }>;
+}
+
 interface SubValidatorResult {
   pass: boolean;
   output: string;
@@ -792,6 +823,7 @@ async function main(): Promise<void> {
     (n, r) => n + r.fallbackIssues.length,
     0,
   );
+  const pageCountIssues = htmlResults.filter((r) => !r.pageCountPass).length;
   const allPass =
     htmlFail.length === 0 &&
     (!pdfReliable || pdfFail.length === 0) &&
@@ -799,6 +831,55 @@ async function main(): Promise<void> {
     fallbackHits === 0 &&
     fixtureValidation.pass &&
     liveValidation.pass;
+
+  // ── Write JSON state file for dashboard consumption ───────────────────────
+  const STATE_PATH = join(process.cwd(), "launch-loop-state.json");
+  const launchState: LaunchLoopState = {
+    lastRunAt: timestamp,
+    cycle,
+    launchReady: allPass,
+    pdfReliable,
+    reports: {
+      total: allOrders.length,
+      generated: generated.length,
+      htmlPass: htmlResults.length - htmlFail.length,
+      htmlFail: htmlFail.length,
+      pdfPass: pdfReliable ? pdfResults.length - pdfFail.length : 0,
+      pdfFail: pdfReliable ? pdfFail.length : 0,
+      pdfSkipped: !pdfReliable,
+    },
+    patterns: {
+      totalPatternHits,
+      fallbackHits,
+      pageCountIssues,
+    },
+    validators: {
+      fixturePass: fixtureValidation.pass,
+      livePass: liveValidation.pass,
+    },
+    failingReports: [
+      ...htmlFail.map((r) => ({
+        orderId: r.orderId,
+        url: r.url,
+        htmlIssues: r.issues.map((i) => i.description),
+        pdfError: pdfResults.find((p) => p.orderId === r.orderId && !p.pass)
+          ?.error,
+      })),
+      // PDF-only failures (not already covered by htmlFail)
+      ...(pdfReliable
+        ? pdfFail
+            .filter((p) => !htmlFail.some((h) => h.orderId === p.orderId))
+            .map((p) => ({
+              orderId: p.orderId,
+              url: p.url,
+              htmlIssues: [] as string[],
+              pdfError: p.error,
+            }))
+        : []),
+    ],
+  };
+  writeFileSync(STATE_PATH, JSON.stringify(launchState, null, 2), "utf-8");
+  console.log(`launch-loop-state.json updated.\n`);
 
   console.log(
     "═══════════════════════════════════════════════════════",
