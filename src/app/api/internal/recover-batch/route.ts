@@ -73,17 +73,22 @@ function checkMalformed(markdown: string | null): {
 
 function countModelFailures(aiValidations: unknown): number {
   if (!aiValidations) return 0;
+  // google_ai_overview is always "unavailable" (no public API exists) — structural,
+  // not a real failure. Exclude it so the counter reflects actual API failures only.
+  const isRealFailure = (v: { provider?: string; status?: string }) =>
+    v?.provider !== "google_ai_overview" &&
+    (v?.status === "unavailable" || v?.status === "error");
   try {
     if (Array.isArray(aiValidations)) {
-      return (aiValidations as Array<{ status?: string }>).filter(
-        (v) => v?.status === "unavailable" || v?.status === "error",
-      ).length;
+      return (
+        aiValidations as Array<{ provider?: string; status?: string }>
+      ).filter(isRealFailure).length;
     }
-    const obj = aiValidations as { outputs?: Array<{ status?: string }> };
+    const obj = aiValidations as {
+      outputs?: Array<{ provider?: string; status?: string }>;
+    };
     if (Array.isArray(obj.outputs)) {
-      return obj.outputs.filter(
-        (v) => v?.status === "unavailable" || v?.status === "error",
-      ).length;
+      return obj.outputs.filter(isRealFailure).length;
     }
   } catch {
     // Malformed intelligence payload — not a hard error
