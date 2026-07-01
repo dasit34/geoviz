@@ -11,6 +11,7 @@ import type {
   Tone,
 } from "@/lib/report/report-model";
 import type { IssueSeverity } from "@/lib/scoring/types";
+import { swapTechnicalTerms } from "@/lib/parse-report";
 import { ReportCtaCard } from "@/components/ReportCtaCard";
 import { ProviderMark } from "@/components/report/BrandMarks";
 import { GeoVizMark } from "@/components/brand/GeoVizMark";
@@ -116,7 +117,7 @@ function CoverPage({ model }: { model: ReportModel }) {
           </span>
         </div>
         <p className="rd-cover-percentile">
-          {m.score.percentileCopy ?? bandContextLine(m.score.band)}
+          {swapTechnicalTerms(m.score.percentileCopy ?? bandContextLine(m.score.band))}
         </p>
         {m.buckets.length > 0 ? (
           <div className="rd-buckets">
@@ -644,7 +645,7 @@ function IssueCard({ diag }: { diag: ReportModelDiagnostic }) {
     <div className="rd-issue rd-issue-v2">
       <div className="rd-issue-head">
         <span className={`rd-issue-rank rd-v-${sevTone}`}>#{d.rank}</span>
-        <span className="rd-issue-title">{d.title}</span>
+        <span className="rd-issue-title">{swapTechnicalTerms(d.title)}</span>
         <Pill {...severityPill(d.severity)} />
       </div>
       {d.problem ? (
@@ -696,7 +697,7 @@ function FixCard({ fix }: { fix: ReportModelFix }) {
     <div className="rd-fix">
       <span className="rd-fix-num">{String(f.rank).padStart(2, "0")}</span>
       <div className="rd-fix-body">
-        <h3 className="rd-fix-title">{f.issue}</h3>
+        <h3 className="rd-fix-title">{swapTechnicalTerms(f.issue)}</h3>
         <span className="rd-fix-exact-label">Exact fix</span>
         <p className="rd-fix-action">{f.action}</p>
         <div className="rd-fix-meta">
@@ -752,7 +753,7 @@ function ActionPage({ model, reportId }: { model: ReportModel; reportId: string 
       <h1 className="rd-action-title">Strategic Action Plan</h1>
 
       {m.score.percentileCopy ? (
-        <p className="rd-action-percentile">{m.score.percentileCopy}</p>
+        <p className="rd-action-percentile">{swapTechnicalTerms(m.score.percentileCopy)}</p>
       ) : null}
 
       <div className="rd-outcome-card">

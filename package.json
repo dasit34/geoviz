@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "npm run report:validate && prisma migrate deploy && prisma generate && next build",
+    "launch:loop": "tsx scripts/launch-loop.ts",
     "report:validate": "tsx scripts/validate-report-fixtures.ts",
     "report:validate:live": "tsx scripts/validate-report-fixtures.ts --live",
     "start": "next start",

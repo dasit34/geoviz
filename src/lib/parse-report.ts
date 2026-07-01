@@ -1248,6 +1248,11 @@ const JARGON_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
     "content that could not be fully extracted"],
   // Scoring-model internal fallback phrase — never expose to customers.
   [/defaulting to low\b/gi, "assessed as limited based on available signals"],
+  // Industry cohort copy that leaks the wrong cohort label (e.g. "nonprofit
+  // audits" on an insurance or restaurant report). Replace with generic copy
+  // that still conveys the benchmark framing without the wrong industry tag.
+  [/\bnonprofit\s+audits?\b/gi, "audits in this dataset"],
+  [/\bnonprofit\s+peers?\b/gi, "audited businesses"],
 ];
 
 export function swapTechnicalTerms(text: string): string {
