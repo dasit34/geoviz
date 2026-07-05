@@ -1,12 +1,12 @@
 {
-  "lastRunAt": "2026-07-01T13:27:25.135Z",
-  "cycle": 3,
+  "lastRunAt": "2026-07-05T21:33:14.725Z",
+  "cycle": 4,
   "launchReady": true,
   "pdfReliable": false,
   "reports": {
-    "total": 25,
-    "generated": 25,
-    "htmlPass": 25,
+    "total": 10,
+    "generated": 10,
+    "htmlPass": 10,
     "htmlFail": 0,
     "pdfPass": 0,
     "pdfFail": 0,

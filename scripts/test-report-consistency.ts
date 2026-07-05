@@ -105,7 +105,7 @@ const ev = (m: NonNullable<ReturnType<typeof build>>, label: string) =>
 
 check("known JSON-LD gap → Evidence schema row is FAIL, never 'Not analyzed'", () => {
   const m = build({})!;
-  const row = ev(m, "JSON-LD schema blocks");
+  const row = ev(m, "Structured data blocks");
   assert.equal(row.status, "fail", `expected fail, got ${row.status}`);
   assert.doesNotMatch(row.descriptor, /not analyzed/i);
 });
@@ -124,7 +124,7 @@ check("crawlability not audited → Robots row is NOT CONFIRMED (never FAIL/na)"
 
 check("entity not checked → NAP row is NOT CONFIRMED (neutral)", () => {
   const m = build({})!;
-  assert.equal(ev(m, "NAP consistency").status, "unconfirmed");
+  assert.equal(ev(m, "Name, address & phone consistency").status, "unconfirmed");
 });
 
 check("crawlability not audited → no fix prescribes editing robots.txt", () => {
@@ -334,9 +334,9 @@ check("JSON-LD blocks detected → identity title says 'incomplete', never 'No �
     ],
     preflightSignals: pf, industryNormalized: "roofing",
   })!;
-  assert.equal(m.diagnostics[0].title, "Existing JSON-LD is incomplete for local business verification");
+  assert.equal(m.diagnostics[0].title, "Existing structured data is incomplete for local business verification");
   const schemaFix = m.fixes.find((f) => f.action.includes("LocalBusiness JSON-LD"))!;
-  assert.equal(schemaFix.issue, "Existing JSON-LD is incomplete for local business verification");
+  assert.equal(schemaFix.issue, "Existing structured data is incomplete for local business verification");
   // No surface may claim there is no JSON-LD block when 2 were detected.
   const blob = [
     m.diagnostics[0].title,
@@ -346,16 +346,16 @@ check("JSON-LD blocks detected → identity title says 'incomplete', never 'No �
   assert.doesNotMatch(blob, /No (?:LocalBusiness or Organization )?JSON-?LD block/i, blob);
 });
 
-check("no JSON-LD blocks (non-local) → identity title says 'No complete Organization or business identity block'", () => {
+check("no JSON-LD blocks (non-local) → identity title says 'No complete organization or business identity block found'", () => {
   // leathery-shaped fixture: no blocks at all + ecommerce (non-local) → the
-  // title leads with Organization, never forces "LocalBusiness" framing.
+  // title leads with organization, never forces "LocalBusiness" framing.
   const m = build({})!;
   const schemaDiag = m.diagnostics.find((d) => d.category === "schema");
   assert.ok(schemaDiag, "expected a schema diagnostic");
-  assert.equal(schemaDiag!.title, "No complete Organization or business identity block");
+  assert.equal(schemaDiag!.title, "No complete organization or business identity block found");
 });
 
-check("no JSON-LD blocks (local) → identity title keeps 'No complete LocalBusiness or Organization identity block'", () => {
+check("no JSON-LD blocks (local) → identity title says 'No complete business identity block found'", () => {
   const m = build({
     industry: "roofing",
     providerOutputs: [
@@ -363,7 +363,7 @@ check("no JSON-LD blocks (local) → identity title keeps 'No complete LocalBusi
     ],
   })!;
   const schemaDiag = m.diagnostics.find((d) => d.category === "schema");
-  assert.equal(schemaDiag!.title, "No complete LocalBusiness or Organization identity block");
+  assert.equal(schemaDiag!.title, "No complete business identity block found");
 });
 
 console.log(`[report-consistency] passed=${passed} failed=${failed}`);

@@ -3,6 +3,7 @@ import {
   type AuditReportContext,
 } from "@/components/AuditReportContent";
 import { ReportDocument } from "@/components/report/ReportDocument";
+import { ReportFailedState } from "@/components/report/ReportFailedState";
 import { buildReportModelFromRender } from "@/lib/report/report-model";
 import { normalizeReportModel } from "@/lib/report/reportDataNormalizer";
 import "@/components/report/report-document.css";
@@ -42,28 +43,46 @@ export function ReportSurface({
   deterministicScore?: unknown;
   context?: AuditReportContext;
 }) {
-  const rawModel = buildReportModelFromRender({
-    orderId,
-    businessLabel,
-    websiteUrl,
-    reportMarkdown,
-    reportGeneratedAt,
-    reviewed,
-    deterministicScore,
-    context: context
-      ? {
-          percentileCopy: context.percentileCopy,
-          cohortCellValue: context.cohortCellValue,
-          confidenceLabel: context.confidenceLabel,
-          confidenceReason: context.confidenceReason,
-          aiValidations: context.aiValidations,
-          nameInconsistency: context.nameInconsistency,
-          preflightSignals: context.preflightSignals,
-          industryNormalized: context.industryNormalized,
-        }
-      : null,
-  });
-  const model = rawModel ? normalizeReportModel(rawModel) : null;
+  // Building/normalizing the report model is deterministic but not
+  // provably total — a sufficiently malformed report (edge case the
+  // parser doesn't already null-out gracefully) can throw deep inside
+  // this call. Never let that propagate into an unbranded framework
+  // 500: log full diagnostic detail server-side for operator review,
+  // and render the same safe ReportFailedState the "failed" audit
+  // status already uses.
+  let rawModel: ReturnType<typeof buildReportModelFromRender>;
+  let model: ReturnType<typeof normalizeReportModel> | null;
+  try {
+    rawModel = buildReportModelFromRender({
+      orderId,
+      businessLabel,
+      websiteUrl,
+      reportMarkdown,
+      reportGeneratedAt,
+      reviewed,
+      deterministicScore,
+      context: context
+        ? {
+            percentileCopy: context.percentileCopy,
+            cohortCellValue: context.cohortCellValue,
+            confidenceLabel: context.confidenceLabel,
+            confidenceReason: context.confidenceReason,
+            aiValidations: context.aiValidations,
+            nameInconsistency: context.nameInconsistency,
+            preflightSignals: context.preflightSignals,
+            industryNormalized: context.industryNormalized,
+          }
+        : null,
+    });
+    model = rawModel ? normalizeReportModel(rawModel) : null;
+  } catch (err) {
+    console.error("[report-render] failed to build/normalize report model", {
+      orderId,
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    return <ReportFailedState orderId={orderId} />;
+  }
 
   // Use the new fixed-template design whenever the deterministic engine
   // gave us real structured content (buckets/diagnostics/fixes). Legacy

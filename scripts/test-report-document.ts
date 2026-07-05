@@ -81,7 +81,7 @@ check("Google AI Overviews stays a derived readiness lens (not a 5th tested mode
   // The 4 directly-tested provider cards come from m.providers; AI Overviews
   // is only in the readiness strip (m.readiness), never a provider card.
   assert.match(DOC, /m\.providers\.map/);
-  assert.match(DOC, /ReadinessStrip/);
+  assert.match(DOC, /ReadinessGrid/);
   assert.match(DOC, /m\.readiness/);
   // The provider list is the four LLMs only.
   const MODEL = read("src/lib/report/report-model.ts");
@@ -117,7 +117,7 @@ check("cover review label is conditional on real review flag, not hardcoded", ()
   // "Human Reviewed" must be gated on m.meta.reviewed; the unreviewed branch
   // reads "Automated Audit". No standalone hardcoded "Human Reviewed" value.
   assert.match(DOC, /m\.meta\.reviewed \? "Human Reviewed" : "Automated Audit"/);
-  assert.match(DOC, /m\.meta\.reviewed \? "Human reviewed" : "Automated audit"/);
+  assert.match(DOC, /m\.meta\.reviewed \? "Human reviewed" : "Audit complete"/);
   assert.doesNotMatch(DOC, /v="Human Reviewed"/, "cover must not hardcode the review label");
   assert.doesNotMatch(DOC, /note="Human reviewed"/, "exec stat must not hardcode the review note");
 });
@@ -131,8 +131,8 @@ check("Page 4 renders Customer Questions Tested from the model (not 'prompts')",
   assert.match(DOC, /Customer Questions Tested/);
   assert.match(DOC, /m\.customerQuestions/);
   assert.doesNotMatch(DOC, /\bprompts?\b/i, "customer copy must not use the word 'prompt(s)'");
-  // Evidence subtitle surfaced
-  assert.match(DOC, /What AI Had To Read/);
+  // Evidence subtitle surfaced (rendered as an all-caps eyebrow label)
+  assert.match(DOC, /WHAT AI HAD TO READ/i);
 });
 
 check("light/dark page system: dark cover + CTA, light interior", () => {
