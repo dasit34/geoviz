@@ -1,5 +1,15 @@
 # GeoViz V2 — Intelligence Layer (placeholder)
 
+> **Note:** The richer, per-product scaffold work (Monitoring, Visibility
+> Layer, Agency Platform, Enterprise, Benchmark Engine, and 9 other
+> future modules) now lives under `src/modules/<name>/` — see
+> `docs/GEOVIZ_PLAYBOOK.md` and `docs/architecture/SYSTEM_ARCHITECTURE.md`.
+> `src/modules/` is the canonical future-product architecture going
+> forward. This directory's `contracts.ts` is unchanged and remains the
+> **shared-primitives source** (`VisibilitySnapshot`, `BenchmarkCohort`,
+> etc.) that the new module contracts import from — nothing here is
+> duplicated or redefined under `src/modules/`.
+
 This directory is the architectural seam where the V2 Intelligence
 Layer will live. **Nothing here is wired into the running V1 app yet.**
 Files here are intentionally not imported by any production code path
