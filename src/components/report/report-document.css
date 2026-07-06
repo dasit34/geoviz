@@ -1272,13 +1272,15 @@
   .rd-cover-biz { font-size: 32px; }
 }
 
-/* ════════════════ PRINT — one .rd-page per A4 page ════════════════
+/* ════════════════ PRINT — one .rd-page per A4 page (usually) ════════
    @page margins (18mm/16mm) are owned by print.css and shared with the
-   legacy renderer, so we don't fight them. Each .rd-page fills the full
-   printable content area (A4 297mm − 2×18mm ≈ 261mm) with its own
-   light/dark background, so the dark cover/CTA print as full dark sheets
-   and the light interior reads clean. The neutral host override stops the
-   legacy dark body from showing through a short page. */
+   legacy renderer, so we don't fight them. Each .rd-page fills at least
+   the full printable content area (A4 297mm − 2×18mm ≈ 261mm) with its
+   own light/dark background, so the dark cover/CTA print as full dark
+   sheets and the light interior reads clean. The neutral host override
+   stops the legacy dark body from showing through a short page. A page
+   whose content exceeds 261mm flows onto an additional physical page
+   instead of being clipped — see the .rd-page rule below. */
 @media print {
   .report-host.rd-host,
   .rd-host.report-host { background: #ffffff !important; }
@@ -1293,11 +1295,23 @@
     border-radius: 0;
     border: none;
     padding: 4mm 4mm 8mm;
-    /* Fixed one-sheet height + clip: a logical page can NEVER spill a block
-       onto a blank physical page (the orphan-page bug). Content is tightened
-       below so it fits 261mm and the clip never triggers visibly. */
-    height: 261mm;
-    overflow: hidden;
+    /* min-height (not height) + visible overflow: every page still fills a
+       full A4 sheet when its content is shorter than 261mm (the common
+       case — same full-bleed background look as before), but a page whose
+       content genuinely exceeds 261mm now grows and spills onto a real,
+       natural continuation page instead of being silently clipped. A rare
+       sparse continuation page is the correct trade-off here — silently
+       discarding paid customer content (the previous behavior) is worse
+       than an occasional thin page. `overflow: visible` is set explicitly
+       (not just omitted) because the base .rd-page rule above sets
+       `overflow: hidden` for an unrelated reason (clipping children to the
+       rounded corners on screen); CSS cascades per-property, so this must
+       be restated here to actually take effect in print. break-inside:
+       avoid on .rd-outcome-card / .rd .cta-card (below) already ensures
+       either atomic block moves whole onto the next page rather than
+       splitting mid-card. */
+    min-height: 261mm;
+    overflow: visible;
     break-before: page;
     page-break-before: always;
     -webkit-print-color-adjust: exact;
