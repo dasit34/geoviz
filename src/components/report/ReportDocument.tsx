@@ -8,6 +8,7 @@ import type {
   ReportModelFix,
   ReadinessFactor,
   EvidenceStatus,
+  DiagnosticConfidence,
   Tone,
 } from "@/lib/report/report-model";
 import type { IssueSeverity } from "@/lib/scoring/types";
@@ -299,6 +300,14 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
         asked who to choose — what they understood, who they recommended, who
         they named instead, and the sources they trusted.
       </p>
+      <p className="rd-note rd-ai-legend">
+        Three distinct signals, not one: <strong>understood</strong> means the
+        model correctly identifies what this business is and does;{" "}
+        <strong>mentioned</strong> means it named this business at all when
+        answering; <strong>recommended</strong> means it would actually
+        suggest this business to a customer today. A business can be
+        understood and mentioned without ever being recommended.
+      </p>
 
       {!m.hasProviders ? (
         <p className="rd-note rd-prov-note">
@@ -351,7 +360,7 @@ function AIIntelligencePage({ model }: { model: ReportModel; reportId: string })
                 <th>Model</th>
                 <th>Verdict</th>
                 <th>Understands</th>
-                <th>Confidence</th>
+                <th>Rec. Confidence</th>
                 <th>Names you</th>
                 <th>Top entity named</th>
                 <th>Sources</th>
@@ -647,6 +656,7 @@ function IssueCard({ diag }: { diag: ReportModelDiagnostic }) {
         <span className={`rd-issue-rank rd-v-${sevTone}`}>#{d.rank}</span>
         <span className="rd-issue-title">{swapTechnicalTerms(d.title)}</span>
         <Pill {...severityPill(d.severity)} />
+        <Pill {...confidencePill(d.confidence)} />
       </div>
       {d.problem ? (
         <div className="rd-issue-problem">
@@ -768,7 +778,7 @@ function ActionPage({ model, reportId }: { model: ReportModel; reportId: string 
         ) : null}
       </div>
 
-      <ReportCtaCard orderId={m.meta.orderId} businessLabel={m.meta.businessName} />
+      <ReportCtaCard orderId={m.meta.orderId} businessLabel={m.meta.businessName} fixCount={m.fixes.length} />
     </Page>
   );
 }
@@ -789,9 +799,19 @@ function evidencePill(s: EvidenceStatus): { label: string; tone: Tone } {
   if (s === "pass") return { label: "PASS", tone: "ok" };
   if (s === "warn") return { label: "WARN", tone: "warn" };
   if (s === "fail") return { label: "FAIL", tone: "bad" };
-  if (s === "unconfirmed") return { label: "UNKNOWN", tone: "muted" };
+  if (s === "unconfirmed") return { label: "NOT CONFIRMED", tone: "muted" };
   // "na" = signal not included in this audit scope
   return { label: "NOT TESTED", tone: "muted" };
+}
+
+function confidencePill(c: DiagnosticConfidence): { label: string; tone: Tone } {
+  // Confidence describes how much evidence backs this finding — never the
+  // score itself. Muted/neutral tones on purpose: this is a trust signal,
+  // not a severity signal, and must not visually compete with the
+  // severity pill it sits next to.
+  if (c === "high") return { label: "HIGH CONFIDENCE", tone: "ok" };
+  if (c === "medium") return { label: "MEDIUM CONFIDENCE", tone: "muted" };
+  return { label: "LOW CONFIDENCE", tone: "muted" };
 }
 
 function severityPill(s: IssueSeverity): { label: string; tone: Tone } {

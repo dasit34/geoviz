@@ -119,6 +119,8 @@ export type ReportModelProvider = {
   mentioned: boolean;
 };
 
+export type DiagnosticConfidence = "high" | "medium" | "low";
+
 export type ReportModelDiagnostic = {
   rank: number;
   title: string;
@@ -128,6 +130,13 @@ export type ReportModelDiagnostic = {
   problem: string;
   /** Why it hurts AI visibility. */
   whyItHurts: string;
+  /**
+   * How much evidence backs this finding — derived from the scoring
+   * engine's existing per-category `category_confidence` (0..1), never
+   * from the score value itself. Presentation-only label; does not
+   * change scoring.
+   */
+  confidence: DiagnosticConfidence;
 };
 
 export type FixDifficulty = "Easy" | "Moderate" | "Technical";
@@ -637,6 +646,26 @@ function buildEvidence(
     status,
   });
 
+  // A bare "Not analyzed" leaves the customer wondering whether the audit
+  // failed. When the preflight fetch itself failed, `fetchError` IS specific,
+  // evidence-backed information — surface it instead of staying silent. When
+  // the fetch succeeded but the deterministic engine's render-intelligence
+  // pass was attempted (content-related rows only), a JS-rendering
+  // explanation is more honest than a generic placeholder. Only when neither
+  // reason is available does the row fall back to a plain "outside audit
+  // scope" note — still true, never a bare unexplained placeholder.
+  const fetchFailed = !!p && p.fetchOk === false;
+  const renderAttempted = es?.render_attempted === true;
+  const notAnalyzedDescriptor = (contentRelated: boolean): string => {
+    if (fetchFailed && p?.fetchError) {
+      return `Not analyzed — the homepage could not be fetched during this audit (${p.fetchError}).`;
+    }
+    if (contentRelated && renderAttempted) {
+      return "Not analyzed — this page appears to require JavaScript to render its content, which automated extraction could not access.";
+    }
+    return "Not analyzed — this signal was outside the scope of this audit pass.";
+  };
+
   // 1. Homepage readable content
   const r = pfOk ? p!.readability : null;
   {
@@ -654,7 +683,7 @@ function buildEvidence(
       const score = content?.score ?? null;
       rows.push(
         score === null
-          ? L(label, "Not analyzed", "na")
+          ? L(label, notAnalyzedDescriptor(true), "na")
           : score < 25
             ? L(label, "Minimal readable content on the homepage", "fail")
             : score < 50
@@ -671,10 +700,10 @@ function buildEvidence(
     if (s) {
       rows.push(
         s.rawJsonLdCount === 0
-          ? L(label, "No structured business data found", "fail")
+          ? L(label, "No machine-readable business profile (name, address, phone) detected in the homepage's code", "fail")
           : s.missingFields.length > 0
-            ? L(label, `${s.rawJsonLdCount} block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields incomplete`, "warn")
-            : L(label, `${s.rawJsonLdCount} block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields complete`, "pass"),
+            ? L(label, `${s.rawJsonLdCount} structured-data block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields incomplete`, "warn")
+            : L(label, `${s.rawJsonLdCount} structured-data block${s.rawJsonLdCount === 1 ? "" : "s"} found; identity fields complete`, "pass"),
       );
     } else {
       const schema = cat("schema");
@@ -682,9 +711,9 @@ function buildEvidence(
       const reason = reasonOf("schema");
       rows.push(
         score === null
-          ? L(label, "Not analyzed", "na")
+          ? L(label, notAnalyzedDescriptor(false), "na")
           : /no json-?ld|0 block/i.test(reason) || score < 20
-            ? L(label, "No structured business data found on the homepage", "fail")
+            ? L(label, "No machine-readable business profile (name, address, phone) detected in the homepage's code", "fail")
             : score < 60
               ? L(label, "Structured data present; identity fields incomplete", "warn")
               : L(label, "Structured data present", "pass"),
@@ -709,7 +738,7 @@ function buildEvidence(
       const score = brand?.score ?? null;
       rows.push(
         score === null
-          ? L(label, "Not analyzed", "na")
+          ? L(label, notAnalyzedDescriptor(false), "na")
           : score < 30
             ? L(label, "No complete name / address / phone found across surfaces", "fail")
             : score < 60
@@ -734,7 +763,15 @@ function buildEvidence(
     } else if (es && !es.crawlability_audited) {
       rows.push(L(label, "Crawl access not confirmed in this audit", "unconfirmed"));
     } else {
-      rows.push(L(label, "Not analyzed", "na"));
+      rows.push(
+        L(
+          label,
+          fetchFailed && p?.fetchError
+            ? `Crawl verification unavailable — the homepage could not be fetched during this audit (${p.fetchError}).`
+            : "Crawl verification unavailable during this audit.",
+          "na",
+        ),
+      );
     }
   }
 
@@ -761,7 +798,7 @@ function buildEvidence(
             ? L(label, `${wc} words; meets depth recommendation`, "pass")
             : L(label, `${wc} words; below 300-word recommendation`, "fail")
           : score === null
-            ? L(label, "Not analyzed", "na")
+            ? L(label, notAnalyzedDescriptor(true), "na")
             : score < 25
               ? L(label, "Insufficient content; below 300-word recommendation", "fail")
               : score < 50
@@ -777,7 +814,7 @@ function buildEvidence(
     const trustPct = cat("trust")?.score ?? null;
     rows.push(
       trustPct === null
-        ? L(label, "Not analyzed", "na")
+        ? L(label, notAnalyzedDescriptor(false), "na")
         : trustPct >= 60
           ? L(label, "Verifiable third-party trust markers present", "pass")
           : trustPct >= 30
@@ -1361,6 +1398,19 @@ export function buildReportModel(
         : NAP_MSG_RE.test(f.message)
           ? ENTITY_CONSISTENCY_WHY
           : WHY_IT_HURTS[f.category];
+    // Confidence reflects how much evidence backs this specific finding
+    // (the scoring engine's existing per-category certainty), never the
+    // score value itself — a low score can still be high-confidence if
+    // the evidence behind it is solid.
+    const categoryConfidence = det?.category_scores?.[f.category]?.category_confidence;
+    const confidence: DiagnosticConfidence =
+      categoryConfidence === undefined || categoryConfidence === null
+        ? "medium"
+        : categoryConfidence >= 0.7
+          ? "high"
+          : categoryConfidence >= 0.4
+            ? "medium"
+            : "low";
     return {
       rank: i + 1,
       title: displayFindingTitle(f.message, f.category, blocksDetected, isLocal),
@@ -1368,6 +1418,7 @@ export function buildReportModel(
       category: f.category,
       problem: n?.problem ?? detReason ?? f.message,
       whyItHurts: n?.whyItHurts ?? why,
+      confidence,
     };
   });
 

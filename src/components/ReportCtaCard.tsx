@@ -15,15 +15,25 @@
 export function ReportCtaCard({
   orderId,
   businessLabel,
+  fixCount,
 }: {
   orderId: string;
   businessLabel: string;
+  /** Number of fixes identified in this specific audit (m.fixes.length). */
+  fixCount?: number;
 }) {
   const params = new URLSearchParams({ orderId });
   if (businessLabel && businessLabel.length > 0) {
     params.set("businessName", businessLabel);
   }
   const href = `/foundation-fix?${params.toString()}`;
+  const lede =
+    fixCount && fixCount > 0
+      ? `GeoViz can implement the ${fixCount} fix${fixCount === 1 ? "" : "es"} identified in this audit — the exact issues surfaced above, scoped as one engagement that closes the technical, trust, and discoverability gaps found, so AI systems can identify, verify, and reference your business with confidence.`
+      : `GeoViz can implement the fixes identified in this audit — a scoped
+        engagement that closes the technical, trust, and discoverability gaps
+        surfaced above, so AI systems can identify, verify, and reference your
+        business with confidence.`;
 
   return (
     <section className="cta-card" aria-label="AI Visibility Foundation Fix offer">
@@ -32,12 +42,7 @@ export function ReportCtaCard({
         <h2 className="cta-card-headline">
           Fix the foundation AI systems use to recommend you
         </h2>
-        <p className="cta-card-lede">
-          GeoViz can implement the fixes identified in this audit — a scoped
-          engagement that closes the technical, trust, and discoverability gaps
-          surfaced above, so AI systems can identify, verify, and reference your
-          business with confidence.
-        </p>
+        <p className="cta-card-lede">{lede}</p>
 
         <p className="cta-card-includes-label">What&rsquo;s included</p>
         <ul className="cta-card-includes">
