@@ -7,6 +7,7 @@ import type { BatchSummary } from "@/app/api/admin/report-qa/batches/route";
 
 type HtmlStatus = "unchecked" | "checking" | "pass" | "fail";
 type PdfStatus = "unchecked" | "generating" | "pass" | "fail";
+type OverflowStatus = "unchecked" | "checking" | "pass" | "fail";
 type ReviewStatus = "pending" | "approved" | "needs_changes";
 type Filter =
   | "all"
@@ -37,6 +38,9 @@ type QaEntry = {
   pageCount: number | null;
   htmlIssues: string[];
   categoryFallbackDetected: boolean;
+  // print-overflow QA (headless-Chromium check — see runPdfChecks)
+  overflowStatus: OverflowStatus;
+  overflowIssues: string[];
   // review state
   reviewStatus: ReviewStatus;
   adminNotes: string | null;
@@ -383,6 +387,30 @@ function pdfBadge(s: PdfStatus) {
   );
 }
 
+function overflowBadge(s: OverflowStatus, issueCount: number) {
+  if (s === "unchecked")
+    return (
+      <span className="pill bg-white/5 text-white/40 text-[10px]">—</span>
+    );
+  if (s === "checking")
+    return (
+      <span className="pill bg-white/10 text-white/60 text-[10px]">
+        checking…
+      </span>
+    );
+  if (s === "pass")
+    return (
+      <span className="pill bg-emerald-500/15 text-emerald-300 text-[10px]">
+        ✓ fits
+      </span>
+    );
+  return (
+    <span className="pill bg-severity-critical/15 text-severity-critical text-[10px]">
+      ✗ {issueCount} page{issueCount === 1 ? "" : "s"}
+    </span>
+  );
+}
+
 function reviewBadge(s: ReviewStatus) {
   if (s === "approved")
     return (
@@ -541,6 +569,8 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
           pageCount: null,
           htmlIssues: [],
           categoryFallbackDetected: false,
+          overflowStatus: "unchecked",
+          overflowIssues: [],
           reviewStatus: (r.reviewStatus ?? "pending") as ReviewStatus,
           adminNotes: r.adminNotes ?? null,
           noteDraft: r.adminNotes ?? "",
@@ -704,7 +734,9 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
       const batch = orderIds.slice(i, i + CONCURRENCY);
       setEntries((prev) =>
         prev.map((e) =>
-          batch.includes(e.orderId) ? { ...e, pdfStatus: "generating" } : e,
+          batch.includes(e.orderId)
+            ? { ...e, pdfStatus: "generating", overflowStatus: "checking" }
+            : e,
         ),
       );
       await Promise.all(
@@ -722,6 +754,44 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
             setEntries((prev) =>
               prev.map((e) =>
                 e.orderId === orderId ? { ...e, pdfStatus: "fail" } : e,
+              ),
+            );
+          }
+          // Print-overflow QA — same headless-Chromium navigation as the
+          // PDF generation above, run in the same concurrency-limited
+          // batch. Generic across every report/page (see
+          // src/lib/pdf-overflow-check.ts); never blocks PDF delivery,
+          // this is a human-review-gate signal only.
+          try {
+            const res = await fetch(
+              `/api/admin/reports/${orderId}/overflow-check?key=${adminKey}`,
+            );
+            const data = (await res.json()) as {
+              violations?: Array<{ pageIndex: number; selector: string; overflowPx: number }>;
+              error?: string;
+            };
+            const violations = data.violations ?? [];
+            setEntries((prev) =>
+              prev.map((e) =>
+                e.orderId === orderId
+                  ? {
+                      ...e,
+                      overflowStatus:
+                        res.ok && violations.length === 0 ? "pass" : "fail",
+                      overflowIssues: violations.map(
+                        (v) =>
+                          `page ${v.pageIndex + 1}: ${v.selector} overflows by ${Math.round(v.overflowPx)}px`,
+                      ),
+                    }
+                  : e,
+              ),
+            );
+          } catch {
+            setEntries((prev) =>
+              prev.map((e) =>
+                e.orderId === orderId
+                  ? { ...e, overflowStatus: "fail", overflowIssues: ["check failed"] }
+                  : e,
               ),
             );
           }
@@ -1596,6 +1666,7 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
                       <th className="px-3 py-3 text-left">Score</th>
                       <th className="px-3 py-3 text-center">HTML</th>
                       <th className="px-3 py-3 text-center">PDF</th>
+                      <th className="px-3 py-3 text-center">Overflow</th>
                       <th className="px-3 py-3 text-center">Review</th>
                       <th className="px-3 py-3 text-center">Checklist</th>
                       <th className="px-3 py-3 text-left">Issues</th>
@@ -1697,6 +1768,16 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
                                 ↓ PDF
                               </a>
                             )}
+                          </div>
+                        </td>
+
+                        {/* Print overflow */}
+                        <td className="px-3 py-3 text-center">
+                          <div
+                            className="flex flex-col items-center gap-1"
+                            title={e.overflowIssues.join("\n") || undefined}
+                          >
+                            {overflowBadge(e.overflowStatus, e.overflowIssues.length)}
                           </div>
                         </td>
 
@@ -1884,6 +1965,15 @@ export function ReportQaPage({ adminKey }: { adminKey: string }) {
               </span>
               <span className="pill bg-white/5 text-white/30">
                 {pdfBadge(focusedEntry.pdfStatus)}
+              </span>
+              <span
+                className="pill bg-white/5 text-white/30"
+                title={focusedEntry.overflowIssues.join("\n") || undefined}
+              >
+                {overflowBadge(
+                  focusedEntry.overflowStatus,
+                  focusedEntry.overflowIssues.length,
+                )}
               </span>
             </div>
 

@@ -29,16 +29,51 @@ import { GeoVizMark } from "@/components/brand/GeoVizMark";
 export function ReportDocument({ model }: { model: ReportModel }) {
   const m = model;
   const reportId = m.meta.reportId;
+  const hasReadiness = m.readiness.length > 0;
+
+  // Ordered manifest of every physical page this template renders. The
+  // "n" badge in each header is derived from this array's position, not
+  // hand-maintained per component — inserting, removing, or (as with
+  // "readiness" below) conditionally skipping a page automatically
+  // renumbers every page after it, instead of requiring a manual sweep
+  // of hardcoded literals across every Page* component.
+  type PageId =
+    | "cover"
+    | "briefing"
+    | "cross-model"
+    | "evidence"
+    | "diagnostics"
+    | "readiness"
+    | "issues"
+    | "fixes"
+    | "action";
+  const pageIds: PageId[] = [
+    "cover",
+    "briefing",
+    "cross-model",
+    "evidence",
+    "diagnostics",
+    ...(hasReadiness ? (["readiness"] as const) : []),
+    "issues",
+    "fixes",
+    "action",
+  ];
+  const n = (id: PageId): string =>
+    String(pageIds.indexOf(id) + 1).padStart(2, "0");
+
   return (
     <article className="rd">
-      <CoverPage model={m} />
-      <ExecutivePage model={m} reportId={reportId} />
-      <AIIntelligencePage model={m} reportId={reportId} />
-      <EvidencePage model={m} reportId={reportId} />
-      <DiagnosticsPage model={m} reportId={reportId} />
-      <IssuesPage model={m} reportId={reportId} />
-      <FixesPage model={m} reportId={reportId} />
-      <ActionPage model={m} reportId={reportId} />
+      <CoverPage model={m} n={n("cover")} />
+      <ExecutivePage model={m} reportId={reportId} n={n("briefing")} />
+      <AIIntelligencePage model={m} reportId={reportId} n={n("cross-model")} />
+      <EvidencePage model={m} reportId={reportId} n={n("evidence")} />
+      <DiagnosticsPage model={m} reportId={reportId} n={n("diagnostics")} />
+      {hasReadiness ? (
+        <ReadinessPage model={m} reportId={reportId} n={n("readiness")} />
+      ) : null}
+      <IssuesPage model={m} reportId={reportId} n={n("issues")} />
+      <FixesPage model={m} reportId={reportId} n={n("fixes")} />
+      <ActionPage model={m} reportId={reportId} n={n("action")} />
     </article>
   );
 }
@@ -82,7 +117,7 @@ function Page({
 }
 
 // ── P1 · Cover ──────────────────────────────────────────────────────
-function CoverPage({ model }: { model: ReportModel }) {
+function CoverPage({ model, n }: { model: ReportModel; n: string }) {
   const m = model;
   const overall = typeof m.score.overall === "number" ? m.score.overall : null;
   const gap =
@@ -93,7 +128,7 @@ function CoverPage({ model }: { model: ReportModel }) {
     <Page variant="dark">
       <header className="rd-head rd-head-cover">
         <Logo dark />
-        <span className="rd-head-num">01</span>
+        <span className="rd-head-num">{n}</span>
       </header>
 
       <p className="rd-cover-eyebrow">AI VISIBILITY INTELLIGENCE REPORT</p>
@@ -165,7 +200,15 @@ function CoverFootCell({ k, v }: { k: string; v: string }) {
 }
 
 // ── P2 · Executive Summary ──────────────────────────────────────────
-function ExecutivePage({ model, reportId }: { model: ReportModel; reportId: string }) {
+function ExecutivePage({
+  model,
+  reportId,
+  n,
+}: {
+  model: ReportModel;
+  reportId: string;
+  n: string;
+}) {
   const m = model;
   const cm = m.crossModel;
   const overall = typeof m.score.overall === "number" ? String(m.score.overall) : "—";
@@ -180,7 +223,7 @@ function ExecutivePage({ model, reportId }: { model: ReportModel; reportId: stri
   );
   return (
     <Page variant="light">
-      <PageHead context="BRIEFING" n="02" />
+      <PageHead context="BRIEFING" n={n} />
       <h1 className="rd-title">Executive Summary</h1>
       <p className="rd-sub">
         The bottom line — what AI systems currently understand about{" "}
@@ -288,12 +331,19 @@ function Callout({
 }
 
 // ── P3 · AI Intelligence ────────────────────────────────────────────
-function AIIntelligencePage({ model }: { model: ReportModel; reportId: string }) {
+function AIIntelligencePage({
+  model,
+  n,
+}: {
+  model: ReportModel;
+  reportId: string;
+  n: string;
+}) {
   const m = model;
   const cm = m.crossModel;
   return (
     <Page variant="light">
-      <PageHead context="CROSS-MODEL AI INTELLIGENCE" n="03" />
+      <PageHead context="CROSS-MODEL AI INTELLIGENCE" n={n} />
       <h1 className="rd-title">AI Intelligence</h1>
       <p className="rd-sub">
         How ChatGPT, Claude, Gemini, and Perplexity answered when a customer
@@ -489,11 +539,19 @@ function ModelMatrixRow({
 }
 
 // ── P4 · Evidence Reviewed ──────────────────────────────────────────
-function EvidencePage({ model, reportId }: { model: ReportModel; reportId: string }) {
+function EvidencePage({
+  model,
+  reportId,
+  n,
+}: {
+  model: ReportModel;
+  reportId: string;
+  n: string;
+}) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="AUDIT EVIDENCE" n="04" />
+      <PageHead context="AUDIT EVIDENCE" n={n} />
 
       {m.customerQuestions.length > 0 ? (
         <>
@@ -546,11 +604,26 @@ function EvidenceRow({ row }: { row: ReportModelEvidence }) {
 }
 
 // ── P5 · Visibility Diagnostics ─────────────────────────────────────
-function DiagnosticsPage({ model, reportId }: { model: ReportModel; reportId: string }) {
+// Deliberately holds only the six-category bar list + score-interpretation
+// card. The composite readiness factors used to live here too (as
+// <ReadinessGrid>), but that block is ~200px of genuinely unavoidable
+// content (see ReadinessPage below) that pushed this page's total well
+// past one printable A4 area regardless of spacing — it now gets its
+// own page instead of being crammed in. See "readiness" in the pageIds
+// manifest in ReportDocument() for how the page numbering adjusts.
+function DiagnosticsPage({
+  model,
+  reportId,
+  n,
+}: {
+  model: ReportModel;
+  reportId: string;
+  n: string;
+}) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="WHERE THE SCORE COMES FROM" n="05" />
+      <PageHead context="WHERE THE SCORE COMES FROM" n={n} />
       <h1 className="rd-title">Visibility Diagnostics</h1>
       <p className="rd-sub">
         The six signals AI systems use to decide whether to identify and
@@ -573,7 +646,33 @@ function DiagnosticsPage({ model, reportId }: { model: ReportModel; reportId: st
           <p className="rd-interp-note">{m.scoreNote}</p>
         ) : null}
       </div>
-      {m.readiness.length > 0 ? <ReadinessGrid readiness={m.readiness} /> : null}
+    </Page>
+  );
+}
+
+// ── P6 · Recommendation Readiness ───────────────────────────────────
+// Split out of DiagnosticsPage (see comment above). Only rendered when
+// m.readiness has entries — see the hasReadiness check in
+// ReportDocument(), which also removes this id from the page-number
+// manifest so numbering never skips a value when it's absent.
+function ReadinessPage({
+  model,
+  n,
+}: {
+  model: ReportModel;
+  reportId: string;
+  n: string;
+}) {
+  const m = model;
+  return (
+    <Page variant="light">
+      <PageHead context="RECOMMENDATION READINESS" n={n} />
+      <h1 className="rd-title">AI Recommendation Readiness</h1>
+      <p className="rd-sub">
+        Composite signals estimating whether AI systems have enough verified
+        structure and trust evidence to surface and recommend this business.
+      </p>
+      <ReadinessGrid readiness={m.readiness} />
     </Page>
   );
 }
@@ -628,11 +727,19 @@ function ReadinessGrid({ readiness }: { readiness: ReadinessFactor[] }) {
 }
 
 // ── P6 · Top Issues ─────────────────────────────────────────────────
-function IssuesPage({ model, reportId }: { model: ReportModel; reportId: string }) {
+function IssuesPage({
+  model,
+  reportId,
+  n,
+}: {
+  model: ReportModel;
+  reportId: string;
+  n: string;
+}) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="CRITICAL VISIBILITY GAPS" n="06" />
+      <PageHead context="CRITICAL VISIBILITY GAPS" n={n} />
       <h1 className="rd-title">Top Issues</h1>
       <p className="rd-sub">
         The few issues that most directly affect whether AI systems recommend
@@ -673,11 +780,19 @@ function IssueCard({ diag }: { diag: ReportModelDiagnostic }) {
 }
 
 // ── P7 · Priority Fix Plan ──────────────────────────────────────────
-function FixesPage({ model, reportId }: { model: ReportModel; reportId: string }) {
+function FixesPage({
+  model,
+  reportId,
+  n,
+}: {
+  model: ReportModel;
+  reportId: string;
+  n: string;
+}) {
   const m = model;
   return (
     <Page variant="light">
-      <PageHead context="WHAT TO FIX FIRST" n="07" />
+      <PageHead context="WHAT TO FIX FIRST" n={n} />
       <h1 className="rd-title">Priority Fix Plan</h1>
       <p className="rd-sub">
         Each fix connects directly to business impact and the GeoViz Foundation
@@ -751,13 +866,20 @@ function FixCard({ fix }: { fix: ReportModelFix }) {
 }
 
 // ── P8 · Strategic Action Plan + Foundation Fix CTA ─────────────────
-function ActionPage({ model, reportId }: { model: ReportModel; reportId: string }) {
+function ActionPage({
+  model,
+  n,
+}: {
+  model: ReportModel;
+  reportId: string;
+  n: string;
+}) {
   const m = model;
   return (
     <Page variant="dark">
       <header className="rd-head rd-head-cover">
         <Logo dark />
-        <span className="rd-head-num">08</span>
+        <span className="rd-head-num">{n}</span>
       </header>
       <p className="rd-cta-eyebrow">Foundation Fix</p>
       <h1 className="rd-action-title">Strategic Action Plan</h1>

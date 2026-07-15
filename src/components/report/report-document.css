@@ -35,6 +35,33 @@
   --c-red: #ef4444;
   --c-blue: #3b82f6;
 
+  /* PDF/print page-layout constants. Physical page size (A4,
+     18mm/16mm margins) is owned by print.css's @page rule and
+     shared with the legacy renderer — these describe the printable
+     area .rd-page itself must respect within that. */
+  --rd-page-height: 261mm; /* PAGE_HEIGHT — A4 minus @page margins */
+  --rd-page-padding-top: 4mm; /* PAGE_PADDING_TOP — matches current header clearance, unchanged */
+  /* PAGE_PADDING_BOTTOM — kept at the original 8mm (~30px), not the
+     48px this was briefly bumped to. Measured via real Puppeteer
+     rendering (scripts/measure-pdf-overflow.ts) against order
+     cmrdgry6u0000x45s65oj80z8: raising this to 48px directly worsened
+     already-existing overflow on OTHER pages (3/4/6/7) that don't have
+     a compensating content-height fix, since it eats into the fixed
+     261mm budget with no content reduction to match. Pages 5 and 8 are
+     fixed below via their actual offending elements' own content
+     height instead of by borrowing page-level padding. */
+  --rd-page-padding-bottom: 8mm; /* PAGE_PADDING_BOTTOM */
+  --rd-content-max-height: calc(
+    var(--rd-page-height) - var(--rd-page-padding-top) - var(--rd-page-padding-bottom)
+  ); /* CONTENT_MAX_HEIGHT — authoring reference only; not applied as an
+        enforced max-height/overflow, which would reintroduce clipping. */
+  --rd-section-gap: 15px; /* SECTION_GAP — title-to-content spacing. 15px
+     (was 18px) — trimmed to give the Diagnostics page real safety
+     margin under the pagination budget (see PAGINATION_SAFETY_MARGIN_PX
+     in pdf-overflow-check.ts); safe everywhere else too since it's a
+     uniform reduction, never an increase, on every page that uses it. */
+  --rd-card-gap: 12px; /* CARD_GAP — card-to-card stacking spacing */
+
   font-family: var(--rd-sans);
   color: var(--l-ink);
   font-size: 15px;
@@ -84,7 +111,15 @@
   border-bottom: 1px solid var(--l-border);
   margin-bottom: 26px;
 }
-.rd-head-cover { border-bottom: none; padding-bottom: 0; margin-bottom: 40px; }
+/* 18px (was 40px, then 26px) — matches the standard .rd-head's own
+   margin-bottom now that this no longer needs to visually substitute
+   for the border-bottom the standard header has and this one doesn't.
+   Trimmed further as part of the Action/CTA page's safety-margin
+   close (see .rd .cta-card below) — safe on the Cover page (P1) too
+   since it's a uniform reduction there as well. Trims the gap, not
+   the page's own bottom padding, so the intentional bottom breathing
+   room is untouched. */
+.rd-head-cover { border-bottom: none; padding-bottom: 0; margin-bottom: 18px; }
 .rd-head-context {
   font-family: var(--rd-mono);
   font-size: 10.5px;
@@ -149,14 +184,18 @@
   font-size: 15px;
   line-height: 1.55;
   color: var(--l-muted);
-  margin: 0 0 22px;
+  /* SECTION_GAP (was a one-off 22px) — shared token, applies to every
+     page's subhead-to-content gap. */
+  margin: 0 0 var(--rd-section-gap);
   max-width: 62ch;
 }
 .rd-note { font-size: 14.5px; color: var(--l-muted); }
 /* Clarifying notes that separate model scores / access scores from
    recommendation readiness. */
 .rd-prov-note { margin: 7px 0 0; line-height: 1.45; font-size: 13px; }
-.rd-bars-note { margin: -8px 0 16px; line-height: 1.45; font-size: 13px; }
+/* margin-bottom 13px (was 16px) — same Diagnostics overflow close as
+   .rd-bars / .rd-interp above. */
+.rd-bars-note { margin: -8px 0 7px; line-height: 1.45; font-size: 13px; }
 
 /* tone text */
 .rd-v-ok { color: var(--c-green); }
@@ -782,8 +821,25 @@
 .rd-ev-row { padding: 10px 20px; }
 
 /* ════════════════ P5 · DIAGNOSTICS (light) ════════════════ */
-.rd-bars { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
-.rd-bar { display: flex; flex-direction: column; gap: 7px; }
+/* CARD_GAP for margin-bottom (was 18px); the inter-bar gap (was 12px)
+   is tightened to 9px — measured via scripts/measure-pdf-overflow.ts
+   against order cmrdgry6u0000x45s65oj80z8: the six-category bar list
+   plus the Score-interpretation card was the identified overflow
+   source on P5 (~20px past the printable-area bottom), and this block
+   was the largest reducible space on that page. */
+/* 4px (was 9px, originally 12px) — now that ReadinessGrid has its own
+   page, Diagnostics only holds .rd-bars + .rd-interp, but that pair
+   alone still ran ~26px over budget on the reference order (see
+   scripts/measure-pdf-overflow.ts). A prior pass got this to exactly
+   0px measured overflow, which turned out to be a false pass —
+   .rd-interp has break-inside:avoid, and the real print engine still
+   pushed it to a blank continuation page at that razor-thin margin.
+   See PAGINATION_SAFETY_MARGIN_PX in pdf-overflow-check.ts: this needs
+   real headroom under the budget, not an exact zero. */
+.rd-bars { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--rd-card-gap); }
+/* gap 6px (was 7px) — same Diagnostics safety-margin close as .rd-bars
+   above; small enough per-bar that six bars still add up. */
+.rd-bar { display: flex; flex-direction: column; gap: 6px; }
 .rd-bar-top { display: flex; align-items: flex-start; justify-content: space-between; }
 .rd-bar-label-col {
   display: flex;
@@ -842,7 +898,9 @@
   background: var(--l-card);
   border: 1px solid var(--l-border);
   border-radius: 14px;
-  padding: 16px 20px;
+  /* Vertical padding 10px (was 16px) — part of the same Diagnostics
+     bars+interp overflow close described on .rd-bars above. */
+  padding: 10px 20px;
 }
 .rd-interp-title {
   font-family: var(--rd-display);
@@ -867,7 +925,10 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
-  margin-top: 16px;
+  /* SECTION_GAP (was a one-off 16px) — this grid is the last block on
+     P5 in the common case; its bottom breathing room comes from
+     .rd-page's own PAGE_PADDING_BOTTOM safe zone, not a margin here. */
+  margin-top: var(--rd-section-gap);
 }
 .rd-readiness-card {
   background: var(--d-page);
@@ -1104,15 +1165,27 @@
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.05;
-  margin: 0 0 22px;
+  /* SECTION_GAP (was a one-off 22px) — trimmed slightly as part of the
+     P8 safe-margin fix to give the CTA card more room before the page's
+     bottom safe zone. */
+  margin: 0 0 var(--rd-section-gap);
   color: #fff;
 }
 .rd-outcome-card {
   background: var(--d-panel);
   border: 1px solid var(--d-border);
   border-radius: 14px;
-  padding: 20px 28px;
-  margin-bottom: 16px;
+  /* Vertical padding 6px (was 20px) — part of the Action/CTA page's
+     safety-margin close, same investigation as .rd .cta-card above:
+     the real safe threshold for this page turned out to be ~70-75px
+     of margin, well past the naive content-box arithmetic. */
+  padding: 6px 28px;
+  /* 0 (was CARD_GAP/12px) — the gap to .cta-card is now controlled
+     solely by .rd .cta-card's own margin-top below, to avoid relying
+     on sibling-margin collapse (which takes the MAX of the two
+     margins, not additive/either) producing a larger gap than
+     intended. */
+  margin-bottom: 0;
 }
 .rd-outcome-label {
   font-family: var(--rd-mono);
@@ -1134,7 +1207,9 @@
   font-size: 14px;
   font-style: italic;
   color: var(--d-muted);
-  margin: -12px 0 16px;
+  /* margin-bottom 10px (was 16px) — part of the Action/CTA safety
+     margin close described on .rd .cta-card below. */
+  margin: -12px 0 10px;
 }
 
 /* P8 — projected trajectory note inside outcome card */
@@ -1155,8 +1230,52 @@
   background: var(--d-panel);
   border: 1px solid var(--d-border);
   border-radius: 16px;
-  padding: 24px 32px;
+  /* Vertical padding 8px (was 24px) — safety-margin close for this
+     page. Empirically (bisected via scripts/measure-pdf-overflow.ts
+     against a real rendered PDF, not just the live-DOM checker — see
+     PAGINATION_SAFETY_MARGIN_PX in pdf-overflow-check.ts) this
+     specific card needed ~70-75px of real margin under the printable
+     budget before the real print engine stopped pushing it to its own
+     continuation page — noticeably more than the ~25-30px that was
+     sufficient for the simpler .rd-interp card on the Diagnostics
+     page. Root cause unconfirmed; this card's deeper nested structure
+     (badges row, button, list) is the most likely reason Chromium's
+     fragmentation reserves more space for it than a flat div. */
+  padding: 8px 32px;
   overflow: hidden;
+  /* !important required — print.css has a pre-existing, unscoped,
+     ALSO-!important `.cta-card { margin: 22px 0 6px !important; }`
+     rule (written for the legacy AuditReportContent renderer's own
+     pagination fix) that otherwise wins regardless of this selector's
+     higher specificity, since !important beats specificity outright.
+     Same pattern as the .rd .cta-card-body padding override above.
+     Confirmed via getComputedStyle: without !important here, the
+     legacy rule silently locked margin-top at 22px no matter what
+     value this rule declared. 8px (not the -30px this went through
+     during the empirical bisection) is a real, positive gap — the
+     negative value closed the pagination gap but visually overlapped
+     .rd-outcome-card, since .rd-outcome-card's own margin-bottom is 0.
+     The other trims on this page (its padding, the header/percentile
+     spacing above) carry the rest of the safety margin instead. */
+  margin-top: 8px !important;
+}
+/* .cta-card-body has no rule of its own anywhere in this stylesheet —
+   ReportCtaCard.tsx renders <section class="cta-card"><div
+   class="cta-card-body">, and print.css's LEGACY, unscoped
+   `.cta-card-body` rules (a base one and an `@media print { ... !important }`
+   one, both written for the older AuditReportContent renderer) were the
+   only rules that ever matched, so their padding leaked onto this
+   component too — stacking on top of .cta-card's own 24px/32px padding
+   above. Measured via scripts/measure-pdf-overflow.ts against the real
+   production PDF (order cmrdgry6u0000x45s65oj80z8): this doubled
+   padding alone accounted for more vertical space than the
+   button+fineprint overflow past the page bottom (~28px). The print
+   rule is `!important`, which beats specificity outright, so this
+   override must also be `!important` to actually win — verified via
+   getComputedStyle that a plain (non-!important) override here was
+   silently no-op'd by the legacy rule. */
+.rd .cta-card-body {
+  padding: 0 !important;
 }
 .rd .cta-card-eyebrow {
   font-family: var(--rd-mono);
@@ -1275,12 +1394,27 @@
 /* ════════════════ PRINT — one .rd-page per A4 page (usually) ════════
    @page margins (18mm/16mm) are owned by print.css and shared with the
    legacy renderer, so we don't fight them. Each .rd-page fills at least
-   the full printable content area (A4 297mm − 2×18mm ≈ 261mm) with its
-   own light/dark background, so the dark cover/CTA print as full dark
-   sheets and the light interior reads clean. The neutral host override
-   stops the legacy dark body from showing through a short page. A page
-   whose content exceeds 261mm flows onto an additional physical page
-   instead of being clipped — see the .rd-page rule below. */
+   the full printable content area (A4 297mm − 2×18mm ≈ var(--rd-page-height))
+   with its own light/dark background, so the dark cover/CTA print as full
+   dark sheets and the light interior reads clean. The neutral host override
+   stops the legacy dark body from showing through a short page.
+
+   IMPORTANT — do not assume a page whose content exceeds
+   --rd-page-height reliably "flows onto an additional physical page."
+   Verified against the real GEO-65OJ80Z8 production PDF
+   (scripts/measure-pdf-overflow.ts): with a small overflow (tens of
+   px), Chromium silently clipped the excess with ZERO continuation
+   page — the failing PDF had exactly 8 pages, matching the 8 .rd-page
+   components, with no spillover anywhere. Whether a large overflow
+   triggers a real continuation page instead appears to depend on the
+   Chromium build (a newer local Chromium did paginate a ~200px+
+   overflow; production's Chromium, per the captured PDF, did not
+   paginate a ~20-28px overflow). Treat `min-height` + `overflow:
+   visible` here as "don't hard-clip via CSS," NOT as a guarantee that
+   overflowing content becomes visible somewhere — the only reliable
+   fix is keeping each page's real content within --rd-page-height
+   (see src/lib/pdf-overflow-check.ts, which flags this generically for
+   every report/page, not just this one). */
 @media print {
   .report-host.rd-host,
   .rd-host.report-host { background: #ffffff !important; }
@@ -1294,28 +1428,46 @@
   .rd-page {
     border-radius: 0;
     border: none;
-    padding: 4mm 4mm 8mm;
+    padding: var(--rd-page-padding-top) 4mm var(--rd-page-padding-bottom);
     /* min-height (not height) + visible overflow: every page still fills a
-       full A4 sheet when its content is shorter than 261mm (the common
-       case — same full-bleed background look as before), but a page whose
-       content genuinely exceeds 261mm now grows and spills onto a real,
-       natural continuation page instead of being silently clipped. A rare
-       sparse continuation page is the correct trade-off here — silently
-       discarding paid customer content (the previous behavior) is worse
-       than an occasional thin page. `overflow: visible` is set explicitly
-       (not just omitted) because the base .rd-page rule above sets
-       `overflow: hidden` for an unrelated reason (clipping children to the
-       rounded corners on screen); CSS cascades per-property, so this must
-       be restated here to actually take effect in print. break-inside:
-       avoid on .rd-outcome-card / .rd .cta-card (below) already ensures
-       either atomic block moves whole onto the next page rather than
-       splitting mid-card. */
-    min-height: 261mm;
+       full A4 sheet when its content is shorter than --rd-page-height (the
+       common case — same full-bleed background look as before). Do NOT
+       assume a page whose content exceeds --rd-page-height reliably
+       spills onto a continuation page instead of clipping — verified
+       against the real GEO-65OJ80Z8 production PDF that a small (tens
+       of px) overflow was silently clipped with zero continuation page.
+       This rule's job is only "don't hard-clip via a fixed height +
+       overflow:hidden," which is a real, necessary improvement over the
+       previous behavior — it is not a complete fix by itself. Keeping
+       each page's actual content within --rd-page-height (see
+       src/lib/pdf-overflow-check.ts, wired into src/lib/generate-pdf.ts)
+       is what actually prevents clipping. `overflow: visible` is set
+       explicitly (not just omitted) because the base .rd-page rule
+       above sets `overflow: hidden` for an unrelated reason (clipping
+       children to the rounded corners on screen); CSS cascades
+       per-property, so this must be restated here to actually take
+       effect in print. break-inside: avoid on .rd-outcome-card /
+       .rd .cta-card (below) keeps either atomic block from splitting
+       mid-card across a page boundary — but that alone was NOT
+       sufficient: .rd .cta-card carried its own overflow:hidden (for
+       its on-screen rounded corners) with no print override, which
+       clipped it instead of moving it whole. The dedicated
+       .rd .cta-card override just below restates overflow:visible for
+       print to close that gap, and .rd .cta-card-body's padding
+       override (further down) removes a doubled-padding bug that was
+       the larger contributor to that same clip. */
+    min-height: var(--rd-page-height);
     overflow: visible;
     break-before: page;
     page-break-before: always;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  /* Root-cause fix for the P8 CTA button clipping — see the .rd-page
+     comment above. Mirrors the same overflow:visible restatement 2a16902
+     already applied to .rd-page, extended to cover this nested box. */
+  .rd .cta-card {
+    overflow: visible;
   }
   .rd-page:first-child { break-before: avoid; page-break-before: avoid; }
   /* keep cards/rows from splitting across pages */

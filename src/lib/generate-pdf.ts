@@ -1,6 +1,7 @@
 import puppeteer, { type Browser } from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 import { resolveAppBaseUrl } from "@/lib/app-url";
+import { assertNoPdfOverflow } from "@/lib/pdf-overflow-check";
 
 /**
  * Generate a PDF for a given audit order by driving a headless Chromium
@@ -107,6 +108,30 @@ export async function generateAuditPdf(args: GeneratePdfArgs): Promise<Buffer> {
       );
     }
 
+    // Generic print-overflow check — flags ANY .rd-page whose content
+    // exceeds the printable-area budget, not specific to any one
+    // report/page/component. Soft warning for now (same posture as the
+    // URL-truncation check above): this synchronously serves paid
+    // customer PDFs, so a false positive must never block delivery.
+    // Promote to a hard failure once proven reliable across the
+    // fixture set (see scripts/measure-pdf-overflow.ts).
+    try {
+      const violations = await assertNoPdfOverflow(page);
+      if (violations.length > 0) {
+        console.warn(
+          `[generate-pdf] orderId=${orderId} PDF_OVERFLOW_DETECTED violations=${JSON.stringify(
+            violations,
+          )} — soft warning; PDF still rendered.`,
+        );
+      }
+    } catch (checkErr) {
+      console.warn(
+        `[generate-pdf] orderId=${orderId} overflow-check failed: ${
+          checkErr instanceof Error ? checkErr.message : String(checkErr)
+        }`,
+      );
+    }
+
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
@@ -128,6 +153,48 @@ export async function generateAuditPdf(args: GeneratePdfArgs): Promise<Buffer> {
     );
 
     return Buffer.from(pdf);
+  } finally {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+/**
+ * Standalone overflow check for the admin QA surface — same navigation
+ * as generateAuditPdf (identical Chromium resolution, viewport, print
+ * media emulation) but skips page.pdf() entirely, since QA only needs
+ * the violation list, not the rendered PDF bytes. Kept as a separate,
+ * additive function rather than folded into generateAuditPdf so the
+ * customer-facing PDF path above is untouched.
+ */
+export async function checkPdfOverflowForOrder(args: GeneratePdfArgs) {
+  const { orderId, baseUrl } = args;
+  const timeoutMs = args.timeoutMs ?? 60_000;
+  const printUrl = `${baseUrl.replace(/\/$/, "")}/report/${encodeURIComponent(orderId)}/print`;
+
+  let executablePath =
+    process.env.PUPPETEER_EXECUTABLE_PATH ?? (await chromium.executablePath());
+  if (!executablePath) executablePath = "/tmp/chromium";
+
+  let browser: Browser | undefined;
+  try {
+    browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: { width: 820, height: 1160 },
+      executablePath,
+      headless: true,
+    });
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(timeoutMs);
+    await page.emulateMediaType("print");
+    await page.goto(printUrl, { waitUntil: "networkidle0", timeout: timeoutMs });
+    await page.evaluateHandle("document.fonts.ready");
+    return await assertNoPdfOverflow(page);
   } finally {
     if (browser) {
       try {
