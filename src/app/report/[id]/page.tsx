@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { checkPageRateLimit } from "@/lib/rate-limit";
 import { isSampleAudit } from "@/lib/sample-audit";
+import { isAdminPageRequest } from "@/lib/admin-secret";
 import { RateLimitedNotice } from "@/components/RateLimitedNotice";
 
 /**
@@ -33,28 +34,34 @@ export const metadata = {
 
 export default async function ReportPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams?: { key?: string | string[] };
 }) {
   // 30 hits per 5 min per IP — accommodates a customer who opens the
   // link from the email, refreshes a few times, and re-opens later in
   // the same session. Runs BEFORE the redirect so the throttle applies
   // to whoever's hitting the bare URL, not to the downstream `/print`.
-  const rl = checkPageRateLimit({
-    headers: headers(),
-    routeKey: "page:report:root",
-    limit: 30,
-    windowMs: 5 * 60_000,
-  });
-  if (rl.blocked) {
-    // Public sample reports must never 429. Only on the blocked path, do one
-    // cheap lookup to let samples through; real orders stay throttled.
-    const sampleProbe = await prisma.auditOrder.findUnique({
-      where: { id: params.id },
-      select: { stripeSessionId: true },
+  // Real admin traffic (cookie session or valid ?key=) is exempt — see
+  // isAdminPageRequest.
+  if (!isAdminPageRequest({ key: searchParams?.key })) {
+    const rl = checkPageRateLimit({
+      headers: headers(),
+      routeKey: "page:report:root",
+      limit: 30,
+      windowMs: 5 * 60_000,
     });
-    if (!isSampleAudit(sampleProbe?.stripeSessionId)) {
-      return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+    if (rl.blocked) {
+      // Public sample reports must never 429. Only on the blocked path, do one
+      // cheap lookup to let samples through; real orders stay throttled.
+      const sampleProbe = await prisma.auditOrder.findUnique({
+        where: { id: params.id },
+        select: { stripeSessionId: true },
+      });
+      if (!isSampleAudit(sampleProbe?.stripeSessionId)) {
+        return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+      }
     }
   }
   redirect(`/report/${encodeURIComponent(params.id)}/print`);

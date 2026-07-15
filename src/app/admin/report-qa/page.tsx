@@ -6,6 +6,7 @@ import {
   validateAdminAccess,
 } from "@/lib/report-access";
 import { isAuthed } from "@/lib/admin-auth";
+import { isAdminPageRequest } from "@/lib/admin-secret";
 import { checkPageRateLimit } from "@/lib/rate-limit";
 import { RateLimitedNotice } from "@/components/RateLimitedNotice";
 import { headers } from "next/headers";
@@ -22,18 +23,23 @@ export default async function AdminReportQaPage({
 }: {
   searchParams?: { key?: string | string[] };
 }) {
-  const rl = checkPageRateLimit({
-    headers: headers(),
-    routeKey: "page:admin:report-qa",
-    limit: 60,
-    windowMs: 5 * 60_000,
-  });
-  if (rl.blocked) {
-    return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
-  }
-
   // Accept either key auth (?key=ADMIN_SECRET) or cookie auth (from /admin dashboard).
   const rawKey = searchParams?.key;
+
+  // Real admin traffic is exempt from the public per-IP throttle below —
+  // see isAdminPageRequest. QA batch runs (checklist across many reports
+  // in one session) can legitimately exceed a generic page-view rate.
+  if (!isAdminPageRequest({ key: rawKey })) {
+    const rl = checkPageRateLimit({
+      headers: headers(),
+      routeKey: "page:admin:report-qa",
+      limit: 60,
+      windowMs: 5 * 60_000,
+    });
+    if (rl.blocked) {
+      return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+    }
+  }
   const access = validateAdminAccess(rawKey);
   const cookieAuth = isAuthed();
 

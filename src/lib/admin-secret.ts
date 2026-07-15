@@ -12,6 +12,7 @@
  * whitespace. The compare itself is constant-time.
  */
 import { timingSafeEqual } from "node:crypto";
+import { isAuthed } from "@/lib/admin-auth";
 
 export type AdminKeyCheck = {
   /** True when ADMIN_SECRET is set on the server. */
@@ -65,6 +66,23 @@ export function isValidAdminKey(
   supplied: string | string[] | undefined | null,
 ): boolean {
   return checkAdminKey(supplied).ok;
+}
+
+/**
+ * Admin-or-authenticated check for page Server Components (not route
+ * handlers — see `applyAdminApiRateLimit` in `src/lib/rate-limit.ts` for
+ * that side). True when either the operator is logged into `/admin` via
+ * the `geoviz_admin` cookie (`isAuthed()`), or a valid `?key=` was
+ * supplied. Used to exempt real admin traffic from the public
+ * `checkPageRateLimit` throttle — see `src/app/admin/reports/page.tsx`,
+ * `src/app/admin/report-qa/page.tsx`, `src/app/report/[id]/page.tsx`,
+ * `src/app/report/[id]/print/page.tsx`.
+ */
+export function isAdminPageRequest(opts: {
+  key?: string | string[] | null;
+}): boolean {
+  if (isAuthed()) return true;
+  return isValidAdminKey(opts.key);
 }
 
 export function readAdminKeyFromRequest(req: Request): string | null {

@@ -7,6 +7,7 @@ import {
   logReportAccessAttempt,
   validateAdminAccess,
 } from "@/lib/report-access";
+import { isAdminPageRequest } from "@/lib/admin-secret";
 import { checkPageRateLimit } from "@/lib/rate-limit";
 import { RateLimitedNotice } from "@/components/RateLimitedNotice";
 import {
@@ -30,26 +31,31 @@ export default async function AdminReportsPage({
 }: {
   searchParams?: { key?: string | string[] };
 }) {
-  // Rate-limit BEFORE the admin check + DB work. 60 hits per 5 min
-  // per IP — bumped from 20 after active testing sessions hit the
-  // ceiling on legit reloads (every Run/Send/Review action redirects
-  // the operator back to this page). 60 still bounds a runaway
-  // grinder; the API surfaces (which a script would target) have
-  // their own per-route limits.
-  const rl = checkPageRateLimit({
-    headers: headers(),
-    routeKey: "page:admin:reports",
-    limit: 60,
-    windowMs: 5 * 60_000,
-  });
-  if (rl.blocked) {
-    return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+  const rawKey = searchParams?.key;
+
+  // Rate-limit BEFORE the admin check + DB work — EXCEPT for real admin
+  // traffic (cookie session or valid ?key=), which is exempt (see
+  // isAdminPageRequest). 60 hits per 5 min per IP for everyone else —
+  // bumped from 20 after active testing sessions hit the ceiling on
+  // legit reloads (every Run/Send/Review action redirects the operator
+  // back to this page). 60 still bounds a runaway grinder; the API
+  // surfaces (which a script would target) have their own per-route
+  // limits.
+  if (!isAdminPageRequest({ key: rawKey })) {
+    const rl = checkPageRateLimit({
+      headers: headers(),
+      routeKey: "page:admin:reports",
+      limit: 60,
+      windowMs: 5 * 60_000,
+    });
+    if (rl.blocked) {
+      return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+    }
   }
 
   // Centralized admin compare lives in `lib/report-access.ts` — read
   // ADMIN_SECRET at request time, length-stable compare, no module-level
   // cache. Fail-closed when ADMIN_SECRET is unset.
-  const rawKey = searchParams?.key;
   const key = Array.isArray(rawKey) ? rawKey[0] : rawKey;
   const access = validateAdminAccess(rawKey);
 

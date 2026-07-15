@@ -7,6 +7,7 @@ import { ReportFailedState } from "@/components/report/ReportFailedState";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { logReportAccessAttempt } from "@/lib/report-access";
+import { isAdminPageRequest } from "@/lib/admin-secret";
 import { checkPageRateLimit } from "@/lib/rate-limit";
 import { isSampleAudit } from "@/lib/sample-audit";
 import { RateLimitedNotice } from "@/components/RateLimitedNotice";
@@ -43,28 +44,36 @@ export const metadata = {
 
 export default async function PrintPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams?: { key?: string | string[] };
 }) {
   // 30 hits per 5 min per IP. Throttle BEFORE the Prisma lookup so a
-  // script can't churn `findUnique` calls fishing for CUIDs.
-  const rl = checkPageRateLimit({
-    headers: headers(),
-    routeKey: "page:report:print",
-    limit: 30,
-    windowMs: 5 * 60_000,
-  });
-  if (rl.blocked) {
-    // Public sample reports must never 429 — they're marketing surfaces with
-    // no per-user state. Only on the blocked path do one cheap stripeSessionId
-    // lookup to let samples through; real orders stay throttled and the
-    // happy-path/anti-CUID-fishing behavior is unchanged.
-    const sampleProbe = await prisma.auditOrder.findUnique({
-      where: { id: params.id },
-      select: { stripeSessionId: true },
+  // script can't churn `findUnique` calls fishing for CUIDs. Real admin
+  // traffic (cookie session or valid ?key=) is exempt — see
+  // isAdminPageRequest. This is what lets the admin QA surface
+  // (ReportQaPage's batch fetches to this route) run through many
+  // reports in one session without tripping the public throttle.
+  if (!isAdminPageRequest({ key: searchParams?.key })) {
+    const rl = checkPageRateLimit({
+      headers: headers(),
+      routeKey: "page:report:print",
+      limit: 30,
+      windowMs: 5 * 60_000,
     });
-    if (!isSampleAudit(sampleProbe?.stripeSessionId)) {
-      return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+    if (rl.blocked) {
+      // Public sample reports must never 429 — they're marketing surfaces with
+      // no per-user state. Only on the blocked path do one cheap stripeSessionId
+      // lookup to let samples through; real orders stay throttled and the
+      // happy-path/anti-CUID-fishing behavior is unchanged.
+      const sampleProbe = await prisma.auditOrder.findUnique({
+        where: { id: params.id },
+        select: { stripeSessionId: true },
+      });
+      if (!isSampleAudit(sampleProbe?.stripeSessionId)) {
+        return <RateLimitedNotice retryAfterSec={rl.retryAfterSec} />;
+      }
     }
   }
 
