@@ -32,7 +32,6 @@ const REQUIRED_SERVER_VARS = [
   "DATABASE_URL",
   "ADMIN_SECRET",
   "RESEND_API_KEY",
-  "ANTHROPIC_API_KEY",
 ] as const;
 
 const serverEnvSchema = z.object({
@@ -42,11 +41,25 @@ const serverEnvSchema = z.object({
     .string()
     .min(16, "must be at least 16 chars (high-entropy random)"),
   RESEND_API_KEY: z.string().min(1, "missing"),
-  ANTHROPIC_API_KEY: z
-    .string()
-    .startsWith("sk-ant-", "must start with sk-ant-"),
 
   // Recommended — has a code-level fallback but production should set it.
+  // NOT a build-time hard requirement: the Vercel-deployed Next.js app
+  // (the thing this schema gates) has no unconditional runtime dependency
+  // on Anthropic. The only code paths that actually call the API already
+  // guard themselves at the point of use — the Railway audit worker
+  // (scripts/geo-worker.ts, throws its own clear error before starting an
+  // audit), and the in-app consensus/validator layer
+  // (src/lib/validators/providers/claude.ts,
+  // src/lib/consensus/polishConsensusBullets.ts, both fail soft when it's
+  // missing). Hard-blocking the entire production build on this one var
+  // was redundant with those guards and meant any deploy — including one
+  // for a feature with zero Anthropic dependency — failed if this var
+  // wasn't visible to that particular build. Format is still validated
+  // when the value is present.
+  ANTHROPIC_API_KEY: z
+    .string()
+    .startsWith("sk-ant-", "must start with sk-ant-")
+    .optional(),
   RESEND_EMAIL_FROM: z.string().optional(),
   AUDIT_NOTIFICATION_EMAIL: z.string().email("must be a valid email").optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
@@ -74,7 +87,17 @@ export type EnvCheckResult =
 
 export function checkServerEnv(): EnvCheckResult {
   const parsed = serverEnvSchema.safeParse(process.env);
-  if (parsed.success) return { ok: true, env: parsed.data };
+  if (parsed.success) {
+    if (!parsed.data.ANTHROPIC_API_KEY) {
+      console.warn(
+        "[env] ANTHROPIC_API_KEY is not set. This does not block the build " +
+          "or boot, but paid AI-visibility audits (Railway worker) and the " +
+          "consensus/validator layer will be unavailable until it's " +
+          "configured — see .env.example.",
+      );
+    }
+    return { ok: true, env: parsed.data };
+  }
 
   const errors: string[] = [];
   const flat = parsed.error.flatten().fieldErrors;

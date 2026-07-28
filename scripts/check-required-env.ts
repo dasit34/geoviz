@@ -5,8 +5,10 @@
  * Build-time hard gate for required production environment variables.
  * Wired into the `build` npm script (see package.json) so a genuinely
  * missing/invalid required var (DATABASE_URL, ADMIN_SECRET,
- * RESEND_API_KEY, ANTHROPIC_API_KEY — see src/lib/env.ts) fails the
- * Vercel/Railway BUILD and blocks the deploy.
+ * RESEND_API_KEY — see src/lib/env.ts) fails the Vercel/Railway BUILD
+ * and blocks the deploy. ANTHROPIC_API_KEY is deliberately NOT in this
+ * hard-required list — see its own comment in src/lib/env.ts for why;
+ * a missing value there only logs a warning, it never blocks the build.
  *
  * This is deliberately NOT wired into src/instrumentation.ts's runtime
  * hook. That hook already validates env at boot but soft-fails on
