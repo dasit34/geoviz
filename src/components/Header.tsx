@@ -19,6 +19,9 @@ export function Header() {
           >
             Sample report
           </Link>
+          <Link href="/check" className="transition hover:text-white">
+            Free AI Visibility Check
+          </Link>
           <Link href="/#pricing" className="transition hover:text-white">
             Pricing
           </Link>

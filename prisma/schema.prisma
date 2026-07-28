@@ -18,6 +18,44 @@ enum AuditStatus {
   completed
 }
 
+/// Free AI Visibility Check (`/check`) — a lightweight, unauthenticated
+/// lead-generation tool. Fully separate from the paid audit pipeline:
+/// deterministic-only (reuses the V2 preflight analyzers), no LLM call,
+/// no relation to `AuditOrder`. Never feeds the canonical GeoViz score.
+///
+/// Purchase attribution is intentionally NOT a foreign key — it's
+/// computed at read time in the admin view by matching `email` against
+/// `AuditOrder` rows created after this submission. Keeping it a soft
+/// join means the Stripe checkout/webhook code paths (load-bearing,
+/// see CLAUDE.md) never need to know this table exists.
+model FreeCheckSubmission {
+  id           String  @id @default(cuid())
+  websiteUrl   String
+  businessName String
+  city         String
+  state        String
+  category     String
+  email        String
+
+  // "completed" | "failed" (e.g. the target site couldn't be fetched).
+  status        String  @default("completed")
+  failureReason String?
+
+  // Null when status = "failed".
+  overallScore Int?
+  // CheckResult[] — see src/lib/free-check/types.ts. Kept as Json so the
+  // simplified check taxonomy can evolve without a migration.
+  checks       Json?
+  strengths    Json?
+  problems     Json?
+  fixes        Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+}
+
 model AuditOrder {
   id                         String        @id @default(cuid())
   websiteUrl                 String

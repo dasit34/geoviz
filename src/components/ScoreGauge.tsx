@@ -20,6 +20,10 @@ type ScoreGaugeProps = {
   score: number;
   status: string;
   size?: "lg" | "sm";
+  /** Show the "SAMPLE" ribbon. Default true (existing behavior). Set
+   * false for surfaces showing a real, freshly-computed score (e.g.
+   * the /check free tool) rather than a fixture/marketing sample. */
+  sampleLabel?: boolean;
 };
 
 // Arc geometry: 270° sweep starting at 7-o'clock (135° from 12),
@@ -55,7 +59,12 @@ const ARC_D = `M ${arcStart.x} ${arcStart.y} A ${RADIUS} ${RADIUS} 0 1 0 ${arcEn
 // Background (unfilled) arc — same geometry, low opacity.
 const BG_ARC_D = ARC_D;
 
-export function ScoreGauge({ score, status, size = "lg" }: ScoreGaugeProps) {
+export function ScoreGauge({
+  score,
+  status,
+  size = "lg",
+  sampleLabel = true,
+}: ScoreGaugeProps) {
   const dim = size === "lg" ? 360 : 160;
   const scoreFont = size === "lg" ? 64 : 36;
   const statusFont = size === "lg" ? 9 : 7.5;
@@ -85,7 +94,7 @@ export function ScoreGauge({ score, status, size = "lg" }: ScoreGaugeProps) {
         height: dim,
         maxWidth: "100%",
       }}
-      aria-label={`AI Visibility Score — ${score} of 100 · ${status} · Sample`}
+      aria-label={`AI Visibility Score — ${score} of 100 · ${status}${sampleLabel ? " · Sample" : ""}`}
       role="img"
     >
       <svg
@@ -215,30 +224,33 @@ export function ScoreGauge({ score, status, size = "lg" }: ScoreGaugeProps) {
           {status}
         </text>
 
-        {/* SAMPLE ribbon — top-right of the gauge frame */}
-        <g transform="translate(70, 8)">
-          <rect
-            x="-9"
-            y="-3.6"
-            width="18"
-            height="7.2"
-            rx="0.6"
-            fill="oklch(0.16 0.020 248 / 0.85)"
-            stroke="oklch(0.82 0.12 70 / 0.55)"
-            strokeWidth="0.25"
-          />
-          <text
-            x="0"
-            y="0.8"
-            fontFamily="ui-monospace, monospace"
-            fontSize={ribbonFont}
-            fill="oklch(0.82 0.12 70 / 0.95)"
-            textAnchor="middle"
-            letterSpacing="0.22em"
-          >
-            SAMPLE
-          </text>
-        </g>
+        {/* SAMPLE ribbon — top-right of the gauge frame. Omitted when
+            sampleLabel=false (real, non-fixture scores). */}
+        {sampleLabel ? (
+          <g transform="translate(70, 8)">
+            <rect
+              x="-9"
+              y="-3.6"
+              width="18"
+              height="7.2"
+              rx="0.6"
+              fill="oklch(0.16 0.020 248 / 0.85)"
+              stroke="oklch(0.82 0.12 70 / 0.55)"
+              strokeWidth="0.25"
+            />
+            <text
+              x="0"
+              y="0.8"
+              fontFamily="ui-monospace, monospace"
+              fontSize={ribbonFont}
+              fill="oklch(0.82 0.12 70 / 0.95)"
+              textAnchor="middle"
+              letterSpacing="0.22em"
+            >
+              SAMPLE
+            </text>
+          </g>
+        ) : null}
 
         {/* Frame corners — measurement-instrument ticks */}
         <g stroke="oklch(0.50 0.018 245 / 0.35)" strokeWidth="0.22" fill="none" strokeLinecap="round">

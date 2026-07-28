@@ -45,6 +45,7 @@
     "test:missing-providers": "tsx scripts/test-missing-providers.ts",
     "test:score-explainer": "tsx scripts/test-score-explainer.ts",
     "test:format-score": "tsx scripts/test-format-score.ts",
+    "test:free-check-scoring": "tsx scripts/test-free-check-scoring.ts",
     "test:category-label-wrap": "tsx scripts/test-category-label-wrap.ts",
     "test:report-redesign": "tsx scripts/test-report-redesign.ts",
     "test:report-model": "tsx scripts/test-report-model.ts",

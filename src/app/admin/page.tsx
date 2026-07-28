@@ -176,6 +176,9 @@ export default async function AdminPage({
             >
               Report QA
             </Link>
+            <Link href="/admin/free-checks" className="btn-ghost text-sm">
+              Free Checks
+            </Link>
             <form action={logoutAction}>
               <button type="submit" className="btn-ghost text-sm">
                 Sign out
