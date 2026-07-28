@@ -172,6 +172,23 @@ check("light/dark page system: dark bookends fixed, light interior flows", () =>
     /\.rd-head,\s*\.rd-title\s*\{[^}]*break-after:\s*avoid/,
     "section headers must not be strandable alone at a page bottom",
   );
+
+  // orphans/widows guard against a lone wrapped line being left alone at
+  // the top/bottom of a page. Both properties inherit, so setting them on
+  // .rd (print) covers every paragraph in the document.
+  const rdPrintBlock = printCss.match(/\.rd\s*\{([^}]*)\}/);
+  assert.ok(rdPrintBlock, ".rd print rule block not found");
+  assert.match(rdPrintBlock[1], /orphans:\s*\d/, "orphans must be set on .rd in print");
+  assert.match(rdPrintBlock[1], /widows:\s*\d/, "widows must be set on .rd in print");
+
+  // List rows that can wrap to 2 lines (Executive Summary bullets,
+  // Customer Questions Tested) must not split mid-item across a page
+  // boundary, same protection every card class already has.
+  assert.match(
+    CSS,
+    /\.rd-exec-item,\s*\.rd-questions-item\s*\{\s*break-inside:\s*avoid/,
+    "list rows must not split mid-item across a page boundary",
+  );
 });
 
 check("Evidence Reviewed page renders inspected signals from preflight", () => {

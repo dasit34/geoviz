@@ -1451,6 +1451,13 @@
     padding: 0;
     gap: 0;
     display: block;
+    /* orphans/widows inherit to every descendant paragraph — stops a
+       lone line of a wrapped paragraph from being left alone at the
+       top or bottom of a page. Most report text is short (1-2 lines)
+       so this rarely triggers, but it's the correct standing rule for
+       any paragraph that does wrap to 3+ lines. */
+    orphans: 2;
+    widows: 2;
   }
   .rd-page {
     border-radius: 0;
@@ -1489,19 +1496,14 @@
   /* Keep a section's header band + title glued to the content below it
      — never let a heading get stranded alone at the bottom of a page. */
   .rd-head, .rd-title { break-after: avoid; page-break-after: avoid; }
-  /* .rd-impl (Implementation path, end of FixesPage) sits directly
-     before ActionPage, which always forces a fresh dark sheet
-     (.rd-page-dark above). Without this, .rd-impl alone doesn't fit
-     after the fix cards, so it gets pushed to its own near-empty
-     trailing page. break-before: avoid tells the print engine it may
-     not break immediately before .rd-impl — if it still doesn't fit,
-     the fragmentation algorithm pulls the preceding fix card down with
-     it instead, so the trailing page always carries real content, not
-     just a short orphaned block. */
-  .rd-impl { break-before: avoid; page-break-before: avoid; }
   /* keep cards/rows from splitting across pages */
   .rd-stat, .rd-callout, .rd-prov, .rd-ev-row, .rd-bar, .rd-issue, .rd-fix,
   .rd-readiness-card, .rd-bucket, .rd-fix-pill, .rd-exec-gap,
   .rd-impl, .rd-outcome-card, .rd .cta-card,
-  .rd-interp, .rd-cmi-meta, .rd-matrix { break-inside: avoid; page-break-inside: avoid; }
+  .rd-interp, .rd-cmi-meta, .rd-matrix,
+  /* .rd-exec-item (Executive Summary bullets) and .rd-questions-item
+     (Customer Questions Tested list) are <li> rows that can wrap to 2
+     lines — without this they could split mid-item across a page
+     boundary the same way an unprotected card could. */
+  .rd-exec-item, .rd-questions-item { break-inside: avoid; page-break-inside: avoid; }
 }
