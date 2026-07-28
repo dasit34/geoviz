@@ -135,7 +135,7 @@ check("Page 4 renders Customer Questions Tested from the model (not 'prompts')",
   assert.match(DOC, /WHAT AI HAD TO READ/i);
 });
 
-check("light/dark page system: dark cover + CTA, light interior", () => {
+check("light/dark page system: dark bookends fixed, light interior flows", () => {
   // Page variant is applied via <Page variant="dark|light"> → rd-page-${variant}.
   assert.match(DOC, /variant="dark"/);
   assert.match(DOC, /variant="light"/);
@@ -143,7 +143,35 @@ check("light/dark page system: dark cover + CTA, light interior", () => {
   const CSS = read("src/components/report/report-document.css");
   assert.match(CSS, /\.rd-page-light/);
   assert.match(CSS, /\.rd-page-dark/);
-  assert.match(CSS, /break-before: page/, "per-page print breaks");
+
+  // Dark bookends (Cover, ActionPage) stay fixed full-bleed sheets that
+  // always start a fresh page. Light interior sections must NOT force a
+  // page break or a fixed height — they flow, so short sections can
+  // share a physical page instead of leaving a blank one.
+  //
+  // Scope the search to the actual @media print RULE (not just the string
+  // "@media print", which also appears in the file's header comment):
+  // .rd-page-dark / .rd-page-light are ALSO defined earlier for screen
+  // (background/color only) — matching the first occurrence in the whole
+  // file would grab that screen rule instead of the print one.
+  const printRuleMatch = CSS.match(/@media print\s*\{/);
+  assert.ok(printRuleMatch, "@media print rule not found");
+  const printCss = CSS.slice(printRuleMatch.index);
+  const darkBlock = printCss.match(/\.rd-page-dark\s*\{([^}]*)\}/);
+  const lightBlock = printCss.match(/\.rd-page-light\s*\{([^}]*)\}/);
+  assert.ok(darkBlock, ".rd-page-dark print rule block not found");
+  assert.ok(lightBlock, ".rd-page-light print rule block not found");
+  assert.match(darkBlock[1], /break-before:\s*page/, "dark bookends must force a fresh sheet");
+  assert.match(darkBlock[1], /min-height:\s*var\(--rd-page-height\)/, "dark bookends must stay full-bleed sheets");
+  assert.doesNotMatch(lightBlock[1], /break-before:\s*page\b/, "light interior sections must not force a page break");
+  assert.doesNotMatch(lightBlock[1], /min-height/, "light interior sections must not be forced to a fixed sheet height");
+
+  // Section headers must stay glued to their content — no orphaned headings.
+  assert.match(
+    CSS,
+    /\.rd-head,\s*\.rd-title\s*\{[^}]*break-after:\s*avoid/,
+    "section headers must not be strandable alone at a page bottom",
+  );
 });
 
 check("Evidence Reviewed page renders inspected signals from preflight", () => {

@@ -3,7 +3,9 @@
    Rebuilt to the approved Figma spec: dark-navy Cover (P1) + CTA
    (P8), light interior (P2–P7). Premium, spacious, customer-facing.
    Drives BOTH the on-screen report and the Puppeteer PDF (the
-   @media print block at the bottom maps each .rd-page to one A4 page).
+   @media print block at the bottom fixes the dark Cover/CTA to one
+   full A4 sheet each; the light interior sections flow continuously
+   and share physical pages based on actual content height).
    ============================================================ */
 
 .rd {
@@ -1391,30 +1393,55 @@
   .rd-cover-biz { font-size: 32px; }
 }
 
-/* ════════════════ PRINT — one .rd-page per A4 page (usually) ════════
+/* ════════════════ PRINT — dark bookends are fixed sheets; light
+   interior sections flow ════════════════════════════════════════════
    @page margins (18mm/16mm) are owned by print.css and shared with the
-   legacy renderer, so we don't fight them. Each .rd-page fills at least
-   the full printable content area (A4 297mm − 2×18mm ≈ var(--rd-page-height))
-   with its own light/dark background, so the dark cover/CTA print as full
-   dark sheets and the light interior reads clean. The neutral host override
-   stops the legacy dark body from showing through a short page.
+   legacy renderer, so we don't fight them.
 
-   IMPORTANT — do not assume a page whose content exceeds
-   --rd-page-height reliably "flows onto an additional physical page."
-   Verified against the real GEO-65OJ80Z8 production PDF
-   (scripts/measure-pdf-overflow.ts): with a small overflow (tens of
-   px), Chromium silently clipped the excess with ZERO continuation
-   page — the failing PDF had exactly 8 pages, matching the 8 .rd-page
-   components, with no spillover anywhere. Whether a large overflow
-   triggers a real continuation page instead appears to depend on the
-   Chromium build (a newer local Chromium did paginate a ~200px+
-   overflow; production's Chromium, per the captured PDF, did not
-   paginate a ~20-28px overflow). Treat `min-height` + `overflow:
-   visible` here as "don't hard-clip via CSS," NOT as a guarantee that
-   overflowing content becomes visible somewhere — the only reliable
-   fix is keeping each page's real content within --rd-page-height
-   (see src/lib/pdf-overflow-check.ts, which flags this generically for
-   every report/page, not just this one). */
+   Two DIFFERENT pagination contracts, split by variant:
+
+   - .rd-page-dark (Cover, ActionPage/closing CTA) — these are
+     deliberate full-bleed dramatic sheets. Each one always fills at
+     least the full printable content area (A4 297mm − 2×18mm ≈
+     var(--rd-page-height)) and always starts on its own fresh
+     physical page, exactly as before. Unchanged.
+
+   - .rd-page-light (every interior content section — Executive,
+     AI Intelligence, Evidence, Diagnostics, Readiness, Issues, Fixes)
+     — these are NOT forced to a fixed height or a fresh page anymore.
+     They flow in normal document order and let Chromium's native print
+     fragmentation decide where physical page boundaries fall, based on
+     each section's actual content height. This is what fixes short
+     sections leaving large blank areas below them, and short sections
+     being unable to share a sheet with a neighbor. `break-inside:
+     avoid` on every card/row class (below) still prevents any single
+     card from splitting mid-content across a page boundary, and
+     `break-after: avoid` on the header band + title (below) keeps a
+     section heading from ever being stranded alone at a page bottom.
+
+   Cover→Executive and Fixes→Action transitions need no extra rule:
+   Cover's forced min-height already exactly fills one physical sheet,
+   so content after it naturally starts at the top of sheet 2; Action
+   keeps its own forced break-before, so it always starts fresh
+   regardless of how much light content packed onto the previous sheet.
+
+   IMPORTANT — historical note, still relevant for .rd-page-dark: do
+   not assume a page whose content exceeds --rd-page-height reliably
+   "flows onto an additional physical page." Verified against the real
+   GEO-65OJ80Z8 production PDF (scripts/measure-pdf-overflow.ts): with
+   a small overflow (tens of px), Chromium silently clipped the excess
+   with ZERO continuation page. Whether a large overflow triggers a
+   real continuation page instead appears to depend on the Chromium
+   build. This is why .rd-page-dark's height stays a hard min-height +
+   forced break rather than being allowed to flow — it's a single,
+   bounded, always-full sheet by design, so there's no overflow case to
+   worry about. The light sections deliberately move AWAY from that
+   fixed-height model instead of trying to make overflow-from-a-fixed-
+   height reliable — natural, non-fixed-height flow is Chromium's
+   standard, well-tested print code path. src/lib/pdf-overflow-check.ts
+   still measures each .rd-page's content against a one-sheet budget as
+   a soft diagnostic; a light section legitimately spanning more than
+   one physical sheet is now expected, not a bug. */
 @media print {
   .report-host.rd-host,
   .rd-host.report-host { background: #ffffff !important; }
@@ -1429,39 +1456,28 @@
     border-radius: 0;
     border: none;
     padding: var(--rd-page-padding-top) 4mm var(--rd-page-padding-bottom);
-    /* min-height (not height) + visible overflow: every page still fills a
-       full A4 sheet when its content is shorter than --rd-page-height (the
-       common case — same full-bleed background look as before). Do NOT
-       assume a page whose content exceeds --rd-page-height reliably
-       spills onto a continuation page instead of clipping — verified
-       against the real GEO-65OJ80Z8 production PDF that a small (tens
-       of px) overflow was silently clipped with zero continuation page.
-       This rule's job is only "don't hard-clip via a fixed height +
-       overflow:hidden," which is a real, necessary improvement over the
-       previous behavior — it is not a complete fix by itself. Keeping
-       each page's actual content within --rd-page-height (see
-       src/lib/pdf-overflow-check.ts, wired into src/lib/generate-pdf.ts)
-       is what actually prevents clipping. `overflow: visible` is set
-       explicitly (not just omitted) because the base .rd-page rule
-       above sets `overflow: hidden` for an unrelated reason (clipping
-       children to the rounded corners on screen); CSS cascades
-       per-property, so this must be restated here to actually take
-       effect in print. break-inside: avoid on .rd-outcome-card /
-       .rd .cta-card (below) keeps either atomic block from splitting
-       mid-card across a page boundary — but that alone was NOT
-       sufficient: .rd .cta-card carried its own overflow:hidden (for
-       its on-screen rounded corners) with no print override, which
-       clipped it instead of moving it whole. The dedicated
-       .rd .cta-card override just below restates overflow:visible for
-       print to close that gap, and .rd .cta-card-body's padding
-       override (further down) removes a doubled-padding bug that was
-       the larger contributor to that same clip. */
-    min-height: var(--rd-page-height);
+    /* `overflow: visible` is set explicitly (not just omitted) because
+       the base .rd-page rule above sets `overflow: hidden` for an
+       unrelated reason (clipping children to the rounded corners on
+       screen); CSS cascades per-property, so this must be restated
+       here to actually take effect in print. */
     overflow: visible;
-    break-before: page;
-    page-break-before: always;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  /* Dark bookends (Cover, ActionPage) — fixed full-bleed sheets,
+     unchanged from the original single-rule behavior. */
+  .rd-page-dark {
+    min-height: var(--rd-page-height);
+    break-before: page;
+    page-break-before: always;
+  }
+  /* Light interior sections — no forced height, no forced break.
+     Content flows continuously; break-inside: avoid on individual
+     cards (below) is what actually protects each card from splitting. */
+  .rd-page-light {
+    break-before: auto;
+    page-break-before: auto;
   }
   /* Root-cause fix for the P8 CTA button clipping — see the .rd-page
      comment above. Mirrors the same overflow:visible restatement 2a16902
@@ -1470,6 +1486,19 @@
     overflow: visible;
   }
   .rd-page:first-child { break-before: avoid; page-break-before: avoid; }
+  /* Keep a section's header band + title glued to the content below it
+     — never let a heading get stranded alone at the bottom of a page. */
+  .rd-head, .rd-title { break-after: avoid; page-break-after: avoid; }
+  /* .rd-impl (Implementation path, end of FixesPage) sits directly
+     before ActionPage, which always forces a fresh dark sheet
+     (.rd-page-dark above). Without this, .rd-impl alone doesn't fit
+     after the fix cards, so it gets pushed to its own near-empty
+     trailing page. break-before: avoid tells the print engine it may
+     not break immediately before .rd-impl — if it still doesn't fit,
+     the fragmentation algorithm pulls the preceding fix card down with
+     it instead, so the trailing page always carries real content, not
+     just a short orphaned block. */
+  .rd-impl { break-before: avoid; page-break-before: avoid; }
   /* keep cards/rows from splitting across pages */
   .rd-stat, .rd-callout, .rd-prov, .rd-ev-row, .rd-bar, .rd-issue, .rd-fix,
   .rd-readiness-card, .rd-bucket, .rd-fix-pill, .rd-exec-gap,
