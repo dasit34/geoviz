@@ -20,6 +20,8 @@ export type FetchRawHtmlResult =
   | {
       ok: false;
       error: string;
+      /** True when the failure was the timeoutMs AbortController firing, not a DNS/connection/protocol error. */
+      timedOut: boolean;
     };
 
 export type FetchRawHtmlOptions = {
@@ -60,7 +62,8 @@ export async function fetchRawHtml(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: message };
+    const timedOut = err instanceof Error && err.name === "AbortError";
+    return { ok: false, error: message, timedOut };
   } finally {
     clearTimeout(timer);
   }

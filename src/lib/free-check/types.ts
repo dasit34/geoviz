@@ -42,4 +42,6 @@ export type FreeCheckResult = {
 export type FreeCheckFailure = {
   ok: false;
   error: string;
+  /** HTTP status the API route should respond with. Defaults to 502 (site unreachable) when omitted; 504 for a timeout. */
+  status?: number;
 };

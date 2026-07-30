@@ -72,10 +72,53 @@ export async function POST(req: Request) {
 
   console.log(`[free-check] submitted url=${websiteUrl}`);
 
-  const result = await runFreeCheck({ websiteUrl, businessName, city, state, category });
+  // Anything unexpected below (a bug in an analyzer, a dependency load
+  // failure, etc.) must never fall through to Next's default HTML error
+  // page — the frontend can't parse that and shows a blank generic
+  // failure. Always resolve to a categorized JSON error instead.
+  try {
+    const result = await runFreeCheck({ websiteUrl, businessName, city, state, category });
 
-  if (!result.ok) {
-    console.log(`[free-check] failed url=${websiteUrl} reason=${result.error}`);
+    if (!result.ok) {
+      console.log(`[free-check] failed url=${websiteUrl} reason=${result.error}`);
+      await persistSubmission({
+        websiteUrl,
+        businessName,
+        city,
+        state,
+        category,
+        email,
+        status: "failed",
+        failureReason: result.error,
+      });
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.status ?? 502 },
+      );
+    }
+
+    console.log(
+      `[free-check] completed url=${websiteUrl} score=${result.overallScore}`,
+    );
+
+    await persistSubmission({
+      websiteUrl,
+      businessName,
+      city,
+      state,
+      category,
+      email,
+      status: "completed",
+      overallScore: result.overallScore,
+      checks: result.checks,
+      strengths: result.strengths,
+      problems: result.problems,
+      fixes: result.fixes,
+    });
+
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error(`[free-check] unhandled error url=${websiteUrl}`, err);
     await persistSubmission({
       websiteUrl,
       businessName,
@@ -84,31 +127,13 @@ export async function POST(req: Request) {
       category,
       email,
       status: "failed",
-      failureReason: result.error,
+      failureReason: "unhandled_exception",
     });
-    return NextResponse.json({ error: result.error }, { status: 502 });
+    return NextResponse.json(
+      { error: "Something went wrong on our end. Please try again in a moment." },
+      { status: 500 },
+    );
   }
-
-  console.log(
-    `[free-check] completed url=${websiteUrl} score=${result.overallScore}`,
-  );
-
-  await persistSubmission({
-    websiteUrl,
-    businessName,
-    city,
-    state,
-    category,
-    email,
-    status: "completed",
-    overallScore: result.overallScore,
-    checks: result.checks,
-    strengths: result.strengths,
-    problems: result.problems,
-    fixes: result.fixes,
-  });
-
-  return NextResponse.json(result);
 }
 
 async function persistSubmission(args: {

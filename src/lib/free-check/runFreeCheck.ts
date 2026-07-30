@@ -50,10 +50,19 @@ export async function runFreeCheck(
 ): Promise<FreeCheckResult | FreeCheckFailure> {
   const fetchRes = await fetchRawHtml(input.websiteUrl, { timeoutMs: 10_000 });
   if (!fetchRes.ok) {
+    if (fetchRes.timedOut) {
+      return {
+        ok: false,
+        error:
+          "This site took too long to respond. It may be temporarily down — try again in a moment.",
+        status: 504,
+      };
+    }
     return {
       ok: false,
       error:
         "We couldn't reach this website. Double-check the URL and try again.",
+      status: 502,
     };
   }
 
