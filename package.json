@@ -90,7 +90,7 @@
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
     "framer-motion": "^12.40.0",
-    "jsdom": "27.3.0",
+    "jsdom": "22.1.0",
     "next": "14.2.35",
     "puppeteer-core": "^24.42.0",
     "react": "^18.3.1",
