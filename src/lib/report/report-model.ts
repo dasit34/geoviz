@@ -334,7 +334,10 @@ const CATEGORY_LABEL: Record<CategoryKey, { label: string; tooltip: string }> = 
 
 const BUCKET_LABEL: Record<PublicBucketKey, string> = {
   understanding: "Understanding",
-  retrieval: "Retrieval",
+  // "Retrieval" read as technical jargon and customers mistook a high score
+  // here for "AI recommends me." "AI Accessibility" communicates that AI can
+  // reach and read the site — not that it trusts or recommends it.
+  retrieval: "AI Accessibility",
   trust: "Trust",
   recommendation: "Recommendation Readiness",
 };
@@ -1275,10 +1278,10 @@ function buildCrossModelSummary(
   // reads naturally as a full sentence.
   const recommendedCopy =
     recommendedCount === 0
-      ? "None of the four tested AI systems recommended this business."
+      ? "None of the four tested AI systems recommended your business during this audit."
       : recommendedCount === 4
-        ? "All four tested AI systems recommended this business."
-        : `${recommendedCount} of the four tested AI systems recommended this business.`;
+        ? "All four tested AI systems recommended your business during this audit."
+        : `${recommendedCount} of the four tested AI systems recommended your business during this audit.`;
 
   return {
     modelsTested: tested.length,

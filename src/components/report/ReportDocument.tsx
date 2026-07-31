@@ -234,7 +234,7 @@ function ExecutivePage({
         {m.hasProviders ? (
           <Stat
             accent="amber"
-            k="AI Models That Recommended You"
+            k="Live AI Recommendations"
             v={`${cm.recommendedCount} of 4`}
             note={cm.recommendedCopy}
           />
@@ -627,7 +627,9 @@ function DiagnosticsPage({
       <h1 className="rd-title">Visibility Diagnostics</h1>
       <p className="rd-sub">
         The six signals AI systems use to decide whether to identify and
-        recommend your business.
+        recommend your business. These diagnostic scores measure the
+        strength of individual website signals — they are not direct AI
+        recommendation scores.
       </p>
       <div className="rd-bars">
         {m.categories.map((c) => (
@@ -696,6 +698,11 @@ function ReadinessPage({
         This score measures whether your website has the identity, trust, and
         content signals AI systems typically need. It is separate from how
         many tested AI models currently recommend your business.
+      </p>
+      <p className="rd-note">
+        Recommendation Readiness estimates how prepared your website is to
+        earn AI recommendations. It is not the same as the number of AI
+        models that currently recommend your business.
       </p>
       <ReadinessGrid readiness={m.readiness} />
     </Page>
@@ -918,11 +925,33 @@ function ActionPage({
         <p className="rd-outcome-body">{m.businessImpact}</p>
         {(m.score.band === "Needs Work" || m.score.band === "At Risk") ? (
           <p className="rd-outcome-note">
-            Businesses at the {m.score.band} level that complete a Foundation
-            Fix typically move into the Competitive range — the threshold where
-            AI systems begin recommending them in local searches.
+            Businesses that resolve these foundational issues generally
+            improve their AI visibility and recommendation readiness. Actual
+            results depend on competition, industry, website quality, and
+            external AI signals.
           </p>
         ) : null}
+      </div>
+
+      <div className="rd-next-steps">
+        <p className="rd-next-steps-label">What Happens Next</p>
+        <ol className="rd-next-steps-list">
+          <li className="rd-next-steps-item">
+            <span className="rd-next-steps-num">1</span>Review your audit findings.
+          </li>
+          <li className="rd-next-steps-item">
+            <span className="rd-next-steps-num">2</span>Approve your Foundation Fix.
+          </li>
+          <li className="rd-next-steps-item">
+            <span className="rd-next-steps-num">3</span>GeoViz implements the recommended improvements.
+          </li>
+          <li className="rd-next-steps-item">
+            <span className="rd-next-steps-num">4</span>Receive a verification audit.
+          </li>
+          <li className="rd-next-steps-item">
+            <span className="rd-next-steps-num">5</span>Track your AI visibility improvements over time.
+          </li>
+        </ol>
       </div>
 
       <ReportCtaCard orderId={m.meta.orderId} businessLabel={m.meta.businessName} fixCount={m.fixes.length} />

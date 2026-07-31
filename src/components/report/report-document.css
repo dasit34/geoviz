@@ -1225,6 +1225,49 @@
   line-height: 1.5;
 }
 
+/* P8 — "What Happens Next" fulfillment steps, between the outcome card and
+   the Foundation Fix CTA. Deliberately compact (single-line rows, tight
+   gap) — this page is already at its printable-area budget (see the
+   .rd .cta-card padding comment below), so this reuses the same dark-theme
+   tokens and sizing scale as .rd-outcome-note/.rd-cta-eyebrow above rather
+   than a new card/border treatment. */
+.rd-next-steps {
+  margin: 4px 0 0;
+}
+.rd-next-steps-label {
+  font-family: var(--rd-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-orange);
+  margin: 0 0 4px;
+}
+.rd-next-steps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rd-next-steps-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--d-muted);
+}
+.rd-next-steps-num {
+  flex: none;
+  width: 14px;
+  font-family: var(--rd-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
 /* CTA card — dark Foundation Fix offer (overrides print.css light styling
    when rendered inside the report). */
 .rd .cta-card {

@@ -310,7 +310,7 @@ check("actual model recommendation count is never confused with the readiness sc
   assert.equal(m.crossModel.recommendedCount, 0, "expected 0 of 4 models to recommend in this fixture");
   assert.equal(m.crossModel.mentionedCount, 2, "expected 2 of 4 models to mention in this fixture");
   assert.doesNotMatch(m.crossModel.recommendedCopy, /%/, "recommendedCopy must be a count sentence, never a percentage");
-  assert.match(m.crossModel.recommendedCopy, /none of the four tested ai systems recommended this business/i);
+  assert.match(m.crossModel.recommendedCopy, /none of the four tested ai systems recommended your business during this audit/i);
   assert.notEqual(
     m.crossModel.recommendedCount,
     m.recommendationReadiness!.score,
