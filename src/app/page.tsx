@@ -206,15 +206,18 @@ export default function Page() {
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 sm:mt-9 sm:gap-x-6 sm:gap-y-4">
-              <Link href="/order" className="btn-primary text-base">
+              <Link
+                href="/order"
+                className="btn-primary w-full text-base sm:w-auto"
+              >
                 Run Your AI Visibility Audit — $97
                 <span aria-hidden>→</span>
               </Link>
               <Link
-                href="/sample-report"
+                href="/check"
                 className="text-sm font-medium text-white/65 underline-offset-4 transition-colors hover:text-white hover:underline"
               >
-                View sample report
+                Try the free AI check first
               </Link>
             </div>
 

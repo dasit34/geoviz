@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
+import { MobileNav } from "./MobileNav";
 
 export function Header() {
   return (
@@ -19,8 +20,14 @@ export function Header() {
           >
             Sample report
           </Link>
-          <Link href="/check" className="transition hover:text-white">
+          <Link
+            href="/check"
+            className="inline-flex items-center gap-1.5 transition hover:text-white"
+          >
             Free AI Visibility Check
+            <span className="pill border-accent/30 bg-accent/10 px-1.5 py-0 text-[9px] text-accent">
+              Free
+            </span>
           </Link>
           <Link href="/#pricing" className="transition hover:text-white">
             Pricing
@@ -29,9 +36,10 @@ export function Header() {
             FAQ
           </Link>
         </nav>
-        <Link href="/order" className="btn-primary text-sm">
+        <Link href="/order" className="btn-primary hidden text-sm lg:inline-flex">
           Run AI Visibility Audit
         </Link>
+        <MobileNav />
       </div>
     </header>
   );
