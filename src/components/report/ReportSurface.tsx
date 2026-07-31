@@ -68,6 +68,7 @@ export function ReportSurface({
             confidenceLabel: context.confidenceLabel,
             confidenceReason: context.confidenceReason,
             aiValidations: context.aiValidations,
+            consensusIndex: context.consensusIndex,
             nameInconsistency: context.nameInconsistency,
             preflightSignals: context.preflightSignals,
             industryNormalized: context.industryNormalized,

@@ -49,6 +49,10 @@ const PRODUCTION_GATE: Array<[RegExp, string]> = [
   // means a wrong-cohort benchmark was applied.
   [/nonprofit\s+audits?/i, "nonprofit benchmark on non-nonprofit report"],
   [/nonprofit\s+peers?/i, "nonprofit peer benchmark leak"],
+  // Customer-question grammar guards — catch a business-type noun getting
+  // pluralized twice ("business" + "es" + "es" = "businesseses").
+  [/businesseses/i, "double-pluralized 'businesseses'"],
+  [/\b\w+(?:s|sh|ch|x|z)eses\b/i, "duplicate plural suffix (e.g. 'businesseses')"],
 ];
 
 // ── Fixtures mode ──────────────────────────────────────────────────────────
@@ -113,6 +117,13 @@ async function runFixtureMode(): Promise<boolean> {
   const { MISSING_REVIEWS_AUDIT_INPUT } = await import(
     "../src/lib/report/__tests__/snapshots/missing-reviews-audit"
   );
+  const { RECOMMENDATION_READINESS_CONTRADICTION_INPUT } = await import(
+    "../src/lib/report/__tests__/snapshots/recommendation-readiness-contradiction"
+  );
+  const { buildReportModel } = await import("../src/lib/report/report-model");
+  const { normalizeReportModel } = await import(
+    "../src/lib/report/reportDataNormalizer"
+  );
 
   const fixtures = [
     { name: "perfect-audit", input: PERFECT_AUDIT_INPUT },
@@ -121,16 +132,42 @@ async function runFixtureMode(): Promise<boolean> {
     { name: "failed-model-audit", input: FAILED_MODEL_AUDIT_INPUT },
     { name: "missing-schema-audit", input: MISSING_SCHEMA_AUDIT_INPUT },
     { name: "missing-reviews-audit", input: MISSING_REVIEWS_AUDIT_INPUT },
+    {
+      name: "recommendation-readiness-contradiction",
+      input: RECOMMENDATION_READINESS_CONTRADICTION_INPUT,
+    },
   ];
 
   console.log(`Checking ${fixtures.length} fixture reports...\n`);
 
   let allPass = true;
   for (const { name, input } of fixtures) {
-    // Check the raw markdown (the primary source of prose text).
+    // Check the raw markdown (the primary source of prose text) — a no-op
+    // for BuildReportModelInput-shaped fixtures, which carry no
+    // `reportMarkdown` field, but kept for any fixture that does.
     const md = (input as { reportMarkdown?: string | null }).reportMarkdown ?? "";
     const result = checkText(md, `fixture:${name} (reportMarkdown)`);
     if (!result.pass) allPass = false;
+
+    // Also check the actual rendered customer-facing strings, built the
+    // same way the live report is (buildReportModel → normalizeReportModel).
+    // This is what actually catches template/mapping bugs (e.g. malformed
+    // generated questions) since these fixtures have no reportMarkdown.
+    const rawModel = buildReportModel(input);
+    if (rawModel) {
+      const model = normalizeReportModel(rawModel);
+      const rendered = [
+        model.executive.headline,
+        ...model.executive.summaryBullets,
+        model.executive.weakestSignal,
+        model.executive.strongestSignal,
+        ...model.customerQuestions,
+        ...model.diagnostics.flatMap((d) => [d.title, d.problem, d.whyItHurts]),
+        ...model.fixes.flatMap((f) => [f.issue, f.title, f.action, f.businessImpact]),
+      ].join(" \n ");
+      const renderedResult = checkText(rendered, `fixture:${name} (rendered model)`);
+      if (!renderedResult.pass) allPass = false;
+    }
   }
 
   console.log("\n═══════════════════════════════════════════");

@@ -38,6 +38,7 @@ import {
   categoryToneFromRatio,
 } from "@/lib/parse-report";
 import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
+import { computeDimensions } from "@/lib/consensus/dimensions";
 import { buildCustomerQuestions } from "@/lib/report/customer-questions";
 import { providerHasUsableData } from "@/lib/report/model-testing";
 import { ISSUE_TO_FIX } from "@/lib/scoring/fixes-table";
@@ -236,6 +237,10 @@ export type ReportModelCrossModel = {
   strongestDimension: { label: string; score: number } | null;
   /** Weakest consensus dimension — the recommendation bottleneck; null when absent. */
   bottleneckDimension: { label: string; score: number } | null;
+  /** One dynamic sentence built from `recommendedCount` — e.g. "None of the
+   *  four tested AI systems recommended this business." Never a percentage;
+   *  keeps the count and the readiness score visibly distinct. */
+  recommendedCopy: string;
 };
 
 export type ReportModel = {
@@ -245,6 +250,16 @@ export type ReportModel = {
   buckets: ReportModelBucket[];
   categories: ReportModelCategory[];
   providers: ReportModelProvider[];
+  /**
+   * THE canonical "AI Recommendation Readiness" score (0-100) — a website-
+   * signal composite (identity + trust + content), computed once via
+   * `computeDimensions().recommendation_readiness` and reused everywhere the
+   * report shows this concept (cover bucket, Page 6 headline). Distinct from
+   * `crossModel.recommendedCount`, which is how many tested AI models
+   * actually recommended the business — the two must never share a label.
+   * Null only when there is no deterministic score at all.
+   */
+  recommendationReadiness: { score: number; tone: Tone } | null;
   /** Derived AI-search / visibility readiness factors (incl. Google AI Overviews). */
   readiness: ReadinessFactor[];
   /** Inspected-signal rows for the "Evidence Reviewed" page (from preflight). */
@@ -278,9 +293,16 @@ export type ReportModel = {
 };
 
 // ── Display vocab ───────────────────────────────────────────────────
+// NOTE: "schema" is the raw Structured Data / Schema category (0-25 pts).
+// It must NOT be labeled "Recommendation Ready" / "Recommendation
+// Readiness" here — that name is reserved for the single canonical
+// composite score (`recommendationReadiness` on ReportModel, computed via
+// `computeDimensions()`), which blends brand + schema + trust + content.
+// Relabeling this one category as "recommendation readiness" was the root
+// cause of the cover-vs-diagnostics contradiction this file now avoids.
 const CATEGORY_LABEL: Record<CategoryKey, { label: string; tooltip: string }> = {
   schema: {
-    label: "Recommendation Ready",
+    label: "Structured Data / Schema",
     tooltip: "How clearly AI systems can identify who you are and what you do.",
   },
   crawler: {
@@ -314,7 +336,7 @@ const BUCKET_LABEL: Record<PublicBucketKey, string> = {
   understanding: "Understanding",
   retrieval: "Retrieval",
   trust: "Trust",
-  recommendation: "Recommendation",
+  recommendation: "Recommendation Readiness",
 };
 
 const CATEGORY_ORDER: CategoryKey[] = [
@@ -1248,11 +1270,22 @@ function buildCrossModelSummary(
 
   const consensus = readConsensusSummary(consensusIndex);
 
+  // Dynamic, count-driven sentence — never a percentage, never conflated
+  // with the readiness score. "of the four tested AI systems" (not "of 4")
+  // reads naturally as a full sentence.
+  const recommendedCopy =
+    recommendedCount === 0
+      ? "None of the four tested AI systems recommended this business."
+      : recommendedCount === 4
+        ? "All four tested AI systems recommended this business."
+        : `${recommendedCount} of the four tested AI systems recommended this business.`;
+
   return {
     modelsTested: tested.length,
     recognizedCount,
     mentionedCount,
     recommendedCount,
+    recommendedCopy,
     topCitedDomains,
     mainSkipReason,
     consensusLabel: consensus.label,
@@ -1285,6 +1318,21 @@ export function buildReportModel(
       ? plainEnglishBandLabel(score.overall)
       : score.status ?? "Pending";
 
+  // ── THE canonical "AI Recommendation Readiness" score ─────────────
+  // One composite (brand + schema + trust + content), computed once here
+  // and reused everywhere the report shows this concept (cover bucket,
+  // Page 6 headline) so it can never disagree with itself. Computed
+  // directly from `det.category_scores` — never from `consensusIndex`,
+  // which can be null when fewer than 2 validators ran; this stays
+  // available whenever the six-category rubric is available at all.
+  const recommendationReadinessPct = det
+    ? computeDimensions(det).recommendation_readiness.score
+    : null;
+  const recommendationReadiness: ReportModel["recommendationReadiness"] =
+    recommendationReadinessPct === null
+      ? null
+      : { score: recommendationReadinessPct, tone: toneForPct(recommendationReadinessPct) };
+
   // ── Categories (display order + normalized 0–100) ────────────────
   const categories: ReportModelCategory[] = score.categories.map((c) => {
     const meta = CATEGORY_LABEL[c.key as CategoryKey];
@@ -1303,8 +1351,18 @@ export function buildReportModel(
   });
 
   // ── Public buckets (the four AI-platform readiness lanes) ────────
+  // The "recommendation" bucket is display-only here and intentionally does
+  // NOT read `det.public_bucket_scores.recommendation` (that's the internal
+  // calibration bucket — Content category only, an unrelated telemetry
+  // concept). It shows the same canonical `recommendationReadiness` score
+  // as Page 6 and the diagnostics categories, so the cover can never
+  // disagree with the rest of the report.
   const buckets: ReportModelBucket[] = det
     ? BUCKET_ORDER.map((k) => {
+        if (k === "recommendation") {
+          const pct = recommendationReadiness?.score ?? 0;
+          return { key: k, label: BUCKET_LABEL[k], pct, tone: toneForPct(pct) };
+        }
         const b = det.public_bucket_scores?.[k];
         const pct =
           b && typeof b.percentage === "number"
@@ -1391,7 +1449,6 @@ export function buildReportModel(
   const findings = det?.top_3_findings ?? [];
   const diagnostics: ReportModelDiagnostic[] = findings.map((f, i) => {
     const n = narration?.diagnostics?.[f.id];
-    const detReason = det?.category_scores?.[f.category]?.reason;
     const why =
       f.category === "schema" && !isLocal
         ? SCHEMA_WHY_GENERAL
@@ -1416,7 +1473,12 @@ export function buildReportModel(
       title: displayFindingTitle(f.message, f.category, blocksDetected, isLocal),
       severity: f.severity,
       category: f.category,
-      problem: n?.problem ?? detReason ?? f.message,
+      // f.message is unique per finding id; the category-level `detReason`
+      // is a single shared string that can belong to a DIFFERENT finding in
+      // the same category (e.g. trust holds both a NAP finding and a
+      // reviews finding) — see ENTITY_CONSISTENCY_WHY above for the same
+      // collision already fixed on `whyItHurts`.
+      problem: n?.problem ?? f.message,
       whyItHurts: n?.whyItHurts ?? why,
       confidence,
     };
@@ -1572,6 +1634,7 @@ export function buildReportModel(
     buckets,
     categories,
     providers,
+    recommendationReadiness,
     readiness,
     evidence,
     diagnostics,

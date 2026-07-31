@@ -234,9 +234,9 @@ function ExecutivePage({
         {m.hasProviders ? (
           <Stat
             accent="amber"
-            k="AI Recommendation"
+            k="AI Models That Recommended You"
             v={`${cm.recommendedCount} of 4`}
-            note={m.score.band}
+            note={cm.recommendedCopy}
           />
         ) : (
           <Stat accent="amber" k="Overall" v={overall} note={m.score.band} />
@@ -671,6 +671,31 @@ function ReadinessPage({
       <p className="rd-sub">
         Composite signals estimating whether AI systems have enough verified
         structure and trust evidence to surface and recommend this business.
+      </p>
+      {m.recommendationReadiness ? (
+        <div className="rd-bar">
+          <div className="rd-bar-top">
+            <div className="rd-bar-label-col">
+              <span className="rd-bar-label">AI Recommendation Readiness</span>
+            </div>
+            <span className={`rd-bar-val rd-v-${m.recommendationReadiness.tone}`}>
+              {m.recommendationReadiness.score}
+            </span>
+          </div>
+          <div className="rd-bar-track">
+            <div
+              className={`rd-bar-fill rd-fill-${m.recommendationReadiness.tone}`}
+              style={{
+                width: `${Math.max(0, Math.min(100, Math.round(m.recommendationReadiness.score)))}%`,
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+      <p className="rd-note">
+        This score measures whether your website has the identity, trust, and
+        content signals AI systems typically need. It is separate from how
+        many tested AI models currently recommend your business.
       </p>
       <ReadinessGrid readiness={m.readiness} />
     </Page>

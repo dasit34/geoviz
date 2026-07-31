@@ -54,6 +54,14 @@ const UNCOUNTABLE_NOUNS = new Set([
  *  (e.g. "luxury home goods and decor retailer" → tail slice = "and decor retailer"). */
 const STOPWORD_START_RE = /^(?:and|or|the|an?\s|of|in|to|for|with|at|by|on|from)\b/i;
 
+/** A trailing generic-audience clause ("… platform for businesses", "… service
+ *  for customers/clients/companies") carries no distinguishing information —
+ *  worse, it's already plural, so keeping it in the tail slice both discards
+ *  the specific part of the phrase AND risks double-pluralizing an already-
+ *  plural word. Strip it before the head-noun slice runs. */
+const TRAILING_GENERIC_AUDIENCE_RE =
+  /\s+for\s+(?:businesses?|customers?|clients?|companies)$/i;
+
 /** Collapse a long detected business-type phrase to its head noun so generated
  *  questions stay short and natural. "home remodeling contractor specializing in
  *  windows, doors, roofing, and siding" → "home remodeling contractor". */
@@ -65,6 +73,8 @@ function simplifyBusinessType(phrase: string): string {
   )[0];
   // Drop a trailing list clause introduced by a comma or dash.
   t = t.split(/[,—–]| - /)[0];
+  // Drop a trailing generic-audience clause before the head-noun slice.
+  t = t.replace(TRAILING_GENERIC_AUDIENCE_RE, "");
   t = t.replace(/\s+/g, " ").trim();
   // Still long? Keep the head noun phrase (last 3 words — the noun usually
   // trails: "… remodeling contractor"). Guard against conjunctions at the
@@ -89,6 +99,12 @@ function simplifyBusinessType(phrase: string): string {
   return t.trim();
 }
 
+/** Matches a trailing word that already looks like a standard English plural
+ *  (businesses, matches, boxes, companies, …) — i.e. the OUTPUT shape of this
+ *  same function's own pluralization rules. Guards against double-pluralizing
+ *  a noun phrase that arrives already plural ("businesses" → "businesseses"). */
+const ALREADY_PLURAL_RE = /(?:[sxz]es|[cs]hes|ies)$/i;
+
 /** Pluralize ONLY the last word of a noun phrase ("home remodeling contractor"
  *  → "home remodeling contractors"), leaving uncountable trailing nouns alone. */
 function pluralizeLastWord(phrase: string): string {
@@ -96,6 +112,7 @@ function pluralizeLastWord(phrase: string): string {
   const i = words.length - 1;
   const last = words[i];
   if (!last || UNCOUNTABLE_NOUNS.has(last.toLowerCase())) return phrase;
+  if (ALREADY_PLURAL_RE.test(last)) return phrase;
   words[i] = /(s|sh|ch|x|z)$/i.test(last)
     ? `${last}es`
     : /[^aeiou]y$/i.test(last)

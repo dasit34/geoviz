@@ -11,6 +11,8 @@
 import assert from "node:assert/strict";
 
 import { buildReportModel } from "../src/lib/report/report-model";
+import { buildCustomerQuestions } from "../src/lib/report/customer-questions";
+import { RECOMMENDATION_READINESS_CONTRADICTION_INPUT } from "../src/lib/report/__tests__/snapshots/recommendation-readiness-contradiction";
 import type { ReportScore } from "../src/lib/parse-report";
 import type { DeterministicScore } from "../src/lib/scoring/types";
 
@@ -34,7 +36,7 @@ console.log("[report-consistency] running...");
 
 const CATS = (overrides: Partial<Record<string, number>> = {}) =>
   [
-    { key: "schema", label: "Recommendation Ready", short: "S", max: 25, score: overrides.schema ?? 2 },
+    { key: "schema", label: "Structured Data / Schema", short: "S", max: 25, score: overrides.schema ?? 2 },
     { key: "crawler", label: "Technical Access", short: "C", max: 20, score: overrides.crawler ?? 5 },
     { key: "trust", label: "Trust Signals", short: "T", max: 20, score: overrides.trust ?? 3 },
     { key: "content", label: "Content Depth", short: "Co", max: 15, score: overrides.content ?? 1 },
@@ -272,6 +274,78 @@ check("diagnostic labels are access-honest (Crawl Access / Content Extraction)",
   assert.ok(labels.includes("Content Extraction"), `tech label should be 'Content Extraction'`);
   assert.ok(!labels.includes("Technical Access"), "old 'Technical Access' label must be gone");
   assert.ok(!labels.includes("AI Readability"), "old 'AI Readability' label must be gone");
+  // Regression guard: the Schema category must never be relabeled
+  // "Recommendation Ready" / "Recommendation Readiness" — that name is
+  // reserved for the single canonical composite score (recommendationReadiness),
+  // not any one rubric category. Mislabeling this category was the root
+  // cause of the cover-vs-diagnostics "80% vs 8%" contradiction.
+  assert.ok(labels.includes("Structured Data / Schema"), `schema label should be 'Structured Data / Schema', got ${labels.join(", ")}`);
+  assert.ok(!labels.includes("Recommendation Ready"), "schema must not be relabeled 'Recommendation Ready'");
+  assert.ok(!labels.includes("Recommendation Readiness"), "no category bar may claim to BE the readiness composite");
+});
+
+// ── Recommendation-readiness contradiction regression ────────────────────
+// Uses the exact fixture from the "Recommendation 80%" bug report: overall
+// 50, canonical readiness composite 8, 0 of 4 models recommended, 2 of 4
+// mentioned. See src/lib/report/__tests__/snapshots/recommendation-readiness-contradiction.ts
+// for the full derivation.
+
+check("cover bucket, Page 6 headline, and diagnostics never disagree on recommendation readiness", () => {
+  const m = buildReportModel(RECOMMENDATION_READINESS_CONTRADICTION_INPUT)!;
+  assert.ok(m.recommendationReadiness, "expected a canonical recommendationReadiness score");
+  const coverBucket = m.buckets.find((b) => b.key === "recommendation")!;
+  assert.ok(coverBucket, "expected a 'recommendation' bucket on the cover");
+  assert.equal(
+    coverBucket.pct,
+    m.recommendationReadiness!.score,
+    `cover (${coverBucket.pct}) must equal the canonical readiness score (${m.recommendationReadiness!.score})`,
+  );
+  assert.equal(m.recommendationReadiness!.score, 8, `expected the composite to compute to 8 for this fixture, got ${m.recommendationReadiness!.score}`);
+  assert.notEqual(coverBucket.pct, 80, "cover must never show the old content-only-bucket 80% value");
+  assert.equal(coverBucket.label, "Recommendation Readiness");
+});
+
+check("actual model recommendation count is never confused with the readiness score", () => {
+  const m = buildReportModel(RECOMMENDATION_READINESS_CONTRADICTION_INPUT)!;
+  assert.equal(m.crossModel.recommendedCount, 0, "expected 0 of 4 models to recommend in this fixture");
+  assert.equal(m.crossModel.mentionedCount, 2, "expected 2 of 4 models to mention in this fixture");
+  assert.doesNotMatch(m.crossModel.recommendedCopy, /%/, "recommendedCopy must be a count sentence, never a percentage");
+  assert.match(m.crossModel.recommendedCopy, /none of the four tested ai systems recommended this business/i);
+  assert.notEqual(
+    m.crossModel.recommendedCount,
+    m.recommendationReadiness!.score,
+    "the model-recommendation count and the readiness score must stay visibly distinct fields",
+  );
+});
+
+check("issue evidence mapping: reviews finding shows its own message, not the category's shared NAP reason", () => {
+  const m = buildReportModel(RECOMMENDATION_READINESS_CONTRADICTION_INPUT)!;
+  const reviewsIssue = m.diagnostics.find((d) => d.category === "trust" && /review/i.test(d.problem));
+  assert.ok(reviewsIssue, `expected a trust diagnostic whose problem mentions "review"; got: ${m.diagnostics.map((d) => `[${d.category}] ${d.problem}`).join(" | ")}`);
+  assert.match(reviewsIssue!.problem, /review/i);
+  assert.doesNotMatch(
+    reviewsIssue!.problem,
+    /phone|address|identity inconsistenc|name.*address.*inconsistent/i,
+    `reviews issue leaked NAP-identity evidence: "${reviewsIssue!.problem}"`,
+  );
+});
+
+check("customer questions never double-pluralize an already-plural business type", () => {
+  const qs = buildCustomerQuestions({
+    businessName: "GeoViz",
+    industrySlug: null,
+    city: null,
+    services: [],
+    businessType: "AI visibility intelligence platform for businesses",
+    isLocal: false,
+  });
+  const blob = qs.join(" | ");
+  assert.doesNotMatch(blob, /businesseses/i, blob);
+  assert.doesNotMatch(blob, /\b\w+(?:s|sh|ch|x|z)eses\b/i, blob);
+  assert.ok(
+    qs.some((q) => /AI visibility intelligence platform/i.test(q)),
+    `expected the specific detected category to survive simplification, got: ${blob}`,
+  );
 });
 
 check("high access + low recommendation signals → interpretation warns access ≠ recommendation", () => {

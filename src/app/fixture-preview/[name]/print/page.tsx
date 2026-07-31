@@ -19,6 +19,7 @@ import { BROKEN_CATEGORY_AUDIT_INPUT } from "@/lib/report/__tests__/snapshots/br
 import { FAILED_MODEL_AUDIT_INPUT } from "@/lib/report/__tests__/snapshots/failed-model-audit";
 import { MISSING_SCHEMA_AUDIT_INPUT } from "@/lib/report/__tests__/snapshots/missing-schema-audit";
 import { MISSING_REVIEWS_AUDIT_INPUT } from "@/lib/report/__tests__/snapshots/missing-reviews-audit";
+import { RECOMMENDATION_READINESS_CONTRADICTION_INPUT } from "@/lib/report/__tests__/snapshots/recommendation-readiness-contradiction";
 
 const FIXTURES: Record<string, typeof PERFECT_AUDIT_INPUT> = {
   "perfect-audit": PERFECT_AUDIT_INPUT,
@@ -27,6 +28,7 @@ const FIXTURES: Record<string, typeof PERFECT_AUDIT_INPUT> = {
   "failed-model-audit": FAILED_MODEL_AUDIT_INPUT,
   "missing-schema-audit": MISSING_SCHEMA_AUDIT_INPUT,
   "missing-reviews-audit": MISSING_REVIEWS_AUDIT_INPUT,
+  "recommendation-readiness-contradiction": RECOMMENDATION_READINESS_CONTRADICTION_INPUT,
 };
 
 export const dynamic = "force-dynamic";
