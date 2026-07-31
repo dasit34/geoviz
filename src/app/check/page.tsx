@@ -50,8 +50,8 @@ export default function FreeCheckPage() {
               Claude, Gemini, Perplexity, and Google AI.
             </p>
             <p className="mt-3 max-w-md text-sm text-white/55">
-              Enter your website and a few details below. You&rsquo;ll get a
-              free, plain-English preview in about 10 seconds — no account
+              Enter your website and a few details below. Get your free
+              preview in about 10 seconds — no account or credit card
               required.
             </p>
 
