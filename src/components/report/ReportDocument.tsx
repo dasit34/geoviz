@@ -345,7 +345,7 @@ function AIIntelligencePage({
     <Page variant="light">
       <PageHead context="CROSS-MODEL AI INTELLIGENCE" n={n} />
       <h1 className="rd-title">AI Intelligence</h1>
-      <p className="rd-sub">
+      <p className="rd-sub rd-cm-sub">
         How ChatGPT, Claude, Gemini, and Perplexity answered when a customer
         asked who to choose — what they understood, who they recommended, who
         they named instead, and the sources they trusted.

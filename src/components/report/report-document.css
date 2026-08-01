@@ -111,7 +111,10 @@
   gap: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--l-border);
-  margin-bottom: 26px;
+  /* 17px (was 26px) — uniform reduction, safe on every light page; part
+     of the P3/P4/P7 overflow close (see
+     PAGINATION_SAFETY_MARGIN_PX in pdf-overflow-check.ts). */
+  margin-bottom: 17px;
 }
 /* 18px (was 40px, then 26px) — matches the standard .rd-head's own
    margin-bottom now that this no longer needs to visually substitute
@@ -195,6 +198,13 @@
 /* Clarifying notes that separate model scores / access scores from
    recommendation readiness. */
 .rd-prov-note { margin: 7px 0 0; line-height: 1.45; font-size: 13px; }
+/* P3 (AI Intelligence) legend — a fixed 4-line paragraph on every render;
+   tightened line-height (not font-size or wording) recovers real space on
+   a page that can also stack several .rd-callout blocks below it. */
+.rd-ai-legend { line-height: 1.15; }
+/* P3 subhead — same fixed-copy/tighter-line-height treatment as
+   .rd-ai-legend above, same reason. */
+.rd-cm-sub { line-height: 1.3; }
 /* margin-bottom 13px (was 16px) — same Diagnostics overflow close as
    .rd-bars / .rd-interp above. */
 .rd-bars-note { margin: -8px 0 7px; line-height: 1.45; font-size: 13px; }
@@ -389,17 +399,23 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  margin-bottom: 26px;
+  /* 16px (was 26px) — P3 (AI Intelligence) reuses this same row and needs
+     headroom for its stacked-callout overflow; safe on P2 (Executive) too
+     since it's a uniform reduction. */
+  margin-bottom: 16px;
 }
 .rd-stat {
   background: var(--l-card);
   border: 1px solid var(--l-border);
   border-left-width: 4px;
   border-radius: 12px;
-  padding: 20px 22px;
+  /* 8px 12px (was 20px 22px) — P3 (AI Intelligence) reuses this same
+     card and needs headroom for its stacked-callout overflow; safe on P2
+     (Executive) too since it's a uniform reduction. */
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
 }
 .rd-stat-amber { border-left-color: var(--c-amber); }
 .rd-stat-blue { border-left-color: var(--c-blue); }
@@ -425,8 +441,13 @@
   background: var(--l-card);
   border: 1px solid var(--l-border);
   border-radius: 14px;
-  padding: 24px 26px;
-  margin-top: 16px;
+  /* 8px 12px (was 24px 26px) — P3 (AI Intelligence) can stack up to three
+     of these (their trigger conditions overlap), each holding audit-
+     generated free text; see PAGINATION_SAFETY_MARGIN_PX in
+     pdf-overflow-check.ts / scripts/measure-fixture-overflow.ts. */
+  padding: 8px 12px;
+  /* 3px (was 16px) — same P3 stacking close. */
+  margin-top: 3px;
 }
 .rd-callout-pill {
   display: inline-flex;
@@ -435,22 +456,81 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 5px 13px;
+  /* 2px 9px (was 5px 13px) — same P3 stacking close. */
+  padding: 2px 9px;
   border-radius: 999px;
-  margin-bottom: 14px;
+  /* 6px (was 14px) — same P3 stacking close. */
+  margin-bottom: 6px;
 }
 .rd-callout-pill-issue { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
 .rd-callout-pill-fix { background: rgba(34, 197, 94, 0.12); color: #15803d; }
 .rd-callout-title {
   font-family: var(--rd-display);
-  font-size: 23px;
+  font-size: 21px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 1.2;
-  margin: 0 0 10px;
+  line-height: 1.15;
+  /* 0 0 6px (was 0 0 10px) — same P3 stacking close. */
+  margin: 0 0 6px;
   color: var(--l-ink);
+  /* Clamped: on P3 (AI Intelligence) this can be filled with unbounded
+     audit-generated text (cm.mainSkipReason) rather than a fixed template
+     string — same guard already applied to .rd-prov-v / .rd-bar-tip
+     elsewhere in this file "so a verbose audit cannot balloon a card and
+     overflow the page." */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
-.rd-callout-body { font-size: 15px; line-height: 1.6; color: var(--l-muted); margin: 0; }
+.rd-callout-body {
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--l-muted);
+  margin: 0;
+  /* Clamped for the same reason as .rd-callout-title above — body text on
+     P3 is frequently interpolated audit data (name lists, skip reasons)
+     with no upper bound. 2 lines (not 3) even for the first/full-size
+     callout — every .rd-callout body used in this template is a single
+     supporting sentence, not multi-point prose. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* P3 (AI Intelligence) can render up to three .rd-callout blocks back to
+   back (their trigger conditions overlap by design — display only, no
+   logic changed here). Each one alone fits comfortably; stacked, they
+   don't. Tighten only the SECOND-and-later callout in a run — the first
+   keeps full size/prominence as the primary finding, subsequent ones read
+   as supporting context and can afford to be smaller. */
+.rd-callout + .rd-callout {
+  margin-top: 2px;
+  padding: 5px 9px;
+}
+/* Keep the pill even on stacked callouts (not display:none) — some
+   titles here are short data fragments (e.g. a raw "missing fact" phrase
+   rather than a full sentence), and without the pill's label those read
+   as an orphaned, uncapitalized heading with no context. */
+.rd-callout + .rd-callout .rd-callout-pill {
+  padding: 2px 8px;
+  margin-bottom: 3px;
+}
+.rd-callout + .rd-callout .rd-callout-title {
+  font-size: 15px;
+  margin-bottom: 3px;
+  -webkit-line-clamp: 1;
+}
+.rd-callout + .rd-callout .rd-callout-body {
+  -webkit-line-clamp: 1;
+}
+/* Third-and-later callout in a run (all trigger conditions can overlap
+   simultaneously in principle) — tighter still. */
+.rd-callout + .rd-callout + .rd-callout {
+  margin-top: 0;
+  padding: 3px 8px;
+}
 
 /* Executive Summary — intelligence bullets + gap highlight */
 .rd-exec-label {
@@ -615,7 +695,8 @@
 .rd-matrix {
   width: 100%;
   border-collapse: collapse;
-  margin: 16px 0 6px;
+  /* 4px 0 2px (was 16px 0 6px) — P3 stacked-callout overflow close. */
+  margin: 4px 0 2px;
   font-size: 12.5px;
 }
 .rd-matrix thead th {
@@ -626,12 +707,17 @@
   color: var(--l-faint);
   text-align: left;
   font-weight: 600;
-  padding: 0 9px 8px;
+  padding: 0 9px 6px;
   border-bottom: 1px solid var(--l-border);
   white-space: nowrap;
 }
 .rd-matrix tbody td {
-  padding: 9px;
+  /* 5px 9px (was 9px, then 7px) — same P3 overflow close. */
+  padding: 5px 9px;
+  /* 1.25 — tighten row line-height without changing font-size; matrix
+     cells are short single-value fields (verdicts, scores, counts), not
+     prose, so a tighter line-height doesn't affect readability. */
+  line-height: 1.25;
   border-bottom: 1px solid var(--l-border);
   vertical-align: middle;
   color: var(--l-ink);
@@ -657,6 +743,13 @@
   font-size: 12px;
   color: var(--l-muted);
   max-width: 160px;
+  /* Single-line, ellipsized — this cell shows a business/competitor name
+     with no length bound; without this a long name wraps to 2 lines and
+     grows every row in the table (4 rows × ~20px ≈ 80px on a table that's
+     already the largest element on P3). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rd-matrix-na {
   color: var(--l-faint);
@@ -672,7 +765,8 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 14px 0 6px;
+  /* 2px 0 1px (was 14px 0 6px) — P3 stacked-callout overflow close. */
+  margin: 2px 0 1px;
 }
 .rd-sources-label {
   font-family: var(--rd-mono);
@@ -730,7 +824,17 @@
   font-weight: 700;
   color: var(--l-ink);
 }
-.rd-ev-desc { font-size: 14px; color: var(--l-muted); }
+.rd-ev-desc {
+  font-size: 14px;
+  color: var(--l-muted);
+  /* Descriptor text is sourced from real preflight/audit data with no
+     length bound (e.g. notAnalyzedDescriptor() failure-case strings run
+     much longer) — clamp so one longer row can't grow the whole page. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 
 /* Evidence Reviewed subtitle ("What AI Had To Read") under the page title */
 .rd-title-sub {
@@ -749,7 +853,8 @@
   border: 1px solid var(--l-border);
   border-radius: 12px;
   padding: 14px 18px;
-  margin-bottom: 16px;
+  /* 12px (was 16px) — part of the P4 overflow close below. */
+  margin-bottom: 12px;
 }
 .rd-questions-title {
   font-family: var(--rd-display);
@@ -804,7 +909,8 @@
 .rd-page-divider {
   height: 1px;
   background: var(--l-border);
-  margin: 18px 0;
+  /* 10px 0 (was 18px 0) — part of the P4 overflow close below. */
+  margin: 10px 0;
 }
 
 /* P4 — Evidence sub-section title (below rd-title-sub eyebrow) */
@@ -814,13 +920,23 @@
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.1;
-  margin: 4px 0 8px;
+  /* 2px 0 6px (was 4px 0 8px) — part of the P4 overflow close below. */
+  margin: 2px 0 6px;
   color: var(--l-ink);
 }
 
-/* P4 evidence rows tighten to make room for the questions card (8-page fit) */
-.rd-ev { gap: 8px; }
-.rd-ev-row { padding: 10px 20px; }
+/* P4 evidence rows tighten to make room for the questions card (8-page
+   fit). Further tightened — the first pass wasn't enough on its own; see
+   PAGINATION_SAFETY_MARGIN_PX in pdf-overflow-check.ts /
+   scripts/measure-fixture-overflow.ts. */
+.rd-ev { gap: 6px; }
+.rd-ev-row {
+  padding: 8px 20px;
+  /* Guards against a row (or the trailing Pill) being split across a
+     physical page boundary by the real print engine. */
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
 
 /* ════════════════ P5 · DIAGNOSTICS (light) ════════════════ */
 /* CARD_GAP for margin-bottom (was 18px); the inter-bar gap (was 12px)
@@ -1038,13 +1154,16 @@
 }
 
 /* ════════════════ P7 · PRIORITY FIX PLAN (light) ════════════════ */
-.rd-fixes { display: flex; flex-direction: column; gap: 16px; margin-bottom: 26px; }
+/* 10px (was 16px, gap), 12px (was 26px, margin) — P7 overflow close (see
+   PAGINATION_SAFETY_MARGIN_PX in pdf-overflow-check.ts). */
+.rd-fixes { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
 .rd-fix {
   background: var(--l-card);
   border: 1px solid var(--l-border);
   border-left: 4px solid var(--c-green-fill);
   border-radius: 12px;
-  padding: 22px 26px;
+  /* 12px 22px (was 22px 26px) — same P7 overflow close. */
+  padding: 12px 22px;
   display: flex;
   gap: 22px;
 }
@@ -1055,14 +1174,15 @@
   color: var(--c-green);
   flex: none;
 }
-.rd-fix-body { display: flex; flex-direction: column; gap: 4px; }
+.rd-fix-body { display: flex; flex-direction: column; gap: 2px; }
 .rd-fix-title {
   font-family: var(--rd-display);
   font-size: 21px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 1.2;
-  margin: 0 0 6px;
+  line-height: 1.15;
+  /* 0 0 4px (was 0 0 6px) — P7 overflow close. */
+  margin: 0 0 4px;
   color: var(--l-ink);
 }
 .rd-fix-exact-label {
@@ -1072,15 +1192,18 @@
   text-transform: uppercase;
   color: var(--l-faint);
 }
-.rd-fix-action { font-size: 15px; line-height: 1.6; color: var(--l-muted); margin: 2px 0 0; }
+/* line-height 1.45 (was 1.6) — P7 overflow close. */
+.rd-fix-action { font-size: 15px; line-height: 1.45; color: var(--l-muted); margin: 2px 0 0; }
 
 /* P7 v2 — fix metadata badges + unlocks chips */
-.rd-fixes-v2 { gap: 12px; }
+/* 8px (was 12px) — same P7 overflow close. */
+.rd-fixes-v2 { gap: 8px; }
 .rd-fix-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  /* 8px (was 12px) — same P7 overflow close. */
+  margin-top: 8px;
 }
 .rd-fix-pill {
   font-family: var(--rd-mono);
@@ -1121,7 +1244,8 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 10px;
+  /* 6px (was 10px) — same P7 overflow close. */
+  margin-top: 6px;
 }
 .rd-fix-unlocks-k {
   font-family: var(--rd-mono);
@@ -1136,7 +1260,8 @@
 .rd-impl {
   background: var(--d-page);
   border-radius: 12px;
-  padding: 22px 26px;
+  /* 10px 20px (was 22px 26px) — P7 overflow close. */
+  padding: 10px 20px;
   display: flex;
   align-items: baseline;
   gap: 22px;
@@ -1149,7 +1274,8 @@
   color: #fff;
   flex: none;
 }
-.rd-impl-body { font-size: 14px; line-height: 1.55; color: var(--d-muted); }
+/* line-height 1.4 (was 1.55) — P7 overflow close. */
+.rd-impl-body { font-size: 14px; line-height: 1.4; color: var(--d-muted); }
 
 /* ════════════════ P8 · ACTION / CTA (dark) ════════════════ */
 .rd-cta-eyebrow {
@@ -1159,18 +1285,20 @@
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--c-orange);
-  margin: 0 0 12px;
+  /* 8px (was 12px) — same CTA-card real-margin close as .rd-outcome-body. */
+  margin: 0 0 8px;
 }
 .rd-action-title {
   font-family: var(--rd-display);
-  font-size: 42px;
+  font-size: 38px;
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.05;
-  /* SECTION_GAP (was a one-off 22px) — trimmed slightly as part of the
-     P8 safe-margin fix to give the CTA card more room before the page's
-     bottom safe zone. */
-  margin: 0 0 var(--rd-section-gap);
+  /* 8px, font-size 38px (was 42px/SECTION_GAP-15px, before that a
+     one-off 22px) — the "What Happens Next" addition needs this page's
+     CTA card to keep real margin (not razor-thin), not just the shared
+     token value. */
+  margin: 0 0 8px;
   color: #fff;
 }
 .rd-outcome-card {
@@ -1198,10 +1326,22 @@
   color: var(--c-orange);
 }
 .rd-outcome-body {
-  font-size: 17px;
-  line-height: 1.55;
+  /* 15px/1.4 (was 17px/1.55) — the CTA card below (.rd .cta-card) needs
+     real margin, not a razor-thin one, to avoid the real print engine
+     pushing it whole to its own near-blank continuation page (confirmed
+     empirically — a live-DOM "0 violations" measurement is NOT a safe
+     proxy for a break-inside:avoid card this size; see
+     PAGINATION_SAFETY_MARGIN_PX in pdf-overflow-check.ts). */
+  font-size: 15px;
+  line-height: 1.4;
   color: #eaf0fb;
-  margin: 12px 0 0;
+  margin: 8px 0 0;
+  /* Business-name length varies per audit — clamp so an unusually long
+     name can't reopen the CTA-card margin this page depends on. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
 }
 
 /* P8 — percentile copy above outcome card */
@@ -1209,9 +1349,9 @@
   font-size: 14px;
   font-style: italic;
   color: var(--d-muted);
-  /* margin-bottom 10px (was 16px) — part of the Action/CTA safety
-     margin close described on .rd .cta-card below. */
-  margin: -12px 0 10px;
+  /* margin-bottom 6px (was 10px, before that 16px) — part of the
+     Action/CTA safety margin close described on .rd .cta-card below. */
+  margin: -12px 0 6px;
 }
 
 /* P8 — projected trajectory note inside outcome card */
@@ -1219,10 +1359,12 @@
   font-size: 13.5px;
   font-style: italic;
   color: var(--d-muted);
-  margin: 10px 0 0;
-  padding-top: 10px;
+  /* 6px (was 10px, both) — same CTA-card real-margin close as
+     .rd-outcome-body above. */
+  margin: 6px 0 0;
+  padding-top: 6px;
   border-top: 1px solid var(--d-border);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 /* P8 — "What Happens Next" fulfillment steps, between the outcome card and
@@ -1232,7 +1374,7 @@
    tokens and sizing scale as .rd-outcome-note/.rd-cta-eyebrow above rather
    than a new card/border treatment. */
 .rd-next-steps {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
 }
 .rd-next-steps-label {
   font-family: var(--rd-mono);
@@ -1255,8 +1397,8 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 12.5px;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.2;
   color: var(--d-muted);
 }
 .rd-next-steps-num {
@@ -1322,6 +1464,12 @@
 .rd .cta-card-body {
   padding: 0 !important;
 }
+/* Inner cta-card margins below tightened as part of the "What Happens
+   Next" P8 real-margin close (see the padding/margin-top comments on
+   .rd .cta-card above) — the original P8 fix relied on outer spacing
+   alone; the new content above this card needs more, so these join in.
+   Uniform reduction — safe everywhere this shared component renders
+   (sample report, admin preview, PDF). */
 .rd .cta-card-eyebrow {
   font-family: var(--rd-mono);
   font-size: 11px;
@@ -1329,25 +1477,25 @@
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--c-orange);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .rd .cta-card-headline {
   font-family: var(--rd-display);
-  font-size: 27px;
+  font-size: 25px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 1.18;
+  line-height: 1.15;
   color: #fff;
-  margin: 0 0 10px;
+  margin: 0 0 6px;
 }
 .rd .cta-card-lede {
-  font-size: 15.5px;
-  line-height: 1.55;
+  font-size: 14.5px;
+  line-height: 1.45;
   color: var(--d-muted);
   max-width: 60ch;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
 }
-.rd .cta-card-badges { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.rd .cta-card-badges { display: flex; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .rd .cta-card-badge {
   font-family: var(--rd-mono);
   font-size: 12px;
@@ -1385,7 +1533,7 @@
   font-size: 13px;
   font-style: italic;
   color: rgba(255, 255, 255, 0.5);
-  margin: 12px 0 0;
+  margin: 8px 0 0;
 }
 .rd .cta-card-includes-label {
   font-family: var(--rd-mono);
@@ -1393,15 +1541,15 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.55);
-  margin: 0 0 10px;
+  margin: 0 0 6px;
 }
 .rd .cta-card-includes {
   list-style: none;
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   padding: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 7px 20px;
+  gap: 5px 20px;
 }
 .rd .cta-card-includes li {
   position: relative;
