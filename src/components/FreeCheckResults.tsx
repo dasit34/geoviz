@@ -116,17 +116,27 @@ export function FreeCheckResults({
 
       {result.fixes.length > 0 ? (
         <div className="card">
-          <h3 className="h3 text-base">Recommended fixes</h3>
-          <ol className="mt-4 space-y-3">
+          <h3 className="h3 text-base">Recommended priorities</h3>
+          <ol className="mt-4 space-y-4">
             {result.fixes.map((f, i) => (
               <li key={f} className="flex items-start gap-3 text-sm text-white/75">
                 <span className="mono-data mt-0.5 text-accent">
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <span>{f}</span>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+                    Priority {i + 1}
+                  </p>
+                  <p className="mt-0.5">{f}</p>
+                </div>
               </li>
             ))}
           </ol>
+          <p className="mt-5 text-sm text-white/55">
+            The Full GeoViz Audit identifies exactly where these issues
+            occur, why they affect AI visibility, and provides prioritized
+            implementation guidance.
+          </p>
         </div>
       ) : null}
 
@@ -138,10 +148,20 @@ export function FreeCheckResults({
           See the full picture of your AI visibility.
         </h2>
         <p className="muted mx-auto mt-4 max-w-xl text-sm leading-relaxed">
-          The full GeoViz audit analyzes how AI systems understand, trust,
-          retrieve, cite, and recommend your business. Get the complete
-          report with prioritized fixes and detailed recommendations.
+          This free check is a high-level snapshot. The complete audit
+          performs a much deeper analysis across your website, with the
+          specific evidence and guidance needed to act.
         </p>
+        <p className="mono-data mt-6 text-xs uppercase tracking-wide text-white/45">
+          The Full GeoViz Audit includes
+        </p>
+        <ul className="mx-auto mt-4 max-w-sm space-y-2.5 text-left">
+          <ListRow tone="good" label="Complete AI Visibility Report" />
+          <ListRow tone="good" label="Detailed evidence for every issue" />
+          <ListRow tone="good" label="Prioritized fixes ranked by impact" />
+          <ListRow tone="good" label="AI recommendation analysis" />
+          <ListRow tone="good" label="Implementation roadmap" />
+        </ul>
         <Link
           href={`/order?${orderParams.toString()}`}
           className="btn-primary mt-6 inline-flex justify-center text-base"

@@ -215,19 +215,14 @@ const CHECK_LABELS: Record<CheckId, string> = {
   ai_recommendation_readiness: "AI recommendation readiness",
 };
 
-const CHECK_FIXES: Record<CheckId, string> = {
-  business_identity:
-    "Make your business name clearly visible in your homepage title, headline, and body text — not only in a logo image.",
-  location_clarity:
-    "State your city, state, and service area clearly in your homepage text and page titles.",
-  service_clarity:
-    "Describe your core services in plain language on your homepage, not only in a menu, icon grid, or image.",
-  contact_consistency:
-    "Make sure your business name, phone number, and address match exactly across your homepage, footer, and structured data.",
-  structured_data:
-    "Add LocalBusiness structured data (JSON-LD) with your name, address, phone, and hours so AI systems can verify who you are.",
+const CHECK_PRIORITIES: Record<CheckId, string> = {
+  business_identity: "Strengthen your business identity clarity.",
+  location_clarity: "Strengthen your location signals.",
+  service_clarity: "Improve service and offering clarity.",
+  contact_consistency: "Improve business identity consistency.",
+  structured_data: "Increase AI-readable website signals.",
   ai_recommendation_readiness:
-    "Strengthen crawlability, structured data, and content depth together — these compound to determine AI recommendation readiness.",
+    "Strengthen your overall AI recommendation readiness.",
 };
 
 const CHECK_ORDER: CheckId[] = [
@@ -280,7 +275,7 @@ export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
     .sort((a, b) => severityRank[a.status] - severityRank[b.status]);
 
   const problems = problemChecks.slice(0, 3).map((c) => c.label);
-  const fixes = problemChecks.slice(0, 3).map((c) => CHECK_FIXES[c.id]);
+  const fixes = problemChecks.slice(0, 3).map((c) => CHECK_PRIORITIES[c.id]);
 
   return {
     ok: true,
