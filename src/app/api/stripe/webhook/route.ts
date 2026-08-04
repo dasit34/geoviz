@@ -285,7 +285,12 @@ async function persistOrder(
     return null;
   }
 
-  const paid = session.payment_status === "paid";
+  // Stripe reports "no_payment_required" (not "paid") for a `payment`-mode
+  // session that a coupon/promotion code discounts to $0 — treat both as a
+  // completed order so 100%-off checkouts still get a report and emails.
+  const paid =
+    session.payment_status === "paid" ||
+    session.payment_status === "no_payment_required";
 
   const order = await prisma.auditOrder.upsert({
     where: { stripeSessionId: session.id },
