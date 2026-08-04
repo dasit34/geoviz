@@ -4,6 +4,7 @@ import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import { getResend } from "@/lib/resend";
 import { resolveAppBaseUrl, buildAdminReviewUrl } from "@/lib/app-url";
+import { createAuditOrderFromCheckoutSession } from "@/lib/audit-orders/create-from-checkout-session";
 
 /**
  * Webhook-specific FROM fallback. We deliberately do NOT inherit
@@ -265,80 +266,40 @@ async function handleChargeRefunded(
   }
 }
 
+// Thin adapter over the shared `createAuditOrderFromCheckoutSession` —
+// order/queue creation lives there (also used by
+// `scripts/recover-missing-checkout-order.ts`), so paid, discounted, and
+// $0 checkouts all go through the exact same logic whether they arrive via
+// a live webhook delivery or a manual recovery replay. Collapses the
+// shared service's 3-way result back to the `AuditOrder | null` shape the
+// rest of this route already expects, so the email-sending flow below is
+// unchanged.
 async function persistOrder(
   session: Stripe.Checkout.Session,
 ): Promise<AuditOrder | null> {
-  const metadata = session.metadata ?? {};
-  const websiteUrl = metadata.websiteUrl ?? "";
-  const email =
-    metadata.email ??
-    session.customer_details?.email ??
-    session.customer_email ??
-    "";
-  const businessName = metadata.businessName || null;
-  const competitorUrl = metadata.competitorUrl || null;
-
-  if (!websiteUrl || !email) {
-    console.error(
-      `[stripe-webhook] missing websiteUrl or email in metadata for session=${session.id}`,
-    );
-    return null;
-  }
-
-  // Stripe reports "no_payment_required" (not "paid") for a `payment`-mode
-  // session that a coupon/promotion code discounts to $0 — treat both as a
-  // completed order so 100%-off checkouts still get a report and emails.
-  const paid =
-    session.payment_status === "paid" ||
-    session.payment_status === "no_payment_required";
-
-  const order = await prisma.auditOrder.upsert({
-    where: { stripeSessionId: session.id },
-    create: {
-      stripeSessionId: session.id,
-      websiteUrl,
-      email,
-      businessName,
-      competitorUrl,
-      amount: session.amount_total ?? 9700,
-      currency: session.currency ?? "usd",
-      paymentStatus: paid ? "paid" : "pending",
-      auditStatus: "pending",
-    },
-    update: {
-      paymentStatus: paid ? "paid" : "pending",
-    },
+  const result = await createAuditOrderFromCheckoutSession({
+    id: session.id,
+    metadata: session.metadata,
+    payment_status: session.payment_status,
+    amount_total: session.amount_total,
+    currency: session.currency,
+    customer_details_email: session.customer_details?.email,
+    customer_email: session.customer_email,
   });
 
-  console.log(
-    `[stripe-webhook] order persisted id=${order.id} payment=${order.paymentStatus}`,
-  );
-
-  // Auto-queue the report for the Railway worker as soon as payment is
-  // confirmed. Eligible: `pending` (fresh paid order) or `failed` (a
-  // prior worker run errored — paid customer deserves a retry). Excluded:
-  // `queued` / `running` / `generated` — those are in-flight or done and
-  // a webhook replay must not knock them back. Idempotent.
-  if (paid) {
-    const promoted = await prisma.auditOrder.updateMany({
-      where: {
-        id: order.id,
-        reportStatus: { in: ["pending", "failed"] },
-      },
-      data: {
-        reportStatus: "queued",
-        reportQueuedAt: new Date(),
-        reportError: null,
-      },
-    });
-    if (promoted.count > 0) {
-      console.log(
-        `[stripe-webhook] paid order queued orderId=${order.id}`,
-      );
-    }
+  if (result.outcome === "skipped_missing_metadata") {
+    return null;
   }
-
-  return order;
+  if (result.outcome === "already_exists") {
+    console.log(
+      `[stripe-webhook] order already exists id=${result.order.id} — replay/duplicate delivery, no changes made`,
+    );
+    return result.order;
+  }
+  console.log(
+    `[stripe-webhook] order persisted id=${result.order.id} payment=${result.order.paymentStatus} queued=${result.queued}`,
+  );
+  return result.order;
 }
 
 async function notifyAdmin(

@@ -19,6 +19,7 @@
     "seed:public-samples": "tsx scripts/seed-public-samples.ts",
     "recover-stale-jobs": "tsx scripts/recover-stale-jobs.ts",
     "test:worker-recovery": "tsx scripts/test-worker-recovery.ts",
+    "test:checkout-audit-creation": "tsx scripts/test-checkout-audit-creation.ts",
     "backfill:audit-intelligence": "tsx scripts/backfill-audit-intelligence.ts",
     "intelligence:summary": "tsx scripts/intelligence-summary.ts",
     "intelligence:industry": "tsx scripts/intelligence-industry.ts",
