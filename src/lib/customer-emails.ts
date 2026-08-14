@@ -243,6 +243,7 @@ export function buildCustomerSuccessTexts(args: {
   businessLabel: string;
   websiteUrl: string;
   reportUrl: string;
+  pdfUrl: string;
 }): { text: string; html: string } {
   return {
     text: buildSuccessPlainText(args),
@@ -267,10 +268,12 @@ export async function sendCustomerSuccessEmail(args: {
 
   const businessLabel = businessName?.trim() || websiteUrl;
   const reportUrl = `${resolveAppBaseUrl()}/report/${encodeURIComponent(orderId)}/print`;
+  const pdfUrl = `${resolveAppBaseUrl()}/api/report/${encodeURIComponent(orderId)}/pdf`;
   const { text: textBody, html: htmlBody } = buildCustomerSuccessTexts({
     businessLabel,
     websiteUrl,
     reportUrl,
+    pdfUrl,
   });
 
   console.log(
@@ -309,8 +312,9 @@ function buildSuccessPlainText(args: {
   businessLabel: string;
   websiteUrl: string;
   reportUrl: string;
+  pdfUrl: string;
 }): string {
-  const { businessLabel, websiteUrl, reportUrl } = args;
+  const { businessLabel, websiteUrl, reportUrl, pdfUrl } = args;
   return [
     `Hi —`,
     "",
@@ -319,7 +323,10 @@ function buildSuccessPlainText(args: {
     `Open the report:`,
     reportUrl,
     "",
-    `The link is private to you — no login required. You can return to it any time.`,
+    `Download the PDF:`,
+    pdfUrl,
+    "",
+    `The links are private to you — no login required. You can return to them any time.`,
     "",
     `If you have any questions, just reply to this email.`,
     "",
@@ -331,11 +338,13 @@ function buildSuccessHtml(args: {
   businessLabel: string;
   websiteUrl: string;
   reportUrl: string;
+  pdfUrl: string;
 }): string {
-  const { businessLabel, websiteUrl, reportUrl } = args;
+  const { businessLabel, websiteUrl, reportUrl, pdfUrl } = args;
   const sb = escapeHtml(businessLabel);
   const sw = escapeHtml(websiteUrl);
   const sr = escapeHtml(reportUrl);
+  const sp = escapeHtml(pdfUrl);
   return `<!doctype html>
 <html>
   <body style="margin:0;padding:0;background:#0b0d14;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e8eaf0;">
@@ -352,10 +361,14 @@ function buildSuccessHtml(args: {
             Your report is ready to review.
           </td></tr>
           <tr><td style="padding:8px 32px 8px;">
-            <a href="${sr}" style="display:inline-block;background:#ff6a1a;color:#ffffff;text-decoration:none;font-size:14.5px;font-weight:600;letter-spacing:0.01em;padding:12px 22px;border-radius:6px;">Open the report →</a>
+            <!-- Plain inline-block anchors (no fixed-width table) so the
+                 pair wraps to two stacked lines on narrow phone widths
+                 instead of overflowing the 560px card. -->
+            <a href="${sr}" style="display:inline-block;margin:0 10px 10px 0;background:#ff6a1a;color:#ffffff;text-decoration:none;font-size:14.5px;font-weight:600;letter-spacing:0.01em;padding:12px 22px;border-radius:6px;">Open the report →</a>
+            <a href="${sp}" style="display:inline-block;margin:0 0 10px 0;background:transparent;color:#ffffff;text-decoration:none;font-size:14.5px;font-weight:600;letter-spacing:0.01em;padding:11px 21px;border-radius:6px;border:1px solid rgba(255,255,255,0.18);">Download PDF</a>
           </td></tr>
           <tr><td style="padding:14px 32px 28px;font-size:14px;line-height:1.6;color:rgba(255,255,255,0.6);">
-            The link is private to you — no login required. You can return to it any time.
+            The links are private to you — no login required. You can return to them any time.
           </td></tr>
           <tr><td style="padding:0 32px 28px;font-size:13px;color:rgba(255,255,255,0.5);border-top:1px solid rgba(255,255,255,0.06);padding-top:18px;">
             Questions? Just reply to this email and we&#39;ll get back to you within one business day.

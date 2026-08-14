@@ -62,6 +62,7 @@ const SAMPLE_ORDER = {
   businessLabel: "North Coast Roofing",
   websiteUrl: "https://northcoastroofing.com",
   reportUrl: "https://geoviz.ai/report/ord_abc123/print",
+  pdfUrl: "https://geoviz.ai/api/report/ord_abc123/pdf",
 };
 
 const FORBIDDEN_PHRASES: RegExp[] = [
@@ -108,6 +109,22 @@ async function run(): Promise<void> {
       occurrences,
       1,
       `expected exactly 1 reportUrl occurrence in html body, got ${occurrences}`,
+    );
+  });
+  test("plain-text body contains the PDF URL", () => {
+    const occurrences = text.split(SAMPLE_ORDER.pdfUrl).length - 1;
+    assert.equal(
+      occurrences,
+      1,
+      `expected exactly 1 pdfUrl occurrence in text body, got ${occurrences}`,
+    );
+  });
+  test("html body contains the PDF URL", () => {
+    const occurrences = html.split(SAMPLE_ORDER.pdfUrl).length - 1;
+    assert.equal(
+      occurrences,
+      1,
+      `expected exactly 1 pdfUrl occurrence in html body, got ${occurrences}`,
     );
   });
   test("plain-text body signs off with — GeoViz", () => {

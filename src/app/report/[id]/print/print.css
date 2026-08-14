@@ -29,6 +29,25 @@
   overflow-x: hidden;
 }
 
+/* ---- screen-only PDF download bar ----
+ * Sits above <ReportSurface /> on the customer report page only
+ * (src/app/report/[id]/print/page.tsx). Must be hidden in the
+ * Puppeteer print capture (see generateAuditPdf in
+ * src/lib/generate-pdf.ts, which navigates to this exact route with
+ * emulateMediaType("print")) — otherwise a "Download PDF" button
+ * would render inside the generated PDF itself. */
+.report-toolbar {
+  display: flex;
+  justify-content: center;
+  padding: 20px 16px 0;
+}
+
+@media print {
+  .report-toolbar {
+    display: none !important;
+  }
+}
+
 /* ---- universal long-token / URL hardening ----
  * Customer reports embed full https:// URLs in prose ("**Site:**
  * https://example.com"), anchor href text, and mono-data IDs.

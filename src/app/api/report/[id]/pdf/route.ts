@@ -143,7 +143,7 @@ export async function GET(
     `[pdf] orderId=${order.id} ready bytes=${pdf.length} elapsedMs=${Date.now() - startedAt}`,
   );
 
-  const filename = filenameFor(order.id, order.businessName);
+  const filename = filenameFor(order.businessName);
 
   return new NextResponse(new Uint8Array(pdf), {
     status: 200,
@@ -156,12 +156,17 @@ export async function GET(
   });
 }
 
-function filenameFor(id: string, businessName: string | null): string {
-  const slug = (businessName ?? "audit")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40) || "audit";
-  const shortId = id.slice(-6);
-  return `geoviz-${slug}-${shortId}.pdf`;
+function filenameFor(businessName: string | null): string {
+  // Title-Case-With-Hyphens slug of the business name, e.g.
+  // "Rick's Affordable Heating!" -> "Ricks-Affordable-Heating".
+  // Falls back to "Business" so the filename is never malformed when
+  // businessName is null/empty.
+  const words = (businessName ?? "")
+    .replace(/[^a-zA-Z0-9\s-]/g, "")
+    .trim()
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .slice(0, 8);
+  const slug = words.length > 0 ? words.join("-") : "Business";
+  return `GeoViz-AI-Visibility-Audit-${slug}.pdf`;
 }

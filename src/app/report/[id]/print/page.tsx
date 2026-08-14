@@ -179,17 +179,37 @@ export default async function PrintPage({
     outcome: "served",
   });
 
+  const reviewed = order.reviewStatus === "approved";
+
   return (
-    <ReportSurface
-      orderId={order.id}
-      businessLabel={businessLabel}
-      websiteUrl={order.websiteUrl}
-      reportMarkdown={order.reportMarkdown}
-      reportGeneratedAt={order.reportGeneratedAt}
-      reviewed={order.reviewStatus === "approved"}
-      deterministicScore={order.intelligence?.deterministicScore ?? null}
-      context={contextWithIdentity}
-    />
+    <>
+      {/* Screen-only download bar. Hidden from the Puppeteer print
+          capture via .report-toolbar's @media print rule in
+          print.css, so it never appears inside the generated PDF.
+          Gated on `reviewed` so the button only shows once the
+          report has cleared admin review — same moment the customer
+          success email (with its own PDF link) starts sending. */}
+      {reviewed && (
+        <div className="report-toolbar">
+          <a
+            href={`/api/report/${order.id}/pdf`}
+            className="btn-primary text-sm"
+          >
+            Download PDF
+          </a>
+        </div>
+      )}
+      <ReportSurface
+        orderId={order.id}
+        businessLabel={businessLabel}
+        websiteUrl={order.websiteUrl}
+        reportMarkdown={order.reportMarkdown}
+        reportGeneratedAt={order.reportGeneratedAt}
+        reviewed={reviewed}
+        deterministicScore={order.intelligence?.deterministicScore ?? null}
+        context={contextWithIdentity}
+      />
+    </>
   );
 }
 
