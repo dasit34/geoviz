@@ -68,6 +68,16 @@ const PERPLEXITY_ENDPOINT = "https://api.perplexity.ai/chat/completions";
 const PERPLEXITY_TIMEOUT_MS = 15_000;
 const PERPLEXITY_TEMPERATURE = 0.1;
 
+// Bounded retry for the MAIN validation request only (not the
+// competitive-capture sub-call below — that's a separate, capture-only
+// feature and out of scope for this fix). A transient 429/5xx or a
+// network timeout gets up to 2 retries before the request is treated
+// as a final failure, same as it always was.
+const PERPLEXITY_MAX_ATTEMPTS = 3;
+const PERPLEXITY_RETRY_DELAYS_MS = [1000, 2500]; // before attempt 2, before attempt 3
+const PERPLEXITY_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+const PERPLEXITY_RETRY_DELAY_CAP_MS = 10_000; // ceiling on a respected Retry-After
+
 // Buyer-intent competitive capture (AI Answer Graph). Perplexity is
 // search-grounded, so its competitive set reflects real retrieval.
 // Capture-only — never fed to consensus/scoring.
@@ -365,6 +375,139 @@ function buildPrompt(input: ValidationInput): { system: string; user: string } {
   return { system, user };
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Same timeout/abort detection the outer catch block already uses,
+// plus generic fetch-layer network errors — both are transient and
+// worth a retry. Anything else (programming errors, etc.) is not.
+function isRetryableNetworkError(e: Error): boolean {
+  const isTimeout = e.name === "TimeoutError" || /aborted/i.test(e.message ?? "");
+  const isNetwork = e.name === "TypeError" && /fetch failed|network/i.test(e.message ?? "");
+  return isTimeout || isNetwork;
+}
+
+// Respects a valid `Retry-After` header (seconds or HTTP-date form)
+// when present and reasonable; otherwise falls back to the scheduled
+// default delay for this attempt. Capped so a large/malformed value
+// can never block the worker for an unreasonable amount of time.
+function retryDelayMs(response: Response, fallbackMs: number): number {
+  const header = response.headers.get("retry-after");
+  if (!header) return fallbackMs;
+  const asSeconds = Number(header);
+  if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+    return Math.min(asSeconds * 1000, PERPLEXITY_RETRY_DELAY_CAP_MS);
+  }
+  const asDate = Date.parse(header);
+  if (!Number.isNaN(asDate)) {
+    const ms = asDate - Date.now();
+    return ms > 0 ? Math.min(ms, PERPLEXITY_RETRY_DELAY_CAP_MS) : fallbackMs;
+  }
+  return fallbackMs;
+}
+
+// Safe, production-visible retry telemetry — status/attempt/outcome
+// only. Never logs the request body, headers, or API key.
+function logRetryAttempt(fields: {
+  attempt: number;
+  httpStatus?: number;
+  error?: string;
+  retryScheduled: boolean;
+  delayMs?: number;
+  outcome?: "success" | "exhausted" | "non-retryable";
+}): void {
+  const { attempt, httpStatus, error, retryScheduled, delayMs, outcome } = fields;
+  console.log(
+    `[perplexity-retry] provider=perplexity attempt=${attempt}/${PERPLEXITY_MAX_ATTEMPTS}` +
+      (httpStatus !== undefined ? ` httpStatus=${httpStatus}` : "") +
+      (error ? ` error="${error}"` : "") +
+      ` retryScheduled=${retryScheduled}` +
+      (delayMs !== undefined ? ` delayMs=${delayMs}` : "") +
+      (outcome ? ` outcome=${outcome}` : ""),
+  );
+}
+
+// Retries ONLY the main validation fetch — never the competitive-capture
+// sub-call. On success (ok, or a non-retryable/exhausted non-ok status)
+// returns the Response as-is so all downstream parsing/validation stays
+// byte-for-byte unchanged. On a retryable thrown error that exhausts
+// retries, rethrows so the existing outer catch block's classification
+// (timeout vs. generic error) is unchanged.
+async function fetchPerplexityMainWithRetry(
+  body: string,
+): Promise<Response> {
+  for (let attempt = 1; attempt <= PERPLEXITY_MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(PERPLEXITY_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${readApiKey("PERPLEXITY_API_KEY")!}`,
+        },
+        body,
+        // Fresh timeout per attempt — a fired AbortSignal can't be
+        // reused, and a retry shouldn't be pre-doomed by attempt 1's
+        // stale timer.
+        signal: AbortSignal.timeout(PERPLEXITY_TIMEOUT_MS),
+      });
+
+      const canRetryStatus =
+        !response.ok &&
+        PERPLEXITY_RETRY_STATUSES.has(response.status) &&
+        attempt < PERPLEXITY_MAX_ATTEMPTS;
+
+      if (!canRetryStatus) {
+        logRetryAttempt({
+          attempt,
+          httpStatus: response.status,
+          retryScheduled: false,
+          outcome: response.ok
+            ? "success"
+            : PERPLEXITY_RETRY_STATUSES.has(response.status)
+              ? "exhausted"
+              : "non-retryable",
+        });
+        return response;
+      }
+
+      const delay = retryDelayMs(response, PERPLEXITY_RETRY_DELAYS_MS[attempt - 1]);
+      logRetryAttempt({
+        attempt,
+        httpStatus: response.status,
+        retryScheduled: true,
+        delayMs: delay,
+      });
+      await sleep(delay);
+    } catch (err) {
+      const e = err as Error;
+      const canRetryError = isRetryableNetworkError(e) && attempt < PERPLEXITY_MAX_ATTEMPTS;
+
+      if (!canRetryError) {
+        logRetryAttempt({
+          attempt,
+          error: e.message ?? String(err),
+          retryScheduled: false,
+          outcome: "exhausted",
+        });
+        throw err;
+      }
+
+      const delay = PERPLEXITY_RETRY_DELAYS_MS[attempt - 1];
+      logRetryAttempt({
+        attempt,
+        error: e.message ?? String(err),
+        retryScheduled: true,
+        delayMs: delay,
+      });
+      await sleep(delay);
+    }
+  }
+  // Unreachable — the loop always returns or throws by the final
+  // attempt — but TypeScript needs an exhaustive path.
+  throw new Error("Perplexity retry loop exhausted without a result");
+}
+
 function failedOutput(message: string): NormalizedValidationOutput {
   return {
     provider: PROVIDER_NAME,
@@ -419,13 +562,8 @@ export const PerplexityValidator: AiValidator = {
 
     try {
       const { system, user } = buildPrompt(input);
-      const response = await fetch(PERPLEXITY_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${readApiKey("PERPLEXITY_API_KEY")!}`,
-        },
-        body: JSON.stringify({
+      const response = await fetchPerplexityMainWithRetry(
+        JSON.stringify({
           model: PERPLEXITY_MODEL,
           messages: [
             { role: "system", content: system },
@@ -437,8 +575,7 @@ export const PerplexityValidator: AiValidator = {
           },
           temperature: PERPLEXITY_TEMPERATURE,
         }),
-        signal: AbortSignal.timeout(PERPLEXITY_TIMEOUT_MS),
-      });
+      );
 
       if (!response.ok) {
         const errText = await response.text().catch(() => "");
