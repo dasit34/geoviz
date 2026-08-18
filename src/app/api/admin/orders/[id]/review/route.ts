@@ -77,7 +77,9 @@ export async function POST(
 
   const order = await prisma.auditOrder.findUnique({
     where: { id: params.id },
-    include: { intelligence: { select: { aiValidations: true } } },
+    include: {
+      intelligence: { select: { aiValidations: true, overallScore: true } },
+    },
   });
   if (!order) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -129,11 +131,35 @@ export async function POST(
 
   if (shouldAutoSend) {
     try {
+      // Re-Audit context — additive, best-effort. A lookup failure
+      // here must never block sending the underlying report email, so
+      // it's wrapped separately and simply omitted on any error.
+      let reAudit: { previousScore: number | null; currentScore: number | null } | undefined;
+      if (order.previousAuditOrderId) {
+        try {
+          const previous = await prisma.auditIntelligence.findUnique({
+            where: { auditOrderId: order.previousAuditOrderId },
+            select: { overallScore: true },
+          });
+          reAudit = {
+            previousScore: previous?.overallScore ?? null,
+            currentScore: order.intelligence?.overallScore ?? null,
+          };
+        } catch (err) {
+          console.warn(
+            `[admin-review] re-audit score lookup failed (non-fatal) orderId=${order.id}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+      }
+
       const ok = await sendCustomerSuccessEmail({
         orderId: order.id,
         businessName: order.businessName,
         customerEmail: order.email,
         websiteUrl: order.websiteUrl,
+        reAudit,
       });
       if (ok) {
         await prisma.auditOrder.update({

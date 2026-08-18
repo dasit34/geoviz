@@ -496,6 +496,7 @@ export default async function AdminReportsPage({
                   amount: o.amount,
                   currency: o.currency,
                   createdAt: o.createdAt.toISOString(),
+                  previousAuditOrderId: o.previousAuditOrderId,
                 }}
               />
               );

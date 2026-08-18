@@ -239,11 +239,25 @@ function escapeHtml(s: string): string {
 // as the failure template for visual consistency.
 // ────────────────────────────────────────────────────────────
 
+/**
+ * Optional Re-Audit / Verification Audit context. When present, the
+ * success email adds a short comparison line plus a secondary "View
+ * Re-Audit" / "Download Re-Audit PDF" link pair alongside the normal
+ * report links — additive only, same send/approval timing as today.
+ */
+export type ReAuditEmailContext = {
+  previousScore: number | null;
+  currentScore: number | null;
+  verificationUrl: string;
+  verificationPdfUrl: string;
+};
+
 export function buildCustomerSuccessTexts(args: {
   businessLabel: string;
   websiteUrl: string;
   reportUrl: string;
   pdfUrl: string;
+  reAudit?: ReAuditEmailContext;
 }): { text: string; html: string } {
   return {
     text: buildSuccessPlainText(args),
@@ -256,6 +270,8 @@ export async function sendCustomerSuccessEmail(args: {
   businessName: string | null;
   customerEmail: string;
   websiteUrl: string;
+  /** Set when this order is a linked Re-Audit — adds the comparison line + links. */
+  reAudit?: { previousScore: number | null; currentScore: number | null };
 }): Promise<boolean> {
   const { orderId, businessName, customerEmail, websiteUrl } = args;
 
@@ -269,11 +285,20 @@ export async function sendCustomerSuccessEmail(args: {
   const businessLabel = businessName?.trim() || websiteUrl;
   const reportUrl = `${resolveAppBaseUrl()}/report/${encodeURIComponent(orderId)}/print`;
   const pdfUrl = `${resolveAppBaseUrl()}/api/report/${encodeURIComponent(orderId)}/pdf`;
+  const reAudit: ReAuditEmailContext | undefined = args.reAudit
+    ? {
+        previousScore: args.reAudit.previousScore,
+        currentScore: args.reAudit.currentScore,
+        verificationUrl: `${resolveAppBaseUrl()}/report/${encodeURIComponent(orderId)}/verification`,
+        verificationPdfUrl: `${resolveAppBaseUrl()}/api/report/${encodeURIComponent(orderId)}/verification-pdf`,
+      }
+    : undefined;
   const { text: textBody, html: htmlBody } = buildCustomerSuccessTexts({
     businessLabel,
     websiteUrl,
     reportUrl,
     pdfUrl,
+    reAudit,
   });
 
   console.log(
@@ -313,9 +338,10 @@ function buildSuccessPlainText(args: {
   websiteUrl: string;
   reportUrl: string;
   pdfUrl: string;
+  reAudit?: ReAuditEmailContext;
 }): string {
-  const { businessLabel, websiteUrl, reportUrl, pdfUrl } = args;
-  return [
+  const { businessLabel, websiteUrl, reportUrl, pdfUrl, reAudit } = args;
+  const lines = [
     `Hi —`,
     "",
     `Your GeoViz AI Visibility Report for ${businessLabel} (${websiteUrl}) is ready to review.`,
@@ -325,13 +351,30 @@ function buildSuccessPlainText(args: {
     "",
     `Download the PDF:`,
     pdfUrl,
+  ];
+  if (reAudit) {
+    lines.push(
+      "",
+      `This is a Verification Audit compared against your previous score` +
+        (reAudit.previousScore !== null ? ` of ${reAudit.previousScore}` : "") +
+        (reAudit.currentScore !== null ? `. Current score: ${reAudit.currentScore}.` : "."),
+      "",
+      `View your Re-Audit comparison:`,
+      reAudit.verificationUrl,
+      "",
+      `Download the Re-Audit PDF:`,
+      reAudit.verificationPdfUrl,
+    );
+  }
+  lines.push(
     "",
     `The links are private to you — no login required. You can return to them any time.`,
     "",
     `If you have any questions, just reply to this email.`,
     "",
     `— GeoViz`,
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 function buildSuccessHtml(args: {
@@ -339,12 +382,26 @@ function buildSuccessHtml(args: {
   websiteUrl: string;
   reportUrl: string;
   pdfUrl: string;
+  reAudit?: ReAuditEmailContext;
 }): string {
-  const { businessLabel, websiteUrl, reportUrl, pdfUrl } = args;
+  const { businessLabel, websiteUrl, reportUrl, pdfUrl, reAudit } = args;
   const sb = escapeHtml(businessLabel);
   const sw = escapeHtml(websiteUrl);
   const sr = escapeHtml(reportUrl);
   const sp = escapeHtml(pdfUrl);
+  const reAuditBlock = reAudit
+    ? `<tr><td style="padding:4px 32px 8px;font-size:14px;line-height:1.6;color:rgba(255,255,255,0.75);">
+            This is a Verification Audit${
+              reAudit.previousScore !== null && reAudit.currentScore !== null
+                ? ` — score ${reAudit.previousScore} → ${reAudit.currentScore}`
+                : ""
+            }.
+          </td></tr>
+          <tr><td style="padding:0 32px 8px;">
+            <a href="${escapeHtml(reAudit.verificationUrl)}" style="display:inline-block;margin:0 10px 10px 0;background:transparent;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;letter-spacing:0.01em;padding:11px 20px;border-radius:6px;border:1px solid rgba(255,106,26,0.5);">View Re-Audit →</a>
+            <a href="${escapeHtml(reAudit.verificationPdfUrl)}" style="display:inline-block;margin:0 0 10px 0;background:transparent;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;letter-spacing:0.01em;padding:11px 20px;border-radius:6px;border:1px solid rgba(255,255,255,0.18);">Download Re-Audit PDF</a>
+          </td></tr>`
+    : "";
   return `<!doctype html>
 <html>
   <body style="margin:0;padding:0;background:#0b0d14;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e8eaf0;">
@@ -367,6 +424,7 @@ function buildSuccessHtml(args: {
             <a href="${sr}" style="display:inline-block;margin:0 10px 10px 0;background:#ff6a1a;color:#ffffff;text-decoration:none;font-size:14.5px;font-weight:600;letter-spacing:0.01em;padding:12px 22px;border-radius:6px;">Open the report →</a>
             <a href="${sp}" style="display:inline-block;margin:0 0 10px 0;background:transparent;color:#ffffff;text-decoration:none;font-size:14.5px;font-weight:600;letter-spacing:0.01em;padding:11px 21px;border-radius:6px;border:1px solid rgba(255,255,255,0.18);">Download PDF</a>
           </td></tr>
+          ${reAuditBlock}
           <tr><td style="padding:14px 32px 28px;font-size:14px;line-height:1.6;color:rgba(255,255,255,0.6);">
             The links are private to you — no login required. You can return to them any time.
           </td></tr>

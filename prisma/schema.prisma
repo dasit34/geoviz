@@ -29,7 +29,7 @@ enum AuditStatus {
 /// join means the Stripe checkout/webhook code paths (load-bearing,
 /// see CLAUDE.md) never need to know this table exists.
 model FreeCheckSubmission {
-  id           String  @id @default(cuid())
+  id           String @id @default(cuid())
   websiteUrl   String
   businessName String
   city         String
@@ -118,11 +118,43 @@ model AuditOrder {
   // Groups all AuditOrder rows created by one Launch QA batch submission.
   // Null on historic rows and customer orders. Populated by the calibration
   // POST route when queuing a batch via the Launch QA tool.
+  //
+  // NOT the same concept as CalibrationBatch.batchNumber below — this is
+  // an operator's manual "which URLs did I submit together" grouping;
+  // CalibrationBatch is the automatic, count-based learning-loop batch
+  // (every GEO_CALIBRATION_BATCH_SIZE completed audits, system-wide).
   calibrationBatchId         String?
   createdAt                  DateTime      @default(now())
   updatedAt                  DateTime      @updatedAt
+  // Durable business identity — nullable, additive (Phase 1-2 of the
+  // monitoring foundation). Set at creation time by
+  // `findOrCreateBusinessForUrl()` for orders created via
+  // `createAuditOrderFromCheckoutSession`; null on historic rows until
+  // `scripts/backfill-business-identity.ts` links them, and null on
+  // rows created by other entry points (seed scripts, calibration
+  // batch route) not yet wired into business linking. `onDelete:
+  // SetNull` because a Business row is never deleted by any code path
+  // today, but if it ever were, AuditOrder rows (financial/customer
+  // records) must survive, not cascade-delete.
+  businessId                 String?
+  business                   Business?     @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  // Re-Audit / Verification Audit linkage — set (fail-soft, best-effort)
+  // at checkout order-creation time when a prior COMPLETED audit exists
+  // for the same business (see `createAuditOrderFromCheckoutSession` and
+  // `src/lib/audit-comparison/`). Deliberately just a relationship, not
+  // a persisted comparison/deltas snapshot — the comparison itself is
+  // always recomputed live from both orders' AuditIntelligence rows, the
+  // same way ReportModel is computed at render time rather than stored.
+  // `onDelete: SetNull` for the same reason as `businessId` above: an
+  // AuditOrder is a financial/customer record and must never cascade-
+  // delete because a sibling order was removed.
+  previousAuditOrderId       String?
+  previousAudit              AuditOrder?   @relation("AuditOrderPrevious", fields: [previousAuditOrderId], references: [id], onDelete: SetNull)
+  // Inverse side — any later audits that named THIS order as their prior
+  // audit. Schema-file-only; generates no SQL.
+  nextAudits                 AuditOrder[]  @relation("AuditOrderPrevious")
 
-  intelligence AuditIntelligence?
+  intelligence       AuditIntelligence?
   // Append-only history of observation runs for this audit.
   // Multi-row (re-audits add rows) — distinct from the 1:1
   // `intelligence` relation. See `src/lib/observations/history/`.
@@ -131,9 +163,211 @@ model AuditOrder {
   // operator-triggered replay; we never mutate or overwrite. See
   // `src/lib/calibration/replays.ts`.
   calibrationReplays CalibrationReplay[]
+  // Frozen calibration-engine snapshots, one per completed audit once
+  // the learning loop has processed it. Never mutated — see
+  // AuditSnapshot's own doc comment. See `src/lib/calibration/`.
+  auditSnapshots     AuditSnapshot[]
+  // Append-only per-model-response evidence rows, normalized from the
+  // AI validator layer's already-real output. Multi-row per audit (one
+  // per provider call). See `Observation`'s own doc comment.
+  observations       Observation[]
 
   @@index([email])
   @@index([createdAt])
+  @@index([businessId])
+  @@index([previousAuditOrderId])
+}
+
+model Business {
+  id                String   @id @default(cuid())
+  // Canonical identity key — output of normalizeDomain() (protocol,
+  // www, path, query, fragment, and case stripped). @unique so
+  // findOrCreateBusinessForUrl()'s create() naturally rejects a
+  // concurrent duplicate via a DB-level constraint, not just an
+  // application-level check-then-create race.
+  normalizedDomain  String   @unique
+  // First raw websiteUrl seen for this domain, for human debugging/
+  // display. Set once at creation, never updated on later orders —
+  // stays an unambiguous "first seen as" reference rather than a
+  // contested field multiple orders would fight over.
+  primaryWebsiteUrl String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  auditOrders         AuditOrder[]
+  queryLibraryEntries QueryLibraryEntry[]
+  observations        Observation[]
+
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Intelligence Engine Phase 1 — persistent evidence layer
+// (GEO_EVIDENCE_LAYER_ENABLED)
+//
+// Normalizes what the AI validator layer (`src/lib/validators/*`)
+// already produces on every paid audit — real per-provider model
+// calls, already running unconditionally in production — into
+// queryable rows, instead of leaving it trapped as opaque JSON on
+// `AuditIntelligence.aiValidations`. Adds ZERO new LLM calls: this
+// layer is a pure read-and-normalize step over data already
+// captured earlier in the same request. See
+// `docs/INTELLIGENCE_ENGINE_GAP_ANALYSIS.md` for the full design
+// rationale and what is/isn't populated yet.
+//
+// Deliberately does NOT touch `ObservationHistory` (an unrelated,
+// pre-existing aggregate-per-run rollup written by a separate,
+// permanently-disabled scaffold — see that model's doc comment) or
+// any `AuditIntelligence` column.
+// ─────────────────────────────────────────────────────────────────
+
+/// Persistent, reusable buyer-style query catalog. A row here is a
+/// TEMPLATE ("Who are the best providers in this category and area,
+/// and would you recommend any in particular?") scoped to an
+/// industry + geography, NOT a business-specific prompt — the same
+/// row is intentionally reused across every business audited in the
+/// same industry/geo. See `src/lib/validators/capture.ts`'s
+/// `DISCOVERY_QUERY_TEXT` for the literal text this is seeded from.
+///
+/// `businessId` is nullable and, as of Phase 1, always null for the
+/// auto-populated rows this layer writes (global/reusable). It
+/// exists for a future operator-authored, business-specific ad hoc
+/// query — that write path is NOT built in Phase 1.
+///
+/// GOTCHA — do not "fix" the unique index below by adding
+/// `businessId` to it. Postgres unique indexes treat NULL as
+/// distinct per row, so a nullable `businessId` inside the
+/// constraint would silently defeat dedup for every global
+/// (businessId = null) row. Global reuse is enforced by
+/// (normalizedQueryText, industryNormalized, geographyRaw) alone;
+/// both of those use non-null sentinel defaults ("unknown" /
+/// "unspecified") for the same reason.
+model QueryLibraryEntry {
+  id                  String @id @default(cuid())
+  queryText           String
+  normalizedQueryText String // lowercased/trimmed/whitespace-collapsed
+
+  industryRaw             String?
+  industryNormalized      String  @default("unknown") // src/lib/intelligence/industry-taxonomy.ts IndustrySlug
+  industryTaxonomyVersion String  @default("v1")
+
+  // No geography taxonomy exists anywhere in this codebase today
+  // (AuditIntelligence.location is always null). geographyRaw is
+  // best-effort free text (a provider's own `inferred_location`);
+  // geographyNormalized is reserved for a future geo taxonomy and is
+  // always null in Phase 1 — see gap analysis for this limitation.
+  geographyRaw        String  @default("unspecified")
+  geographyNormalized String?
+
+  /// "discovery" | "recommendation" | "comparison" | "reputation_trust" |
+  /// "service_specific" | "location_specific" | "problem_solution" |
+  /// "purchase_high_intent". Phase 1 only ever writes "recommendation"
+  /// rows (the one real query the validator layer sends today) — the
+  /// other 7 are schema-supported, not yet populated. See gap analysis.
+  intent    String
+  queryType String? // free-form structural subtype, e.g. "competitive_capture_template"
+
+  businessId String?
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  isActive  Boolean  @default(true)
+  source    String // "validator_competitive_capture" | "seed_template" | "operator_manual" (latter two reserved, unused in Phase 1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  observations Observation[]
+
+  @@unique([normalizedQueryText, industryNormalized, geographyRaw])
+  @@index([businessId])
+  @@index([industryNormalized])
+  @@index([geographyRaw])
+  @@index([intent])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+/// Append-only evidence row — one row per real model response
+/// normalized from the AI validator layer's output (see the section
+/// header above). NEVER updated, NEVER overwritten — a future
+/// rescan/re-audit creates NEW rows against the same auditOrderId,
+/// mirroring `ObservationHistory` / `CalibrationReplay` /
+/// `AuditSnapshot`'s established append-only pattern in this file.
+///
+/// Written by
+/// `src/lib/intelligence/evidence/persistObservationEvidence.ts`
+/// from the validatorResult already captured by
+/// `persistAuditIntelligence` — no new LLM calls.
+model Observation {
+  id String @id @default(cuid())
+
+  auditOrderId String
+  auditOrder   AuditOrder @relation(fields: [auditOrderId], references: [id], onDelete: Cascade)
+
+  // Denormalized from AuditOrder.businessId at write time (best-effort
+  // lookup; null on failure or when the order has no linked Business).
+  businessId String?
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  queryLibraryEntryId String?
+  queryLibraryEntry   QueryLibraryEntry? @relation(fields: [queryLibraryEntryId], references: [id], onDelete: SetNull)
+
+  /// "self_assessment" | "competitive_capture" — see write-path doc.
+  /// self_assessment rows are NEVER linked to a QueryLibraryEntry (that
+  /// call's prompt is business-specific, not a reusable buyer query).
+  callType String
+
+  provider     String // matches src/lib/validators/registry.ts provider name: "claude" | "openai" | "gemini" | "perplexity" | "google_ai_overview"
+  model        String?
+  modelVersion String?
+
+  status String // ValidationStatus: "passed" | "failed" | "unavailable" | "skipped" — rows are only written for "passed"
+
+  promptText      String
+  rawResponseText String
+
+  mentioned   Boolean? // competitive_capture: business_named. self_assessment: always null (no mention signal at that call type)
+  recommended Boolean? // self_assessment: would_recommend YES→true, NO→false, PARTIAL→null. competitive_capture: always null (no recommend verdict exists)
+  position    Int? // reserved; not populated in Phase 1 — see gap analysis
+  sentiment   String? // reserved; not populated in Phase 1 — see gap analysis
+
+  citations       Json // string[] — cited_sources verbatim
+  citationDomains Json // string[] — cited_source_domains
+  extractedClaims Json? // reserved; not populated in Phase 1 — see gap analysis
+
+  parserOutput  Json // verbatim NormalizedValidationOutput or CompetitiveCapture object
+  parserVersion String // capture_version / prompt_version stamp from src/lib/validators/capture.ts
+
+  observedAt DateTime // answer_retrieved_at / retrieved_at from the source record
+  createdAt  DateTime @default(now())
+
+  competitorMentions ObservationCompetitorMention[]
+
+  @@index([auditOrderId])
+  @@index([businessId])
+  @@index([queryLibraryEntryId])
+  @@index([provider])
+  @@index([createdAt])
+  @@index([businessId, provider, createdAt])
+}
+
+/// One row per named competitor entity per Observation — a
+/// relational join shape so competitor-frequency / share-of-voice
+/// aggregation is indexed SQL, not a JSON-array scan. Populated only
+/// from callType = "competitive_capture" rows.
+model ObservationCompetitorMention {
+  id            String      @id @default(cuid())
+  observationId String
+  observation   Observation @relation(fields: [observationId], references: [id], onDelete: Cascade)
+
+  competitorName       String // verbatim, as returned by the model
+  competitorNormalized String // lowercased/trimmed for grouping — best-effort, NOT full entity resolution (documented limitation)
+  position             Int? // 0-based index in the model's named-entities array
+  wasRecommended       Boolean? // reserved; always null in Phase 1 — competitive_capture doesn't rank/recommend among named entities
+
+  createdAt DateTime @default(now())
+
+  @@index([observationId])
+  @@index([competitorNormalized])
 }
 
 /// Append-only history of observation-layer runs.
@@ -147,24 +381,24 @@ model AuditOrder {
 /// Foreign key to `AuditOrder` with `ON DELETE CASCADE` — if the
 /// audit row is purged, its observation history goes with it.
 model ObservationHistory {
-  id                String     @id @default(cuid())
-  auditId           String
-  auditOrder        AuditOrder @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  id         String     @id @default(cuid())
+  auditId    String
+  auditOrder AuditOrder @relation(fields: [auditId], references: [id], onDelete: Cascade)
 
   providerCount     Int
-  agreementScore    Int        // 0..100 from computeAgreement
-  variance          Float      // max stdev across the 4 signal dimensions
-  observationStatus String     // "OK" | "DISAGREE" | "SUPPRESSED" | "SINGLE_PROVIDER"
-  providerNames     Json       // string[] of ObservationProviderIds, stable order
-  estimatedCost     Decimal    @db.Decimal(10, 6)
-  avgLatency        Int        // ms — round(mean(success.latency_ms))
+  agreementScore    Int // 0..100 from computeAgreement
+  variance          Float // max stdev across the 4 signal dimensions
+  observationStatus String // "OK" | "DISAGREE" | "SUPPRESSED" | "SINGLE_PROVIDER"
+  providerNames     Json // string[] of ObservationProviderIds, stable order
+  estimatedCost     Decimal @db.Decimal(10, 6)
+  avgLatency        Int // ms — round(mean(success.latency_ms))
 
   // Freeze-contract evidence copied from frozen.ts at write time.
-  scoringVersion    String     // "scoring@1.0.0"
-  weightHash        String     // frozen.WEIGHT_HASH
-  categoryHash      String     // frozen.CATEGORY_HASH
+  scoringVersion String // "scoring@1.0.0"
+  weightHash     String // frozen.WEIGHT_HASH
+  categoryHash   String // frozen.CATEGORY_HASH
 
-  createdAt         DateTime   @default(now())
+  createdAt DateTime @default(now())
 
   @@index([auditId])
   @@index([createdAt])
@@ -183,43 +417,194 @@ model ObservationHistory {
 /// + createdAt, foreign-key cascade. Adds a third index on
 /// replayStatus for the cockpit's filter pills.
 model CalibrationReplay {
-  id                  String     @id @default(cuid())
-  auditId             String
-  auditOrder          AuditOrder @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  id         String     @id @default(cuid())
+  auditId    String
+  auditOrder AuditOrder @relation(fields: [auditId], references: [id], onDelete: Cascade)
 
   // Headline fields surfaced in the cockpit table.
-  originalScore       Int?
-  recalculatedScore   Int?
-  delta               Int?
-  previousBand        String?    // e.g. "Needs Work"
-  currentBand         String?
-  bandChanged         Boolean    @default(false)
-  replayStatus        String     // "stable" | "minor_drift" | "major_drift" | "band_moved" | "hash_mismatch" | "partial_replay" | "unreplayable"
-  runtimeMs           Int
-  replayMode          String     // "stored" | "skip" | "live"
+  originalScore     Int?
+  recalculatedScore Int?
+  delta             Int?
+  previousBand      String? // e.g. "Needs Work"
+  currentBand       String?
+  bandChanged       Boolean @default(false)
+  replayStatus      String // "stable" | "minor_drift" | "major_drift" | "band_moved" | "hash_mismatch" | "partial_replay" | "unreplayable"
+  runtimeMs         Int
+  replayMode        String // "stored" | "skip" | "live"
 
   // Freeze-contract evidence (matches ObservationHistory pattern).
-  scoringVersion      String?    // "scoring@1.0.0" stamp from the original audit run
-  weightHashMatch     Boolean?   // null when no replayBundle was available (partial_replay)
-  categoryHashMatch   Boolean?
+  scoringVersion       String? // "scoring@1.0.0" stamp from the original audit run
+  weightHashMatch      Boolean? // null when no replayBundle was available (partial_replay)
+  categoryHashMatch    Boolean?
   // Actual hash values stamped at the original audit time. Lets
   // analysts query lineage patterns ("all drift from rows stamped
   // with weight_hash=abc123") without re-running anything. Null
   // for replays whose source row predates the replayBundle column
   // OR for partial_replay fallback rows.
-  weightHashOriginal  String?
+  weightHashOriginal   String?
   categoryHashOriginal String?
 
   // Drill-down payload (optional, lazy-loaded by the inline panel).
   // Shape per src/lib/calibration/replays.ts CategoryDeltas + ChangedFindings types.
-  categoryDeltas      Json?
-  changedFindings     Json?
+  categoryDeltas  Json?
+  changedFindings Json?
 
-  createdAt           DateTime   @default(now())
+  createdAt DateTime @default(now())
 
   @@index([auditId])
   @@index([createdAt])
   @@index([replayStatus])
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Calibration Engine (learning loop) — GEO_MODULE_CALIBRATION_ENGINE_ENABLED
+//
+// Additive, read-mostly extension of the calibration cockpit above.
+// Written only by scripts/calibration-batch-runner.ts (never by the
+// worker, never inline with persistAuditIntelligence). Disabled by
+// default; enabling the flag only affects the batch runner script and
+// the new dashboard panel it feeds — no other code path reads these
+// tables. See docs/prd or the approved plan for full design rationale.
+// ─────────────────────────────────────────────────────────────────
+
+/// Frozen snapshot of an audit's calibration-relevant state, written
+/// once at completion time by the calibration batch runner. NEVER
+/// updated, NEVER overwritten — mirrors ObservationHistory /
+/// CalibrationReplay. Exists because AuditIntelligence's operator
+/// fields (operatorVerdict, benchmarkTag, calibrationNotes) ARE
+/// editable after the fact via PATCH, so batch math computed against
+/// live AuditIntelligence rows would not be reproducible over time.
+///
+/// Deliberately thin — does not duplicate columnar AuditIntelligence
+/// data reachable via the auditOrderId join (deterministicScore,
+/// consensusIndex, aiValidations, full category scores, report
+/// markdown, prompt/scoring/render version, etc.). Only freezes the
+/// small denormalized slice batch aggregation needs every run, plus
+/// the genuinely new review-queue fields.
+model AuditSnapshot {
+  id           String     @id @default(cuid())
+  auditOrderId String
+  auditOrder   AuditOrder @relation(fields: [auditOrderId], references: [id], onDelete: Cascade)
+
+  // Denormalized identity/grouping — cheap to freeze, avoids a join
+  // in every batch aggregation query.
+  businessName       String?
+  websiteUrl         String
+  industryNormalized String? // == AuditIntelligence.industryCategoryNormalized at snapshot time
+
+  // Frozen headline numbers (== AuditIntelligence.overallScore /
+  // deterministicScore.* at snapshot time — frozen so a later
+  // operator retag or future scoring-version bump doesn't rewrite
+  // history for a batch already computed).
+  overallScore    Int?
+  categoryScores  Json // Record<CategoryKey, number> snapshot of category_scores
+  confidenceLevel String? // deterministicScore.confidence_level at snapshot time
+  modelAgreement  String? // consensusIndex.model_agreement (AgreementLabel) at snapshot time
+
+  costUsd   Decimal? @db.Decimal(10, 6)
+  runtimeMs Int?
+
+  // == deterministicScore.top_3_findings / top_3_recommended_fixes
+  // stable ids, frozen for RecommendationFrequency aggregation.
+  topFindingIds        Json // string[] of stable finding ids, e.g. "schema.no_jsonld"
+  topRecommendationIds Json // string[] of stable fix ids
+
+  // Genuinely new — the automatic manual-review-queue output.
+  // Computed by the pure function in
+  // src/lib/calibration/review-flags.ts at snapshot time. This is
+  // the first AUTOMATIC flagging in the system, additive alongside
+  // (not replacing) the existing manual operatorVerdict tagging.
+  needsReview        Boolean   @default(false)
+  needsReviewReasons Json // string[] of reason codes
+  reviewResolvedAt   DateTime? // set when an operator addresses a flagged row
+
+  // Which CalibrationBatch this snapshot was rolled into. Null until
+  // a batch run consumes it. Distinct from AuditOrder.calibrationBatchId
+  // (see that field's doc comment).
+  calibrationBatchNumber Int?
+
+  scoringVersion String
+  snapshotAt     DateTime @default(now())
+
+  @@index([auditOrderId])
+  @@index([snapshotAt])
+  @@index([calibrationBatchNumber])
+  @@index([websiteUrl])
+  @@index([needsReview])
+}
+
+/// Learning-loop analysis batch — the Nth group of `batchSize`
+/// completed audits (system-wide, chronological by
+/// AuditSnapshot.snapshotAt). NOT the same concept as
+/// AuditOrder.calibrationBatchId — see that field's doc comment.
+/// Written once by scripts/calibration-batch-runner.ts when the
+/// count of un-batched AuditSnapshot rows reaches
+/// GEO_CALIBRATION_BATCH_SIZE (default 25). NEVER updated after
+/// write — to revise, the runner creates batchNumber N+1 covering
+/// the next window; historical batches stay immutable.
+model CalibrationBatch {
+  id          String @id @default(cuid())
+  batchNumber Int    @unique
+  batchSize   Int // audits actually included (== configured size unless a partial final batch)
+
+  computedAt  DateTime @default(now())
+  windowStart DateTime // earliest AuditSnapshot.snapshotAt included
+  windowEnd   DateTime // latest AuditSnapshot.snapshotAt included
+
+  avgScore                Float?
+  medianScore             Float?
+  industryDistribution    Json // Record<industry, count>
+  categoryDistribution    Json // Record<CategoryKey, avg>
+  avgRuntimeMs            Int?
+  avgCostUsd              Decimal? @db.Decimal(10, 6)
+  recommendationFrequency Json // Array<{id, count}> — top findings/fixes this batch
+  modelAgreementPct       Float? // % of snapshots with modelAgreement in {"Strong","Moderate"}
+  confidenceDistribution  Json // Record<"low"|"moderate"|"high", count>
+  failureCount            Int      @default(0)
+  warningCount            Int      @default(0)
+  outlierAuditIds         Json // string[] of AuditOrder ids flagged as score outliers
+  needsReviewCount        Int      @default(0)
+
+  // Pointer to the generated markdown report for this batch (see
+  // src/lib/calibration/report-writer.ts). Lands under
+  // tmp/calibration-reports/ — gitignored, never under docs/.
+  reportPath String?
+
+  @@index([computedAt])
+}
+
+/// Recommendation-frequency rollup, refreshed per CalibrationBatch
+/// run. One row per (recommendationId, industry | null) pair
+/// reflecting corpus-to-date frequency — a leaderboard, NOT
+/// append-only history (each batch run upserts this table). The
+/// frozen per-batch snapshot lives on
+/// CalibrationBatch.recommendationFrequency instead.
+model RecommendationFrequency {
+  id               String   @id @default(cuid())
+  recommendationId String // stable id, e.g. "schema.no_jsonld" (Finding/Fix.id)
+  industry         String? // null row = all-industries rollup
+  timesGenerated   Int
+  avgScore         Float?
+  avgConfidence    Float? // 0..2 numeric, matches src/lib/intelligence/calibration.ts's low/medium/high convention
+  updatedAt        DateTime @updatedAt
+
+  @@unique([recommendationId, industry])
+  @@index([industry])
+}
+
+/// Per-industry benchmark rollup, refreshed per CalibrationBatch run.
+/// Current-state view (upserted), mirrors RecommendationFrequency.
+model IndustryBenchmarks {
+  id                  String   @id @default(cuid())
+  industry            String   @unique
+  auditCount          Int
+  avgScore            Float?
+  medianScore         Float?
+  bestScore           Int?
+  worstScore          Int?
+  topWeakCategories   Json // Array<{category, avgScore}>, ranked ascending
+  topRecommendedFixes Json // Array<{id, count}>, ranked
+  updatedAt           DateTime @updatedAt
 }
 
 /// V2 data foundation — normalized intelligence row written once per
@@ -302,11 +687,11 @@ model AuditIntelligence {
   // Populated post-audit by `src/lib/intelligence/intelligenceIngest.ts`
   // in a fail-soft try/catch. NOT consumed by scoring, NOT consumed by
   // report rendering. Pre-Stage-1 rows stay null on every field below.
-  cmsDetected         String?    // e.g. "shopify" | "wordpress" | "wix" | "squarespace"
-  frameworkDetected   String?    // e.g. "nextjs" | "react" | "vanilla" | "vue"
-  schemaTypes         Json?      // string[] — detected schema.org types
-  aiReadabilityScore  Int?       // 0..100 composite heuristic
-  contentDensity      Int?       // approximate words per discoverable page
+  cmsDetected         String? // e.g. "shopify" | "wordpress" | "wix" | "squarespace"
+  frameworkDetected   String? // e.g. "nextjs" | "react" | "vanilla" | "vue"
+  schemaTypes         Json? // string[] — detected schema.org types
+  aiReadabilityScore  Int? // 0..100 composite heuristic
+  contentDensity      Int? // approximate words per discoverable page
   // Render-required is a heuristic flag for future browser-rendering work.
   // Stage 1 ships the flags only; no browser infrastructure yet. The three
   // render* columns stay null on every row until Stage 6 (post-launch).
@@ -319,7 +704,7 @@ model AuditIntelligence {
   // Both can coexist; the system-set array is for automated cohort tags
   // like "high_js_density" / "thin_content" / etc.
   benchmarkTags       Json?
-  extractedEntities   Json?      // string[] — business names, services, locations
+  extractedEntities   Json? // string[] — business names, services, locations
   // Score provenance — per-dimension reasons + signals for explainability.
   // Shape: { schema: { score, reasons[], signals[] }, crawlability: …,
   //          trust: …, content: …, aiReadability: …, recommendationReadiness: … }
@@ -361,22 +746,22 @@ model AuditIntelligence {
   // NOT consumed by scoring, NOT shown to customers in V1/V2. Stage 6+
   // may consider feeding renderability findings back into the score
   // weighting; until then, treat these columns as research surface.
-  renderDurationMs           Int?
-  renderedHtmlLength         Int?
-  renderedTextLength         Int?
-  renderedSchemaTypes        Json?    // string[] — schema.org types found after render
-  hydrationDetected          Boolean?
-  blankShellRisk             Boolean? // true when raw HTML is mostly empty shell
-  clientOnlyContentDetected  Boolean? // true when rendered content >> raw content
-  renderConfidence           String?  // "low" | "medium" | "high"
-  renderFailureReason        String?
+  renderDurationMs          Int?
+  renderedHtmlLength        Int?
+  renderedTextLength        Int?
+  renderedSchemaTypes       Json? // string[] — schema.org types found after render
+  hydrationDetected         Boolean?
+  blankShellRisk            Boolean? // true when raw HTML is mostly empty shell
+  clientOnlyContentDetected Boolean? // true when rendered content >> raw content
+  renderConfidence          String? // "low" | "medium" | "high"
+  renderFailureReason       String?
   // Raw-vs-rendered comparison snapshot. `rawTextLength` and
   // `rawSchemaTypes` are captured pre-render so a future analyst can
   // diff without re-fetching the source page.
-  rawTextLength              Int?
-  rawSchemaTypes             Json?    // string[]
-  schemaDeltaDetected        Boolean? // true when renderedSchemaTypes ⊋ rawSchemaTypes
-  contentDeltaDetected       Boolean? // true when renderedTextLength / rawTextLength > threshold
+  rawTextLength             Int?
+  rawSchemaTypes            Json? // string[]
+  schemaDeltaDetected       Boolean? // true when renderedSchemaTypes ⊋ rawSchemaTypes
+  contentDeltaDetected      Boolean? // true when renderedTextLength / rawTextLength > threshold
 
   // ─── V2 Preflight intelligence ──────────────────────────────────
   // Populated post-audit by `src/lib/intelligence/preflight/runPreflight.ts`
@@ -387,7 +772,7 @@ model AuditIntelligence {
   // and name/phone/address consistency across homepage + footer +
   // schema. Not consumed by scoring, not shown to customers — V2
   // research surface only. Pre-preflight rows stay null.
-  preflightSignals           Json?
+  preflightSignals Json?
 
   // ─── V2 Deterministic scoring (scoring@1.0.0) ───────────────────
   // Populated by `src/lib/scoring/scoreAudit()` from preflight +
@@ -398,7 +783,7 @@ model AuditIntelligence {
   // stay null and the resolver in
   // `src/lib/scoring/getCanonicalScore.ts` falls back to
   // `parseReportScoreBreakdown(reportMarkdown)`.
-  deterministicScore         Json?
+  deterministicScore Json?
 
   // Self-contained replay snapshot per audit. Populated by the
   // deterministic scoring block in `src/lib/audit-intelligence.ts`
@@ -409,7 +794,7 @@ model AuditIntelligence {
   // and recover the same score byte-equal. Shape: `ReplayBundle`
   // from `src/lib/scoring/replay-bundle.ts`. Historical rows stay
   // null — no backfill.
-  replayBundle               Json?
+  replayBundle Json?
 
   // ─── Cross-Model Consensus layer (consensus@1.0.0) ──────────────
   // Raw validator outputs preserved internally. Shape:
@@ -417,7 +802,7 @@ model AuditIntelligence {
   // Populated only when `ENABLE_CONSENSUS_PIPELINE=true` and at
   // least one validator returned. `null` when the validator step
   // failed entirely (fail-soft) or the feature flag is off.
-  aiValidations              Json?
+  aiValidations Json?
 
   // Customer-facing intelligence synthesis. Shape: `ConsensusIndex`
   // from `src/lib/consensus/types.ts`. SECONDARY to
@@ -427,7 +812,7 @@ model AuditIntelligence {
   // cross-model agreement metrics from `aiValidations`. Validator
   // outputs DO NOT enter the confidence_index number — only the
   // model_agreement + consensus_confidence labels.
-  consensusIndex             Json?
+  consensusIndex Json?
 
   @@index([createdAt])
   @@index([websiteUrl])

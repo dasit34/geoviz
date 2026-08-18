@@ -42,6 +42,9 @@ type Order = {
   amount: number;
   currency: string;
   createdAt: string;
+  // Re-Audit / Verification Audit linkage. Null for a first-ever audit
+  // or a re-audit that hasn't been detected/linked yet.
+  previousAuditOrderId: string | null;
 };
 
 const REVIEW_OPTIONS: Array<{ value: string; label: string }> = [
@@ -695,6 +698,16 @@ export function AdminReportCard({
           >
             {order.websiteUrl}
           </a>
+          {order.previousAuditOrderId ? (
+            <p className="mt-1.5">
+              <a
+                href={`/admin/audit-comparison/${order.id}?key=${encodeURIComponent(adminKey)}`}
+                className="pill border-accent/40 text-accent hover:bg-accent/10"
+              >
+                Re-Audit — Previous audit ↗
+              </a>
+            </p>
+          ) : null}
           <p className="mt-2 text-xs text-white/65">
             <span className="font-medium text-white/85">{order.email}</span>
             {order.competitorUrl ? (

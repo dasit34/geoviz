@@ -1,5 +1,7 @@
 import type { AuditOrder } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { findOrCreateBusinessForUrl } from "@/lib/business/find-or-create-business";
+import { findPreviousCompletedAuditOrderId } from "@/lib/audit-comparison/findPreviousAudit";
 
 /**
  * The subset of a Stripe Checkout Session this module actually reads.
@@ -74,6 +76,40 @@ export async function createAuditOrderFromCheckoutSession(
 
   const paid = isCompletedCheckout(session.payment_status);
 
+  // Business-identity linking (Phase 1-2 monitoring foundation). Fails
+  // soft and deliberately: a business-linking problem must never block
+  // a paying customer's checkout → audit pipeline. businessId simply
+  // stays null on failure, same as it does for unbackfilled historic
+  // rows and other not-yet-wired creation paths.
+  let businessId: string | null = null;
+  try {
+    businessId = await findOrCreateBusinessForUrl(websiteUrl);
+  } catch (err) {
+    console.warn(
+      `[audit-orders] business linking failed for session=${session.id} (non-fatal):`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  // Re-Audit / Verification Audit detection (additive; same fail-soft
+  // contract as business linking above — a lookup problem here must
+  // never block checkout). businessId-first with websiteUrl fallback,
+  // same pattern already proven in audit-intelligence.ts. Simply
+  // stays null when there's no prior completed audit, or when the
+  // lookup itself fails for any reason.
+  let previousAuditOrderId: string | null = null;
+  try {
+    previousAuditOrderId = await findPreviousCompletedAuditOrderId({
+      businessId,
+      websiteUrl,
+    });
+  } catch (err) {
+    console.warn(
+      `[audit-orders] previous-audit lookup failed for session=${session.id} (non-fatal):`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+
   const order = await prisma.auditOrder.create({
     data: {
       stripeSessionId: session.id,
@@ -85,8 +121,16 @@ export async function createAuditOrderFromCheckoutSession(
       currency: session.currency ?? "usd",
       paymentStatus: paid ? "paid" : "pending",
       auditStatus: "pending",
+      businessId,
+      previousAuditOrderId,
     },
   });
+
+  if (previousAuditOrderId) {
+    console.log(
+      `[audit-orders] re-audit detected id=${order.id} previousAuditOrderId=${previousAuditOrderId}`,
+    );
+  }
 
   console.log(
     `[audit-orders] order created id=${order.id} payment=${order.paymentStatus}`,

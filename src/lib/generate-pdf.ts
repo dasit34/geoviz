@@ -26,14 +26,22 @@ export type GeneratePdfArgs = {
   baseUrl: string;
   /** Hard timeout for the whole PDF generation in ms (default 60s). */
   timeoutMs?: number;
+  /**
+   * Which `/report/[id]/<segment>` route to render. Defaults to
+   * `"print"` (the standard audit report). The Re-Audit/Verification
+   * PDF passes `"verification"` — same Puppeteer pipeline, same
+   * function, just a different already-public route to point it at.
+   */
+  routeSegment?: string;
 };
 
 export async function generateAuditPdf(args: GeneratePdfArgs): Promise<Buffer> {
   const { orderId, baseUrl } = args;
   const timeoutMs = args.timeoutMs ?? 60_000;
+  const routeSegment = args.routeSegment ?? "print";
 
   // Print page is publicly accessible — order ID is the access token.
-  const printUrl = `${baseUrl.replace(/\/$/, "")}/report/${encodeURIComponent(orderId)}/print`;
+  const printUrl = `${baseUrl.replace(/\/$/, "")}/report/${encodeURIComponent(orderId)}/${routeSegment}`;
 
   // Resolve the chromium binary. On Vercel @sparticuz/chromium ships
   // its own packed binary inside node_modules; calling executablePath()
