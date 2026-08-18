@@ -65,6 +65,15 @@ model AuditOrder {
   stripeSessionId            String        @unique
   amount                     Int           @default(9700)
   currency                   String        @default("usd")
+  // Explicit purchase-type marker. "RE_AUDIT" | null (null = standard
+  // $97 audit — the default for every order type today, including
+  // Foundation Fix follow-on audits). Set ONLY by the $59 re-audit
+  // checkout path (src/app/api/checkout/re-audit/route.ts) from
+  // server-validated context. Distinct from previousAuditOrderId below:
+  // that link is auto-detected fail-soft for ANY repeat business
+  // regardless of what was purchased, so it alone can't answer "was
+  // this order actually bought as a discounted re-audit?"
+  orderType                  String?
   paymentStatus              PaymentStatus @default(pending)
   auditStatus                AuditStatus   @default(pending)
   notes                      String?
@@ -176,6 +185,7 @@ model AuditOrder {
   @@index([createdAt])
   @@index([businessId])
   @@index([previousAuditOrderId])
+  @@index([orderType])
 }
 
 model Business {

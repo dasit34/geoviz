@@ -2,6 +2,7 @@ import type { AuditOrder } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { findOrCreateBusinessForUrl } from "@/lib/business/find-or-create-business";
 import { findPreviousCompletedAuditOrderId } from "@/lib/audit-comparison/findPreviousAudit";
+import { validateReAuditEligibility } from "@/lib/audit-orders/reaudit-eligibility";
 
 /**
  * The subset of a Stripe Checkout Session this module actually reads.
@@ -110,6 +111,37 @@ export async function createAuditOrderFromCheckoutSession(
     );
   }
 
+  // $59 Re-Audit purchase (additive; same fail-soft contract as the
+  // linking above — a re-validation problem here must never block a
+  // paying customer's order). `metadata.previousOrderId` was set
+  // server-side at checkout-session creation from a validated order
+  // (see /api/checkout/re-audit) — re-checked here defensively since
+  // the referenced order's state could theoretically change in the
+  // window between checkout creation and webhook delivery. On success
+  // this OVERRIDES the auto-detected previousAuditOrderId above with
+  // the authoritative, purchase-time-validated one (normally the same
+  // order anyway). On failure, falls back to whatever auto-detection
+  // above already found rather than blocking order creation.
+  let orderType: string | null = null;
+  if (metadata.productType === "RE_AUDIT" && metadata.previousOrderId) {
+    try {
+      const reAuditEligibility = await validateReAuditEligibility(metadata.previousOrderId);
+      if (reAuditEligibility.eligible) {
+        orderType = "RE_AUDIT";
+        previousAuditOrderId = reAuditEligibility.previousOrder.id;
+      } else {
+        console.warn(
+          `[audit-orders] re-audit purchase re-validation failed for session=${session.id} reason="${reAuditEligibility.reason}" — order still created, falling back to auto-detected previousAuditOrderId`,
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `[audit-orders] re-audit eligibility re-check errored for session=${session.id} (non-fatal):`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
   const order = await prisma.auditOrder.create({
     data: {
       stripeSessionId: session.id,
@@ -123,6 +155,7 @@ export async function createAuditOrderFromCheckoutSession(
       auditStatus: "pending",
       businessId,
       previousAuditOrderId,
+      orderType,
     },
   });
 

@@ -1,4 +1,5 @@
 import type { AuditComparisonResult, ComparisonClassification } from "@/lib/audit-comparison/types";
+import { ReAuditCtaCard } from "@/components/ReAuditCtaCard";
 
 /**
  * Re-Audit / Verification Audit customer view — deliberately concise,
@@ -15,11 +16,16 @@ export function VerificationReportView({
   websiteUrl,
   comparison,
   currentOrderId,
+  previousOrderId,
+  reAuditEligible = false,
 }: {
   businessLabel: string;
   websiteUrl: string;
   comparison: AuditComparisonResult;
   currentOrderId: string;
+  previousOrderId: string;
+  /** True only when THIS (current, re-audit) order has cleared review — mirrors the reviewStatus === "approved" gate used on /report/[id]/print. */
+  reAuditEligible?: boolean;
 }) {
   const { siteTechnical, liveModel, queryConsistency, cohort, availability } = comparison;
   const overall = siteTechnical?.overall;
@@ -194,6 +200,9 @@ export function VerificationReportView({
             <a href={`/report/${currentOrderId}/print`} className="btn-ghost text-sm">
               View Full Current Report
             </a>
+            <a href={`/report/${previousOrderId}/print`} className="btn-ghost text-sm">
+              View Previous Audit ↗
+            </a>
             <a
               href={`/api/report/${currentOrderId}/verification-pdf`}
               className="btn-primary text-sm"
@@ -207,6 +216,12 @@ export function VerificationReportView({
               Some sections above are marked unavailable rather than
               estimated — the prior audit didn't persist that data.
             </p>
+          ) : null}
+
+          {reAuditEligible ? (
+            <div className="mt-10">
+              <ReAuditCtaCard orderId={currentOrderId} />
+            </div>
           ) : null}
         </div>
       </div>

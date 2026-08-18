@@ -14,6 +14,7 @@ import type {
 import type { IssueSeverity } from "@/lib/scoring/types";
 import { swapTechnicalTerms } from "@/lib/parse-report";
 import { ReportCtaCard } from "@/components/ReportCtaCard";
+import { ReAuditCtaCard } from "@/components/ReAuditCtaCard";
 import { ProviderMark } from "@/components/report/BrandMarks";
 import { GeoVizMark } from "@/components/brand/GeoVizMark";
 
@@ -955,6 +956,8 @@ function ActionPage({
       </div>
 
       <ReportCtaCard orderId={m.meta.orderId} businessLabel={m.meta.businessName} fixCount={m.fixes.length} />
+
+      {m.meta.reviewed ? <ReAuditCtaCard orderId={m.meta.orderId} /> : null}
     </Page>
   );
 }

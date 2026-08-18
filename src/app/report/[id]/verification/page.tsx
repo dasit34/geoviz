@@ -144,6 +144,8 @@ export default async function VerificationReportPage({
         websiteUrl={current.websiteUrl}
         comparison={comparison}
         currentOrderId={current.id}
+        previousOrderId={previous.id}
+        reAuditEligible={current.reviewStatus === "approved"}
       />
       <Footer />
     </main>

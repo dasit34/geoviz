@@ -385,11 +385,16 @@ async function notifyAdmin(
     adminReviewUrl,
   });
 
+  const subject =
+    order.orderType === "RE_AUDIT"
+      ? "New GeoViz Re-Audit Order — $59"
+      : "New GeoViz Audit Order — $97";
+
   console.log("[stripe-webhook] sending admin email");
   const result = await getResend().emails.send({
     from: webhookFromEmail(),
     to: adminEmail,
-    subject: "New GeoViz Audit Order — $97",
+    subject,
     text: body,
     html: htmlBody,
   });

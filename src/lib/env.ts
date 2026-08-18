@@ -70,6 +70,9 @@ const serverEnvSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_PRICE_ID: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  // $59 Re-Audit price — optional at the env layer for the same reason as
+  // STRIPE_PRICE_ID above; `/api/checkout/re-audit` returns 503 when unset.
+  STRIPE_REAUDIT_PRICE_ID: z.string().optional(),
 
   // Legacy / verify-system script — kept optional so the script can run
   // when present and the app boots fine when it isn't. The audit

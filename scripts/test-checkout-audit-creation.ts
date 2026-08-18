@@ -23,6 +23,12 @@
  *
  * Requires a live DB connection — same category as
  * scripts/test-worker-recovery.ts, which this mirrors in shape.
+ *
+ * As of the Phase 1-2 business-identity layer, every call into
+ * createAuditOrderFromCheckoutSession also creates/reuses a Business
+ * row as a side effect — this suite's fixture domains are unique per
+ * run, so each run creates its own Business rows. Cleaned up in the
+ * finally block alongside the AuditOrder fixtures.
  */
 import assert from "node:assert/strict";
 import { prisma } from "../src/lib/db";
@@ -171,9 +177,94 @@ async function main(): Promise<void> {
         assert.equal(result.queued, true);
       },
     );
+
+    await check(
+      "RE_AUDIT metadata sets orderType + previousAuditOrderId from a valid prior order",
+      async () => {
+        // First create + fully qualify a "previous" order (paid, generated,
+        // approved) — the exact bar validateReAuditEligibility enforces.
+        const prevId = nextSessionId("reaudit-previous");
+        const prevResult = await createAuditOrderFromCheckoutSession({
+          id: prevId,
+          metadata: { websiteUrl: "https://example-reaudit.invalid", email: "buyer@example.invalid" },
+          payment_status: "paid",
+          amount_total: 9700,
+          currency: "usd",
+        });
+        assert.equal(prevResult.outcome, "created");
+        if (prevResult.outcome !== "created") return;
+        await prisma.auditOrder.update({
+          where: { id: prevResult.order.id },
+          data: { reportStatus: "generated", reviewStatus: "approved" },
+        });
+
+        const id = nextSessionId("reaudit-purchase");
+        const result = await createAuditOrderFromCheckoutSession({
+          id,
+          metadata: {
+            productType: "RE_AUDIT",
+            previousOrderId: prevResult.order.id,
+            websiteUrl: "https://example-reaudit.invalid",
+            email: "buyer@example.invalid",
+          },
+          payment_status: "paid",
+          amount_total: 5900,
+          currency: "usd",
+        });
+        assert.equal(result.outcome, "created");
+        if (result.outcome !== "created") return;
+        assert.equal(result.order.orderType, "RE_AUDIT");
+        assert.equal(result.order.previousAuditOrderId, prevResult.order.id);
+        assert.equal(result.queued, true);
+      },
+    );
+
+    await check(
+      "RE_AUDIT metadata pointing at an ineligible previous order still creates the order, without orderType set",
+      async () => {
+        const id = nextSessionId("reaudit-ineligible");
+        const result = await createAuditOrderFromCheckoutSession({
+          id,
+          metadata: {
+            productType: "RE_AUDIT",
+            previousOrderId: "does-not-exist-cuid",
+            websiteUrl: "https://example-reaudit-bad.invalid",
+            email: "buyer@example.invalid",
+          },
+          payment_status: "paid",
+          amount_total: 5900,
+          currency: "usd",
+        });
+        assert.equal(result.outcome, "created");
+        if (result.outcome !== "created") return;
+        // Customer paid — order must still be created and queued even
+        // though the re-audit linkage couldn't be validated.
+        assert.equal(result.order.orderType, null);
+        assert.equal(result.queued, true);
+      },
+    );
   } finally {
     await prisma.auditOrder.deleteMany({
       where: { stripeSessionId: { in: sessionIds } },
+    });
+    // Business rows created as a side effect of business-identity
+    // linking (Phase 1-2) — this suite's fixture domains are fixed
+    // (not per-run-unique), so delete by exact known domain rather
+    // than a marker prefix.
+    await prisma.business.deleteMany({
+      where: {
+        normalizedDomain: {
+          in: [
+            "example-full.invalid",
+            "example-discount.invalid",
+            "example-zero.invalid",
+            "example-dup.invalid",
+            "example-other-product.invalid",
+            "example-reaudit.invalid",
+            "example-reaudit-bad.invalid",
+          ],
+        },
+      },
     });
   }
 
