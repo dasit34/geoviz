@@ -179,6 +179,12 @@ export default async function AdminPage({
             <Link href="/admin/free-checks" className="btn-ghost text-sm">
               Free Checks
             </Link>
+            <Link
+              href={`/admin/leads?key=${process.env.ADMIN_SECRET ?? ""}`}
+              className="btn-ghost text-sm"
+            >
+              Leads
+            </Link>
             <form action={logoutAction}>
               <button type="submit" className="btn-ghost text-sm">
                 Sign out

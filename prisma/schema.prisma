@@ -52,6 +52,11 @@ model FreeCheckSubmission {
 
   createdAt DateTime @default(now())
 
+  // Inverse side of Lead.freeCheckSubmissionId — a lead that ran a
+  // Free Check on its own site before/instead of being discovered.
+  // Schema-file-only; generates no SQL. See Lead's doc comment.
+  leads Lead[]
+
   @@index([email])
   @@index([createdAt])
 }
@@ -180,6 +185,9 @@ model AuditOrder {
   // AI validator layer's already-real output. Multi-row per audit (one
   // per provider call). See `Observation`'s own doc comment.
   observations       Observation[]
+  // Inverse side of Lead.auditOrderId — set once a lead converts to a
+  // paid audit. Schema-file-only; generates no SQL.
+  leads              Lead[]
 
   @@index([email])
   @@index([createdAt])
@@ -207,6 +215,9 @@ model Business {
   auditOrders         AuditOrder[]
   queryLibraryEntries QueryLibraryEntry[]
   observations        Observation[]
+  // Inverse side of Lead.businessId — set once a discovered lead is
+  // matched to (or converts into) a canonical Business identity.
+  leads               Lead[]
 
   @@index([createdAt])
 }
@@ -826,4 +837,189 @@ model AuditIntelligence {
 
   @@index([createdAt])
   @@index([websiteUrl])
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Internal lead generation / prospecting (admin-only, not customer-
+// facing). Business discovery → qualification → contact enrichment
+// → outreach tracking → conversion. See `src/lib/discovery/`,
+// `src/lib/leads/`, and `src/app/admin/leads/`.
+// ─────────────────────────────────────────────────────────────────
+
+/// One prospect business, deduplicated across every discovery
+/// provider that has surfaced it (see `LeadSourceRef`). All contact/
+/// discovery/qualification fields live flat on this row — Phase 1
+/// supports one contact per lead via a single "Find Contact" action;
+/// a separate LeadContact table is not warranted until multi-contact
+/// support is actually needed.
+///
+/// `source`/`sourceId` are a convenience "first-discovered-via" pair
+/// only — the authoritative, queryable cross-provider dedup key is
+/// `LeadSourceRef`, not these two columns. A lead found by two
+/// different providers still gets exactly one `Lead` row plus two
+/// `LeadSourceRef` rows.
+///
+/// Relations to `Business`/`FreeCheckSubmission`/`AuditOrder` are
+/// nullable FKs (`onDelete: SetNull`), mirroring
+/// `AuditOrder.businessId`'s existing pattern — reused, not
+/// duplicated: e.g. a lead's Free Check score is read through
+/// `freeCheckSubmission.overallScore`, never copied onto this row.
+model Lead {
+  id                     String  @id @default(cuid())
+  businessName           String
+  // Lowercase + whitespace-collapsed + legal-suffix-stripped, via
+  // normalizeBusinessNameForDedup() — a dedup key, not for display.
+  businessNameNormalized String
+  website                String?
+  // normalizeDomain() output (src/lib/business/normalize-domain.ts)
+  // — reused, not reimplemented. A dedup key.
+  domain                 String?
+  // Digits-only, via normalizePhoneDigits(). A dedup key.
+  phoneNormalized        String?
+  // Lowercase, unit/suite-stripped, via normalizeAddressForDedup().
+  // A dedup key (used combined with businessNameNormalized only).
+  addressNormalized      String?
+  // normalizeIndustry() slug (src/lib/intelligence/industry-taxonomy.ts)
+  // — the SAME taxonomy AuditIntelligence.industryCategoryNormalized
+  // and QueryLibraryEntry.industryNormalized already use. Never a
+  // provider's raw category/type string.
+  category               String?
+  city                   String?
+  state                  String?
+  address                String?
+  phone                  String?
+  // First-discovered-via, e.g. "google_places" | "manual". See doc
+  // comment above — not the cross-provider dedup key.
+  source                 String
+  sourceId               String?
+  // Provider-reported. Scale is NOT assumed uniform across providers
+  // (e.g. not assumed to always be a 1–5 star scale) — qualification
+  // treats presence/count as a loose legitimacy signal only.
+  rating                 Float?
+  reviewCount            Int?
+  contactName            String?
+  contactTitle            String?
+  contactEmail           String?
+  // "hunter_io" | "manual" | ... — which enrichment provider (or
+  // manual entry) supplied the contact fields above.
+  contactSource          String?
+  qualificationScore     Int?
+  // string[] — legitimacy-gate reasoning plus informational
+  // AI-readiness/entity-clarity gaps (pitch talking points). Kept as
+  // Json so the reason taxonomy can evolve without a migration,
+  // mirroring FreeCheckSubmission.checks/strengths/problems/fixes.
+  qualificationReasons   Json?
+  // Status values: NEW | QUALIFIED | NOT_QUALIFIED | READY_FOR_CONTACT |
+  // CONTACTED | RESPONDED | FREE_CHECK | AUDIT_PURCHASED | CLOSED |
+  // DO_NOT_CONTACT. Plain String, matching this schema's dominant
+  // status-field convention (see reportStatus/reviewStatus) rather
+  // than a new Prisma enum — this set is expected to gain values in
+  // Phase 2 and Postgres enum value removal isn't safely additive.
+  status                 String  @default("NEW")
+  notes                  String?
+
+  discoveredAt DateTime  @default(now())
+  qualifiedAt  DateTime?
+  enrichedAt   DateTime?
+  contactedAt  DateTime?
+  respondedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businessId String?
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  freeCheckSubmissionId String?
+  freeCheckSubmission   FreeCheckSubmission? @relation(fields: [freeCheckSubmissionId], references: [id], onDelete: SetNull)
+
+  auditOrderId String?
+  auditOrder   AuditOrder? @relation(fields: [auditOrderId], references: [id], onDelete: SetNull)
+
+  sourceRefs LeadSourceRef[]
+  // Inverse side of LeadListMembership.leadId — the campaign/prospecting
+  // lists (e.g. "Columbus HVAC") this lead has been manually added to.
+  // Schema-file-only; generates no SQL.
+  listMemberships LeadListMembership[]
+
+  @@index([status])
+  @@index([domain])
+  @@index([phoneNormalized])
+  @@index([category])
+  @@index([city])
+  @@index([createdAt])
+}
+
+/// Tracks EVERY discovery provider that has surfaced a given Lead —
+/// the actual cross-provider dedup key (see Lead's doc comment). A
+/// single Lead can have 2+ rows here (e.g. found via Google Places
+/// AND later via a different provider) without a duplicate Lead row.
+/// `@@unique([provider, providerId])` stops the same provider from
+/// re-attaching the same external id twice.
+model LeadSourceRef {
+  id           String   @id @default(cuid())
+  leadId       String
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  provider     String
+  providerId   String
+  discoveredAt DateTime @default(now())
+
+  @@unique([provider, providerId])
+  @@index([leadId])
+}
+
+/// Audit trail AND spend guardrail for lead-discovery searches — the
+/// only Phase 1 action that can trigger real external API cost. One
+/// row per search regardless of outcome. The discover API route sums
+/// `providerRequestCount`/`estimatedCostUsd` over a trailing window
+/// from this table before allowing a new run, since
+/// `applyApiRateLimit` (in-memory, per-IP, anti-abuse) is not a spend
+/// guardrail — see src/lib/rate-limit.ts's own doc comment.
+model LeadDiscoveryRun {
+  id                   String   @id @default(cuid())
+  provider             String
+  industry             String
+  city                 String
+  state                String?
+  radiusMiles          Int?
+  requestedCount       Int
+  providerRequestCount Int?
+  resultCount          Int?
+  estimatedCostUsd     Decimal? @db.Decimal(10, 4)
+  createdAt            DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// A named grouping of leads — e.g. "Columbus HVAC", "Toledo Roofers" —
+/// for campaign-style outreach organization. Purely a manual grouping
+/// (no auto-membership rules); a lead can belong to zero, one, or many
+/// lists via `LeadListMembership`. Deleting a list cascades only the
+/// membership join rows, never the underlying `Lead` rows.
+model LeadList {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships LeadListMembership[]
+
+  @@index([createdAt])
+}
+
+/// Join row for the many-to-many Lead ↔ LeadList relationship.
+/// `@@unique([leadId, leadListId])` makes "add to list" idempotent —
+/// re-adding an already-member lead is a no-op, not a duplicate row.
+model LeadListMembership {
+  id         String   @id @default(cuid())
+  leadId     String
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadListId String
+  leadList   LeadList @relation(fields: [leadListId], references: [id], onDelete: Cascade)
+  addedAt    DateTime @default(now())
+
+  @@unique([leadId, leadListId])
+  @@index([leadListId])
+  @@index([leadId])
 }
