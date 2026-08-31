@@ -1,6 +1,7 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { LeadDiscoveryForm } from "@/components/admin/LeadDiscoveryForm";
+import { isAdminPageRequest, isValidAdminKey } from "@/lib/admin-secret";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,26 +15,29 @@ export default function AdminLeadDiscoveryPage({
 }: {
   searchParams?: { key?: string | string[] };
 }) {
-  const ADMIN_SECRET = process.env.ADMIN_SECRET;
   const rawKey = searchParams?.key;
-  const key = Array.isArray(rawKey) ? rawKey[0] : rawKey;
+  const rawKeyStr = Array.isArray(rawKey) ? rawKey[0] : rawKey;
 
-  if (!ADMIN_SECRET || key !== ADMIN_SECRET) {
+  if (!isAdminPageRequest({ key: rawKey })) {
     return (
       <main>
         <Header />
         <section className="container-page py-24">
           <h1 className="h2">Unauthorized</h1>
           <p className="muted mt-3 max-w-xl">
-            This page requires an admin key. Append{" "}
-            <code className="rounded bg-white/10 px-1.5 py-0.5">?key=…</code>{" "}
-            to the URL.
+            Add <code className="rounded bg-white/10 px-1.5 py-0.5">?key=ADMIN_SECRET</code>{" "}
+            to the URL, or sign in at{" "}
+            <a href="/admin" className="text-accent hover:underline">/admin</a>.
           </p>
         </section>
         <Footer />
       </main>
     );
   }
+
+  const key = isValidAdminKey(rawKeyStr) && rawKeyStr
+    ? rawKeyStr
+    : (process.env.ADMIN_SECRET ?? "");
 
   return (
     <main>

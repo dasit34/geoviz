@@ -2,6 +2,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { prisma } from "@/lib/db";
 import { LeadsTable } from "@/components/admin/LeadsTable";
+import { isAdminPageRequest, isValidAdminKey } from "@/lib/admin-secret";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,8 +12,13 @@ export const metadata = {
 };
 
 /**
- * Internal (non-customer-facing) lead prospecting table. `?key=`
- * gated, same pattern as /admin/calibration and /admin/evidence/*.
+ * Internal (non-customer-facing) lead prospecting table. Accepts
+ * either an authenticated `/admin` cookie session or a valid `?key=`
+ * (see `isAdminPageRequest`, `src/lib/admin-secret.ts`) — same
+ * cookie-OR-key pattern already used by `/admin/report-qa`. When the
+ * operator is in via cookie only, the real `ADMIN_SECRET` value is
+ * resolved server-side and handed to `<LeadsTable>` so its API calls
+ * still carry a valid key automatically.
  *
  * Single bounded server fetch (take: 1000, orderBy createdAt desc) —
  * matches the existing repo convention (/admin/reports, /admin/free-
@@ -27,26 +33,29 @@ export default async function AdminLeadsPage({
 }: {
   searchParams?: { key?: string | string[] };
 }) {
-  const ADMIN_SECRET = process.env.ADMIN_SECRET;
   const rawKey = searchParams?.key;
-  const key = Array.isArray(rawKey) ? rawKey[0] : rawKey;
+  const rawKeyStr = Array.isArray(rawKey) ? rawKey[0] : rawKey;
 
-  if (!ADMIN_SECRET || key !== ADMIN_SECRET) {
+  if (!isAdminPageRequest({ key: rawKey })) {
     return (
       <main>
         <Header />
         <section className="container-page py-24">
           <h1 className="h2">Unauthorized</h1>
           <p className="muted mt-3 max-w-xl">
-            This page requires an admin key. Append{" "}
-            <code className="rounded bg-white/10 px-1.5 py-0.5">?key=…</code>{" "}
-            to the URL.
+            Add <code className="rounded bg-white/10 px-1.5 py-0.5">?key=ADMIN_SECRET</code>{" "}
+            to the URL, or sign in at{" "}
+            <a href="/admin" className="text-accent hover:underline">/admin</a>.
           </p>
         </section>
         <Footer />
       </main>
     );
   }
+
+  const key = isValidAdminKey(rawKeyStr) && rawKeyStr
+    ? rawKeyStr
+    : (process.env.ADMIN_SECRET ?? "");
 
   const leads = await prisma.lead.findMany({
     take: 1000,
