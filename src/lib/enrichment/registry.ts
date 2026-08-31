@@ -1,16 +1,15 @@
 /**
- * Enrichment provider registry — empty in Phase 1 by design. See
- * `src/lib/enrichment/types.ts` and the lead-gen plan's §5: Hunter.io
- * is the recommended first provider when enrichment is actually
- * built, but no provider file is implemented yet, so this array
- * stays empty and `find-contact` always reports "not configured."
- * Adding a real provider later is a one-line addition here plus a
- * new file under `./providers/` — no other code changes.
+ * Enrichment provider registry. Phase 3 adds the first real provider
+ * (Outscraper Emails & Contacts) — inert until OUTSCRAPER_API_KEY is
+ * set, same gating pattern as the discovery registry.
  */
 
+import { OutscraperEnrichmentProvider } from "./providers/outscraper";
 import type { ContactEnrichmentProvider } from "./types";
 
-export const ENRICHMENT_PROVIDER_REGISTRY: readonly ContactEnrichmentProvider[] = [];
+export const ENRICHMENT_PROVIDER_REGISTRY: readonly ContactEnrichmentProvider[] = [
+  OutscraperEnrichmentProvider,
+];
 
 export function getEnrichmentProvider(
   name: string,

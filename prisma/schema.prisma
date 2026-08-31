@@ -888,6 +888,14 @@ model Lead {
   state                  String?
   address                String?
   phone                  String?
+  // Additive Phase 3 fields (Outscraper Google Maps data). Optional on
+  // NormalizedBusinessRecord too — any provider may leave these null.
+  zip                    String?
+  latitude               Float?
+  longitude              Float?
+  // Google Maps listing URL (Outscraper's location_link). Distinct from
+  // `website` (the business's own site).
+  mapsUrl                String?
   // First-discovered-via, e.g. "google_places" | "manual". See doc
   // comment above — not the cross-provider dedup key.
   source                 String
@@ -903,6 +911,13 @@ model Lead {
   // "hunter_io" | "manual" | ... — which enrichment provider (or
   // manual entry) supplied the contact fields above.
   contactSource          String?
+  // Phase 3 (Outscraper Emails & Contacts) — additional emails beyond
+  // the single best one in contactEmail, and social profile URLs.
+  // string[], capped at 5 by the enrichment provider before write.
+  contactAlternateEmails Json?
+  // Record<string, string> — e.g. {facebook: "...", linkedin: "..."}.
+  // Only non-empty keys are stored.
+  contactSocials         Json?
   qualificationScore     Int?
   // string[] — legitimacy-gate reasoning plus informational
   // AI-readiness/entity-clarity gaps (pitch talking points). Kept as
@@ -986,6 +1001,19 @@ model LeadDiscoveryRun {
   providerRequestCount Int?
   resultCount          Int?
   estimatedCostUsd     Decimal? @db.Decimal(10, 4)
+  // Phase 3 — import-outcome tracking, populated by the discover route
+  // after running filters + dedup. Null on Phase 1 historic rows (no
+  // backfill). "matchedExistingCount" IS "duplicates avoided" — one
+  // number, not two separate concepts.
+  newLeadsCreated      Int?
+  matchedExistingCount Int?
+  // Records rejected by minReviews/minRating/mustHaveWebsite before
+  // import was even attempted.
+  filteredOutCount     Int?
+  errorCount           Int?
+  // Array<{ message: string }>, capped at 20 entries by the route —
+  // never the full raw provider error payload.
+  errors               Json?
   createdAt            DateTime @default(now())
 
   @@index([createdAt])

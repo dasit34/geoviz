@@ -1,23 +1,19 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { applyApiRateLimit } from "@/lib/rate-limit";
-import { ENRICHMENT_PROVIDER_REGISTRY } from "@/lib/enrichment/registry";
+import { enrichOneLead } from "@/lib/leads/enrichLead";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const ENRICHABLE_STATUSES = new Set(["QUALIFIED", "READY_FOR_CONTACT"]);
+// Outscraper's Emails & Contacts lookup can poll for up to ~20s inside
+// enrichOneLead() — see src/lib/enrichment/providers/outscraper.ts.
+export const maxDuration = 30;
 
 /**
  * POST /api/admin/leads/[id]/find-contact — contact enrichment.
- * Phase 1: no provider is wired (ENRICHMENT_PROVIDER_REGISTRY is
- * empty by design, see src/lib/enrichment/registry.ts), so this
- * always responds with a clean "not configured" message. Wired and
- * ready — becomes live the moment a real provider file + API key are
- * added later, with zero changes needed here. Gated to
- * QUALIFIED/READY_FOR_CONTACT leads only, per the requirement that
- * enrichment spend never happens on an unqualified lead.
+ * Gated to QUALIFIED/READY_FOR_CONTACT leads with a website/domain —
+ * see src/lib/leads/enrichLead.ts for the full guard + backfill-only
+ * write logic (shared with the bulk enrich-batch route).
  */
 export async function POST(
   req: Request,
@@ -35,53 +31,10 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const lead = await prisma.lead.findUnique({ where: { id: params.id } });
-  if (!lead) {
-    return NextResponse.json({ error: "Lead not found" }, { status: 404 });
-  }
-  if (!ENRICHABLE_STATUSES.has(lead.status)) {
-    return NextResponse.json(
-      { error: "Only QUALIFIED or READY_FOR_CONTACT leads can be enriched." },
-      { status: 409 },
-    );
+  const result = await enrichOneLead(params.id);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  const provider = ENRICHMENT_PROVIDER_REGISTRY.find((p) => p.enabled());
-  if (!provider) {
-    return NextResponse.json(
-      {
-        error:
-          "No enrichment provider configured yet. This is a Phase 1 architecture-only stub — see src/lib/enrichment/registry.ts.",
-      },
-      { status: 409 },
-    );
-  }
-
-  const result = await provider.findContact({
-    businessName: lead.businessName,
-    domain: lead.domain,
-    website: lead.website,
-  });
-
-  if (!result.contact) {
-    return NextResponse.json(
-      { error: result.error ?? "No contact found." },
-      { status: 404 },
-    );
-  }
-
-  const updated = await prisma.lead.update({
-    where: { id: lead.id },
-    data: {
-      contactName: result.contact.contactName,
-      contactTitle: result.contact.contactTitle,
-      contactEmail: result.contact.contactEmail,
-      contactSource: provider.name,
-      enrichedAt: new Date(),
-    },
-  });
-
-  console.log(`[admin-leads] enriched id=${lead.id} provider=${provider.name}`);
-
-  return NextResponse.json({ lead: updated });
+  return NextResponse.json({ lead: result.lead });
 }

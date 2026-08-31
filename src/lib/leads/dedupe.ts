@@ -164,6 +164,12 @@ export async function importDiscoveredBusiness(
     if (!match.lead.reviewCount && record.reviewCount !== null)
       backfill.reviewCount = record.reviewCount;
     if (!match.lead.category && category !== "unknown") backfill.category = category;
+    if (!match.lead.zip && record.zip) backfill.zip = record.zip;
+    if (match.lead.latitude === null && record.latitude != null)
+      backfill.latitude = record.latitude;
+    if (match.lead.longitude === null && record.longitude != null)
+      backfill.longitude = record.longitude;
+    if (!match.lead.mapsUrl && record.mapsUrl) backfill.mapsUrl = record.mapsUrl;
 
     const lead =
       Object.keys(backfill).length > 0
@@ -190,6 +196,10 @@ export async function importDiscoveredBusiness(
       sourceId: record.providerId,
       rating: record.rating,
       reviewCount: record.reviewCount,
+      zip: record.zip ?? null,
+      latitude: record.latitude ?? null,
+      longitude: record.longitude ?? null,
+      mapsUrl: record.mapsUrl ?? null,
       status: "NEW",
       sourceRefs: {
         create: { provider: record.provider, providerId: record.providerId },

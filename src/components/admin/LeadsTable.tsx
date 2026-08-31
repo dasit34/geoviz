@@ -294,6 +294,56 @@ export function LeadsTable({
     }
   }
 
+  async function bulkEnrich() {
+    if (selectedIds.size === 0) return;
+    if (selectedIds.size > 25) {
+      setMessage("Bulk enrich is limited to 25 leads at a time — select fewer.");
+      return;
+    }
+    setBulkBusy(true);
+    try {
+      const res = await authedFetch(adminKey, "/api/admin/leads/enrich-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        type EnrichResult = {
+          id: string;
+          ok: boolean;
+          error?: string;
+          contactEmail?: string | null;
+          contactName?: string | null;
+          contactTitle?: string | null;
+          contactSource?: string | null;
+        };
+        const results = data.results as EnrichResult[];
+        const byId = new Map(results.map((r) => [r.id, r]));
+        setLeads((prev) =>
+          prev.map((l) => {
+            const r = byId.get(l.id);
+            if (!r || !r.ok) return l;
+            return {
+              ...l,
+              contactEmail: r.contactEmail ?? l.contactEmail,
+              contactName: r.contactName ?? l.contactName,
+              contactTitle: r.contactTitle ?? l.contactTitle,
+              contactSource: r.contactSource ?? l.contactSource,
+            };
+          }),
+        );
+        const okCount = results.filter((r) => r.ok).length;
+        setMessage(`Enriched ${okCount} of ${results.length} selected lead(s).`);
+        setSelectedIds(new Set());
+      } else {
+        setMessage(data.error ?? "Bulk enrich failed.");
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   async function bulkAddToList(targetListId: string) {
     if (selectedIds.size === 0 || !targetListId) return;
     setBulkBusy(true);
@@ -458,6 +508,9 @@ export function LeadsTable({
           <span className="text-sm text-white/80">{selectedIds.size} selected</span>
           <button onClick={bulkQualify} disabled={bulkBusy} className="btn-ghost text-xs disabled:opacity-50">
             Qualify selected
+          </button>
+          <button onClick={bulkEnrich} disabled={bulkBusy} className="btn-ghost text-xs disabled:opacity-50">
+            Enrich Contacts
           </button>
           <select
             disabled={bulkBusy}

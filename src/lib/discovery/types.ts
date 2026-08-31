@@ -32,6 +32,14 @@ export interface NormalizedBusinessRecord {
   /** Provider's own rating scale — NEVER assumed to be 1–5 stars. */
   rating: number | null;
   reviewCount: number | null;
+  // Phase 3 additions — optional so existing providers (e.g. Google
+  // Places) need zero changes; a provider that can't supply one just
+  // omits it (treated as null downstream).
+  zip?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  /** Google Maps listing URL, distinct from `website`. */
+  mapsUrl?: string | null;
   /** Optional verbatim payload, debugging only — never rendered in the UI. */
   raw?: unknown;
 }

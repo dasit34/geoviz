@@ -4,9 +4,16 @@ import { isValidAdminKey, readAdminKeyFromRequest } from "@/lib/admin-secret";
 import { applyApiRateLimit } from "@/lib/rate-limit";
 import { getDiscoveryProvider } from "@/lib/discovery/registry";
 import { importDiscoveredBusiness } from "@/lib/leads/dedupe";
+import { filterDiscoveryRecords } from "@/lib/leads/discoveryFilters";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Outscraper's bounded poll (see src/lib/discovery/providers/outscraper.ts)
+// can take up to ~50s inside discoverBusinesses() before this route even
+// starts importing — give the whole request room to finish.
+export const maxDuration = 90;
+
+const MAX_STORED_ERRORS = 20;
 
 /**
  * POST /api/admin/leads/discover — the ONE route in this feature that
@@ -53,6 +60,10 @@ export async function POST(req: Request) {
     state?: unknown;
     radiusMiles?: unknown;
     limit?: unknown;
+    minReviews?: unknown;
+    minRating?: unknown;
+    mustHaveWebsite?: unknown;
+    leadListId?: unknown;
   } = {};
   try {
     body = (await req.json().catch(() => ({}))) as typeof body;
@@ -72,6 +83,16 @@ export async function POST(req: Request) {
     typeof body.limit === "number" && Number.isFinite(body.limit)
       ? Math.round(body.limit)
       : 0;
+  const minReviews =
+    typeof body.minReviews === "number" && Number.isFinite(body.minReviews)
+      ? Math.max(0, Math.round(body.minReviews))
+      : null;
+  const minRating =
+    typeof body.minRating === "number" && Number.isFinite(body.minRating)
+      ? body.minRating
+      : null;
+  const mustHaveWebsite = body.mustHaveWebsite === true;
+  const leadListId = typeof body.leadListId === "string" ? body.leadListId : null;
 
   if (!category || !city) {
     return NextResponse.json(
@@ -96,6 +117,13 @@ export async function POST(req: Request) {
       },
       { status: 409 },
     );
+  }
+
+  if (leadListId) {
+    const list = await prisma.leadList.findUnique({ where: { id: leadListId } });
+    if (!list) {
+      return NextResponse.json({ error: "leadListId not found" }, { status: 404 });
+    }
   }
 
   // Guardrail 2 — rolling-24h cap on total provider requests across
@@ -131,17 +159,35 @@ export async function POST(req: Request) {
     limit,
   });
 
+  const { passed, filteredOutCount } = filterDiscoveryRecords(
+    result.records.slice(0, limit),
+    { minReviews, minRating, mustHaveWebsite },
+  );
+
   let imported = 0;
   let matched = 0;
-  for (const record of result.records.slice(0, limit)) {
+  let addedToList = 0;
+  const errors: { message: string }[] = [];
+  for (const record of passed) {
     try {
       const outcome = await importDiscoveredBusiness(record);
       if (outcome.matched) matched += 1;
       else imported += 1;
+
+      if (leadListId) {
+        await prisma.leadListMembership.upsert({
+          where: { leadId_leadListId: { leadId: outcome.lead.id, leadListId } },
+          create: { leadId: outcome.lead.id, leadListId },
+          update: {},
+        });
+        addedToList += 1;
+      }
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error(
-        `[admin-leads] discover import failed provider=${providerName} providerId=${record.providerId}: ${err instanceof Error ? err.message : String(err)}`,
+        `[admin-leads] discover import failed provider=${providerName} providerId=${record.providerId}: ${message}`,
       );
+      if (errors.length < MAX_STORED_ERRORS) errors.push({ message: message.slice(0, 300) });
     }
   }
 
@@ -155,18 +201,26 @@ export async function POST(req: Request) {
       requestedCount: requestedLimit,
       providerRequestCount: result.providerRequestCount,
       resultCount: result.records.length,
+      newLeadsCreated: imported,
+      matchedExistingCount: matched,
+      filteredOutCount,
+      errorCount: errors.length,
+      errors: errors.length > 0 ? errors : undefined,
     },
   });
 
   console.log(
-    `[admin-leads] discover done provider=${providerName} requested=${requestedLimit} resultCount=${result.records.length} imported=${imported} matched=${matched} providerRequestCount=${result.providerRequestCount}${result.error ? ` error="${result.error}"` : ""}`,
+    `[admin-leads] discover done provider=${providerName} requested=${requestedLimit} resultCount=${result.records.length} filteredOut=${filteredOutCount} imported=${imported} matched=${matched} addedToList=${addedToList} providerRequestCount=${result.providerRequestCount}${result.error ? ` error="${result.error}"` : ""}`,
   );
 
   return NextResponse.json({
     requested: requestedLimit,
     resultCount: result.records.length,
+    filteredOutCount,
     imported,
     matched,
+    addedToList,
+    errorCount: errors.length,
     providerRequestCount: result.providerRequestCount,
     providerError: result.error ?? null,
   });

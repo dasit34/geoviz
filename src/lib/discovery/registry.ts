@@ -10,10 +10,12 @@
  */
 
 import { GooglePlacesProvider } from "./providers/google-places";
+import { OutscraperProvider } from "./providers/outscraper";
 import type { BusinessDiscoveryProvider } from "./types";
 
 export const DISCOVERY_PROVIDER_REGISTRY: readonly BusinessDiscoveryProvider[] = [
   GooglePlacesProvider,
+  OutscraperProvider,
 ];
 
 export function getDiscoveryProvider(

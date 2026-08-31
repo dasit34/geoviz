@@ -19,6 +19,12 @@ export interface NormalizedContactRecord {
   contactName: string | null;
   contactTitle: string | null;
   contactEmail: string | null;
+  // Phase 3 additions — optional so a provider that can't supply these
+  // (or any future provider) needs zero interface changes.
+  /** Additional emails beyond contactEmail, deduped, capped by the provider. */
+  alternateEmails?: string[] | null;
+  /** e.g. { facebook: "...", linkedin: "..." } — only non-empty keys. */
+  socials?: Record<string, string> | null;
 }
 
 export interface EnrichmentResult {
