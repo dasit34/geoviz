@@ -956,6 +956,9 @@ model Lead {
   // lists (e.g. "Columbus HVAC") this lead has been manually added to.
   // Schema-file-only; generates no SQL.
   listMemberships LeadListMembership[]
+  // Inverse side of LeadOutreach.leadId — Phase 4 outbound-provider
+  // sends (Instantly). Schema-file-only; generates no SQL.
+  outreach LeadOutreach[]
 
   @@index([status])
   @@index([domain])
@@ -1050,4 +1053,61 @@ model LeadListMembership {
   @@unique([leadId, leadListId])
   @@index([leadListId])
   @@index([leadId])
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Phase 4 — Outbound provider integration (Instantly). GeoViz stays
+// the source of truth; an outbound provider only ever handles email
+// send/follow-up/reply tracking for leads GeoViz has already
+// discovered/qualified/enriched. See `src/lib/outbound/`.
+// ─────────────────────────────────────────────────────────────────
+
+/// One row per (Lead, outbound campaign) send — the authoritative
+/// duplicate-send guard and outreach-state tracker for that pair.
+/// Deliberately separate from `Lead.status` (that field's own doc
+/// comment already establishes its status vocabulary; outreach state
+/// is a different axis, not a replacement) — mirrors
+/// `LeadSourceRef`'s (provider, externalId) dedup shape.
+model LeadOutreach {
+  id                 String @id @default(cuid())
+  leadId             String
+  lead               Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  // "instantly" — matches OutboundProvider.name (src/lib/outbound/types.ts).
+  provider           String
+  providerCampaignId String
+  // Denormalized at send time so the admin UI can show which campaign
+  // without a live Instantly lookup on every render.
+  campaignName       String?
+
+  // Instantly's returned lead id for this send, once known. Null until
+  // a successful send response supplies it.
+  providerLeadId     String?
+
+  // NOT_SENT is implicit (no row for this lead+campaign pair exists).
+  // QUEUED | SENT_TO_INSTANTLY | ACTIVE | REPLIED | INTERESTED |
+  // BOUNCED | UNSUBSCRIBED | FAILED. Plain String, matching this
+  // schema's dominant status-field convention (see Lead.status).
+  status             String    @default("QUEUED")
+
+  sentAt             DateTime?
+  // Set by the polling sync route (src/app/api/admin/leads/outbound/sync)
+  // each time this row's status is refreshed from Instantly.
+  lastSyncedAt        DateTime?
+  failureReason        String?
+
+  // Last raw provider payload for this pair — debugging + future field
+  // additions without a migration, mirrors the existing Json-field
+  // convention (Lead.qualificationReasons, Lead.contactSocials).
+  lastProviderPayload Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // The actual duplicate-send guard: one row per lead per campaign per
+  // provider, enforced at the DB level, not just in application code.
+  @@unique([provider, providerCampaignId, leadId])
+  @@index([leadId])
+  @@index([status])
+  @@index([providerCampaignId])
 }

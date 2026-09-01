@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { Lead } from "@prisma/client";
 import { serializeLeadsToCsv } from "@/lib/leads/csv";
+import { SendToInstantlyModal } from "@/components/admin/SendToInstantlyModal";
 
 const STATUS_VALUES = [
   "NEW",
@@ -54,6 +55,7 @@ export function LeadsTable({
   const [addText, setAddText] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [lists, setLists] = useState<{ id: string; name: string }[]>([]);
+  const [instantlyModalOpen, setInstantlyModalOpen] = useState(false);
 
   useEffect(() => {
     authedFetch(adminKey, "/api/admin/leads/lists")
@@ -512,6 +514,14 @@ export function LeadsTable({
           <button onClick={bulkEnrich} disabled={bulkBusy} className="btn-ghost text-xs disabled:opacity-50">
             Enrich Contacts
           </button>
+          <button
+            onClick={() => setInstantlyModalOpen(true)}
+            disabled={bulkBusy || selectedIds.size > 25}
+            title={selectedIds.size > 25 ? "Send to Instantly is limited to 25 leads at a time — select fewer." : undefined}
+            className="btn-ghost text-xs disabled:opacity-50"
+          >
+            Send to Instantly
+          </button>
           <select
             disabled={bulkBusy}
             onChange={(e) => e.target.value && bulkSetStatus(e.target.value)}
@@ -698,6 +708,15 @@ export function LeadsTable({
           </button>
         </div>
       </div>
+
+      {instantlyModalOpen ? (
+        <SendToInstantlyModal
+          adminKey={adminKey}
+          leadIds={Array.from(selectedIds)}
+          onClose={() => setInstantlyModalOpen(false)}
+          onSent={() => setSelectedIds(new Set())}
+        />
+      ) : null}
     </div>
   );
 }
