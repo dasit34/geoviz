@@ -57,6 +57,25 @@ export interface DiscoveryResult {
   /** For the LeadDiscoveryRun cost/audit row — not the same as records.length. */
   providerRequestCount: number;
   error?: string;
+  /**
+   * Async-job providers (e.g. Outscraper) echo their job id back here in
+   * EVERY branch — success, failure, and "still processing after the
+   * poll budget ran out" — so a timed-out caller can persist it and
+   * resume polling the same job later instead of resubmitting. Absent
+   * for providers with no async-job concept (e.g. Google Places).
+   */
+  providerJobId?: string;
+  /** Mirrors providerJobId's presence — null/absent for sync providers. */
+  providerJobStatus?: "PENDING" | "SUCCESS" | "FAILURE";
+}
+
+export interface DiscoverBusinessesOptions {
+  /**
+   * Fired the instant an async submit is accepted (status Pending +
+   * an id) — BEFORE polling starts — so the caller can persist the
+   * job id durably. Optional: sync providers never call it.
+   */
+  onJobAccepted?: (jobId: string) => Promise<void>;
 }
 
 export interface BusinessDiscoveryProvider {
@@ -64,5 +83,13 @@ export interface BusinessDiscoveryProvider {
   name: string;
   enabled(): boolean;
   requiredEnvVars: readonly string[];
-  discoverBusinesses(input: DiscoveryInput): Promise<DiscoveryResult>;
+  discoverBusinesses(input: DiscoveryInput, opts?: DiscoverBusinessesOptions): Promise<DiscoveryResult>;
+  /**
+   * Optional capability — only providers with an async-job concept
+   * implement this. Resumes polling an existing job id directly
+   * (never resubmits the search), so it can never create a second
+   * job. Callers must feature-detect (`provider.resumeDiscovery`)
+   * rather than assume every provider supports it.
+   */
+  resumeDiscovery?(jobId: string): Promise<DiscoveryResult>;
 }

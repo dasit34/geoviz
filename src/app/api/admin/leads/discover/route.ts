@@ -8,12 +8,21 @@ import { filterDiscoveryRecords } from "@/lib/leads/discoveryFilters";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Outscraper's bounded poll (see src/lib/discovery/providers/outscraper.ts)
-// can take up to ~50s inside discoverBusinesses() before this route even
-// starts importing — give the whole request room to finish.
-export const maxDuration = 90;
+// Outscraper's bounded poll (see src/lib/discovery/providers/outscraper.ts,
+// OUTSCRAPER_POLL_BUDGET_MS, default 180s as of 2026-09-02) can take up
+// to ~180s inside discoverBusinesses() before this route even starts
+// importing. 220 = 20s submit worst case + 180s poll worst case + ~20s
+// headroom for the filter/import/dedupe loop and the LeadDiscoveryRun
+// write. Keep this in sync if OUTSCRAPER_POLL_BUDGET_MS is ever raised.
+export const maxDuration = 220;
 
 const MAX_STORED_ERRORS = 20;
+// How long a PENDING run is treated as "still genuinely in flight" for
+// the duplicate-job guard below — comfortably longer than the poll
+// budget so it only ever catches a real overlapping job, not a run
+// that simply finished (successfully or not) after GeoViz stopped
+// watching it.
+const PENDING_RUN_STALE_MS_DEFAULT = 15 * 60_000;
 
 /**
  * POST /api/admin/leads/discover — the ONE route in this feature that
@@ -64,6 +73,7 @@ export async function POST(req: Request) {
     minRating?: unknown;
     mustHaveWebsite?: unknown;
     leadListId?: unknown;
+    resumeRunId?: unknown;
   } = {};
   try {
     body = (await req.json().catch(() => ({}))) as typeof body;
@@ -93,6 +103,7 @@ export async function POST(req: Request) {
       : null;
   const mustHaveWebsite = body.mustHaveWebsite === true;
   const leadListId = typeof body.leadListId === "string" ? body.leadListId : null;
+  const resumeRunId = typeof body.resumeRunId === "string" && body.resumeRunId ? body.resumeRunId : null;
 
   if (!category || !city) {
     return NextResponse.json(
@@ -126,38 +137,118 @@ export async function POST(req: Request) {
     }
   }
 
-  // Guardrail 2 — rolling-24h cap on total provider requests across
-  // all discovery runs, DB-backed so it survives cold starts.
-  const maxRequestsPerDay = envInt(
-    "LEAD_DISCOVERY_MAX_REQUESTS_PER_DAY",
-    MAX_REQUESTS_PER_DAY_DEFAULT,
-  );
-  const since = new Date(Date.now() - 24 * 60 * 60_000);
-  const recentRuns = await prisma.leadDiscoveryRun.aggregate({
-    where: { createdAt: { gte: since } },
-    _sum: { providerRequestCount: true },
-  });
-  const requestsInLast24h = recentRuns._sum.providerRequestCount ?? 0;
-  if (requestsInLast24h >= maxRequestsPerDay) {
-    return NextResponse.json(
-      {
-        error: `Daily discovery request cap reached (${requestsInLast24h}/${maxRequestsPerDay} in the last 24h). Try again later or raise LEAD_DISCOVERY_MAX_REQUESTS_PER_DAY.`,
-      },
-      { status: 429 },
+  let run: Awaited<ReturnType<typeof prisma.leadDiscoveryRun.findUnique>>;
+
+  if (resumeRunId) {
+    // ── Resume path — never resubmits; only continues polling a job
+    // GeoViz already knows about (see resumeDiscovery() on the
+    // provider). Daily-spend cap and duplicate-job guard below don't
+    // apply here — this IS the guarded, already-approved job.
+    run = await prisma.leadDiscoveryRun.findUnique({ where: { id: resumeRunId } });
+    if (!run) {
+      return NextResponse.json({ error: "resumeRunId not found" }, { status: 404 });
+    }
+    if (run.providerJobStatus !== "PENDING" || !run.providerJobId) {
+      return NextResponse.json(
+        { error: "This run has no pending provider job to resume (already finished, failed, or never had one)." },
+        { status: 400 },
+      );
+    }
+    if (!provider.resumeDiscovery) {
+      return NextResponse.json(
+        { error: "This provider does not support resuming a job." },
+        { status: 400 },
+      );
+    }
+  } else {
+    // ── Fresh submit path — guardrails against runaway spend / duplicate jobs ──
+
+    // Guardrail 2 — rolling-24h cap on total provider requests across
+    // all discovery runs, DB-backed so it survives cold starts.
+    const maxRequestsPerDay = envInt(
+      "LEAD_DISCOVERY_MAX_REQUESTS_PER_DAY",
+      MAX_REQUESTS_PER_DAY_DEFAULT,
     );
+    const since = new Date(Date.now() - 24 * 60 * 60_000);
+    const recentRuns = await prisma.leadDiscoveryRun.aggregate({
+      where: { createdAt: { gte: since } },
+      _sum: { providerRequestCount: true },
+    });
+    const requestsInLast24h = recentRuns._sum.providerRequestCount ?? 0;
+    if (requestsInLast24h >= maxRequestsPerDay) {
+      return NextResponse.json(
+        {
+          error: `Daily discovery request cap reached (${requestsInLast24h}/${maxRequestsPerDay} in the last 24h). Try again later or raise LEAD_DISCOVERY_MAX_REQUESTS_PER_DAY.`,
+        },
+        { status: 429 },
+      );
+    }
+
+    // Guardrail 3 (new) — never submit a second job for a query that
+    // still has one genuinely in flight. Heuristic identity match on
+    // (provider, industry, city, state, radiusMiles) — not
+    // requestedCount, since re-running "the same search" for a
+    // different count is still the same underlying job to wait for.
+    const staleWindowMs = envInt("OUTSCRAPER_PENDING_RUN_STALE_MS", PENDING_RUN_STALE_MS_DEFAULT);
+    const pendingSince = new Date(Date.now() - staleWindowMs);
+    const inFlight = await prisma.leadDiscoveryRun.findFirst({
+      where: {
+        provider: providerName,
+        industry: category,
+        city,
+        state: state ?? null,
+        radiusMiles: radiusMiles ?? null,
+        providerJobStatus: "PENDING",
+        createdAt: { gte: pendingSince },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (inFlight) {
+      return NextResponse.json(
+        {
+          error: `A search for this exact query is still processing (started ${inFlight.createdAt.toISOString()}). Resume it instead of starting a new one.`,
+          runId: inFlight.id,
+          providerJobId: inFlight.providerJobId,
+        },
+        { status: 409 },
+      );
+    }
+
+    // Create the audit row UP FRONT (not after the provider call, as
+    // before) so the provider job id can be persisted the instant
+    // it's known — durable even if this request is later killed
+    // mid-poll by the platform's own function-duration limit.
+    run = await prisma.leadDiscoveryRun.create({
+      data: {
+        provider: providerName,
+        industry: category,
+        city,
+        state: state ?? null,
+        radiusMiles: radiusMiles ?? null,
+        requestedCount: requestedLimit,
+        providerRequestCount: 0,
+      },
+    });
   }
 
+  const runId = run.id;
   console.log(
-    `[admin-leads] discover starting provider=${providerName} category="${category}" city="${city}" limit=${limit}`,
+    `[admin-leads] discover ${resumeRunId ? "resuming" : "starting"} provider=${providerName} category="${category}" city="${city}" limit=${limit} runId=${runId}`,
   );
 
-  const result = await provider.discoverBusinesses({
-    category,
-    city,
-    state,
-    radiusMiles,
-    limit,
-  });
+  const result = resumeRunId
+    ? await provider.resumeDiscovery!(run.providerJobId!)
+    : await provider.discoverBusinesses(
+        { category, city, state, radiusMiles, limit },
+        {
+          onJobAccepted: async (jobId) => {
+            await prisma.leadDiscoveryRun.update({
+              where: { id: runId },
+              data: { providerJobId: jobId, providerJobStatus: "PENDING" },
+            });
+          },
+        },
+      );
 
   const { passed, filteredOutCount } = filterDiscoveryRecords(
     result.records.slice(0, limit),
@@ -191,26 +282,28 @@ export async function POST(req: Request) {
     }
   }
 
-  await prisma.leadDiscoveryRun.create({
+  // Additive onto whatever the run already recorded — matters for
+  // resume, where the original submit+poll requests must not be lost
+  // from the rolling-24h spend guardrail above.
+  const totalProviderRequestCount = (run.providerRequestCount ?? 0) + result.providerRequestCount;
+
+  await prisma.leadDiscoveryRun.update({
+    where: { id: runId },
     data: {
-      provider: providerName,
-      industry: category,
-      city,
-      state: state ?? null,
-      radiusMiles: radiusMiles ?? null,
-      requestedCount: requestedLimit,
-      providerRequestCount: result.providerRequestCount,
+      providerRequestCount: totalProviderRequestCount,
       resultCount: result.records.length,
       newLeadsCreated: imported,
       matchedExistingCount: matched,
       filteredOutCount,
       errorCount: errors.length,
       errors: errors.length > 0 ? errors : undefined,
+      providerJobId: result.providerJobId ?? run.providerJobId,
+      providerJobStatus: result.providerJobStatus ?? run.providerJobStatus,
     },
   });
 
   console.log(
-    `[admin-leads] discover done provider=${providerName} requested=${requestedLimit} resultCount=${result.records.length} filteredOut=${filteredOutCount} imported=${imported} matched=${matched} addedToList=${addedToList} providerRequestCount=${result.providerRequestCount}${result.error ? ` error="${result.error}"` : ""}`,
+    `[admin-leads] discover done provider=${providerName} runId=${runId} requested=${requestedLimit} resultCount=${result.records.length} filteredOut=${filteredOutCount} imported=${imported} matched=${matched} addedToList=${addedToList} providerRequestCount=${totalProviderRequestCount}${result.error ? ` error="${result.error}"` : ""}`,
   );
 
   return NextResponse.json({
@@ -221,7 +314,11 @@ export async function POST(req: Request) {
     matched,
     addedToList,
     errorCount: errors.length,
-    providerRequestCount: result.providerRequestCount,
+    providerRequestCount: totalProviderRequestCount,
     providerError: result.error ?? null,
+    runId,
+    providerJobId: result.providerJobId ?? null,
+    providerJobStatus: result.providerJobStatus ?? null,
+    resumable: result.providerJobStatus === "PENDING",
   });
 }

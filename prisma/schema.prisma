@@ -1017,9 +1017,19 @@ model LeadDiscoveryRun {
   // Array<{ message: string }>, capped at 20 entries by the route —
   // never the full raw provider error payload.
   errors               Json?
+  // Async-job providers (Outscraper) only — added 2026-09-02 after a
+  // production 50-business search outran the poll budget. Lets the
+  // discover route (a) guard against submitting a second job for the
+  // same query while one is still PENDING, and (b) resume polling the
+  // SAME job id later instead of resubmitting. Null for providers
+  // with no async-job concept (Google Places) and for pre-2026-09-02
+  // historic rows.
+  providerJobId        String?
+  providerJobStatus    String?
   createdAt            DateTime @default(now())
 
   @@index([createdAt])
+  @@index([providerJobStatus, createdAt])
 }
 
 /// A named grouping of leads — e.g. "Columbus HVAC", "Toledo Roofers" —

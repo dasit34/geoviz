@@ -21,6 +21,8 @@ type DiscoverResponse = {
   errorCount: number;
   providerRequestCount: number;
   providerError: string | null;
+  runId?: string;
+  resumable?: boolean;
 };
 
 function authedFetch(adminKey: string, path: string, init?: RequestInit) {
@@ -45,6 +47,10 @@ export function LeadDiscoveryForm({ adminKey }: { adminKey: string }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<DiscoverResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set whenever a response (success, timeout, or "already in flight")
+  // carries a resumable job — lets the admin continue checking the
+  // SAME provider job instead of resubmitting a brand-new one.
+  const [resumeRunId, setResumeRunId] = useState<string | null>(null);
 
   useEffect(() => {
     authedFetch(adminKey, "/api/admin/leads/lists")
@@ -53,8 +59,7 @@ export function LeadDiscoveryForm({ adminKey }: { adminKey: string }) {
       .catch(() => {});
   }, [adminKey]);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function runSearch(opts?: { resumeRunId?: string }) {
     setError(null);
     setResult(null);
     setBusy(true);
@@ -73,16 +78,29 @@ export function LeadDiscoveryForm({ adminKey }: { adminKey: string }) {
           minRating: minRating ? Number(minRating) : undefined,
           mustHaveWebsite: mustHaveWebsite || undefined,
           leadListId: leadListId || undefined,
+          resumeRunId: opts?.resumeRunId,
         }),
       });
       const data = await res.json();
-      if (res.ok) setResult(data);
-      else setError(data.error ?? "Discovery search failed.");
+      if (res.ok) {
+        setResult(data);
+        setResumeRunId(data.resumable && data.runId ? data.runId : null);
+      } else {
+        setError(data.error ?? "Discovery search failed.");
+        // A 409 "still processing" response (either a timeout or the
+        // duplicate-job guard) carries the resumable runId too.
+        setResumeRunId(typeof data.runId === "string" ? data.runId : null);
+      }
     } catch {
       setError("Network error — please try again.");
     } finally {
       setBusy(false);
     }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    void runSearch();
   }
 
   return (
@@ -236,9 +254,19 @@ export function LeadDiscoveryForm({ adminKey }: { adminKey: string }) {
       </form>
 
       {error ? (
-        <p className="mt-4 rounded-md border border-severity-critical/30 bg-severity-critical/10 px-4 py-2 text-sm text-severity-critical">
-          {error}
-        </p>
+        <div className="mt-4 rounded-md border border-severity-critical/30 bg-severity-critical/10 px-4 py-2 text-sm text-severity-critical">
+          <p>{error}</p>
+          {resumeRunId ? (
+            <button
+              type="button"
+              onClick={() => void runSearch({ resumeRunId })}
+              disabled={busy}
+              className="btn-ghost mt-2 text-xs disabled:opacity-50"
+            >
+              {busy ? "Checking…" : "Resume checking this search"}
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {result ? (
@@ -277,6 +305,16 @@ export function LeadDiscoveryForm({ adminKey }: { adminKey: string }) {
               Provider reported an error partway through:{" "}
               {result.providerError}
             </p>
+          ) : null}
+          {resumeRunId ? (
+            <button
+              type="button"
+              onClick={() => void runSearch({ resumeRunId })}
+              disabled={busy}
+              className="btn-ghost mt-2 text-xs disabled:opacity-50"
+            >
+              {busy ? "Checking…" : "Resume checking this search"}
+            </button>
           ) : null}
         </div>
       ) : null}

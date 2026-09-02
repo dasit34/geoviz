@@ -13,8 +13,19 @@
  * implements a BOUNDED SYNCHRONOUS POLL inside `discoverBusinesses()`
  * (submit, then poll `GET /requests/{id}` up to the poll budget) so it
  * satisfies the exact same fully-synchronous `BusinessDiscoveryProvider`
- * contract `GooglePlacesProvider` already does — no new "pending run"
- * architecture anywhere else in the codebase.
+ * contract `GooglePlacesProvider` already does.
+ *
+ * ── Resumable polling (added 2026-09-02) ──────────────────────────────
+ * If the poll budget runs out while Outscraper is still `"Pending"`,
+ * the job id is echoed back via `DiscoveryResult.providerJobId` (and,
+ * earlier still, via the `onJobAccepted` callback fired the instant
+ * submit is accepted) instead of being discarded. `resumeDiscovery(jobId)`
+ * polls that SAME job id directly — it never calls `/google-maps-search`
+ * again, so it can't create a second (billable) job. The caller (the
+ * discover route) is responsible for persisting the id/status durably
+ * and for guarding against submitting a fresh search while a matching
+ * one is still `PENDING`; this file only guarantees it never
+ * self-duplicates a submit.
  *
  * ── Retry policy (hardened 2026-08-31, after live testing) ───────────
  * The SUBMIT call is NEVER retried automatically. A submit request that
@@ -47,6 +58,7 @@
 import { readApiKey } from "../../validators/apiKey";
 import type {
   BusinessDiscoveryProvider,
+  DiscoverBusinessesOptions,
   DiscoveryInput,
   DiscoveryResult,
   NormalizedBusinessRecord,
@@ -83,12 +95,22 @@ function pollTimeoutMs(): number {
 function pollIntervalMs(): number {
   return envInt("OUTSCRAPER_POLL_INTERVAL_MS", 3_000);
 }
-// Bounded wait for the whole poll cycle (after a Pending submit). A
-// timeout returns a clean "still processing" error — nothing is
-// imported. See file doc comment: this is a deliberate simplification
-// vs. a true resumable async architecture (not built in this phase).
+// Bounded wait for the whole poll cycle (after a Pending submit, or
+// for a single resumeDiscovery() call). A timeout returns a clean
+// "still processing" error — nothing is imported — but DOES echo the
+// job id back (see finalizeResult()) so the caller can resume rather
+// than resubmit. Hardened 2026-09-02 after a real production 50-
+// business search: the prior 50_000 default gave the poll loop only
+// ~16 iterations (~48s), which the production job hadn't finished
+// within. Raised to 180_000 (3 min) — a reasoned estimate, not a
+// live-verified number, chosen to comfortably clear the observed
+// failure while staying well under the platform's function-duration
+// ceiling once submit time + import/DB work are added on top (see
+// maxDuration in the discover route). Still fully bounded, not
+// infinite — resumeDiscovery() is the answer if 3 min genuinely isn't
+// enough for a given search, not a bigger single-shot number here.
 function pollBudgetMs(): number {
-  return envInt("OUTSCRAPER_POLL_BUDGET_MS", 50_000);
+  return envInt("OUTSCRAPER_POLL_BUDGET_MS", 180_000);
 }
 
 type OutscraperPlace = {
@@ -266,13 +288,96 @@ function describeSubmitFailure(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/**
+ * Bounded poll loop against an already-known job id. Individual poll
+ * failures are safe to retry within the budget (read-only status
+ * check); a single flaky poll never aborts the run. Shared by both
+ * `discoverBusinesses()` (after a Pending submit) and
+ * `resumeDiscovery()` (given a previously-persisted job id) — exactly
+ * one poll implementation, never duplicated.
+ */
+async function pollJob(
+  apiKey: string,
+  requestId: string,
+  startResult: OutscraperResponse,
+  startHttpCalls: number,
+): Promise<{ result: OutscraperResponse; httpCalls: number }> {
+  let result = startResult;
+  let httpCalls = startHttpCalls;
+  const deadline = Date.now() + pollBudgetMs();
+  while (Date.now() < deadline) {
+    await sleep(pollIntervalMs());
+    try {
+      httpCalls += 1;
+      result = await outscraperFetch(apiKey, `/requests/${requestId}`, {}, pollTimeoutMs());
+      if (result.status === "Success" || result.status === "Failure") break;
+    } catch (pollErr) {
+      console.error(
+        `[discovery] provider=${PROVIDER_NAME} poll attempt failed, retrying within budget: ${pollErr instanceof Error ? pollErr.message : String(pollErr)}`,
+      );
+      // Not fatal — loop continues to the next scheduled poll.
+    }
+  }
+  return { result, httpCalls };
+}
+
+/**
+ * Turns a final (or budget-exhausted) OutscraperResponse into the
+ * provider's public DiscoveryResult shape. Stamps providerJobId /
+ * providerJobStatus in EVERY branch — including the still-pending
+ * timeout branch, which is what makes resumeDiscovery() possible.
+ * Shared by discoverBusinesses() and resumeDiscovery().
+ */
+function finalizeResult(result: OutscraperResponse, httpCalls: number, requestId: string | undefined): DiscoveryResult {
+  if (result.status === "Failure") {
+    console.log(`[discovery] provider=${PROVIDER_NAME} reported Failure httpCalls=${httpCalls}`);
+    return {
+      records: [],
+      providerRequestCount: httpCalls,
+      error: result.errorMessage ?? "Outscraper reported this search failed.",
+      providerJobId: requestId,
+      providerJobStatus: "FAILURE",
+    };
+  }
+
+  if (result.status !== "Success") {
+    console.log(
+      `[discovery] provider=${PROVIDER_NAME} polling budget exhausted status=${result.status ?? "unknown"} httpCalls=${httpCalls}`,
+    );
+    return {
+      records: [],
+      providerRequestCount: httpCalls,
+      error:
+        "Outscraper is still processing this search after the polling budget ran out — nothing was imported. This job can be resumed instead of resubmitted.",
+      providerJobId: requestId,
+      providerJobStatus: "PENDING",
+    };
+  }
+
+  const places = flattenPlaces(result.data);
+  const records: NormalizedBusinessRecord[] = [];
+  for (const place of places) {
+    const record = toNormalizedRecord(place);
+    if (record) records.push(record);
+  }
+  console.log(
+    `[discovery] provider=${PROVIDER_NAME} httpCalls=${httpCalls} received=${places.length} normalized=${records.length}`,
+  );
+  return {
+    records,
+    providerRequestCount: httpCalls,
+    providerJobId: requestId,
+    providerJobStatus: "SUCCESS",
+  };
+}
+
 export const OutscraperProvider: BusinessDiscoveryProvider = {
   name: PROVIDER_NAME,
   requiredEnvVars: REQUIRED_ENV_VARS,
   enabled(): boolean {
     return missingKeys().length === 0;
   },
-  async discoverBusinesses(input: DiscoveryInput): Promise<DiscoveryResult> {
+  async discoverBusinesses(input: DiscoveryInput, opts?: DiscoverBusinessesOptions): Promise<DiscoveryResult> {
     const missing = missingKeys();
     if (missing.length > 0) {
       return { records: [], providerRequestCount: 0, error: `${missing.join(", ")} not set` };
@@ -298,58 +403,19 @@ export const OutscraperProvider: BusinessDiscoveryProvider = {
     }
 
     try {
-      // ── Poll — safe to retry individual attempts; read-only status
-      // check on a job id we already have. A single flaky poll never
-      // aborts the whole search; the bounded loop just continues.
-      if (result.status === "Pending" && result.id) {
-        const requestId = result.id;
-        const deadline = Date.now() + pollBudgetMs();
-        while (Date.now() < deadline) {
-          await sleep(pollIntervalMs());
-          try {
-            httpCalls += 1;
-            result = await outscraperFetch(apiKey, `/requests/${requestId}`, {}, pollTimeoutMs());
-            if (result.status === "Success" || result.status === "Failure") break;
-          } catch (pollErr) {
-            console.error(
-              `[discovery] provider=${PROVIDER_NAME} poll attempt failed, retrying within budget: ${pollErr instanceof Error ? pollErr.message : String(pollErr)}`,
-            );
-            // Not fatal — loop continues to the next scheduled poll.
-          }
+      const requestId = result.id;
+      if (result.status === "Pending" && requestId) {
+        // Job accepted — hand the id to the caller BEFORE polling
+        // starts, so it's durable even if this request is later
+        // killed by the platform mid-poll.
+        if (opts?.onJobAccepted) {
+          await opts.onJobAccepted(requestId);
         }
+        const polled = await pollJob(apiKey, requestId, result, httpCalls);
+        result = polled.result;
+        httpCalls = polled.httpCalls;
       }
-
-      if (result.status === "Failure") {
-        console.log(`[discovery] provider=${PROVIDER_NAME} reported Failure httpCalls=${httpCalls}`);
-        return {
-          records: [],
-          providerRequestCount: httpCalls,
-          error: result.errorMessage ?? "Outscraper reported this search failed.",
-        };
-      }
-
-      if (result.status !== "Success") {
-        console.log(
-          `[discovery] provider=${PROVIDER_NAME} polling budget exhausted status=${result.status ?? "unknown"} httpCalls=${httpCalls}`,
-        );
-        return {
-          records: [],
-          providerRequestCount: httpCalls,
-          error:
-            "Outscraper is still processing this search after the polling budget ran out — try again in a few minutes. Nothing was imported.",
-        };
-      }
-
-      const places = flattenPlaces(result.data);
-      const records: NormalizedBusinessRecord[] = [];
-      for (const place of places) {
-        const record = toNormalizedRecord(place);
-        if (record) records.push(record);
-      }
-      console.log(
-        `[discovery] provider=${PROVIDER_NAME} httpCalls=${httpCalls} received=${places.length} normalized=${records.length}`,
-      );
-      return { records, providerRequestCount: httpCalls };
+      return finalizeResult(result, httpCalls, requestId);
     } catch (err) {
       // Last-resort safety net for anything genuinely unexpected — the
       // classified paths above already return normally, they don't
@@ -359,6 +425,25 @@ export const OutscraperProvider: BusinessDiscoveryProvider = {
         `[discovery] provider=${PROVIDER_NAME} unexpected failure after httpCalls=${httpCalls}: ${e.message ?? String(err)}`,
       );
       return { records: [], providerRequestCount: httpCalls, error: e.message ?? String(err) };
+    }
+  },
+  /**
+   * Resumes polling a previously-submitted job by id. Never calls
+   * `/google-maps-search` — structurally cannot create a second job.
+   */
+  async resumeDiscovery(jobId: string): Promise<DiscoveryResult> {
+    const missing = missingKeys();
+    if (missing.length > 0) {
+      return { records: [], providerRequestCount: 0, error: `${missing.join(", ")} not set` };
+    }
+    const apiKey = readApiKey("OUTSCRAPER_API_KEY")!;
+    try {
+      const polled = await pollJob(apiKey, jobId, { status: "Pending", id: jobId }, 0);
+      return finalizeResult(polled.result, polled.httpCalls, jobId);
+    } catch (err) {
+      const e = err as Error;
+      console.error(`[discovery] provider=${PROVIDER_NAME} resume failed jobId=${jobId}: ${e.message ?? String(err)}`);
+      return { records: [], providerRequestCount: 0, error: e.message ?? String(err), providerJobId: jobId, providerJobStatus: "PENDING" };
     }
   },
 };
