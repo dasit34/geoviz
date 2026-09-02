@@ -97,11 +97,31 @@ function missingKeys(): string[] {
   return REQUIRED_ENV_VARS.filter((k) => readApiKey(k) === null);
 }
 
+/**
+ * TEMPORARY DIAGNOSTIC LOGGING (added 2026-09-03, remove once the
+ * Instantly 401/403 investigation is closed and confirmed resolved).
+ * Logs ONLY the upstream HTTP status, a truncated snippet of
+ * Instantly's own error response body, the endpoint path, and the
+ * campaign id (if the caller has one) — every one of those is either
+ * non-secret (path, campaign id are GeoViz-internal identifiers) or is
+ * Instantly's own error description of what went wrong, never our
+ * request. Never logs: the API key, the Authorization header, any
+ * other request header, or lead emails/PII (this function never sees
+ * lead data — sendLeads() passes only a campaignId as context, not
+ * the lead payload).
+ */
+function logInstantlyDiagnostic(path: string, status: number, bodySnippet: string, campaignId?: string) {
+  console.error(
+    `[outbound-diag] provider=instantly endpoint=${path} status=${status}${campaignId ? ` campaignId=${campaignId}` : ""} body=${bodySnippet.slice(0, 500)}`,
+  );
+}
+
 /** Single HTTP call. Throws typed errors — never a generic Error, never includes the API key in any message. */
 async function instantlyFetch(
   apiKey: string,
   path: string,
   init: { method: "GET" | "POST"; query?: Record<string, string>; body?: unknown },
+  diagContext?: { campaignId?: string },
 ): Promise<unknown> {
   const url = new URL(`${BASE_URL}${path}`);
   for (const [k, v] of Object.entries(init.query ?? {})) url.searchParams.set(k, v);
@@ -124,6 +144,7 @@ async function instantlyFetch(
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
     const detail = errText ? `: ${errText.slice(0, 200)}` : "";
+    logInstantlyDiagnostic(path, response.status, errText, diagContext?.campaignId);
     if (response.status === 429) throw new InstantlyRateLimitError(`HTTP 429${detail}`);
     throw new InstantlyHttpError(response.status, `HTTP ${response.status}${detail}`);
   }
@@ -142,16 +163,27 @@ async function instantlyFetchWithRetry(
   apiKey: string,
   path: string,
   init: { method: "GET" | "POST"; query?: Record<string, string>; body?: unknown },
+  diagContext?: { campaignId?: string },
 ): Promise<unknown> {
   try {
-    return await instantlyFetch(apiKey, path, init);
+    return await instantlyFetch(apiKey, path, init, diagContext);
   } catch (err) {
     if (err instanceof InstantlyRateLimitError || err instanceof InstantlyHttpError) throw err;
     // Timeout or malformed response — one retry, since this is a read-only call.
-    return await instantlyFetch(apiKey, path, init);
+    return await instantlyFetch(apiKey, path, init, diagContext);
   }
 }
 
+/**
+ * Distinguishes upstream failure classes rather than collapsing them
+ * into one generic message (hardened 2026-09-03 — the prior single
+ * "invalid or insufficient permissions" string for both 401 and 403
+ * made a genuine key-scope gap indistinguishable from an invalid key,
+ * a campaign-state problem, or a validation error). `err.message` on
+ * `InstantlyHttpError` already carries `HTTP {status}: {truncated
+ * body}` from Instantly itself — surfaced here, not discarded, since
+ * it's Instantly's own error description, not request data.
+ */
 function describeError(err: unknown, context: "submit" | "read"): string {
   if (err instanceof InstantlyTimeoutError) {
     return context === "submit"
@@ -160,8 +192,10 @@ function describeError(err: unknown, context: "submit" | "read"): string {
   }
   if (err instanceof InstantlyRateLimitError) return "Instantly rate limit reached — try again later.";
   if (err instanceof InstantlyHttpError) {
-    if (err.status === 404) return "Campaign not found in Instantly.";
-    if (err.status === 401 || err.status === 403) return "Instantly rejected the API key (invalid or insufficient permissions).";
+    if (err.status === 401) return `Instantly rejected the API key as invalid: ${err.message}`;
+    if (err.status === 403) return `Instantly denied this request — the key may be missing a required scope, or the campaign/workspace doesn't allow this action: ${err.message}`;
+    if (err.status === 404) return `Campaign not found in Instantly: ${err.message}`;
+    if (err.status === 400 || err.status === 422) return `Instantly rejected the request as invalid: ${err.message}`;
     return `Instantly request failed: ${err.message}`;
   }
   if (err instanceof InstantlyMalformedResponseError) {
@@ -255,7 +289,7 @@ export const InstantlyProvider: OutboundProvider = {
     let raw: unknown;
     try {
       // One attempt — never retried, see file doc comment.
-      raw = await instantlyFetch(apiKey, "/leads/add", { method: "POST", body });
+      raw = await instantlyFetch(apiKey, "/leads/add", { method: "POST", body }, { campaignId });
     } catch (err) {
       const message = describeError(err, "submit");
       console.error(`[outbound] provider=${PROVIDER_NAME} sendLeads failed (not retrying): ${message}`);
@@ -308,14 +342,19 @@ export const InstantlyProvider: OutboundProvider = {
 
     try {
       do {
-        const raw = await instantlyFetchWithRetry(apiKey, "/leads/list", {
-          method: "POST",
-          body: {
-            campaign_id: campaignId,
-            limit: STATUS_SYNC_PAGE_LIMIT,
-            ...(startingAfter ? { starting_after: startingAfter } : {}),
+        const raw = await instantlyFetchWithRetry(
+          apiKey,
+          "/leads/list",
+          {
+            method: "POST",
+            body: {
+              campaign_id: campaignId,
+              limit: STATUS_SYNC_PAGE_LIMIT,
+              ...(startingAfter ? { starting_after: startingAfter } : {}),
+            },
           },
-        });
+          { campaignId },
+        );
         pages += 1;
 
         const items = Array.isArray(raw)

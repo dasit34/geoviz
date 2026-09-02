@@ -81,6 +81,35 @@ async function run() {
     assert(/campaign not found/i.test(result.error ?? ""), "sendLeads 404: clean 'campaign not found' message");
   }
 
+  // sendLeads: 401 vs 403 -> distinct messages, neither collapsed into
+  // the old generic "invalid or insufficient permissions" string, and
+  // the real upstream body detail is surfaced (not discarded).
+  {
+    const mock401 = installMockFetch([errResponse(401, "invalid_api_key")]);
+    const result401 = await InstantlyProvider.sendLeads("camp_1", [sampleLead]);
+    assert(mock401.callCount() === 1, "sendLeads 401: exactly one attempt (no retry)");
+    assert(/invalid/i.test(result401.error ?? "") && /401/.test(result401.error ?? ""), "sendLeads 401: message identifies an invalid-key failure");
+    assert((result401.error ?? "").includes("invalid_api_key"), "sendLeads 401: real upstream body detail is surfaced, not discarded");
+    assert(!(result401.error ?? "").includes(KEY), "sendLeads 401: error never contains the API key");
+
+    const mock403 = installMockFetch([errResponse(403, "missing_scope: leads:create")]);
+    const result403 = await InstantlyProvider.sendLeads("camp_1", [sampleLead]);
+    assert(mock403.callCount() === 1, "sendLeads 403: exactly one attempt (no retry)");
+    assert(/scope|permission/i.test(result403.error ?? "") && /403/.test(result403.error ?? ""), "sendLeads 403: message identifies a permission/scope failure");
+    assert((result403.error ?? "").includes("missing_scope"), "sendLeads 403: real upstream body detail is surfaced, not discarded");
+    assert(!(result403.error ?? "").includes(KEY), "sendLeads 403: error never contains the API key");
+
+    assert(result401.error !== result403.error, "sendLeads: 401 and 403 no longer collapse into the same generic message");
+  }
+
+  // sendLeads: 400 validation error -> distinct from both 401 and 403.
+  {
+    const mock = installMockFetch([errResponse(400, "email is required")]);
+    const result = await InstantlyProvider.sendLeads("camp_1", [sampleLead]);
+    assert(mock.callCount() === 1, "sendLeads 400: exactly one attempt (no retry)");
+    assert(/invalid/i.test(result.error ?? "") && (result.error ?? "").includes("email is required"), "sendLeads 400: validation error surfaced distinctly, not read as a permissions failure");
+  }
+
   // sendLeads: 429 rate limit.
   {
     const mock = installMockFetch([errResponse(429, "slow down")]);
