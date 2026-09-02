@@ -2,7 +2,7 @@
  * Tests filterSendEligibleLeads() — the "Send to Instantly" pre-send
  * eligibility gate. Run: npx tsx scripts/test-outbound-eligibility.ts
  */
-import { filterSendEligibleLeads } from "@/lib/leads/outboundEligibility";
+import { filterSendEligibleLeads, normalizeEmail } from "@/lib/leads/outboundEligibility";
 
 let failures = 0;
 function assert(cond: boolean, msg: string) {
@@ -137,6 +137,40 @@ const CAMPAIGN_B = "camp_b";
     { campaignId: null, outreachByLeadId },
   );
   assert(eligible.length === 0 && skipped[0]?.reason.includes("bounced"), "null campaignId: previously-bounced-anywhere guard still applies in preview mode");
+}
+
+// Email normalization — trims/lowercases without altering the address.
+{
+  assert(normalizeEmail("  Test@Example.COM  ") === "test@example.com", "normalizeEmail trims and lowercases");
+  assert(normalizeEmail("a@b.co") === "a@b.co", "normalizeEmail is a no-op on an already-clean email");
+}
+
+// A mixed-case/whitespace-padded email still passes eligibility (normalized before the regex check).
+{
+  const { eligible } = filterSendEligibleLeads(
+    [{ leadId: "l1", email: "  Person@Example.COM ", status: "QUALIFIED" }],
+    { campaignId: CAMPAIGN_A, outreachByLeadId: new Map() },
+  );
+  assert(eligible.length === 1, "a mixed-case/whitespace-padded but syntactically valid email is still eligible");
+}
+
+// Disposable-domain emails are rejected, with a distinct reason from "no valid email."
+{
+  const { eligible, skipped } = filterSendEligibleLeads(
+    [{ leadId: "l1", email: "person@mailinator.com", status: "QUALIFIED" }],
+    { campaignId: CAMPAIGN_A, outreachByLeadId: new Map() },
+  );
+  assert(eligible.length === 0, "a disposable-domain email is not eligible");
+  assert(skipped[0]?.reason.includes("disposable"), "disposable-domain skip has its own distinct reason, not the generic 'no valid email' one");
+}
+
+// Disposable-domain check is case-insensitive (domain normalized before the lookup).
+{
+  const { eligible } = filterSendEligibleLeads(
+    [{ leadId: "l1", email: "person@MAILINATOR.COM", status: "QUALIFIED" }],
+    { campaignId: CAMPAIGN_A, outreachByLeadId: new Map() },
+  );
+  assert(eligible.length === 0, "disposable-domain check is case-insensitive");
 }
 
 if (failures > 0) {

@@ -58,6 +58,7 @@ export function SendToInstantlyModal({
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [sendResult, setSendResult] = useState<SendResponse | null>(null);
+  const [sentCampaignName, setSentCampaignName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Mock/local mode: no Instantly connection configured yet (or simply
@@ -116,6 +117,7 @@ export function SendToInstantlyModal({
       const data = await res.json();
       if (res.ok) {
         setSendResult(data);
+        setSentCampaignName(campaign?.name ?? null);
         onSent?.();
       } else {
         setError(data.error ?? "Send failed.");
@@ -255,11 +257,38 @@ export function SendToInstantlyModal({
         ) : (
           <div>
             <div className="mb-4 rounded-md border border-white/10 bg-white/[0.02] p-4 text-sm">
-              <p className="text-white/80">
-                <strong>{sendResult.sentCount}</strong> sent,{" "}
-                <strong>{sendResult.failedCount}</strong> failed,{" "}
-                <strong>{sendResult.skippedCount}</strong> skipped.
-              </p>
+              {sendResult.sentCount > 0 ? (
+                <p className="text-white/80">
+                  <strong>{sendResult.sentCount}</strong> lead{sendResult.sentCount === 1 ? "" : "s"} sent
+                  successfully{sentCampaignName ? ` to ${sentCampaignName}` : ""}.
+                  {sendResult.failedCount > 0 ? (
+                    <>
+                      {" "}
+                      <strong>{sendResult.failedCount}</strong> failed.
+                    </>
+                  ) : null}
+                  {sendResult.skippedCount > 0 ? (
+                    <>
+                      {" "}
+                      <strong>{sendResult.skippedCount}</strong> skipped.
+                    </>
+                  ) : null}
+                </p>
+              ) : (
+                <p className="text-white/80">
+                  <strong>{sendResult.skippedCount}</strong> skipped — nothing was sent
+                  {sentCampaignName ? ` to ${sentCampaignName}` : ""}.
+                </p>
+              )}
+              {sendResult.skipped.length > 0 ? (
+                <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs text-white/50">
+                  {sendResult.skipped.map((s) => (
+                    <li key={s.leadId}>
+                      {s.businessName ?? s.leadId}: {s.reason}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
             <button onClick={onClose} className="btn-primary w-full text-sm">
               Done

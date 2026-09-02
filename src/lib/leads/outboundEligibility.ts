@@ -10,6 +10,41 @@ const APPROVED_STATUSES = new Set(["QUALIFIED", "READY_FOR_CONTACT", "CONTACTED"
 const BLOCKED_PRIOR_OUTREACH_STATUSES = new Set(["BOUNCED", "UNSUBSCRIBED"]);
 const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Free, static heuristic only — NOT real deliverability/catch-all
+// verification. That would require a paid third-party provider
+// (e.g. ZeroBounce/NeverBounce/Hunter Verify, roughly $0.003-$0.01
+// per email) and is explicitly out of scope until requested. This
+// list only catches the most common disposable/temp-mail domains —
+// obvious junk, not a comprehensive verification system.
+const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  "mailinator.com",
+  "guerrillamail.com",
+  "10minutemail.com",
+  "tempmail.com",
+  "temp-mail.org",
+  "throwawaymail.com",
+  "yopmail.com",
+  "trashmail.com",
+  "sharklasers.com",
+  "getnada.com",
+  "discard.email",
+  "maildrop.cc",
+  "mailnesia.com",
+  "fakeinbox.com",
+  "dispostable.com",
+]);
+
+/**
+ * Trim + lowercase only — never alters the actual address, never
+ * fabricates or guesses a value. Applied before both the eligibility
+ * check and the value actually sent to the provider so a stray
+ * whitespace/casing difference can't cause a mismatch between what
+ * was validated and what was sent.
+ */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export type EligibilityLead = {
   leadId: string;
   email: string | null;
@@ -61,8 +96,18 @@ export function filterSendEligibleLeads(
       });
       continue;
     }
-    if (!lead.email || !EMAIL_FORMAT_RE.test(lead.email)) {
+    if (!lead.email) {
       skipped.push({ leadId: lead.leadId, reason: "No valid email address on file." });
+      continue;
+    }
+    const normalizedEmail = normalizeEmail(lead.email);
+    if (!EMAIL_FORMAT_RE.test(normalizedEmail)) {
+      skipped.push({ leadId: lead.leadId, reason: "No valid email address on file." });
+      continue;
+    }
+    const emailDomain = normalizedEmail.split("@")[1];
+    if (emailDomain && DISPOSABLE_EMAIL_DOMAINS.has(emailDomain)) {
+      skipped.push({ leadId: lead.leadId, reason: "Email uses a disposable/temporary domain." });
       continue;
     }
 

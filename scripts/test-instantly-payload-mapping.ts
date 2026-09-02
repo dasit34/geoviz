@@ -96,6 +96,13 @@ function makeLead(overrides: Partial<Lead>): Lead {
   assert(input.lastName === null, "single-word name never invents a lastName");
 }
 
+// Email is normalized (trim/lowercase) on the way out — never altered otherwise.
+{
+  const lead = makeLead({ contactEmail: "  Rick@RicksTestHVAC.example.com  " });
+  const input = toOutboundLeadInput(lead);
+  assert(input.email === "rick@rickstesthvac.example.com", "email sent to Instantly is trimmed and lowercased, same address");
+}
+
 // Null qualification score is never coerced to a fake number.
 {
   const lead = makeLead({ qualificationScore: null });

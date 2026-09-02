@@ -10,6 +10,7 @@
 
 import type { Lead } from "@prisma/client";
 import type { OutboundLeadInput } from "@/lib/outbound/types";
+import { normalizeEmail } from "@/lib/leads/outboundEligibility";
 
 export function toOutboundLeadInput(lead: Lead): OutboundLeadInput {
   const contactName = lead.contactName?.trim() || null;
@@ -19,7 +20,10 @@ export function toOutboundLeadInput(lead: Lead): OutboundLeadInput {
 
   return {
     leadId: lead.id,
-    email: lead.contactEmail!, // caller guarantees a valid email via eligibility filtering first
+    // caller guarantees a valid email via eligibility filtering first;
+    // normalized the same way that filter validated it, so the value
+    // sent always matches the value that passed the gate.
+    email: normalizeEmail(lead.contactEmail!),
     firstName,
     lastName,
     companyName: lead.businessName,
