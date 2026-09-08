@@ -108,6 +108,35 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Organization JSON-LD for GeoViz itself.
+ *
+ * GeoViz's own site shipped no machine-readable identity block — the
+ * exact gap its audits flag. This is a schema.org `Organization` (not
+ * `LocalBusiness`: GeoViz has no physical storefront and we do not
+ * invent an address). Every field is verifiable from the site or the
+ * project: name, canonical URL (`src/lib/app-url.ts`
+ * PRODUCTION_DOMAIN_FALLBACK), the published support address, the
+ * app icon, and a one-line description drawn from `public/llms.txt`.
+ * `sameAs` is intentionally omitted — no verified social profiles
+ * exist in the project to point at.
+ */
+const ORGANIZATION_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "GeoViz",
+  url: "https://geoviz.ai",
+  logo: "https://geoviz.ai/icon.svg",
+  email: "support@geoviz.ai",
+  description:
+    "GeoViz audits whether AI systems like ChatGPT, Claude, Gemini, and Perplexity can understand, trust, and recommend a business, and delivers a prioritized plan to fix the gaps.",
+  contactPoint: {
+    "@type": "ContactPoint",
+    contactType: "customer support",
+    email: "support@geoviz.ai",
+  },
+} as const;
+
 export default function RootLayout({
   children,
 }: {
@@ -119,6 +148,14 @@ export default function RootLayout({
       className={`${inter.variable} ${newsreader.variable} ${instrument.variable} ${jetbrainsMono.variable} ${poppins.variable} ${spaceGrotesk.variable}`}
     >
       <body className="min-h-screen font-sans antialiased">
+        <script
+          type="application/ld+json"
+          // Static, developer-authored object — no user input. Rendered
+          // in <body> per the Next.js App Router JSON-LD convention.
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(ORGANIZATION_JSON_LD),
+          }}
+        />
         <div className="amber-spine" aria-hidden />
         {children}
       </body>

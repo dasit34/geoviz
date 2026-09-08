@@ -18,5 +18,6 @@ dentists, med spas, real estate agents, and similar professionals who want
 to be recommended when customers ask AI platforms for help.
 
 ## Where to start
-- Sample report: https://geoviz.app/sample-report
-- Order an audit: https://geoviz.app/order
+- Free AI visibility check: https://geoviz.ai/check
+- Sample report: https://geoviz.ai/sample-report
+- Order an audit: https://geoviz.ai/order

@@ -111,7 +111,11 @@ const RULES: ReadonlyArray<{ pattern: RegExp; slug: IndustrySlug }> = [
   { pattern: /\b(salon|barber(?:\s+shop)?|stylist|hair\s+(?:salon|studio)|nail\s+salon|day\s+spa|\bspa\b|esthetician|med\s*spa)\b/, slug: "salon" },
   { pattern: /\b(real(?:tor|tors|\s+estate)|realty|broker(?:age)?|home\s+sales|mls)\b/, slug: "real_estate" },
   { pattern: /\b(auto(?:motive)?(?:\s+(?:repair|shop|body))?|mechanic|tire\s+shop|oil\s+change|transmission\s+shop|collision\s+(?:center|repair))\b/, slug: "automotive" },
-  { pattern: /\b(non[-\s]?profit|nonprofit|501\(?c\)?\(?3\)?|charity|foundation)\b/, slug: "nonprofit" },
+  // "foundation" alone is NOT a nonprofit signal — it collides with
+  // "foundation repair" (contractors), "foundation inspection", and
+  // product names like "GEO Foundation Fix". Only match it in an
+  // unambiguous charitable phrasing.
+  { pattern: /\b(not[-\s]?for[-\s]?profit|non[-\s]?profit|nonprofit|501\(?c\)?\(?3\)?|charitable\s+(?:organization|foundation|trust)|charity|(?:community|family|private|public|charitable)\s+foundation)\b/, slug: "nonprofit" },
   { pattern: /\b(ecommerce|e-commerce|online\s+store|shopify|woocommerce|shop(?:ify)?\s+store|dtc\s+brand|d2c\s+brand)\b/, slug: "ecommerce" },
   { pattern: /\b(accountant|cpa|bookkeep(?:er|ing)|tax\s+(?:prep|services?|professional)|financial\s+advisor|insurance\s+(?:agent|agency|broker)|consultant|consulting\s+(?:firm|services?))\b/, slug: "professional_services" },
 
