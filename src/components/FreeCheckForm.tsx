@@ -20,19 +20,6 @@ type ApiResult = {
   fixes: string[];
 };
 
-const CATEGORIES = [
-  "Roofing",
-  "HVAC",
-  "Plumbing",
-  "Electrical",
-  "General Contractor",
-  "Legal Services",
-  "Dental",
-  "Medical / Med Spa",
-  "Real Estate",
-  "Other",
-];
-
 const LOADING_STAGES = [
   "Fetching your homepage…",
   "Checking structured data…",
@@ -54,7 +41,6 @@ export function FreeCheckForm() {
     businessName: string;
     email: string;
   } | null>(null);
-  const [categorySelect, setCategorySelect] = useState("Roofing");
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -72,17 +58,13 @@ export function FreeCheckForm() {
 
     const form = e.currentTarget;
     const data = new FormData(form);
-    const category =
-      String(data.get("category") ?? "") === "Other"
-        ? String(data.get("categoryOther") ?? "").trim()
-        : String(data.get("category") ?? "").trim();
 
     const payload = {
       websiteUrl: String(data.get("websiteUrl") ?? "").trim(),
       businessName: String(data.get("businessName") ?? "").trim(),
       city: String(data.get("city") ?? "").trim(),
       state: String(data.get("state") ?? "").trim(),
-      category,
+      category: String(data.get("category") ?? "").trim(),
       email: String(data.get("email") ?? "").trim(),
       website2: String(data.get("website2") ?? ""), // honeypot
     };
@@ -167,59 +149,33 @@ export function FreeCheckForm() {
             placeholder="Acme Roofing"
             error={fieldErrors.businessName?.[0]}
           />
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field
-              id="city"
-              label="City"
-              type="text"
-              required
-              placeholder="Phoenix"
-              error={fieldErrors.city?.[0]}
-            />
-            <Field
-              id="state"
-              label="State"
-              type="text"
-              required
-              placeholder="AZ"
-              error={fieldErrors.state?.[0]}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label
-              htmlFor="category"
-              className="text-sm font-medium text-white/85"
-            >
-              Business category<span className="ml-1 text-accent">*</span>
-            </label>
-            <select
-              id="category"
-              name="category"
-              required
-              value={categorySelect}
-              onChange={(e) => setCategorySelect(e.target.value)}
-              className="input-field"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            {categorySelect === "Other" ? (
-              <input
-                id="categoryOther"
-                name="categoryOther"
+          <div className="space-y-4 rounded-md border border-white/10 bg-white/[0.02] p-4">
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/40">
+              Optional — sharpens the location &amp; service-clarity checks
+            </p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                id="city"
+                label="City"
                 type="text"
-                required
-                placeholder="Describe your business category"
-                className="input-field mt-2"
+                placeholder="Phoenix"
+                error={fieldErrors.city?.[0]}
               />
-            ) : null}
-            {fieldErrors.category?.[0] ? (
-              <p className="text-xs text-red-300">{fieldErrors.category[0]}</p>
-            ) : null}
+              <Field
+                id="state"
+                label="State"
+                type="text"
+                placeholder="AZ"
+                error={fieldErrors.state?.[0]}
+              />
+            </div>
+            <Field
+              id="category"
+              label="Business category"
+              type="text"
+              placeholder="Roofing, HVAC, dental…"
+              error={fieldErrors.category?.[0]}
+            />
           </div>
 
           <Field
@@ -228,7 +184,7 @@ export function FreeCheckForm() {
             type="email"
             required
             placeholder="you@yourbusiness.com"
-            hint="We'll send your results here too."
+            hint="Your results appear on the next screen. We use your email to follow up with full-audit options."
             error={fieldErrors.email?.[0]}
           />
 

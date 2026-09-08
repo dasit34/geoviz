@@ -83,9 +83,14 @@ export const freeCheckInputSchema = z.object({
     .trim()
     .min(2, "Business name is required")
     .max(200),
-  city: z.string().trim().min(1, "City is required").max(100),
-  state: z.string().trim().min(1, "State is required").max(100),
-  category: z.string().trim().min(1, "Business category is required").max(100),
+  // city / state / category are optional — they only sharpen three
+  // substring sub-checks in deriveChecks() (which is fully null-safe),
+  // and the paid audit infers category + location from the site
+  // itself. `.default("")` keeps the non-null FreeCheckSubmission
+  // columns satisfied without a migration.
+  city: z.string().trim().max(100).optional().default(""),
+  state: z.string().trim().max(100).optional().default(""),
+  category: z.string().trim().max(100).optional().default(""),
   email: z
     .string()
     .trim()

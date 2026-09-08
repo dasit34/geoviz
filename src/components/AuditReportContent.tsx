@@ -125,12 +125,20 @@ export function AuditReportContent({
   reportGeneratedAt,
   deterministicScore = null,
   context,
+  legacy = false,
 }: {
   orderId: string;
   businessLabel: string;
   websiteUrl: string;
   reportMarkdown: string;
   reportGeneratedAt: Date | null;
+  /**
+   * True when this is an earlier-generation audit with no
+   * deterministic score / cross-model layer / preflight inventory.
+   * Renders a provenance notice and collapses the empty
+   * "What AI Systems Found" panels into a single explanatory line.
+   */
+  legacy?: boolean;
   /**
    * Optional — when present, the canonical resolver reads scores from
    * this `DeterministicScore` JSON (scoring@1.0.0). When absent, the
@@ -249,6 +257,23 @@ export function AuditReportContent({
           cohortCellValue={context?.cohortCellValue ?? null}
         />
 
+        {legacy ? (
+          <div className="mt-8 rounded-md border border-white/10 bg-ink-900/60 p-4 text-[13px] leading-relaxed text-white/60">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
+              Earlier-generation audit
+            </p>
+            <p className="mt-2">
+              This report was generated {dateLabel} on an earlier version
+              of the GeoViz engine. It predates the cross-model AI
+              intelligence layer and the structured-input inventory, so
+              those sections show limited detail. Current audits include
+              per-model results from ChatGPT, Claude, Gemini and
+              Perplexity, plus a full evidence review. The score and
+              findings below reflect the site as it was on that date.
+            </p>
+          </div>
+        ) : null}
+
         {/* Hero header REMOVED (LaBre review) — it duplicated the
             cover's business name, band, assessment, website, and
             generated date, producing two near-identical opening pages.
@@ -331,30 +356,45 @@ export function AuditReportContent({
             section: "What AI Systems Found." */}
         <SectionMarker number="02" title="What AI Systems Found" />
 
-        {/* Report Polish P4 — single consolidated "What AI Systems
-            Read" section. Previously the report rendered both this
-            quantitative strip AND a categorical FOUND/PARTIAL
-            checklist (AiInputsAnalyzed); the two overlapped enough
-            that the customer read it as padding. AiInputsAnalyzed
-            was deleted; the metric strip is now the single answer
-            to "what did the system actually analyze?" */}
-        <WhatAiSystemsRead
-          preflightSignals={context?.preflightSignals ?? null}
-        />
+        {legacy ? (
+          /* Legacy audit: preflightSignals + aiValidations are absent,
+             so WhatAiSystemsRead and FourModelGrid would render 7 rows
+             of "Not analyzed" plus an "unavailable" panel. The notice
+             at the top of the report already explains why — replace
+             the empty panels with one line rather than repeat it. */
+          <p className="report-prose mt-4 text-[14px] leading-relaxed text-white/60">
+            Per-model results (ChatGPT, Claude, Gemini, Perplexity) and
+            the structured-input inventory were not part of this
+            earlier-generation audit — see the note above. The score and
+            prioritized fixes below are based on the site content,
+            business-identity signals, and AI-crawler accessibility
+            captured on the audit date.
+          </p>
+        ) : (
+          <>
+            {/* Report Polish P4 — single consolidated "What AI Systems
+                Read" section. Previously the report rendered both this
+                quantitative strip AND a categorical FOUND/PARTIAL
+                checklist (AiInputsAnalyzed); the two overlapped enough
+                that the customer read it as padding. AiInputsAnalyzed
+                was deleted; the metric strip is now the single answer
+                to "what did the system actually analyze?" */}
+            <WhatAiSystemsRead
+              preflightSignals={context?.preflightSignals ?? null}
+            />
 
-        {/* Report v2 — Four-Model Grid. Customer-language read of
-            how each of the four AI systems interprets the business
-            (per-dimension verdicts + knowledge gaps). Sits
-            immediately after AI Inputs Analyzed and before Category
-            Breakdown so customers see how AI systems understand
-            them BEFORE they see the score breakdown. Always renders
-            four cards; missing/failed providers render an explicit
-            Status: Unavailable / Reason card. */}
-        <FourModelGrid
-          aiValidations={context?.aiValidations ?? null}
-          businessName={businessLabel}
-          auditUrl={websiteUrl}
-        />
+            {/* Report v2 — Four-Model Grid. Customer-language read of
+                how each of the four AI systems interprets the business
+                (per-dimension verdicts + knowledge gaps). Always renders
+                four cards; missing/failed providers render an explicit
+                Status: Unavailable / Reason card. */}
+            <FourModelGrid
+              aiValidations={context?.aiValidations ?? null}
+              businessName={businessLabel}
+              auditUrl={websiteUrl}
+            />
+          </>
+        )}
 
         {/* Phase E — "Why this matters" aside removed. It duplicated
             the (also removed) "Why this audit exists" premise. The
@@ -367,23 +407,29 @@ export function AuditReportContent({
             identified, what they understood, what they couldn't
             verify. Renders the Overall AI Recommendation Confidence
             LABEL (not score). Fail-soft hidden when fewer than 2
-            providers passed. */}
-        <ConsensusSummary
-          aiValidations={context?.aiValidations ?? null}
-          consensusIndex={context?.consensusIndex ?? null}
-          businessName={businessLabel}
-        />
+            providers passed — and fully suppressed on legacy audits,
+            which have no validator layer to summarize (the notice at
+            the top of the report explains why). */}
+        {legacy ? null : (
+          <>
+            <ConsensusSummary
+              aiValidations={context?.aiValidations ?? null}
+              consensusIndex={context?.consensusIndex ?? null}
+              businessName={businessLabel}
+            />
 
-        {/* Report Polish P6 — Foundation Fix nudge anchored to the
-            peak emotional moment (right after the consensus reveals
-            LOW or MODERATE confidence). Hidden on HIGH confidence
-            reports. Soft anchor only — the full Section 05 CTA still
-            renders at the end of the report. */}
-        <ConsensusActionAnchor
-          aiValidations={context?.aiValidations ?? null}
-          consensusIndex={context?.consensusIndex ?? null}
-          businessName={businessLabel}
-        />
+            {/* Report Polish P6 — Foundation Fix nudge anchored to the
+                peak emotional moment (right after the consensus reveals
+                LOW or MODERATE confidence). Hidden on HIGH confidence
+                reports. Soft anchor only — the full Section 05 CTA
+                still renders at the end of the report. */}
+            <ConsensusActionAnchor
+              aiValidations={context?.aiValidations ?? null}
+              consensusIndex={context?.consensusIndex ?? null}
+              businessName={businessLabel}
+            />
+          </>
+        )}
 
         {/* Category Breakdown — moved here (LaBre review) so the
             customer reads the score → how AI systems read them →
@@ -532,11 +578,13 @@ export function AuditReportContent({
                 lists, confidence read, and full sources moved here from
                 the compact provider cards so the main flow stays
                 scannable while the depth stays available. */}
-            <FourModelAppendix
-              aiValidations={context?.aiValidations ?? null}
-              businessName={businessLabel}
-              auditUrl={websiteUrl}
-            />
+            {legacy ? null : (
+              <FourModelAppendix
+                aiValidations={context?.aiValidations ?? null}
+                businessName={businessLabel}
+                auditUrl={websiteUrl}
+              />
+            )}
             {techSection ? (
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">

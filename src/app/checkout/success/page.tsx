@@ -85,17 +85,20 @@ export default async function CheckoutSuccessPage({
             </div>
             <h1 className="h2 mt-6">You’re booked. We’re on it.</h1>
             <p className="muted mx-auto mt-4 max-w-xl">
-              Your AI Visibility Audit is in our queue. We’ll email your
-              report — most reports are delivered within minutes. Keep an
-              eye on your inbox (and your spam folder, just in case).
+              Your AI Visibility Audit is in our queue. The analysis runs
+              in minutes; a person then reviews the report before it’s
+              sent — most reports arrive by email the same business day.
+              Keep an eye on your inbox (and your spam folder, just in
+              case).
             </p>
 
             <div className="card mx-auto mt-10 max-w-xl text-left">
               <p className="pill">What happens next</p>
               <ol className="mt-4 space-y-3 text-sm text-white/80">
                 <Step n={1}>
-                  Our team runs the full audit across ChatGPT, Claude,
-                  Gemini, and Perplexity.
+                  We run the full audit — deterministic website analysis
+                  plus a direct read from ChatGPT, Claude, Gemini, and
+                  Perplexity.
                 </Step>
                 <Step n={2}>
                   We compile your AI Visibility Score, issues, and ranked fixes

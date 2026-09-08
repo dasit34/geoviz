@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 type Defaults = {
@@ -165,10 +166,18 @@ export function OrderForm({
       </button>
 
       <p className="text-center text-xs text-white/40">
-        Secure payment via Stripe. One-time charge of $97 USD. Delivered
-        by email — most audits are delivered within minutes — generated
-        using AI-assisted analysis across ChatGPT, Claude, Perplexity,
-        and Gemini.
+        Secure payment via Stripe. One-time charge of $97 USD. Generated
+        using deterministic website analysis plus a direct read from
+        ChatGPT, Claude, Perplexity, and Gemini, reviewed by a person,
+        then delivered by email — usually the same business day. Full
+        refund if we haven&rsquo;t started your audit —{" "}
+        <Link
+          href="/refund-policy"
+          className="text-accent hover:text-accent-glow underline-offset-4 hover:underline"
+        >
+          see our refund policy
+        </Link>
+        .
       </p>
 
       {testBypassEnabled ? (

@@ -248,15 +248,17 @@ function ReportInFlight({ orderId }: { orderId: string }) {
                 Your AI Visibility Audit is being prepared.
               </h1>
               <p className="muted mt-5 text-base leading-relaxed">
-                We&rsquo;re running the analysis right now. Most audits
-                finish within a couple of minutes. This page will
-                refresh on its own as soon as your report is ready
+                We&rsquo;re running the analysis right now &mdash; it
+                usually finishes within a couple of minutes. A person
+                then reviews the report before it&rsquo;s sent. This page
+                refreshes on its own as soon as your report is ready
                 &mdash; you don&rsquo;t need to click anything.
               </p>
               <p className="mt-5 text-sm text-white/55">
-                You&rsquo;ll also receive an email when delivery
-                completes. If nothing has appeared after ten minutes,
-                reach us at{" "}
+                You&rsquo;ll receive an email once your report has been
+                reviewed and sent &mdash; usually the same business day.
+                If it hasn&rsquo;t arrived by the next business day, reach
+                us at{" "}
                 <a
                   href="mailto:support@geoviz.ai"
                   className="text-accent hover:text-accent-glow underline-offset-4 hover:underline"

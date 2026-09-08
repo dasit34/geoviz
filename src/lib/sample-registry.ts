@@ -1,4 +1,5 @@
 import { prisma, isDatabaseConfigured } from "@/lib/db";
+import { SAMPLE_SESSION_PREFIX } from "@/lib/sample-audit";
 
 /**
  * Public sample-audit registry.
@@ -11,11 +12,14 @@ import { prisma, isDatabaseConfigured } from "@/lib/db";
  * `scripts/seed-public-samples.ts` then let the worker generate the
  * audit). No other code changes needed.
  *
- * The audit row is identified in the DB by *both* `websiteUrl` (must
- * `contain` the configured fragment) AND `businessName` (must `contain`
- * the configured business label) — both case-insensitive — so that a
- * customer who happened to order an audit of one of these same sites
- * doesn't accidentally surface as a public sample.
+ * The audit row is identified in the DB by *all three* of: a synthetic
+ * `self_audit_*` Stripe session id (the curated-sample marker — see
+ * `src/lib/sample-audit.ts`), `websiteUrl` (must `contain` the
+ * configured fragment), AND `businessName` (must `contain` the
+ * configured business label) — the last two case-insensitive. The
+ * session-id gate is the load-bearing one: it means a real paying
+ * customer, a `cs_test_` order, or a `calibration_*` row for one of
+ * these same domains can never surface as a public sample.
  */
 export type SampleSlug =
   | "geoviz"
@@ -120,6 +124,9 @@ export async function findSampleAudit(entry: SampleEntry) {
   try {
     const row = await prisma.auditOrder.findFirst({
       where: {
+        // Curated-sample marker — only rows seeded by
+        // scripts/seed-public-samples.ts / seed-geoviz-sample.ts.
+        stripeSessionId: { startsWith: SAMPLE_SESSION_PREFIX },
         websiteUrl: { contains: entry.urlMatch, mode: "insensitive" },
         businessName: { contains: businessNameMatch, mode: "insensitive" },
         reportStatus: "generated",
@@ -161,8 +168,14 @@ export async function findSampleAudit(entry: SampleEntry) {
         websiteUrl: { contains: entry.urlMatch, mode: "insensitive" },
       },
     });
+    const curatedCount = await prisma.auditOrder.count({
+      where: {
+        stripeSessionId: { startsWith: SAMPLE_SESSION_PREFIX },
+        websiteUrl: { contains: entry.urlMatch, mode: "insensitive" },
+      },
+    });
     console.warn(
-      `[sample-registry] findSampleAudit(${entry.slug}) returned null · urlMatch="${entry.urlMatch}" businessNameMatch="${businessNameMatch}" rowsMatchingUrlOnly=${urlMatchCount}`,
+      `[sample-registry] findSampleAudit(${entry.slug}) returned null · urlMatch="${entry.urlMatch}" businessNameMatch="${businessNameMatch}" rowsMatchingUrlOnly=${urlMatchCount} curatedRowsForUrl=${curatedCount}`,
     );
     return null;
   } catch (err) {

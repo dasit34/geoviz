@@ -116,9 +116,9 @@ const FIX_SCOPE = [
 
 const AUDIT_BULLETS = [
   "Your AI Visibility Score (0–100)",
-  "Customer Questions Tested — the real buying questions AI was asked",
-  "ChatGPT, Claude, Gemini & Perplexity results",
-  "Google AI Overviews readiness",
+  "How ChatGPT, Claude, Gemini & Perplexity each read your business",
+  "The buyer-intent questions your audit is built around",
+  "Google AI Overviews readiness (a derived assessment)",
   "Evidence Reviewed — what AI could actually read",
   "Top visibility gaps holding you back",
   "Priority Fix Plan, ranked by impact",
@@ -143,7 +143,7 @@ const FAQS = [
   {
     q: "How is the GeoViz score calculated?",
     a: [
-      "GeoViz scores how clearly AI systems can understand, verify, and recommend your business based on several visibility signals. These include crawl access, structured data, business identity clarity, content depth, trust evidence, brand consistency, and direct testing across major AI systems.",
+      "The score is calculated from deterministic website signals — crawl access, structured data, business identity clarity, content depth, trust evidence, and brand consistency. Separately, we query ChatGPT, Claude, Gemini, and Perplexity to see how clearly each interprets your business; that read is reported alongside the score but does not change it.",
       "We do not publish the exact weighting formula, but every report shows the major categories behind the score and the specific issues lowering visibility.",
     ],
   },
@@ -153,7 +153,7 @@ const FAQS = [
   },
   {
     q: "What makes GeoViz different from other AI search tools?",
-    a: "Most tools query one AI system. GeoViz analyzes your business across four — ChatGPT, Claude, Gemini, and Perplexity — and reports where they agree, where they diverge, and which sources they cite about you. The result is a multi-model read, not a single-model guess.",
+    a: "Most tools query one AI system. GeoViz analyzes your business across four — ChatGPT, Claude, Gemini, and Perplexity — and reports where they agree and where they diverge, plus the sources any web-connected model (such as Perplexity) drew on. The result is a multi-model read, not a single-model guess.",
   },
   {
     q: "Can you fix the issues for me?",
@@ -161,7 +161,7 @@ const FAQS = [
   },
   {
     q: "How long does it take?",
-    a: "Most audits are delivered by email within minutes. Every report is reviewed by a human before it’s sent, which can occasionally add a short wait during busy periods.",
+    a: "The analysis itself runs in minutes. Every report is then reviewed by a person before it’s sent — most audits are delivered by email the same business day.",
   },
 ];
 
@@ -195,14 +195,18 @@ export default function Page() {
             <p className="mono-data mb-4 max-w-md border-l border-accent/40 pl-4 text-[11px] uppercase leading-[1.6] tracking-[0.22em] text-white/55 sm:mb-6">
               Visibility is no longer just ranking. It’s interpretation.
             </p>
-            <Thesis className="text-[2rem] leading-[1.1] sm:text-5xl sm:leading-[1.12] lg:text-[3.6rem]">
+            <Thesis
+              as="h1"
+              className="text-[2rem] leading-[1.1] sm:text-5xl sm:leading-[1.12] lg:text-[3.6rem]"
+            >
               Would AI recommend your business when customers ask
               who to hire?
             </Thesis>
             <p className="mt-5 max-w-lg text-base leading-[1.55] text-white/75 sm:mt-7 sm:text-lg sm:leading-[1.6]">
-              GeoViz tests real customer questions across major AI
-              systems and shows whether your business can be found,
-              understood, trusted, and recommended.
+              GeoViz checks how ChatGPT, Claude, Gemini, and Perplexity
+              read your business — and whether it can be found,
+              understood, trusted, and recommended when customers ask AI
+              who to hire.
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 sm:mt-9 sm:gap-x-6 sm:gap-y-4">
@@ -222,7 +226,13 @@ export default function Page() {
             </div>
 
             <p className="mt-5 text-sm font-medium text-white/55 sm:text-[15px]">
-              The fix is optional. Knowing where you stand is not.
+              The fix is optional. Knowing where you stand is not.{" "}
+              <Link
+                href="/sample-report/ohio-roofing-siding"
+                className="font-medium text-accent underline-offset-4 transition-colors hover:underline"
+              >
+                See a real audit&nbsp;→
+              </Link>
             </p>
           </div>
 
@@ -255,10 +265,9 @@ export default function Page() {
           </h2>
           <div className="mt-6 grid max-w-3xl gap-5 text-[17px] leading-[1.6] text-white/70">
             <p>
-              Businesses are already spending money to get found online.
-              But if ChatGPT, Claude, Gemini, Perplexity, or Google AI
-              Overviews cannot understand who you are, what you do, where
-              you serve, and why you should be trusted, that money may not
+              You&rsquo;re already spending to get found online. If AI
+              assistants can&rsquo;t tell who you are, what you do, and
+              why you&rsquo;re trustworthy, that spend doesn&rsquo;t
               translate into AI recommendations.
             </p>
             <p className="text-white/90">
@@ -291,15 +300,12 @@ export default function Page() {
         </Thesis>
         <div className="mt-8 grid max-w-3xl gap-5 text-[17px] leading-[1.6] text-graphite-700">
           <p>
-            Customers are asking AI who to hire. Instead of scrolling
-            a list of links, they get one synthesized answer — and
-            your visibility now depends on whether AI systems can
-            correctly interpret, trust, and retrieve your business.
-          </p>
-          <p>
-            Local businesses are particularly affected as AI
-            assistants become a primary recommendation channel for
-            services customers used to find through search.
+            Customers are asking AI who to hire. Instead of scrolling a
+            list of links, they get one synthesized answer — and for
+            local services, that answer is becoming a primary
+            recommendation channel. Your visibility now depends on
+            whether AI systems can correctly interpret, trust, and
+            retrieve your business.
           </p>
         </div>
         <div className="mt-10 max-w-3xl border-t border-graphite-400/25 pt-5">
@@ -398,8 +404,8 @@ export default function Page() {
             </SectionHeading>
             <p className="mt-5 text-lg leading-[1.55] text-white/70">
               The audit shows the gaps. The GEO Foundation Fix repairs
-              the website and entity signals AI systems need to verify
-              and recommend you — addressing the{" "}
+              the website and entity signals AI systems rely on to
+              verify and understand a business — addressing the{" "}
               underlying technical, trust, and discoverability gaps{" "}
               surfaced in your audit, then re-checking how AI reads
               your business.
@@ -473,8 +479,8 @@ export default function Page() {
                 </div>
                 <p className="mt-2 text-sm text-graphite-500">
                   Cross-model analysis across ChatGPT, Claude, Gemini,
-                  and Perplexity · delivered by email, typically
-                  within minutes.
+                  and Perplexity · reviewed by a person, then delivered
+                  by email — usually the same business day.
                 </p>
                 <ul className="mt-9 space-y-3.5 text-sm text-graphite-700">
                   {AUDIT_BULLETS.map((b) => (
@@ -488,6 +494,16 @@ export default function Page() {
                   Run AI Visibility Audit
                   <span aria-hidden>→</span>
                 </Link>
+                <p className="mt-3 text-xs text-graphite-500">
+                  Full refund if we haven&rsquo;t started your audit —{" "}
+                  <Link
+                    href="/refund-policy"
+                    className="underline underline-offset-4 hover:text-graphite-900"
+                  >
+                    see our refund policy
+                  </Link>
+                  .
+                </p>
               </div>
             </div>
 
@@ -510,6 +526,11 @@ export default function Page() {
                 AI visibility infrastructure installed for you and
                 re-checked.
               </p>
+              <ul className="mt-6 space-y-3.5 text-sm text-graphite-700">
+                {FOUNDATION_BULLETS.map((b) => (
+                  <PricingBullet key={b} tone="light">{b}</PricingBullet>
+                ))}
+              </ul>
               <Link
                 href="/foundation-fix"
                 className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-graphite-700 underline-offset-4 transition-colors hover:text-graphite-900 hover:underline"
@@ -651,18 +672,20 @@ function Thesis({
   children,
   className = "",
   tone = "dark",
+  as: Tag = "h2",
 }: {
   children: React.ReactNode;
   className?: string;
   tone?: "dark" | "light";
+  as?: "h1" | "h2";
 }) {
   const color = tone === "light" ? "text-graphite-900" : "text-white";
   return (
-    <h2
+    <Tag
       className={`font-serif font-medium leading-[1.12] tracking-tight ${color} ${className}`}
     >
       {children}
-    </h2>
+    </Tag>
   );
 }
 
@@ -787,8 +810,9 @@ function MultiModelTesting() {
       </SectionHeading>
       <p className="mt-5 max-w-2xl text-lg leading-[1.55] text-white/70">
         GeoViz checks how your business is understood across ChatGPT, Claude,
-        Gemini, and Perplexity — then turns those findings into a clear
-        visibility score, evidence review, and priority fix plan.
+        Gemini, and Perplexity — reported alongside a visibility score built
+        from your website signals, an evidence review, and a priority fix
+        plan.
       </p>
 
       <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -860,7 +884,7 @@ const EXAMPLE_CUSTOMER_QUESTIONS = [
 function WouldAIRecommend() {
   return (
     <Section>
-      <SectionIndex n={0} label="Customer questions tested" />
+      <SectionIndex n={0} label="Customer questions" />
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,52%)_minmax(0,48%)] lg:gap-16">
         <div>
           <SectionHeading>
@@ -868,10 +892,11 @@ function WouldAIRecommend() {
           </SectionHeading>
           <p className="mt-5 max-w-xl text-lg leading-[1.55] text-white/70">
             Customers are asking AI questions like these before they choose
-            who to hire. GeoViz tests those real buying questions across
-            ChatGPT, Claude, Gemini, Perplexity, and Google AI Overviews — then
-            shows what AI understood, what it missed, and what is blocking your
-            business from being recommended.
+            who to hire. GeoViz puts a representative buyer-intent question to
+            ChatGPT, Claude, Gemini, and Perplexity — then shows what each
+            understood, what it missed, and what is blocking your business
+            from being recommended. Google AI Overviews readiness is assessed
+            separately from your website signals.
           </p>
           <div className="mt-8">
             <Link href="/order" className="btn-primary text-base">
@@ -882,7 +907,7 @@ function WouldAIRecommend() {
         </div>
 
         <div className="rounded-lg border border-white/10 bg-ink-900/60 p-6 shadow-card backdrop-blur-sm sm:p-7">
-          <p className="section-eyebrow">Customer Questions Tested</p>
+          <p className="section-eyebrow">Customer Questions · examples</p>
           <ul className="mt-5 flex flex-col gap-3.5">
             {EXAMPLE_CUSTOMER_QUESTIONS.map((q, i) => (
               <li
@@ -1046,7 +1071,7 @@ function PrintedCoverSample() {
         <ul className="mt-3 grid gap-2 text-sm text-white/75">
           <li>PDF intelligence brief · approximately 6 pages</li>
           <li>Reviewed by a person before delivery</li>
-          <li>Sent by email, typically within minutes</li>
+          <li>Sent by email — usually the same business day</li>
         </ul>
       </div>
 

@@ -104,6 +104,12 @@ export function ReportSurface({
     );
   }
 
+  // Reaching here means the deterministic engine produced no
+  // structured content — an earlier-generation audit that predates the
+  // scoring engine, the cross-model validator layer, and the
+  // structured-input inventory. Flag it so the legacy renderer shows a
+  // one-time provenance notice instead of a wall of "Not analyzed" /
+  // "unavailable" panels.
   return (
     <AuditReportContent
       orderId={orderId}
@@ -113,6 +119,7 @@ export function ReportSurface({
       reportGeneratedAt={reportGeneratedAt}
       deterministicScore={deterministicScore}
       context={context}
+      legacy
     />
   );
 }
