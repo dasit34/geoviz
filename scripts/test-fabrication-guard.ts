@@ -20,7 +20,10 @@
 
 import assert from "node:assert/strict";
 
-import { stripFabricatedGeography } from "../src/lib/parse-report";
+import {
+  stripFabricatedGeography,
+  swapTechnicalTerms,
+} from "../src/lib/parse-report";
 
 let passed = 0;
 let failed = 0;
@@ -168,6 +171,72 @@ check("null validator layer → prose returned untouched", () => {
   const prose = "We see strong signals in Akron.";
   const out = stripFabricatedGeography(prose, null, null);
   assert.equal(out, prose, "null validations must not strip");
+});
+
+check("legacy audit + business-name tokens → prose still untouched", () => {
+  // Regression: a non-empty business name ("Ohio Roofing & Siding")
+  // used to make the allow-set non-empty and re-enable stripping even
+  // with NO validator layer, mangling real model-authored cities on
+  // legacy sample reports.
+  const prose =
+    "Family-owned contractor serving Toledo, Ohio since the 1950s, " +
+    "covering Perrysburg and Oregon, OH.";
+  const out = stripFabricatedGeography(prose, null, "Ohio Roofing & Siding");
+  assert.equal(out, prose, "no validated locations → never strip");
+  const out2 = stripFabricatedGeography(
+    prose,
+    { outputs: [{ status: "failed", location_identified: "Toledo" }] },
+    "Ohio Roofing & Siding",
+  );
+  assert.equal(out2, prose, "only failed validators → never strip");
+});
+
+check("stripFabricatedGeography never rewrites inside a code fence", () => {
+  const prose =
+    "Customers near Cleveland cannot find you.\n\n" +
+    "```json\n" +
+    '{ "areaServed": ["Toledo, OH", "Perrysburg, OH", "Oregon, OH"] }\n' +
+    "```\n\n" +
+    "Signals in Springfield are weak.";
+  const out = stripFabricatedGeography(prose, VALIDATIONS, "Twinsburg Dental");
+  assert.ok(
+    out.includes('["Toledo, OH", "Perrysburg, OH", "Oregon, OH"]'),
+    "the JSON areaServed array must survive verbatim",
+  );
+  // prose OUTSIDE the fence still gets the guard
+  assert.ok(!out.includes("Cleveland"), "prose city outside the fence is stripped");
+  assert.ok(!out.includes("Springfield"), "prose city outside the fence is stripped");
+});
+
+// ── swapTechnicalTerms: jargon plain-Englishing skips code ───────────
+check("swapTechnicalTerms leaves fenced code verbatim", () => {
+  const md =
+    "Your homepage ships no schema markup.\n\n" +
+    "```json\n" +
+    '{ "@context": "https://schema.org", "@type": "RoofingContractor" }\n' +
+    "```\n";
+  const out = swapTechnicalTerms(md);
+  assert.ok(
+    out.includes('"@context": "https://schema.org"'),
+    "schema.org URL inside the fence must not become 'structured business details'",
+  );
+  assert.ok(
+    /no .* structured business details|business details AI systems can verify/i.test(
+      out,
+    ),
+    "prose outside the fence is still plain-Englished",
+  );
+});
+
+check("swapTechnicalTerms leaves inline code verbatim", () => {
+  const out = swapTechnicalTerms(
+    "Add the `robots.txt` file — robots.txt controls AI reader access.",
+  );
+  assert.ok(out.includes("`robots.txt`"), "inline code span survives");
+  assert.ok(
+    out.includes("AI access rules") && !out.split("`robots.txt`")[1]?.includes("robots.txt"),
+    "prose occurrence outside the backticks is still swapped",
+  );
 });
 
 if (failed > 0) {

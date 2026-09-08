@@ -12,6 +12,7 @@ import {
   type SampleEntry,
 } from "@/lib/sample-registry";
 import { buildReportContext } from "@/lib/intelligence/build-report-context";
+import { resolveBusinessName } from "@/lib/intelligence/resolve-business-name";
 import "@/app/report/[id]/print/print.css";
 
 /**
@@ -69,20 +70,49 @@ export default async function SampleReportSlugPage({
   );
   const otherAvailable = allAvailable.filter((e) => e.slug !== entry.slug);
 
+  // Render-path parity with the customer report (`/report/[id]/print`):
+  // resolve the on-site business name, carry the identity-inconsistency
+  // signal into the context, and reflect the real review status. The
+  // sample page previously passed the static registry label and always
+  // rendered "Automated Audit" — hiding the exact identity issue some
+  // samples exist to demonstrate.
+  let realSampleProps: Parameters<typeof RealSample>[0] | null = null;
+  if (audit && audit.reportMarkdown) {
+    const nameResolution = resolveBusinessName({
+      intelligence: audit.intelligence ?? null,
+      order: {
+        businessName: audit.businessName,
+        email: audit.email,
+        websiteUrl: audit.websiteUrl,
+      },
+    });
+    const baseContext = await buildReportContext(audit.intelligence ?? null);
+    const context =
+      baseContext || nameResolution.inconsistency
+        ? {
+            ...(baseContext ?? {}),
+            nameInconsistency: nameResolution.inconsistency,
+          }
+        : undefined;
+    realSampleProps = {
+      entry,
+      orderId: audit.id,
+      businessLabel: nameResolution.name,
+      reportMarkdown: audit.reportMarkdown,
+      reportGeneratedAt: audit.reportGeneratedAt,
+      reviewed: audit.reviewStatus === "approved",
+      deterministicScore: audit.intelligence?.deterministicScore ?? null,
+      context: context as AuditReportContext | undefined,
+      otherAvailable,
+    };
+  }
+
   return (
     <main>
       <Header />
 
-      {audit && audit.reportMarkdown ? (
-        <RealSample
-          entry={entry}
-          orderId={audit.id}
-          reportMarkdown={audit.reportMarkdown}
-          reportGeneratedAt={audit.reportGeneratedAt}
-          deterministicScore={audit.intelligence?.deterministicScore ?? null}
-          context={await buildReportContext(audit.intelligence ?? null)}
-          otherAvailable={otherAvailable}
-        />
+      {realSampleProps ? (
+        <RealSample {...realSampleProps} />
       ) : (
         <PendingSample entry={entry} />
       )}
@@ -95,20 +125,31 @@ export default async function SampleReportSlugPage({
 function RealSample({
   entry,
   orderId,
+  businessLabel,
   reportMarkdown,
   reportGeneratedAt,
+  reviewed,
   deterministicScore,
   context,
   otherAvailable,
 }: {
   entry: SampleEntry;
   orderId: string;
+  businessLabel: string;
   reportMarkdown: string;
   reportGeneratedAt: Date | null;
+  reviewed: boolean;
   deterministicScore: unknown;
   context?: AuditReportContext;
   otherAvailable: SampleEntry[];
 }) {
+  const generatedLabel = reportGeneratedAt
+    ? reportGeneratedAt.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
   return (
     <>
       <section className="border-b border-white/[0.06] bg-ink-950">
@@ -124,15 +165,23 @@ function RealSample({
             rendering to the reports paying customers receive — only the
             audited site is different.
           </p>
+          {generatedLabel ? (
+            <p className="mx-auto mt-3 max-w-2xl text-xs text-white/40 md:mx-0">
+              Point-in-time snapshot generated {generatedLabel}. GeoViz
+              re-audits its public samples periodically, so the live site
+              may since have changed.
+            </p>
+          ) : null}
         </div>
       </section>
 
       <ReportSurface
         orderId={orderId}
-        businessLabel={entry.businessName}
+        businessLabel={businessLabel}
         websiteUrl={entry.publicUrl}
         reportMarkdown={reportMarkdown}
         reportGeneratedAt={reportGeneratedAt}
+        reviewed={reviewed}
         deterministicScore={deterministicScore}
         context={context}
       />

@@ -1060,6 +1060,40 @@ function hasLocativeContext(before: string, after: string): boolean {
   return false;
 }
 
+// Fenced code blocks (```lang … ```) and inline code (`…`). The
+// customer-facing text cleaners (swapTechnicalTerms,
+// stripFabricatedGeography) must never rewrite inside these — a
+// JSON-LD example that reads `"@context": "https://schema.org"` or a
+// real `areaServed` city list is a verbatim technical identifier, not
+// prose to be plain-Englished. Rewriting it produced
+// `"https://structured business details"` and `["your service area",
+// …]` on legacy sample reports.
+/**
+ * Apply `transform` to the prose portions of `text` only, leaving
+ * fenced (```` ``` ````) and inline (`` ` ``) code spans byte-for-byte
+ * intact. Used by the render-layer text cleaners so technical examples
+ * in the audit markdown survive display untouched.
+ */
+export function protectCodeSpans(
+  text: string,
+  transform: (segment: string) => string,
+): string {
+  if (!text) return text;
+  // Local regex instance — never shared, so nested/sequential calls
+  // can't clobber each other's lastIndex.
+  const re = /```[\s\S]*?```|`[^`\n]+`/g;
+  let out = "";
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    out += transform(text.slice(lastIndex, m.index));
+    out += m[0];
+    lastIndex = m.index + m[0].length;
+  }
+  out += transform(text.slice(lastIndex));
+  return out;
+}
+
 export function stripFabricatedGeography(
   prose: string,
   aiValidations: ValidatorLayerForGeography,
@@ -1067,10 +1101,20 @@ export function stripFabricatedGeography(
   options: { logTag?: string } = {},
 ): string {
   if (!prose) return prose;
+  // Only strip when we have at least one validator-confirmed location
+  // to compare against. Without that ground truth there is nothing to
+  // call "fabricated" — a business-name token alone must never *enable*
+  // stripping (it only *exempts*), or a legacy report with no validator
+  // layer would lose its real, model-authored city names ("serving
+  // Toledo, Ohio" → "serving your service area"). Legacy audits keep
+  // their prose untouched — fail-soft, no over-strip.
+  const hasValidatedLocations = Boolean(
+    aiValidations?.outputs?.some(
+      (o) => o.status === "passed" && (o.location_identified ?? "").trim(),
+    ),
+  );
+  if (!hasValidatedLocations) return prose;
   const allowed = buildAllowedPlaceSet(aiValidations, businessName);
-  // When we have NO validated locations to compare against, there's
-  // nothing to strip — return the prose untouched. Legacy audits
-  // (validator layer null) keep their existing behavior.
   if (allowed.size === 0) return prose;
 
   let stripCount = 0;
@@ -1092,7 +1136,8 @@ export function stripFabricatedGeography(
   // Akron"), trailed by a locative noun ("Springfield area/county"),
   // or written as "City, <State>". This keeps the true positives the
   // guard exists for while eliminating the false-positive class.
-  const replaced = prose.replace(
+  const replaced = protectCodeSpans(prose, (segment) =>
+    segment.replace(
     /(?<=[a-z,)"\s])\b([A-Z][a-z]{2,}(?:\s[A-Z][a-z]{2,}){0,1})\b/g,
     (match, phrase: string, offset: number, full: string) => {
       const lower = phrase.toLowerCase();
@@ -1122,6 +1167,7 @@ export function stripFabricatedGeography(
       stripCount += 1;
       return "your service area";
     },
+    ),
   );
 
   if (stripCount > 0) {
@@ -1257,19 +1303,25 @@ const JARGON_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
 
 export function swapTechnicalTerms(text: string): string {
   if (!text) return "";
-  let out = text;
-  for (const [pattern, replacement] of JARGON_REPLACEMENTS) {
-    out = out.replace(pattern, replacement);
-  }
-  // Collapse a double-swap seam: source text like "structured data
-  // (schema.org)" otherwise renders two swapped phrases back-to-back
-  // ("business details AI systems can verify (structured business
-  // details)"). Drop the now-redundant parenthetical.
-  out = out.replace(
-    /\b(business details AI systems can verify|structured business details)\s*\((?:business details AI systems can verify|structured business details)\)/gi,
-    "$1",
-  );
-  return out;
+  // Never rewrite inside fenced / inline code — a JSON-LD example or a
+  // literal identifier is a verbatim technical artifact, not prose to
+  // plain-English. (Rewriting `"https://schema.org"` produced
+  // `"https://structured business details"` on legacy sample reports.)
+  return protectCodeSpans(text, (segment) => {
+    let out = segment;
+    for (const [pattern, replacement] of JARGON_REPLACEMENTS) {
+      out = out.replace(pattern, replacement);
+    }
+    // Collapse a double-swap seam: source text like "structured data
+    // (schema.org)" otherwise renders two swapped phrases back-to-back
+    // ("business details AI systems can verify (structured business
+    // details)"). Drop the now-redundant parenthetical.
+    out = out.replace(
+      /\b(business details AI systems can verify|structured business details)\s*\((?:business details AI systems can verify|structured business details)\)/gi,
+      "$1",
+    );
+    return out;
+  });
 }
 
 export function stripMarkdownMarkers(s: string): string {
