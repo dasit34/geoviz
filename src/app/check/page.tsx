@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 const TITLE = "Free AI Visibility Check for Local Businesses | GeoViz";
 const DESCRIPTION =
-  "Check whether ChatGPT, Claude, Gemini, Perplexity, and Google AI can clearly understand and recommend your business.";
+  "Check the website signals that decide whether AI tools like ChatGPT and Perplexity can understand and recommend your business — structured data, crawler access, business-identity clarity, and content depth.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -46,8 +46,10 @@ export default function FreeCheckPage() {
               Will AI recommend your business?
             </h1>
             <p className="mt-5 max-w-md text-base leading-relaxed text-white/65">
-              See how clearly your business can be understood by ChatGPT,
-              Claude, Gemini, Perplexity, and Google AI.
+              A quick read of the website signals AI tools like ChatGPT,
+              Claude, Gemini, and Perplexity use to understand and
+              recommend a business — structured data, crawler access,
+              business-identity clarity, and content depth.
             </p>
             <p className="mt-3 max-w-md text-sm text-white/55">
               Enter your website and a few details below. Get your free
@@ -60,9 +62,11 @@ export default function FreeCheckPage() {
                 This is a quick preview
               </p>
               <p className="mt-2">
-                Six simplified checks and an overall score — not the full
-                AI Visibility Audit. Want the complete picture? Run the
-                free check first, then upgrade to the $97 audit.
+                Six simplified website checks and an overall score — not
+                the full AI Visibility Audit, which also queries ChatGPT,
+                Claude, Gemini, and Perplexity directly. Want the complete
+                picture? Run the free check first, then upgrade to the $97
+                audit.
               </p>
             </div>
           </div>
