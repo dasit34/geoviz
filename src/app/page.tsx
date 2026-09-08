@@ -226,7 +226,13 @@ export default function Page() {
             </div>
 
             <p className="mt-5 text-sm font-medium text-white/55 sm:text-[15px]">
-              The fix is optional. Knowing where you stand is not.
+              The fix is optional. Knowing where you stand is not.{" "}
+              <Link
+                href="/sample-report/ohio-roofing-siding"
+                className="font-medium text-accent underline-offset-4 transition-colors hover:underline"
+              >
+                See a real audit&nbsp;→
+              </Link>
             </p>
           </div>
 
@@ -259,10 +265,9 @@ export default function Page() {
           </h2>
           <div className="mt-6 grid max-w-3xl gap-5 text-[17px] leading-[1.6] text-white/70">
             <p>
-              Businesses are already spending money to get found online.
-              But if ChatGPT, Claude, Gemini, Perplexity, or Google AI
-              Overviews cannot understand who you are, what you do, where
-              you serve, and why you should be trusted, that money may not
+              You&rsquo;re already spending to get found online. If AI
+              assistants can&rsquo;t tell who you are, what you do, and
+              why you&rsquo;re trustworthy, that spend doesn&rsquo;t
               translate into AI recommendations.
             </p>
             <p className="text-white/90">
@@ -295,15 +300,12 @@ export default function Page() {
         </Thesis>
         <div className="mt-8 grid max-w-3xl gap-5 text-[17px] leading-[1.6] text-graphite-700">
           <p>
-            Customers are asking AI who to hire. Instead of scrolling
-            a list of links, they get one synthesized answer — and
-            your visibility now depends on whether AI systems can
-            correctly interpret, trust, and retrieve your business.
-          </p>
-          <p>
-            Local businesses are particularly affected as AI
-            assistants become a primary recommendation channel for
-            services customers used to find through search.
+            Customers are asking AI who to hire. Instead of scrolling a
+            list of links, they get one synthesized answer — and for
+            local services, that answer is becoming a primary
+            recommendation channel. Your visibility now depends on
+            whether AI systems can correctly interpret, trust, and
+            retrieve your business.
           </p>
         </div>
         <div className="mt-10 max-w-3xl border-t border-graphite-400/25 pt-5">
