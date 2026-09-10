@@ -280,10 +280,21 @@ export function isLaunchRiskFailure(args: {
 }
 
 /**
- * Convenience: detect calibration orders by the synthetic email
- * pattern. The bulk-queue POST handler sets
- * `email: "calibration@geoviz.invalid"` for every [CAL] row.
+ * Convenience: detect internal, non-customer audit orders by the
+ * synthetic `.invalid` email. There is no real customer behind these,
+ * so the worker must never send a failure/delay email:
+ *   - `calibration@geoviz.invalid` — Launch QA / calibration [CAL] rows
+ *     (`POST /api/admin/calibration`)
+ *   - `market-study@geoviz.invalid` — bulk Market Study audits
+ *     (`src/lib/market-studies/`)
+ *
+ * (The historical name is kept — every call site means "is this a
+ * no-customer-contact order?", which is what this now answers.)
  */
 export function isCalibrationOrder(email: string | null | undefined): boolean {
-  return (email ?? "").toLowerCase().includes("calibration@geoviz.invalid");
+  const e = (email ?? "").toLowerCase();
+  return (
+    e.includes("calibration@geoviz.invalid") ||
+    e.includes("market-study@geoviz.invalid")
+  );
 }
