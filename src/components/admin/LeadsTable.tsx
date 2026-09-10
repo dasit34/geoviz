@@ -5,6 +5,15 @@ import { useEffect, useMemo, useState } from "react";
 import type { Lead } from "@prisma/client";
 import { serializeLeadsToCsv } from "@/lib/leads/csv";
 import { SendToInstantlyModal } from "@/components/admin/SendToInstantlyModal";
+import { RunMarketStudyAuditsModal } from "@/components/admin/RunMarketStudyAuditsModal";
+import { MARKET_STUDY_MAX_BATCH } from "@/lib/market-studies/constants";
+
+/** Lead row with the additive relation chips from the leads-page query. */
+type LeadRow = Lead & {
+  auditOrder?: { reportStatus: string | null } | null;
+  marketStudyEntries?: { studyId: string }[];
+  outreach?: { status: string }[];
+};
 
 const STATUS_VALUES = [
   "NEW",
@@ -37,11 +46,11 @@ export function LeadsTable({
   leadListId,
 }: {
   adminKey: string;
-  initialLeads: Lead[];
+  initialLeads: LeadRow[];
   /** When set, this table is rendered on a list-detail page — enables a "Remove from this list" bulk action. */
   leadListId?: string;
 }) {
-  const [leads, setLeads] = useState<Lead[]>(initialLeads);
+  const [leads, setLeads] = useState<LeadRow[]>(initialLeads);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
@@ -56,6 +65,7 @@ export function LeadsTable({
   const [message, setMessage] = useState<string | null>(null);
   const [lists, setLists] = useState<{ id: string; name: string }[]>([]);
   const [instantlyModalOpen, setInstantlyModalOpen] = useState(false);
+  const [studyModalOpen, setStudyModalOpen] = useState(false);
 
   useEffect(() => {
     authedFetch(adminKey, "/api/admin/leads/lists")
@@ -522,6 +532,18 @@ export function LeadsTable({
           >
             Send to Instantly
           </button>
+          <button
+            onClick={() => setStudyModalOpen(true)}
+            disabled={bulkBusy || selectedIds.size > MARKET_STUDY_MAX_BATCH}
+            title={
+              selectedIds.size > MARKET_STUDY_MAX_BATCH
+                ? `Bulk audits are limited to ${MARKET_STUDY_MAX_BATCH} leads per run — select fewer, or run again into the same study.`
+                : undefined
+            }
+            className="btn-ghost text-xs disabled:opacity-50"
+          >
+            Run GeoViz Audits
+          </button>
           <select
             disabled={bulkBusy}
             onChange={(e) => e.target.value && bulkSetStatus(e.target.value)}
@@ -608,6 +630,7 @@ export function LeadsTable({
                     >
                       {lead.businessName}
                     </Link>
+                    <LeadChips lead={lead} />
                   </td>
                   <td className="px-3 py-2 text-white/60">{lead.category ?? "—"}</td>
                   <td className="px-3 py-2 text-white/60">
@@ -717,6 +740,44 @@ export function LeadsTable({
           onSent={() => setSelectedIds(new Set())}
         />
       ) : null}
+
+      {studyModalOpen ? (
+        <RunMarketStudyAuditsModal
+          adminKey={adminKey}
+          leadIds={Array.from(selectedIds)}
+          onClose={() => setStudyModalOpen(false)}
+          onQueued={() => setSelectedIds(new Set())}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/** Small status chips shown under the business name. */
+function LeadChips({ lead }: { lead: LeadRow }) {
+  const audited = Boolean(lead.auditOrder?.reportStatus);
+  const inStudy = (lead.marketStudyEntries?.length ?? 0) > 0;
+  const sent = (lead.outreach ?? []).some((o) =>
+    ["SENT_TO_INSTANTLY", "ACTIVE", "REPLIED", "INTERESTED"].includes(o.status),
+  );
+  if (!audited && !inStudy && !sent) return null;
+  return (
+    <span className="mt-1 flex flex-wrap gap-1">
+      {audited ? (
+        <span className="rounded-sm bg-severity-info/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-severity-info">
+          Audited
+        </span>
+      ) : null}
+      {inStudy ? (
+        <span className="rounded-sm bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+          Study
+        </span>
+      ) : null}
+      {sent ? (
+        <span className="rounded-sm bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/60">
+          Sent
+        </span>
+      ) : null}
+    </span>
   );
 }

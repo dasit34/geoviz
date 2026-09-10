@@ -60,6 +60,13 @@ export default async function AdminLeadsPage({
   const leads = await prisma.lead.findMany({
     take: 1000,
     orderBy: { createdAt: "desc" },
+    // Additive 1:1 / small 1:N joins for the "Audited / In a study /
+    // Sent to Instantly" row chips — all bounded, no perf impact.
+    include: {
+      auditOrder: { select: { reportStatus: true } },
+      marketStudyEntries: { select: { studyId: true }, take: 1 },
+      outreach: { select: { status: true } },
+    },
   });
 
   return (
@@ -77,6 +84,12 @@ export default async function AdminLeadsPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <a
+              href={`/admin/market-studies?key=${encodeURIComponent(key!)}`}
+              className="btn-ghost text-sm"
+            >
+              Market Studies
+            </a>
             <a
               href={`/admin/leads/lists?key=${encodeURIComponent(key!)}`}
               className="btn-ghost text-sm"
