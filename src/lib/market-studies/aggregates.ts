@@ -1,6 +1,9 @@
-import { countFindingFrequency } from "@/lib/scoring/calibration-summary";
 import { bandFor } from "@/lib/scoring/bands";
-import { CATEGORY_MAX, type CategoryKey } from "@/lib/scoring/types";
+import {
+  CATEGORY_MAX,
+  type CategoryKey,
+  type DeterministicScore,
+} from "@/lib/scoring/types";
 import { percentile } from "@/lib/utils/percentile";
 
 import { findingLabel } from "./findingLabels";
@@ -10,6 +13,29 @@ import type {
   StudyAuditRow,
   TopFinding,
 } from "./types";
+
+/**
+ * Tally `top_3_findings[].id` occurrences across a set of scored rows,
+ * ranked descending. Same shape/behavior as the identically-named
+ * helper in `src/lib/scoring/calibration-summary.ts`; kept local here
+ * so the market-study aggregator has no cross-module dependency for
+ * one small pure loop.
+ */
+export function countFindingFrequency(
+  rows: ReadonlyArray<{ score: DeterministicScore }>,
+  opts?: { limit?: number },
+): Array<{ id: string; count: number }> {
+  const counts: Record<string, number> = {};
+  for (const r of rows) {
+    for (const f of r.score.top_3_findings) {
+      counts[f.id] = (counts[f.id] ?? 0) + 1;
+    }
+  }
+  return Object.entries(counts)
+    .map(([id, count]) => ({ id, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, opts?.limit ?? 10);
+}
 
 /**
  * Minimum completed audits before study aggregates are considered
