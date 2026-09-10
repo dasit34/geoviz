@@ -2191,6 +2191,7 @@ async function processOneJob(prisma: PrismaClient): Promise<PollResult> {
           websiteUrl: candidate.websiteUrl,
           reportMarkdown: sanitizedMarkdown,
           reportGeneratedAt: saved.reportGeneratedAt ?? reportGeneratedAt,
+          stripeSessionId: candidate.stripeSessionId,
         }).catch((err) => {
           logErr(
             `[geo-worker] notifyOperatorReportReady error orderId=${candidate.id} (non-fatal):`,

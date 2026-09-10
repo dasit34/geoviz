@@ -3,6 +3,7 @@ import { getResend } from "@/lib/resend";
 import { plainEnglishBandLabel } from "@/lib/parse-report";
 import { getCanonicalScore } from "@/lib/scoring/getCanonicalScore";
 import { resolveAppBaseUrl, buildAdminReviewUrl } from "@/lib/app-url";
+import { isMarketStudyOrder } from "@/lib/market-studies/isMarketStudyOrder";
 
 /**
  * FROM address used specifically for operator notifications. We do
@@ -59,6 +60,13 @@ export async function notifyOperatorReportReady(args: {
   reportGeneratedAt: Date;
   /** Optional deterministic score JSON for the canonical resolver. */
   deterministicScore?: unknown;
+  /**
+   * The order's synthetic session id. When it's a bulk Market Study
+   * audit there is no per-report review step (the operator works from
+   * the study dashboard), so the "ready for review" ping is skipped —
+   * a 25-lead study would otherwise send 25 emails.
+   */
+  stripeSessionId?: string | null;
 }): Promise<boolean> {
   const {
     orderId,
@@ -68,7 +76,15 @@ export async function notifyOperatorReportReady(args: {
     reportMarkdown,
     reportGeneratedAt,
     deterministicScore,
+    stripeSessionId,
   } = args;
+
+  if (isMarketStudyOrder(stripeSessionId)) {
+    console.log(
+      `[notify-operator-report-ready] skipped — market-study audit (orderId=${orderId})`,
+    );
+    return false;
+  }
 
   if (!process.env.RESEND_API_KEY) {
     console.warn(

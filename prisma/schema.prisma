@@ -188,6 +188,10 @@ model AuditOrder {
   // Inverse side of Lead.auditOrderId — set once a lead converts to a
   // paid audit. Schema-file-only; generates no SQL.
   leads              Lead[]
+  // Inverse side of MarketStudyEntry.auditOrderId — the bulk
+  // market-study audit(s) this order was created for. Schema-file-only;
+  // generates no SQL.
+  marketStudyEntries MarketStudyEntry[]
 
   @@index([email])
   @@index([createdAt])
@@ -906,7 +910,7 @@ model Lead {
   rating                 Float?
   reviewCount            Int?
   contactName            String?
-  contactTitle            String?
+  contactTitle           String?
   contactEmail           String?
   // "hunter_io" | "manual" | ... — which enrichment provider (or
   // manual entry) supplied the contact fields above.
@@ -951,14 +955,18 @@ model Lead {
   auditOrderId String?
   auditOrder   AuditOrder? @relation(fields: [auditOrderId], references: [id], onDelete: SetNull)
 
-  sourceRefs LeadSourceRef[]
+  sourceRefs         LeadSourceRef[]
   // Inverse side of LeadListMembership.leadId — the campaign/prospecting
   // lists (e.g. "Columbus HVAC") this lead has been manually added to.
   // Schema-file-only; generates no SQL.
-  listMemberships LeadListMembership[]
+  listMemberships    LeadListMembership[]
   // Inverse side of LeadOutreach.leadId — Phase 4 outbound-provider
   // sends (Instantly). Schema-file-only; generates no SQL.
-  outreach LeadOutreach[]
+  outreach           LeadOutreach[]
+  // Inverse side of MarketStudyEntry.leadId — the bulk GeoViz audit
+  // studies (e.g. "Columbus Roofers - September 2026") this lead has
+  // been included in. Schema-file-only; generates no SQL.
+  marketStudyEntries MarketStudyEntry[]
 
   @@index([status])
   @@index([domain])
@@ -1079,9 +1087,9 @@ model LeadListMembership {
 /// is a different axis, not a replacement) — mirrors
 /// `LeadSourceRef`'s (provider, externalId) dedup shape.
 model LeadOutreach {
-  id                 String @id @default(cuid())
-  leadId             String
-  lead               Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   // "instantly" — matches OutboundProvider.name (src/lib/outbound/types.ts).
   provider           String
@@ -1092,19 +1100,19 @@ model LeadOutreach {
 
   // Instantly's returned lead id for this send, once known. Null until
   // a successful send response supplies it.
-  providerLeadId     String?
+  providerLeadId String?
 
   // NOT_SENT is implicit (no row for this lead+campaign pair exists).
   // QUEUED | SENT_TO_INSTANTLY | ACTIVE | REPLIED | INTERESTED |
   // BOUNCED | UNSUBSCRIBED | FAILED. Plain String, matching this
   // schema's dominant status-field convention (see Lead.status).
-  status             String    @default("QUEUED")
+  status String @default("QUEUED")
 
-  sentAt             DateTime?
+  sentAt        DateTime?
   // Set by the polling sync route (src/app/api/admin/leads/outbound/sync)
   // each time this row's status is refreshed from Instantly.
-  lastSyncedAt        DateTime?
-  failureReason        String?
+  lastSyncedAt  DateTime?
+  failureReason String?
 
   // Last raw provider payload for this pair — debugging + future field
   // additions without a migration, mirrors the existing Json-field
@@ -1120,4 +1128,72 @@ model LeadOutreach {
   @@index([leadId])
   @@index([status])
   @@index([providerCampaignId])
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Market Study / Bulk Audit (admin-only). A MarketStudy groups a set
+// of leads that were bulk-audited together (e.g. "Columbus Roofers -
+// September 2026") so the operator can track per-lead audit progress
+// and compute aggregate metrics for a factual case study. Additive —
+// mirrors the LeadList pattern. Audits themselves are plain AuditOrder
+// rows on the existing queue (stripeSessionId prefix "market_study_");
+// nothing here changes the worker, scoring, or checkout.
+// ─────────────────────────────────────────────────────────────────
+
+/// A named bulk-audit study over a set of leads.
+model MarketStudy {
+  id        String   @id @default(cuid())
+  name      String
+  // normalizeIndustry() slug — same taxonomy as Lead.category /
+  // AuditIntelligence.industryCategoryNormalized. Nullable: a study may
+  // span mixed categories.
+  category  String?
+  city      String?
+  state     String?
+  // Plain String, matching this schema's status-field convention.
+  // Values: active | archived.
+  status    String   @default("active")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries MarketStudyEntry[]
+
+  @@index([createdAt])
+}
+
+/// One lead's participation in a study + the audit it produced.
+/// `websiteUrl`/`businessName` are snapshotted at creation so the study
+/// stays stable even if the lead is later edited or deleted. The
+/// per-entry status is DERIVED at read time from `auditOrder.reportStatus`
+/// (or `skipReason`) — never stored, so it can never drift.
+model MarketStudyEntry {
+  id      String      @id @default(cuid())
+  studyId String
+  study   MarketStudy @relation(fields: [studyId], references: [id], onDelete: Cascade)
+
+  // Nullable + SetNull: deleting a lead must not destroy study history.
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  // Nullable (null while skipped) + SetNull: an AuditOrder is a
+  // financial-adjacent record and must never cascade-delete, matching
+  // AuditOrder.businessId / previousAuditOrderId.
+  auditOrderId String?
+  auditOrder   AuditOrder? @relation(fields: [auditOrderId], references: [id], onDelete: SetNull)
+
+  websiteUrl   String
+  businessName String
+  // Set when no audit was created for this lead (e.g. "no website",
+  // "duplicate domain in selection", "already audited recently").
+  skipReason   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // A lead appears at most once per study — the duplicate-click guard.
+  @@unique([studyId, leadId])
+  @@index([studyId])
+  @@index([auditOrderId])
+  @@index([leadId])
 }
