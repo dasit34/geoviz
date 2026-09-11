@@ -7,8 +7,8 @@ import { useEffect, useState } from "react";
 // to this array, not a UI rewrite — the admin picks a provider, the
 // UI never assumes one.
 const PROVIDER_OPTIONS = [
-  { value: "google_places", label: "Google Places" },
   { value: "outscraper", label: "Outscraper" },
+  { value: "google_places", label: "Google Places" },
 ];
 
 type DiscoverResponse = {

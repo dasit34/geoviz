@@ -5,6 +5,7 @@ import { applyApiRateLimit } from "@/lib/rate-limit";
 import { getDiscoveryProvider } from "@/lib/discovery/registry";
 import { importDiscoveredBusiness } from "@/lib/leads/dedupe";
 import { filterDiscoveryRecords } from "@/lib/leads/discoveryFilters";
+import { readApiKey } from "@/lib/validators/apiKey";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,10 +121,13 @@ export async function POST(req: Request) {
 
   const provider = getDiscoveryProvider(providerName);
   if (!provider || !provider.enabled()) {
+    const missingVars = provider
+      ? provider.requiredEnvVars.filter((v) => !readApiKey(v))
+      : [];
     return NextResponse.json(
       {
         error: provider
-          ? "This discovery provider is not configured (missing API key)."
+          ? `Discovery provider "${provider.name}" is not configured. Missing required environment variable${missingVars.length === 1 ? "" : "s"}: ${missingVars.join(", ")}.`
           : "Unknown discovery provider.",
       },
       { status: 409 },
