@@ -226,6 +226,9 @@ const MOCK_RESPONSE: NormalizedValidationOutput = {
   would_recommend: "PARTIAL",
   recommendation_reason:
     "Identifiable roofing offering but service area definition is thin.",
+  execution_mode: "fixture",
+  country: null,
+  search_region: null,
 };
 
 // JSON shape OpenAI is asked to return. Confidence fields come back as
@@ -515,6 +518,9 @@ export const OpenAIValidator: AiValidator = {
         answer_retrieved_at: mainRetrievedAt,
         cited_source_domains: parseDomains(asStringArray(parsed.cited_sources)),
         competitive: await competitivePromise,
+        execution_mode: "live",
+        country: null,
+        search_region: null,
       };
     } catch (err) {
       const e = err as Error;

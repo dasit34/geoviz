@@ -215,6 +215,9 @@ const MOCK_RESPONSE: NormalizedValidationOutput = {
   would_recommend: "NO",
   recommendation_reason:
     "Limited trust signals and unclear service area make a confident recommendation hard.",
+  execution_mode: "fixture",
+  country: null,
+  search_region: null,
 };
 
 type GeminiJsonResponse = {
@@ -498,6 +501,9 @@ export const GeminiValidator: AiValidator = {
         answer_retrieved_at: mainRetrievedAt,
         cited_source_domains: parseDomains(asStringArray(parsed.cited_sources)),
         competitive: await competitivePromise,
+        execution_mode: "live",
+        country: null,
+        search_region: null,
       };
     } catch (err) {
       const e = err as Error;

@@ -131,12 +131,16 @@ async function scenario3EnabledAllKeys(): Promise<void> {
   check("Claude → passed (mock)", c.status === "passed");
   check("Claude raw_summary contains [MOCK]", c.raw_summary.includes("[MOCK]"));
   check("Claude business_understanding_score is numeric", typeof c.business_understanding_score === "number");
+  check("Claude fixture mode → execution_mode is 'fixture'", c.execution_mode === "fixture", `got ${c.execution_mode}`);
   const o = await OpenAIValidator.validateBusiness(sampleInput);
   check("OpenAI → passed (mock)", o.status === "passed");
+  check("OpenAI fixture mode → execution_mode is 'fixture'", o.execution_mode === "fixture", `got ${o.execution_mode}`);
   const g = await GeminiValidator.validateBusiness(sampleInput);
   check("Gemini → passed (mock)", g.status === "passed");
+  check("Gemini fixture mode → execution_mode is 'fixture'", g.execution_mode === "fixture", `got ${g.execution_mode}`);
   const p = await PerplexityValidator.validateBusiness(sampleInput);
   check("Perplexity → passed (mock) with cited_sources populated", p.status === "passed" && p.cited_sources.length > 0);
+  check("Perplexity fixture mode → execution_mode is 'fixture'", p.execution_mode === "fixture", `got ${p.execution_mode}`);
   const ga = await GoogleAIOverviewValidator.validateBusiness(sampleInput);
   check("Google AI Overview → STILL unavailable (permanent placeholder)", ga.status === "unavailable");
 }

@@ -360,10 +360,32 @@ model Observation {
   extractedClaims Json? // reserved; not populated in Phase 1 — see gap analysis
 
   parserOutput  Json // verbatim NormalizedValidationOutput or CompetitiveCapture object
-  parserVersion String // capture_version / prompt_version stamp from src/lib/validators/capture.ts
+  // This IS the prompt-version stamp (NOT a general "parser" version,
+  // despite the column name — kept for backward compatibility with
+  // existing rows). Aliases NormalizedValidationOutput.prompt_version /
+  // CompetitiveCapture.prompt_version, sourced from capture.ts's
+  // CAPTURE_PROMPT_VERSION.
+  parserVersion String
 
-  observedAt DateTime // answer_retrieved_at / retrieved_at from the source record
+  // Execution timestamp. Aliases NormalizedValidationOutput.answer_retrieved_at
+  // / CompetitiveCapture.retrieved_at from the source record.
+  observedAt DateTime
   createdAt  DateTime @default(now())
+
+  // ─── Provenance (AI Answer Graph capture layer) ─────────────────
+  // "live" | "fixture" — NormalizedValidationOutput.execution_mode /
+  // CompetitiveCapture.execution_mode. Fixture is test-only
+  // (*_VALIDATOR_FIXTURE env escape, never set in production); rows
+  // written here are always "live" in practice since fixture-mode
+  // output never carries promptText/rawResponseText and so never
+  // reaches this table (see persistObservationEvidence.ts).
+  executionMode String?
+  // Reserved — no geo-targeted query capability exists yet; always
+  // null until a future capability sets it. Mirrors the
+  // position/sentiment/extractedClaims reserved-column pattern above.
+  country       String?
+  // Reserved — see `country` above.
+  searchRegion  String?
 
   competitorMentions ObservationCompetitorMention[]
 

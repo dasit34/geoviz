@@ -169,6 +169,12 @@ export function normalizeCompetitive(args: {
     retrieved_at: args.retrievedAt,
     status: args.status,
     error: args.error,
+    // Always "live" — this function is never reached in fixture mode
+    // (see module doc comment above: "providers return their mock
+    // before reaching here").
+    execution_mode: "live",
+    country: null,
+    search_region: null,
   };
 }
 

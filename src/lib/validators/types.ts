@@ -62,6 +62,12 @@ export type NormalizedValidationOutput = {
   cited_source_domains?: string[];
   /** Buyer-intent competitive query capture (which businesses the model names). */
   competitive?: CompetitiveCapture | null;
+  /** "live" | "fixture" — how this provider call executed. Fixture is test-only (*_VALIDATOR_FIXTURE), never set in production. */
+  execution_mode?: "live" | "fixture";
+  /** Reserved — no geo-targeted query capability exists yet; always null. */
+  country?: string | null;
+  /** Reserved — see `country`. */
+  search_region?: string | null;
 };
 
 /**
@@ -87,6 +93,12 @@ export type CompetitiveCapture = {
   retrieved_at: string;
   status: ValidationStatus;
   error: string | null;
+  /** "live" | "fixture" — always "live" in practice: competitive capture never runs in fixture mode (see capture.ts). */
+  execution_mode: "live" | "fixture";
+  /** Reserved — no geo-targeted query capability exists yet; always null. */
+  country: string | null;
+  /** Reserved — see `country`. */
+  search_region: string | null;
 };
 
 /**

@@ -145,6 +145,9 @@ function makeValidatorOutput(overrides: {
       retrieved_at: new Date().toISOString(),
       status: "passed",
       error: null,
+      execution_mode: "live",
+      country: null,
+      search_region: null,
     },
   };
 }

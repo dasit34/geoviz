@@ -273,6 +273,9 @@ const MOCK_RESPONSE: NormalizedValidationOutput = {
   would_recommend: "PARTIAL",
   recommendation_reason:
     "Clear service offering but limited trust signals make a confident recommendation harder.",
+  execution_mode: "fixture",
+  country: null,
+  search_region: null,
 };
 
 type ClaudeToolInput = {
@@ -533,6 +536,9 @@ export const ClaudeValidator: AiValidator = {
         answer_retrieved_at: mainRetrievedAt,
         cited_source_domains: parseDomains(asStringArray(parsed.cited_sources)),
         competitive: await competitivePromise,
+        execution_mode: "live",
+        country: null,
+        search_region: null,
       };
     } catch (err) {
       if (err instanceof Anthropic.APIError) {

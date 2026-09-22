@@ -243,6 +243,9 @@ const MOCK_RESPONSE: NormalizedValidationOutput = {
   would_recommend: "PARTIAL",
   recommendation_reason:
     "Clear service offering with cited testimonials, but pricing and licensing details are not visible.",
+  execution_mode: "fixture",
+  country: null,
+  search_region: null,
 };
 
 type PerplexityJsonResponse = {
@@ -678,6 +681,9 @@ export const PerplexityValidator: AiValidator = {
         answer_retrieved_at: mainRetrievedAt,
         cited_source_domains: parseDomains(mergedCitations),
         competitive: await competitivePromise,
+        execution_mode: "live",
+        country: null,
+        search_region: null,
       };
     } catch (err) {
       const e = err as Error;
