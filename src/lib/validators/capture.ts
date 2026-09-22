@@ -34,6 +34,25 @@ export const CAPTURE_PROMPT_VERSION = "capture@1.0.0";
 export const COMPETITIVE_TIMEOUT_MS = 15_000;
 
 /**
+ * The reusable, business-independent buyer-intent question sent to every
+ * provider as the tail of the competitive-capture user prompt (see
+ * `buildCompetitivePrompt` below). This is the ONE genuinely reusable
+ * query in the current pipeline — deliberately extracted as a named,
+ * exported constant so the persistent Query Library (Intelligence Engine
+ * Phase 1, `QueryLibraryEntry` in `prisma/schema.prisma`) can dedup on the
+ * exact literal actually sent to models, instead of risking drift between
+ * an inline prompt string and a separately-typed-out library seed.
+ *
+ * Do NOT confuse this with `CompetitiveCapture.query_text` (the FULL
+ * per-business user prompt, including embedded evidence JSON) — that
+ * field is business-specific and not reusable; this constant is the
+ * standalone consumer-facing question at its tail only.
+ */
+export const DISCOVERY_QUERY_TEXT =
+  "Who are the best providers in this category and area, and would you " +
+  "recommend any in particular?";
+
+/**
  * Competitive capture defaults ON. Disable with `GEO_COMPETITIVE_CAPTURE=false`
  * (a kill-switch for latency/cost without a code deploy). Never runs in
  * validator fixture mode — providers return their mock before reaching here.
@@ -107,8 +126,7 @@ export function buildCompetitivePrompt(input: ValidationInput): {
     `Subject URL: ${input.url}\n\n` +
     "Website evidence about the subject business:\n" +
     `${JSON.stringify(input.extractedEvidence)}\n\n` +
-    "Consumer question: \"Who are the best providers in this category and " +
-    'area, and would you recommend any in particular?"';
+    `Consumer question: "${DISCOVERY_QUERY_TEXT}"`;
 
   return { system, user };
 }
