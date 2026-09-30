@@ -116,8 +116,12 @@ export type ReportModelProvider = {
   competitors: string[];
   /** Source domains this model drew on for its answer (capped). */
   citationDomains: string[];
-  /** True when this model named the business itself among the options. */
-  mentioned: boolean;
+  /**
+   * True when this model named the business itself among the options;
+   * false when it answered without naming it; null = not measured (the
+   * buyer-intent capture failed / was absent) — never shown as "No".
+   */
+  mentioned: boolean | null;
 };
 
 export type DiagnosticConfidence = "high" | "medium" | "low";
@@ -203,13 +207,20 @@ export type ReadinessFactor = {
 /**
  * Cross-Model Intelligence summary (Page 4). Derived ENTIRELY from the
  * already-captured per-provider validator + competitive data + the consensus
- * roll-up. Display only — no scoring, no new data. Counts are "of 4" across the
- * four directly-tested models (ChatGPT/Claude/Gemini/Perplexity).
+ * roll-up. Display only — no scoring, no new data. Every count carries its own
+ * denominator: the models that actually returned a usable result for that
+ * signal — never a hard-coded 4, so a failed provider reads as "not
+ * measured" rather than as a "No".
  */
 export type ReportModelCrossModel = {
+  /** Models that returned a usable result (denominator for recognized/recommended). */
   modelsTested: number;
   recognizedCount: number;
   mentionedCount: number;
+  /** Models whose buyer-intent answer was captured (denominator for mentions). */
+  mentionMeasuredCount: number;
+  /** Models whose answer named any businesses (denominator for competitor counts). */
+  competitorAnswerCount: number;
   recommendedCount: number;
   /** Aggregated, frequency-ranked citation domains across models (capped). */
   topCitedDomains: string[];
@@ -280,7 +291,7 @@ export type ReportModel = {
    *  explains why an access-driven baseline still lands mid-score. Null
    *  otherwise. */
   scoreNote: string | null;
-  /** Buyer-intent "Customer Questions Tested" (up to 5) — the real questions a
+  /** Buyer-intent "Questions Customers Ask AI" (up to 5) — the real questions a
    *  customer would ask an AI before choosing this business. Deterministically
    *  derived from name / industry / detected city + services. Display only. */
   customerQuestions: string[];
@@ -1037,7 +1048,7 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
         fetchFailed: false,
         competitors: [],
         citationDomains: [],
-        mentioned: false,
+        mentioned: null,
       };
     }
     const services = (o.services_identified ?? [])
@@ -1075,7 +1086,7 @@ function buildProviders(outputs: unknown): ReportModelProvider[] {
         .map((s) => (typeof s === "string" ? s.trim() : ""))
         .filter((s) => s.length > 0)
         .slice(0, 4),
-      mentioned: o.competitive?.business_named === true,
+      mentioned: competitiveMention(o.competitive),
     };
   });
 }
@@ -1167,6 +1178,23 @@ function domainSameBizKey(website: string): string {
   return host ? sameBizKey(host) : "";
 }
 
+/**
+ * Tri-state mention from a competitive capture: an explicit non-passed
+ * status, or no boolean verdict, is "not measured" (null). Legacy records
+ * without a `status` field still count when they carry a boolean.
+ */
+function competitiveMention(
+  c: { status?: string | null; business_named?: boolean | null } | null | undefined,
+): boolean | null {
+  if (!c) return null;
+  if (c.status && c.status !== "passed") return null;
+  return typeof c.business_named === "boolean" ? c.business_named : null;
+}
+
+function numberWord(n: number): string {
+  return ["zero", "one", "two", "three", "four", "five"][n] ?? String(n);
+}
+
 function buildCrossModelSummary(
   providers: ReportModelProvider[],
   consensusIndex: unknown,
@@ -1181,7 +1209,11 @@ function buildCrossModelSummary(
       (!!p.businessType ||
         (p.understandingScore !== null && p.understandingScore >= 25)),
   ).length;
-  const mentionedCount = providers.filter((p) => p.mentioned).length;
+  const mentionedCount = providers.filter((p) => p.mentioned === true).length;
+  const mentionMeasuredCount = providers.filter((p) => p.mentioned !== null).length;
+  const competitorAnswerCount = providers.filter(
+    (p) => p.mentioned !== null || p.competitors.length > 0,
+  ).length;
   const recommendedCount = providers.filter((p) => p.verdict === "YES").length;
 
   // Aggregate citation domains across models, frequency-ranked.
@@ -1274,19 +1306,30 @@ function buildCrossModelSummary(
   const consensus = readConsensusSummary(consensusIndex);
 
   // Dynamic, count-driven sentence — never a percentage, never conflated
-  // with the readiness score. "of the four tested AI systems" (not "of 4")
-  // reads naturally as a full sentence.
+  // with the readiness score. The denominator is the models that actually
+  // returned a result, so a provider outage never reads as "didn't
+  // recommend you".
+  const testedCount = tested.length;
+  const testedWord = numberWord(testedCount);
   const recommendedCopy =
-    recommendedCount === 0
-      ? "None of the four tested AI systems recommended your business during this audit."
-      : recommendedCount === 4
-        ? "All four tested AI systems recommended your business during this audit."
-        : `${recommendedCount} of the four tested AI systems recommended your business during this audit.`;
+    testedCount === 0
+      ? "No AI system returned a usable result during this audit, so recommendations were not measured."
+      : testedCount === 1
+        ? recommendedCount === 1
+          ? "The one AI system that returned a result recommended your business during this audit."
+          : "The one AI system that returned a result did not recommend your business during this audit."
+        : recommendedCount === 0
+          ? `None of the ${testedWord} AI systems that returned a result recommended your business during this audit.`
+          : recommendedCount === testedCount
+            ? `All ${testedWord} AI systems that returned a result recommended your business during this audit.`
+            : `${recommendedCount} of the ${testedWord} AI systems that returned a result recommended your business during this audit.`;
 
   return {
     modelsTested: tested.length,
     recognizedCount,
     mentionedCount,
+    mentionMeasuredCount,
+    competitorAnswerCount,
     recommendedCount,
     recommendedCopy,
     topCitedDomains,
@@ -1584,7 +1627,7 @@ export function buildReportModel(
   );
   const scoreNote = buildScoreNote(band, categories);
 
-  // "Customer Questions Tested" — buyer-intent questions derived from the
+  // "Questions Customers Ask AI" — buyer-intent questions derived from the
   // already-detected city/services. City = the first model-identified location
   // (never invented); services = de-duplicated across providers.
   const detectedCity =

@@ -108,9 +108,10 @@ export function VerificationReportView({
               <>
                 <p className="mt-4 text-sm text-white/80">
                   <strong>Previous:</strong> {liveModel.recommendedCount.previous} of{" "}
-                  {liveModel.recommendedCount.totalProviders} AI systems recommended you.{" "}
+                  {liveModel.recommendedCount.previousProvidersReturned} AI systems that
+                  returned a result recommended you.{" "}
                   <strong>Current:</strong> {liveModel.recommendedCount.current} of{" "}
-                  {liveModel.recommendedCount.totalProviders}.
+                  {liveModel.recommendedCount.currentProvidersReturned}.
                 </p>
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full text-left text-sm">
@@ -316,7 +317,7 @@ function UnavailableNotice({ text }: { text: string }) {
 }
 
 function boolCell(previous: boolean | null, current: boolean | null): string {
-  const p = previous === null ? "—" : previous ? "Yes" : "No";
-  const c = current === null ? "—" : current ? "Yes" : "No";
+  const p = previous === null ? "Not measured" : previous ? "Yes" : "No";
+  const c = current === null ? "Not measured" : current ? "Yes" : "No";
   return `${p} → ${c}`;
 }

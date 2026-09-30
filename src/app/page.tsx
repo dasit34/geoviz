@@ -865,7 +865,7 @@ function MultiModelTesting() {
   );
 }
 
-// Buyer-intent examples for the homepage "Customer Questions Tested" card.
+// Buyer-intent examples for the homepage "Customer Questions · examples" card.
 // Illustrative marketing samples (NOT per-business) — concrete, no template
 // brackets, no "prompts" wording.
 const EXAMPLE_CUSTOMER_QUESTIONS = [

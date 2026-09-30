@@ -18,7 +18,7 @@ import type { IntelligenceIngestResult } from "@/lib/intelligence/intelligenceIn
 import type { PreflightSignals } from "@/lib/intelligence/preflight/types";
 import type { RenderIntelligenceResult } from "@/lib/intelligence/render/renderProvider";
 
-import { CATEGORY_HASH, WEIGHT_HASH } from "./frozen";
+import { CATEGORY_HASH, HASH_SCHEME_VERSION, WEIGHT_HASH } from "./frozen";
 import type { DeterministicScore, Evidence } from "./types";
 import { SCORING_VERSION } from "./version";
 
@@ -36,6 +36,8 @@ export type ReplayBundle = {
   scoring_version: string;
   weight_hash: string;
   category_hash: string;
+  /** Absent on pre-v2 bundles ⇒ "v1". See `frozen.ts`. */
+  hash_scheme?: string;
   inputs: ReplayBundleInputs;
   evidence: Evidence;
   output: DeterministicScore;
@@ -60,6 +62,7 @@ export function buildReplayBundle(args: {
     scoring_version: SCORING_VERSION,
     weight_hash: WEIGHT_HASH,
     category_hash: CATEGORY_HASH,
+    hash_scheme: HASH_SCHEME_VERSION,
     inputs: {
       preflightSignals: args.preflightSignals,
       intelligenceIngest: args.intelligenceIngest,

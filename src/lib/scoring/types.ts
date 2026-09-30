@@ -368,6 +368,12 @@ export type DeterministicScore = {
    * or the bucket-to-category map changes. See `frozen.ts`.
    */
   category_hash: string;
+  /**
+   * Hash scheme the two hashes above were computed under. Absent on
+   * rows stamped before the v2 fix ⇒ "v1". See `frozen.ts`
+   * `HASH_SCHEME_VERSION` — v1 and v2 category hashes never compare.
+   */
+  hash_scheme?: string;
   overall_score: number;
   band: Band;
 

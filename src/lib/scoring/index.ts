@@ -41,7 +41,7 @@ import { deriveTopFindings, deriveTopFixes } from "./findings";
 import { applyPenalties } from "./penalties";
 import { applyRecommendationLift } from "./recommendation-lift";
 import { computeStability } from "./stability";
-import { CATEGORY_HASH, WEIGHT_HASH } from "./frozen";
+import { CATEGORY_HASH, HASH_SCHEME_VERSION, WEIGHT_HASH } from "./frozen";
 import { applySynergyBonus } from "./synergy";
 import { assembleTrace } from "./trace";
 import type {
@@ -209,6 +209,7 @@ export function scoreAudit(input: ScoreAuditInput): DeterministicScore {
     scoring_version: SCORING_VERSION,
     weight_hash: WEIGHT_HASH,
     category_hash: CATEGORY_HASH,
+    hash_scheme: HASH_SCHEME_VERSION,
     overall_score: overall,
     band: bandFor(overall),
     category_scores,

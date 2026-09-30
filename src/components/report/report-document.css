@@ -847,7 +847,7 @@
   margin: -2px 0 4px;
 }
 
-/* Customer Questions Tested (compact card, top of Page 4) */
+/* Questions Customers Ask AI (compact card, top of Page 4) */
 .rd-questions {
   background: var(--l-card);
   border: 1px solid var(--l-border);
@@ -1693,7 +1693,7 @@
   .rd-impl, .rd-outcome-card, .rd .cta-card,
   .rd-interp, .rd-cmi-meta, .rd-matrix,
   /* .rd-exec-item (Executive Summary bullets) and .rd-questions-item
-     (Customer Questions Tested list) are <li> rows that can wrap to 2
+     (Questions Customers Ask AI list) are <li> rows that can wrap to 2
      lines — without this they could split mid-item across a page
      boundary the same way an unprotected card could. */
   .rd-exec-item, .rd-questions-item { break-inside: avoid; page-break-inside: avoid; }

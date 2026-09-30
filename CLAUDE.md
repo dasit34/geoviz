@@ -185,18 +185,32 @@ incrementally automatable.
   propose + (with approval) deploy changes to the layer based on
   monitoring deltas. See `## Automation & Action Module (V3)`.
 
-**Future recurring product — "AI Visibility Monitoring" (NOT built
-now).** The natural subscription evolution of the audit. Potential
-tabs: Visibility · Customer Questions · Mentions & Citations ·
-Sources AI Can Cite · Topics / Services · Competitors. The
-"Customer Questions Tested" surface (shipped on the audit/report
-today — buyer-intent questions per business) and the "Evidence AI
-Can Cite" concept (the monitorable evolution of the report's
-"Evidence Reviewed — What AI Had To Read" page) become recurring
-monitoring features here. Do NOT build this, monthly prompt
-tracking, or a SaaS dashboard now — the core flow stays the **$97
-AI Visibility Audit + Starting-at-$497 GEO Foundation Fix**. Build
-only on explicit request.
+**Recurring product — "AI Visibility Monitoring" (APPROVED
+2026-09-29, building in stages).** The operator explicitly approved
+repositioning GeoViz around the lifecycle **Baseline Audit → Identify
+Gaps → Recommend/Fix → Recheck → Track Improvement → Repeat
+Monthly**. The staged plan (Stage 0 integrity fixes → schema +
+enrollment → organic prompt panel → frozen scans + diff + action plan
+→ operator-triggered recheck → customer status page → scheduler →
+incorrect-info detection → Stripe subscription) is the source of
+truth; build one stage at a time, each additive and feature-flagged.
+Binding rules for monitoring work:
+- The **$97 audit + $59 re-audit checkout, webhook, worker loop,
+  scoring, and report rendering keep working unchanged** at every
+  stage. Subscription billing ships last, as an additive Stripe
+  branch that never touches the one-time payment path.
+- The customer view is a **tokenized, no-login status page**
+  (same access model as `/report/[id]/print`, with its own rotatable
+  token) — NOT a login system or a general SaaS dashboard.
+- Historical scans are **immutable** once finalized; deterministic
+  measurements and LLM-written explanations are stored separately.
+- Provider failures are recorded as "not measured", never as a
+  0 score or a "not mentioned".
+- Monitoring copy names the model + access path ("OpenAI
+  gpt-4.1-mini via API, web-grounded") — never "ChatGPT says".
+The report's "Questions Customers Ask AI" section (buyer-intent
+questions per business — generated, not yet sent to models) and the
+"Evidence AI Can Cite" concept become monitored features here.
 
 **What this is NOT.** The AI Visibility Layer is **not** an attempt
 to rebuild customer websites. We are not a CMS. We are not a site
@@ -218,11 +232,14 @@ Build ONLY:
 - Email notification
 
 DO NOT BUILD:
-- dashboards
+- dashboards (exception: the approved tokenized, no-login monitoring
+  status page — see "Recurring product — AI Visibility Monitoring")
 - login systems
 - white-label features
-- automation pipelines
-- subscription billing
+- automation pipelines (exception: the approved monitoring recheck
+  scheduler, operator review stays mandatory)
+- subscription billing (exception: monitoring subscriptions, the
+  final monitoring stage, additive to the one-time checkout)
 - agency portals
 - lead scraping systems
 

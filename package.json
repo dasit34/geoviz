@@ -41,6 +41,7 @@
     "test:category-breakdown": "tsx scripts/test-category-breakdown-no-placeholders.ts",
     "test:preflight-intelligence": "tsx scripts/test-preflight-intelligence.ts",
     "test:deterministic-scoring": "tsx scripts/test-deterministic-scoring.ts",
+    "test:frozen-hash": "tsx scripts/test-frozen-hash.ts",
     "test:score-source-parity": "tsx scripts/test-score-source-parity.ts",
     "test:report-payload-parity": "tsx scripts/test-report-payload-parity.ts",
     "test:decimal-leakage": "tsx scripts/test-decimal-leakage.ts",
