@@ -18,6 +18,7 @@
     "seed:geoviz-sample": "tsx scripts/seed-geoviz-sample.ts",
     "seed:public-samples": "tsx scripts/seed-public-samples.ts",
     "recover-stale-jobs": "tsx scripts/recover-stale-jobs.ts",
+    "market-study:daily-cron": "tsx scripts/daily-market-study-automation.ts",
     "test:worker-recovery": "tsx scripts/test-worker-recovery.ts",
     "test:checkout-audit-creation": "tsx scripts/test-checkout-audit-creation.ts",
     "test:normalize-domain": "tsx scripts/test-normalize-domain.ts",

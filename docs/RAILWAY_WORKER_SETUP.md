@@ -2,6 +2,8 @@
 
 The GeoViz audit worker runs as a separate long-running Node process from the Vercel web app. Vercel functions cannot run the worker (the audit takes 1–3 minutes per job, exceeding any sane serverless timeout). Railway is the recommended host. This document is the authoritative setup runbook.
 
+> Looking for the **daily Market Study automation** (discover → qualify → bulk-audit → email summary, once a day)? That's a separate, optional Railway Cron Schedule service — see `docs/MARKET_STUDY_DAILY_AUTOMATION.md`. It never touches this worker.
+
 ---
 
 ## What the worker does

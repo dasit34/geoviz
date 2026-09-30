@@ -333,15 +333,27 @@ export async function persistAuditIntelligence(args: {
       orderId,
     });
 
-    // Fetch up to 5 prior deterministic audits for the same website so
+    // Fetch up to 5 prior deterministic audits for the same business so
     // the scorer can compute `score_stability_index`. Fail-soft —
     // any Prisma error leaves history undefined and the scorer
     // returns null for the stability fields.
+    //
+    // Prefers the durable `businessId` link (Phase 1-2 monitoring
+    // foundation) when this order has one; falls back to the historic
+    // websiteUrl-equality convention otherwise, so behavior for
+    // unbackfilled/unlinked rows is unchanged.
     let history: Array<{ computed_at: string; overall_score: number }> | undefined;
     try {
+      const currentOrder = await prisma.auditOrder.findUnique({
+        where: { id: orderId },
+        select: { businessId: true },
+      });
+      const historyWhere = currentOrder?.businessId
+        ? { auditOrder: { businessId: currentOrder.businessId } }
+        : { websiteUrl };
       const prior = await prisma.auditIntelligence.findMany({
         where: {
-          websiteUrl,
+          ...historyWhere,
           NOT: { deterministicScore: { equals: Prisma.JsonNull } },
           // Skip the row we just upserted — its deterministicScore is
           // about to be written in the update below, so it's not in
@@ -574,6 +586,39 @@ export async function persistAuditIntelligence(args: {
         console.warn(
           `[consensus] persist failed orderId=${orderId} (non-fatal): ${msg}`,
         );
+      }
+
+      // ─── Evidence layer (additive, fail-soft, flag-gated) ──────────
+      // Normalizes the validatorResult ALREADY captured above into the
+      // persistent Observation/QueryLibraryEntry tables — Intelligence
+      // Engine Phase 1. Zero new LLM calls: this reads data already in
+      // scope from the validator step earlier in this same block.
+      // Gated by GEO_EVIDENCE_LAYER_ENABLED so the write path can ship
+      // inert, get verified via these log lines, then be flipped on
+      // without a redeploy — mirrors GEO_RENDER_ENABLED's rollout
+      // pattern. Default (flag unset) is byte-equal to pre-integration
+      // behavior: this whole block is skipped.
+      if (validatorResult && process.env.GEO_EVIDENCE_LAYER_ENABLED === "true") {
+        try {
+          const { persistObservationEvidence } = await import(
+            "@/lib/intelligence/evidence/persistObservationEvidence"
+          );
+          const evidenceResult = await persistObservationEvidence({
+            orderId,
+            businessName,
+            websiteUrl,
+            industryRaw: industryRaw ?? null,
+            validatorResult,
+          });
+          console.log(
+            `[evidence] orderId=${orderId} observations=${evidenceResult.observationsWritten} competitorMentions=${evidenceResult.competitorMentionsWritten} queryEntries=${evidenceResult.queryEntriesTouched}`,
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[evidence] persist failed orderId=${orderId} (non-fatal): ${msg}`,
+          );
+        }
       }
 
       // [consensus] block exited cleanly — bookend to the entered

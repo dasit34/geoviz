@@ -2,6 +2,8 @@
 
 Canonical map of build-order dependencies across the 14 `src/modules/` scaffolds, and which module(s) must ship before each stage's exit criteria (`docs/strategy/01_FIVE_YEAR_ROADMAP.md`) can be met. Cross-reference `docs/architecture/SYSTEM_ARCHITECTURE.md` for the runtime/import rules that keep this graph acyclic.
 
+**Canonical for:** hard dependency ordering (what must precede what). **For recommended sequencing/priority/milestone ranking, see `docs/MODULE_BUILD_ORDER.md`**, which is canonical for that and resolves a prior Shopify Plugin stage-placement inconsistency between this doc and `docs/FIVE_YEAR_EXECUTION_PLAN.md`.
+
 ## Layered build order
 
 ```

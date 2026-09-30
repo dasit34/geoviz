@@ -99,6 +99,31 @@ function mean(values: number[]): number | null {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
+/**
+ * Counts `top_3_findings` occurrences across a set of scored rows,
+ * ranked descending. Extracted from `scoreCalibrationSummary()` so
+ * `src/lib/calibration/recommendation-frequency.ts` (the calibration
+ * engine's industry-segmented rollup) can reuse the exact same
+ * counting logic instead of re-walking `top_3_findings` a second way.
+ * Pure, no I/O. Behavior-preserving for the existing caller below —
+ * same output as the inline loop it replaces.
+ */
+export function countFindingFrequency(
+  rows: ReadonlyArray<{ score: DeterministicScore }>,
+  opts?: { limit?: number },
+): Array<{ id: string; count: number }> {
+  const counts: Record<string, number> = {};
+  for (const r of rows) {
+    for (const f of r.score.top_3_findings) {
+      counts[f.id] = (counts[f.id] ?? 0) + 1;
+    }
+  }
+  return Object.entries(counts)
+    .map(([id, count]) => ({ id, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, opts?.limit ?? 10);
+}
+
 function stdDev(values: number[]): number | null {
   if (values.length === 0) return null;
   const m = values.reduce((a, b) => a + b, 0) / values.length;
@@ -238,16 +263,7 @@ export async function scoreCalibrationSummary(args?: {
     }
 
     // Top-3 findings frequency — count finding ids across all rows.
-    const findingCounts: Record<string, number> = {};
-    for (const r of scored) {
-      for (const f of r.score.top_3_findings) {
-        findingCounts[f.id] = (findingCounts[f.id] ?? 0) + 1;
-      }
-    }
-    const topFindings = Object.entries(findingCounts)
-      .map(([id, count]) => ({ id, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+    const topFindings = countFindingFrequency(scored);
 
     return {
       scoring_version: SCORING_VERSION,

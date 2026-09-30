@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { costTone, type CostTone } from "@/lib/pricing";
 import { OperatorInsightsPanel } from "@/components/OperatorInsightsPanel";
 import { ReplayHistoryPanel } from "@/components/ReplayHistoryPanel";
+import { CalibrationLearningLoopPanel } from "@/components/CalibrationLearningLoopPanel";
 import {
   BENCHMARK_TAG_OPTIONS,
   OPERATOR_CONFIDENCE_OPTIONS,
@@ -298,6 +299,12 @@ export function CalibrationDashboard({ adminKey }: { adminKey: string }) {
           summary. Renders only once there's at least one tagged
           row; stays out of the way during empty-state. */}
       <CalibrationIntelligenceBlock summary={calibrationSummary} />
+
+      {/* Calibration Engine (learning loop) — additive, feature-flagged
+          extension. Renders a disabled state on its own when
+          GEO_MODULE_CALIBRATION_ENGINE_ENABLED isn't "true"; the rest
+          of this page stays exactly as it is today either way. */}
+      <CalibrationLearningLoopPanel adminKey={adminKey} />
 
       {/* Failure intelligence — surfaces the dominant failure modes
           across today's run + total retry pressure. Renders only

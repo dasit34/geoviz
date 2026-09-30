@@ -31,3 +31,4 @@ tsconfig.tsbuildinfo
 
 # Figma design source (reference only — not a served asset)
 public/references/geoviz-report-template.pdf
+.env*
