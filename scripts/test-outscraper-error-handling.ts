@@ -7,6 +7,7 @@
  * cleanly, and no failure path ever returns partial records/a contact.
  * Run: npx tsx scripts/test-outscraper-error-handling.ts
  */
+import "./lib/require-nonprod-db";
 import { OutscraperProvider } from "@/lib/discovery/providers/outscraper";
 import { OutscraperEnrichmentProvider } from "@/lib/enrichment/providers/outscraper";
 

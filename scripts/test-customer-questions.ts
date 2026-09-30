@@ -7,6 +7,7 @@
  * services, NEVER inventing a city the audit didn't find, never leaking a
  * template placeholder, and never using the word "prompts".
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import {

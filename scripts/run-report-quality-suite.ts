@@ -14,6 +14,7 @@
  * at the suite level instead of just the per-script level.
  */
 
+import "./lib/require-nonprod-db";
 import { spawnSync } from "node:child_process";
 
 // Exact order previously encoded in package.json's `&&` chain.

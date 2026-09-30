@@ -14,6 +14,7 @@
  * Requires a live DB connection — same category as
  * scripts/test-worker-recovery.ts.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { prisma } from "../src/lib/db";

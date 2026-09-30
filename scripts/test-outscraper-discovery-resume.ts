@@ -9,6 +9,7 @@
  * session — see the plan/report. No live network call either.
  * Run: npx tsx scripts/test-outscraper-discovery-resume.ts
  */
+import "./lib/require-nonprod-db";
 import { prisma } from "@/lib/db";
 import { POST as discoverPOST } from "../src/app/api/admin/leads/discover/route";
 

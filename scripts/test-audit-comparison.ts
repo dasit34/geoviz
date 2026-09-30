@@ -18,6 +18,7 @@
  *   9. Resolved issues detected correctly.
  *  10. Remaining (unchanged) issues shown correctly.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { classifyBooleanDelta, classifyScoreDelta, SCORE_DELTA_THRESHOLD } from "../src/lib/audit-comparison/classify";
 import { computeDimensions } from "../src/lib/consensus/dimensions";

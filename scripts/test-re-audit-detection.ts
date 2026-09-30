@@ -28,6 +28,7 @@
  * ("column does not exist") on the very first insert, and cleanup
  * still runs safely (nothing partial is left behind — verified).
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { prisma } from "../src/lib/db";
 import { findPreviousCompletedAuditOrderId } from "../src/lib/audit-comparison/findPreviousAudit";

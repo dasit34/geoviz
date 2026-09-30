@@ -25,6 +25,7 @@
  *       env disable).
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import {
   EMPTY_RENDER_RESULT,

@@ -23,6 +23,7 @@
  * Read-only — does not modify any files.
  */
 
+import "./lib/require-nonprod-db";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 

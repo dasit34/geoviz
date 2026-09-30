@@ -8,6 +8,7 @@
  * must not appear for non-local businesses; and present platform data must
  * render. Pure unit tests over `buildReportModel`.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import { buildReportModel } from "../src/lib/report/report-model";

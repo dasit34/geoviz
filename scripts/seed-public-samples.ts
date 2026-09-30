@@ -20,6 +20,7 @@
  * Run with:
  *   npx tsx scripts/seed-public-samples.ts
  */
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { SAMPLE_REGISTRY } from "../src/lib/sample-registry";

@@ -16,6 +16,7 @@
  *   - an invalid email override is ignored in favor of the previous
  *     order's own email; a valid override is honored.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import type { AuditOrder } from "@prisma/client";
 import { buildReAuditCheckoutSessionParams } from "../src/lib/audit-orders/reaudit-checkout-params";

@@ -28,6 +28,7 @@
  * Always prints a preview of the rows it intends to recover before
  * mutating the DB. Idempotent — safe to re-run.
  */
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import { PrismaClient, type Prisma } from "@prisma/client";
 

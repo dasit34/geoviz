@@ -11,6 +11,7 @@
  *   - ReportSurface consumes the ReportModel (no per-surface divergence).
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

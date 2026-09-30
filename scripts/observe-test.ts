@@ -13,6 +13,7 @@
  * report if `ENABLE_OBSERVATION=true` and the relevant keys were set.
  */
 
+import "./lib/require-nonprod-db";
 import "dotenv/config";
 
 import { CATEGORY_HASH, WEIGHT_HASH } from "../src/lib/scoring/frozen";

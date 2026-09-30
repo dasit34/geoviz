@@ -18,6 +18,7 @@
  * Requires a live DB connection — same category as
  * scripts/test-checkout-audit-creation.ts, which this mirrors in shape.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { prisma } from "../src/lib/db";
 import { validateReAuditEligibility } from "../src/lib/audit-orders/reaudit-eligibility";

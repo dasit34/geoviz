@@ -4,6 +4,7 @@
  * Resend call. Run:
  *   npx tsx scripts/test-market-study-automation-summary.ts
  */
+import "./lib/require-nonprod-db";
 import {
   computeSummaryStats,
   type SummaryEntry,

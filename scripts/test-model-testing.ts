@@ -7,6 +7,7 @@
  * read as "incomplete" (block delivery), and each provider failure must map to a
  * human reason for the admin.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import {

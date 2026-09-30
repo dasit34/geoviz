@@ -21,6 +21,7 @@
  * Run with:
  *   npx tsx scripts/seed-geoviz-sample.ts
  */
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 

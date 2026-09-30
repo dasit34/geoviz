@@ -44,6 +44,7 @@
  * no `Overall Score: 51/100` line to replace and exits cleanly.
  */
 
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { parseReportScoreBreakdown } from "../src/lib/parse-report";

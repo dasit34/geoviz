@@ -9,6 +9,7 @@
  * names — it must only match in an unambiguous charitable phrasing.
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import { normalizeIndustry } from "../src/lib/intelligence/industry-taxonomy";

@@ -34,6 +34,7 @@
  * single shared function and can't diverge from itself.
  */
 
+import "./lib/require-nonprod-db";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 

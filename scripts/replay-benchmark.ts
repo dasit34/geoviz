@@ -41,6 +41,7 @@
  *   • Writes ONLY under tmp/replay/ (gitignored).
  */
 
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";

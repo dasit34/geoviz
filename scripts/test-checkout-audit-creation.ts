@@ -30,6 +30,7 @@
  * run, so each run creates its own Business rows. Cleaned up in the
  * finally block alongside the AuditOrder fixtures.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { prisma } from "../src/lib/db";
 import { createAuditOrderFromCheckoutSession } from "../src/lib/audit-orders/create-from-checkout-session";

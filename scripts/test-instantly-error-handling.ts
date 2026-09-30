@@ -9,6 +9,7 @@
  * explanation.
  * Run: npx tsx scripts/test-instantly-error-handling.ts
  */
+import "./lib/require-nonprod-db";
 import { InstantlyProvider } from "@/lib/outbound/providers/instantly";
 
 let failures = 0;

@@ -14,6 +14,7 @@
  * test cleanly. isAuthed() itself needs a request context and is covered
  * by the token-equality assertions here + manual dev verification.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 

@@ -27,6 +27,7 @@
  * outcomes are surfaced via the `status` field and the summary line.
  */
 
+import "./lib/require-nonprod-db";
 import { VALIDATOR_REGISTRY } from "../src/lib/validators/registry";
 import type {
   NormalizedValidationOutput,

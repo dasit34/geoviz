@@ -22,6 +22,7 @@
  * reporting. See plan: /Users/davidshinavar/.claude/plans/sprightly-meandering-peach.md
  */
 
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import { Prisma } from "@prisma/client";
 

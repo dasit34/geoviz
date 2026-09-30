@@ -10,6 +10,7 @@
  * Exit code 0 on all pass; 1 on any fail.
  */
 
+import "./lib/require-nonprod-db";
 import { computeAgreement } from "../src/lib/consensus/agreement";
 import { computeDimensions } from "../src/lib/consensus/dimensions";
 import { deriveFindings } from "../src/lib/consensus/findings";

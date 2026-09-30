@@ -39,6 +39,7 @@
  * `scripts/test-business-linking.ts` to scope a real run to disposable
  * test fixtures instead of every unlinked row in production.
  */
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { normalizeDomain } from "../src/lib/business/normalize-domain";

@@ -9,6 +9,7 @@
  *
  *   npx tsx scripts/test-market-study-internal-email.ts
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import { isCalibrationOrder } from "../src/lib/customer-failure-mapping";

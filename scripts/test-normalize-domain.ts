@@ -6,6 +6,7 @@
  * (src/lib/business/normalize-domain.ts) — the canonical identity key
  * every business-linking lookup/create is keyed on. No DB, no I/O.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { normalizeDomain } from "../src/lib/business/normalize-domain";
 

@@ -5,6 +5,7 @@
  * Guards `isSampleAudit` — the marker that lets public sample reports bypass the
  * report-view rate limiter without weakening protection on real paid orders.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import { isSampleAudit, SAMPLE_SESSION_PREFIX } from "../src/lib/sample-audit";

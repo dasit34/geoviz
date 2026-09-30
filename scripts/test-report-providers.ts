@@ -10,6 +10,7 @@
  *   2. With NO outputs → still 4 cards (all UNAVAILABLE), never a blank gap.
  *   3. Degraded output (status != "passed" but has data) → still rendered.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import { buildReportModel } from "../src/lib/report/report-model";

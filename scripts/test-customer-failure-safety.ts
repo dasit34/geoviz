@@ -36,6 +36,7 @@
  *  16. isCalibrationOrder: detects the synthetic email pattern.
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import {
   classifyWrapperFailure,

@@ -4,6 +4,7 @@
  * mapping, using synthetic Lead-shaped objects (no live DB needed).
  * Run: npx tsx scripts/test-instantly-payload-mapping.ts
  */
+import "./lib/require-nonprod-db";
 import type { Lead } from "@prisma/client";
 import { toOutboundLeadInput } from "@/lib/leads/toOutboundLeadInput";
 

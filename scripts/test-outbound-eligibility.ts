@@ -2,6 +2,7 @@
  * Tests filterSendEligibleLeads() — the "Send to Instantly" pre-send
  * eligibility gate. Run: npx tsx scripts/test-outbound-eligibility.ts
  */
+import "./lib/require-nonprod-db";
 import { filterSendEligibleLeads, normalizeEmail } from "@/lib/leads/outboundEligibility";
 
 let failures = 0;

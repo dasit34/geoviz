@@ -657,6 +657,36 @@ passing the prompt via stdin so long URLs / competitor strings can't trip shell 
 - **`claude -p` returns text but no markdown report** — the geo skill's sub-agents may be running. Bump the wrapper timeout via the `timeoutMs` option in `runGeoAudit` (default 5 min) or rerun. The full audit typically takes 1–3 minutes.
 - **Sandboxed CLI sessions block the spawn** — the Claude Code CLI sandbox blocks recursive `claude -p` invocations of skills that fetch from external GitHub repos. This affects automated test runs from a CLI session but not the admin API route running under `npm run dev`.
 
+## Database Safety (fail-closed)
+
+Local `.env` has historically pointed at the PRODUCTION database. Never
+run anything that writes to `DATABASE_URL` unless it is positively
+non-production. Enforced in code:
+
+- `src/lib/safety/database-target.ts` classifies `DATABASE_URL`: allowed
+  only when unset, the `.invalid` no-database sentinel, loopback, or listed
+  in `GEOVIZ_NONPROD_DB_HOSTS`. Unknown remote hosts, hosts in
+  `GEOVIZ_PRODUCTION_DB_HOSTS`, and production context
+  (`RAILWAY_ENVIRONMENT_NAME=production` from `railway run`,
+  `VERCEL_ENV=production`) are refused.
+- Every `scripts/test-*.ts`, the report-quality runner, and observation
+  test/simulate scripts import `scripts/lib/require-nonprod-db` first — no
+  override.
+- Seed, replay, backfill, repair, stale-job recovery, and calibration
+  batch scripts import `scripts/lib/require-nonprod-db-or-break-glass` —
+  a deliberate production run needs `GEOVIZ_ALLOW_PRODUCTION_DB=<exact
+  script name>`.
+- `npm run dev`, `db:push`, `db:studio` are gated by npm pre-hooks.
+- `npm run build` runs `scripts/guard-build-database.ts` before
+  `prisma migrate deploy`: only Vercel production builds may migrate
+  production; previews/local builds need a non-production target.
+- Run DB-free tests with `npm run test:no-db` (forces the sentinel URL).
+- Intentionally NOT guarded (production runtime / read-only ops):
+  `geo-worker` (Railway runs `geo-worker:dev`),
+  `daily-market-study-automation`, `recover-missing-checkout-order`,
+  `verify-system`, `intelligence:*`, `diagnose:*`, `benchmark:*`,
+  `score:validate`, `score:premigration-check`.
+
 ## Operational Verification (post-deploy)
 
 The Railway CLI is installed, authenticated, and linked to the GeoViz production environment (project `refreshing-love`, service `geoviz`). Claude should use it directly — do not ask the operator to tail logs manually unless the CLI fails, auth expires, or browser-only verification is required.
