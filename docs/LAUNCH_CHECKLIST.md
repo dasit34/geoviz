@@ -28,6 +28,23 @@ Pre-flight for the controlled pilot. Walk every item before the first paid custo
 - [ ] **Stripe Price object price = $97.00 USD.** Open the Price in the Stripe dashboard and verify; the codebase doesn't hardcode the amount.
 - [ ] **Test charge run end-to-end on staging** (or use Stripe test mode against the staging deploy) before flipping production live.
 
+## Deferred production smoke checks (recorded 2026-09-30 — launch items, not merge blockers)
+
+After merging #42–#44 every read-only post-deploy check passed (Production Ready, worker clean start, `migrate status` up to date, intelligence summary/cost populated, data counts unchanged, unsigned webhook → 400). Two checks could not be completed without a production write or live-Stripe access and were deliberately deferred:
+
+- [ ] **Authenticated Stripe test webhook returns 200.** Stripe Dashboard → Developers → Webhooks → production endpoint → "Send test webhook" (or a real order) and confirm the delivery shows HTTP 200. The only local Stripe key is test-mode and the live key is a Vercel sensitive var, so this was not verifiable from the CLI.
+- [ ] **One real production audit completes end-to-end.** Queue one audit through the product (a real order, or `/admin/calibration` with the production `ADMIN_SECRET` — the local `.env` value does not match production) and confirm `queued → running → generated`, then review + delivery. Do not insert orders directly into the production database.
+
+## Subscription monitoring (before enabling `GEO_MODULE_MONITORING_ENABLED` in Production)
+
+- [ ] Create a **recurring** monthly Stripe price for monitoring (amount per the documented $29–79/mo Stage 2 range — decided in Stripe, not code) and set `STRIPE_MONITORING_MONTHLY_PRICE_ID`.
+- [ ] Add `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` to the production webhook endpoint's events (alongside `checkout.session.completed`).
+- [ ] Configure the **Stripe Customer Portal** (cancellation + payment-method update allowed) — `/api/monitoring/portal` depends on it.
+- [ ] Approve and apply migration `20260930170000_add_subscription_monitoring` to Production (runs automatically in the Vercel production build when the PR merges).
+- [ ] Create a Railway **cron service** running `npm run monitoring:scheduler` every 15 minutes with the worker's env (same pattern as `market-study:daily-cron`).
+- [ ] End-to-end on Preview/staging with Stripe test mode: subscribe → status page → first audit queued → approve → score shown → portal cancel → no further audits.
+- [ ] Only then set `GEO_MODULE_MONITORING_ENABLED="true"` in Vercel Production AND on the scheduler cron service.
+
 ## Audit Engine
 
 - [ ] **Audit command confirmed working.** Manually queue an audit for a known URL via `/admin/reports` and confirm `reportStatus` advances `pending → queued → running → generated`.

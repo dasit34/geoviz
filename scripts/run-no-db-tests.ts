@@ -54,10 +54,21 @@ const NO_DB_TESTS = [
   "test-market-study-automation-summary",
   "test-competitive-metrics",
   "test-normalize-domain",
+  // subscription monitoring (in-memory fakes, no DB / no Stripe)
+  "test-monitoring-checkout",
+  "test-monitoring-webhook",
+  "test-monitoring-access",
+  "test-monitoring-scheduler",
+  "test-monitoring-cancellation",
 ];
 
+// `--only <substring>` narrows the run (e.g. `npm run test:monitoring`).
+const onlyIdx = process.argv.indexOf("--only");
+const only = onlyIdx >= 0 ? process.argv[onlyIdx + 1] : undefined;
+const selected = only ? NO_DB_TESTS.filter((n) => n.includes(only)) : NO_DB_TESTS;
+
 const results: Array<{ name: string; ok: boolean }> = [];
-for (const name of NO_DB_TESTS) {
+for (const name of selected) {
   const r = spawnSync("npx", ["tsx", `scripts/${name}.ts`], {
     stdio: "inherit",
     env: { ...process.env, DATABASE_URL: NO_DATABASE_SENTINEL_URL },
