@@ -224,6 +224,14 @@ export default async function AdminTracePage({
             . On null, providers are reported as &quot;Not run&quot; — no
             participation is fabricated.
           </p>
+          <p className="mt-2 text-sm">
+            <a
+              href={`/admin/evidence/scan/${order.id}`}
+              className="text-accent hover:underline"
+            >
+              View normalized evidence rows (Intelligence Engine) →
+            </a>
+          </p>
           <div className="mt-4">
             <ProviderTelemetryGrid validations={validations} />
           </div>

@@ -33,6 +33,34 @@ const PAGE_SIZE = 25;
 
 type SortKey = "businessName" | "qualificationScore" | "status" | "createdAt";
 
+type PrepareForOutreachDetail = {
+  id: string;
+  businessName: string;
+  isQualified: boolean;
+  enrichmentAttempted: boolean;
+  enrichedSuccessfully: boolean | null;
+  hasValidContact: boolean;
+  failed: boolean;
+  reason: string;
+  status: string | null;
+  contactEmail: string | null;
+  qualificationScore: number | null;
+};
+
+type PrepareForOutreachResult = {
+  summary: {
+    selected: number;
+    qualified: number;
+    notQualified: number;
+    enrichmentAttempted: number;
+    enrichedSuccessfully: number;
+    noValidContact: number;
+    readyForInstantly: number;
+    failed: number;
+  };
+  details: PrepareForOutreachDetail[];
+};
+
 function authedFetch(adminKey: string, path: string, init?: RequestInit) {
   const url = path.includes("?")
     ? `${path}&key=${encodeURIComponent(adminKey)}`
@@ -59,6 +87,8 @@ export function LeadsTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [prepareBusy, setPrepareBusy] = useState(false);
+  const [prepareResult, setPrepareResult] = useState<PrepareForOutreachResult | null>(null);
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
   const [addText, setAddText] = useState("");
@@ -356,6 +386,48 @@ export function LeadsTable({
     }
   }
 
+  async function bulkPrepareForOutreach() {
+    if (selectedIds.size === 0) return;
+    if (selectedIds.size > 25) {
+      setMessage("Prepare for Outreach is limited to 25 leads at a time — select fewer.");
+      return;
+    }
+    setBulkBusy(true);
+    setPrepareBusy(true);
+    setPrepareResult(null);
+    try {
+      const res = await authedFetch(adminKey, "/api/admin/leads/prepare-for-outreach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const result = data as PrepareForOutreachResult;
+        const byId = new Map(result.details.map((d) => [d.id, d]));
+        setLeads((prev) =>
+          prev.map((l) => {
+            const d = byId.get(l.id);
+            if (!d || d.failed) return l;
+            return {
+              ...l,
+              status: d.status ?? l.status,
+              contactEmail: d.contactEmail ?? l.contactEmail,
+              qualificationScore: d.qualificationScore ?? l.qualificationScore,
+            };
+          }),
+        );
+        setPrepareResult(result);
+        setSelectedIds(new Set());
+      } else {
+        setMessage(data.error ?? "Prepare for Outreach failed.");
+      }
+    } finally {
+      setBulkBusy(false);
+      setPrepareBusy(false);
+    }
+  }
+
   async function bulkAddToList(targetListId: string) {
     if (selectedIds.size === 0 || !targetListId) return;
     setBulkBusy(true);
@@ -525,6 +597,18 @@ export function LeadsTable({
             Enrich Contacts
           </button>
           <button
+            onClick={bulkPrepareForOutreach}
+            disabled={bulkBusy || selectedIds.size > 25}
+            title={
+              selectedIds.size > 25
+                ? "Prepare for Outreach is limited to 25 leads at a time — select fewer."
+                : "Runs qualification, then enrichment, for the selected leads in one step. Already-qualified/already-enriched leads are skipped, not reprocessed."
+            }
+            className="btn-primary text-xs disabled:opacity-50"
+          >
+            {prepareBusy ? "Preparing…" : "Prepare for Outreach"}
+          </button>
+          <button
             onClick={() => setInstantlyModalOpen(true)}
             disabled={bulkBusy || selectedIds.size > 25}
             title={selectedIds.size > 25 ? "Send to Instantly is limited to 25 leads at a time — select fewer." : undefined}
@@ -575,6 +659,46 @@ export function LeadsTable({
             <button onClick={bulkRemoveFromList} disabled={bulkBusy} className="btn-ghost text-xs text-severity-critical disabled:opacity-50">
               Remove from this list
             </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Prepare for Outreach result summary */}
+      {prepareResult ? (
+        <div className="mb-4 rounded-md border border-white/10 bg-white/[0.02] p-4 text-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-white/80">Prepare for Outreach — result</p>
+            <button onClick={() => setPrepareResult(null)} className="text-white/40 hover:text-white/70">✕</button>
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-4">
+            {(
+              [
+                ["Selected", prepareResult.summary.selected],
+                ["Qualified", prepareResult.summary.qualified],
+                ["Not qualified", prepareResult.summary.notQualified],
+                ["Enrichment attempts", prepareResult.summary.enrichmentAttempted],
+                ["Enriched successfully", prepareResult.summary.enrichedSuccessfully],
+                ["No valid contact", prepareResult.summary.noValidContact],
+                ["Ready for Instantly", prepareResult.summary.readyForInstantly],
+                ["Failed", prepareResult.summary.failed],
+              ] as [string, number][]
+            ).map(([label, value]) => (
+              <div key={label}>
+                <div className="text-lg font-semibold text-white/90">{value}</div>
+                <div className="text-xs text-white/50">{label}</div>
+              </div>
+            ))}
+          </div>
+          {prepareResult.details.some((d) => !d.hasValidContact || d.failed || !d.isQualified) ? (
+            <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto border-t border-white/10 pt-3 text-xs text-white/50">
+              {prepareResult.details
+                .filter((d) => !d.hasValidContact || d.failed || !d.isQualified)
+                .map((d) => (
+                  <li key={d.id}>
+                    {d.businessName}: {d.reason}
+                  </li>
+                ))}
+            </ul>
           ) : null}
         </div>
       ) : null}

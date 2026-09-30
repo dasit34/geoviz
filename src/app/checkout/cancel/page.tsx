@@ -19,8 +19,14 @@ export default function CheckoutCancelPage() {
             <h1 className="h2 mt-4">No charge was made.</h1>
             <p className="muted mt-4">
               If something didn’t look right or you have a question before
-              ordering, just reply to your audit email or restart the order
-              when you’re ready.
+              ordering, email us at{" "}
+              <a
+                href="mailto:support@geoviz.ai"
+                className="text-accent hover:text-accent-glow underline-offset-4 hover:underline"
+              >
+                support@geoviz.ai
+              </a>{" "}
+              or restart the order when you’re ready.
             </p>
             <div className="mt-8 flex justify-center gap-3">
               <Link href="/order" className="btn-primary">

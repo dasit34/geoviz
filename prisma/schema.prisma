@@ -1219,3 +1219,47 @@ model MarketStudyEntry {
   @@index([auditOrderId])
   @@index([leadId])
 }
+
+/// One calendar day's automated "discover → qualify → bulk-audit" run
+/// (see `src/lib/market-studies/automation/`). Deliberately does NOT
+/// duplicate anything `MarketStudy`/`MarketStudyEntry`/`LeadDiscoveryRun`
+/// already store — `leadDiscoveryRunId`/`marketStudyId` are plain
+/// unlinked ids (looked up separately), not Prisma relations, so this
+/// model needs zero changes to any existing table. `runDate @unique` is
+/// the whole overlap/duplicate-run guard: the kickoff step does a plain
+/// `create()` and swallows the P2002 exactly like
+/// `createMarketStudyAudits()` already does for `[studyId, leadId]`.
+model MarketStudyAutomationRun {
+  id           String   @id @default(cuid())
+  // UTC-midnight for a real daily run (the uniqueness guard); an exact
+  // full-precision timestamp for a manual test run (isManualTest:
+  // true), so test runs never collide with the daily guard or with
+  // each other in any way that matters.
+  runDate      DateTime @unique
+  isManualTest Boolean  @default(false)
+  // running | completed | failed
+  status       String   @default("running")
+  industry     String
+  city         String
+  state        String?
+  targetCount  Int
+  retryCount   Int      @default(0)
+
+  leadDiscoveryRunId String?
+  marketStudyId      String?
+
+  businessesCollected       Int @default(0)
+  businessesQualified       Int @default(0)
+  duplicatesExcluded        Int @default(0)
+  existingCustomersExcluded Int @default(0)
+  blockedExcluded           Int @default(0)
+
+  lastError          String?
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  summaryEmailSentAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([status])
+}

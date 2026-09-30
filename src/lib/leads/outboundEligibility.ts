@@ -45,6 +45,22 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/**
+ * Format + disposable-domain check only — no status/prior-outreach
+ * checks. Extracted so callers that need "is this email usable at
+ * all" (e.g. the "Prepare for Outreach" orchestrator deciding whether
+ * to mark a lead READY_FOR_CONTACT) share the exact same disposable-
+ * domain list instead of duplicating it. Does not change
+ * `filterSendEligibleLeads`'s behavior — that function is untouched.
+ */
+export function isUsableEmailFormat(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const normalized = normalizeEmail(email);
+  if (!EMAIL_FORMAT_RE.test(normalized)) return false;
+  const domain = normalized.split("@")[1];
+  return !(domain && DISPOSABLE_EMAIL_DOMAINS.has(domain));
+}
+
 export type EligibilityLead = {
   leadId: string;
   email: string | null;

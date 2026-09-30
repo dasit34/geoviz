@@ -2,6 +2,8 @@
 
 Extends `docs/strategy/10_BACKLOG.md` (does not restate its Impact/Difficulty/Revenue/Moat ratings — cross-link, not copy) by adding an **expected engineering weeks** estimate per module and a single recommended build order across all 14 `src/modules/` scaffolds. Build order follows `docs/MODULE_DEPENDENCY_GRAPH.md` exactly — never reorder across a dependency boundary.
 
+**For the canonical sequencing/priority ranking (including the resolved Shopify Plugin stage placement), see `docs/MODULE_BUILD_ORDER.md`** — this doc's per-module Stage column is estimates/context, not the authoritative sequencing source.
+
 ## Ranked build order with estimates
 
 | Order | Module | Depends on | Eng weeks (v1) | Impact | Revenue | Moat | Stage |
