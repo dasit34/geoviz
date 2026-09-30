@@ -30,7 +30,10 @@ import { computeConsensusIndex } from "../src/lib/consensus";
 import { parseReportScoreBreakdown } from "../src/lib/parse-report";
 import { scoreAudit } from "../src/lib/scoring";
 import { bandFor } from "../src/lib/scoring/bands";
-import { CATEGORY_HASH, WEIGHT_HASH } from "../src/lib/scoring/frozen";
+import {
+  WEIGHT_HASH,
+  categoryHashMatchesCurrent,
+} from "../src/lib/scoring/frozen";
 import type { ReplayBundle } from "../src/lib/scoring/replay-bundle";
 import type {
   Band,
@@ -472,9 +475,14 @@ async function replayOne(
   const originalCategoryHash = row.replayBundle?.category_hash ?? null;
   const weightHashMatch =
     originalWeightHash !== null ? originalWeightHash === WEIGHT_HASH : null;
+  // Compared under the scheme the row was stamped with — pre-v2 rows
+  // carry a v1 category hash, which is not comparable to CATEGORY_HASH.
   const categoryHashMatch =
     originalCategoryHash !== null
-      ? originalCategoryHash === CATEGORY_HASH
+      ? categoryHashMatchesCurrent(
+          originalCategoryHash,
+          row.replayBundle?.hash_scheme,
+        )
       : null;
   const hashMismatch =
     (weightHashMatch === false || categoryHashMatch === false) && !partial;

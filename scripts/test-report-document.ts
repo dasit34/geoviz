@@ -127,12 +127,23 @@ check("Page 5 renders the conditional score note when present", () => {
   assert.match(DOC, /rd-interp-note/);
 });
 
-check("Page 4 renders Customer Questions Tested from the model (not 'prompts')", () => {
-  assert.match(DOC, /Customer Questions Tested/);
+check("Page 4 renders Questions Customers Ask AI from the model (not 'prompts')", () => {
+  assert.match(DOC, /Questions Customers Ask AI/);
+  // These questions are generated, not sent to any model — the section
+  // must never claim they were tested.
+  assert.doesNotMatch(DOC, /Customer Questions Tested/);
+  assert.doesNotMatch(DOC, /questions we tested/i);
   assert.match(DOC, /m\.customerQuestions/);
   assert.doesNotMatch(DOC, /\bprompts?\b/i, "customer copy must not use the word 'prompt(s)'");
   // Evidence subtitle surfaced (rendered as an all-caps eyebrow label)
   assert.match(DOC, /WHAT AI HAD TO READ/i);
+});
+
+check("cross-model counts use real denominators and render 'Not measured' (no hard-coded 'of 4')", () => {
+  assert.doesNotMatch(DOC, /of 4\b/, "counts must use the providers that actually returned a result");
+  assert.doesNotMatch(DOC, /\/4 understood/);
+  assert.match(DOC, /Not measured/);
+  assert.match(DOC, /p\.mentioned === null \? NOT_MEASURED/);
 });
 
 check("light/dark page system: dark bookends fixed, light interior flows", () => {
@@ -182,7 +193,7 @@ check("light/dark page system: dark bookends fixed, light interior flows", () =>
   assert.match(rdPrintBlock[1], /widows:\s*\d/, "widows must be set on .rd in print");
 
   // List rows that can wrap to 2 lines (Executive Summary bullets,
-  // Customer Questions Tested) must not split mid-item across a page
+  // Questions Customers Ask AI) must not split mid-item across a page
   // boundary, same protection every card class already has.
   assert.match(
     CSS,

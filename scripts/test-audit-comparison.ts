@@ -21,7 +21,11 @@
 import assert from "node:assert/strict";
 import { classifyBooleanDelta, classifyScoreDelta, SCORE_DELTA_THRESHOLD } from "../src/lib/audit-comparison/classify";
 import { computeDimensions } from "../src/lib/consensus/dimensions";
-import { computeQueryConsistency } from "../src/lib/audit-comparison/queryConsistency";
+import {
+  computeQueryConsistency,
+  extractConsumerQuestion,
+} from "../src/lib/audit-comparison/queryConsistency";
+import { buildCompetitivePrompt, DISCOVERY_QUERY_TEXT } from "../src/lib/validators/capture";
 import { buildAuditComparison } from "../src/lib/audit-comparison/buildAuditComparison";
 import type { DeterministicScore } from "../src/lib/scoring/types";
 import type { NormalizedValidationOutput } from "../src/lib/validators/types";
@@ -117,6 +121,8 @@ function makeValidatorOutput(overrides: {
   mentioned?: boolean;
   recommended?: boolean;
   queryText?: string;
+  /** null = legacy record with no prompt_version stamp. */
+  promptVersion?: string | null;
   understandingScore?: number;
   citations?: string[];
 }): NormalizedValidationOutput {
@@ -134,7 +140,10 @@ function makeValidatorOutput(overrides: {
     would_recommend: overrides.recommended ? "YES" : "NO",
     competitive: {
       query_text: overrides.queryText ?? "who are the best providers",
-      prompt_version: "capture@1.0.0",
+      prompt_version:
+        overrides.promptVersion === undefined
+          ? "capture@1.0.0"
+          : (overrides.promptVersion as string),
       raw_response: "",
       inferred_category: null,
       inferred_location: null,
@@ -205,6 +214,57 @@ async function run(): Promise<void> {
       currentTaxonomyVersion: "v1",
       previousOutputs: [makeValidatorOutput({ provider: "perplexity", queryText: "league management service" })],
       currentOutputs: [makeValidatorOutput({ provider: "perplexity", queryText: "management software provider" })],
+    });
+    assert.equal(r.perProviderQueryMatch.perplexity, false);
+  });
+  const realPrompt = (evidence: unknown, question = DISCOVERY_QUERY_TEXT) =>
+    buildCompetitivePrompt({
+      businessName: "Rock Roofing",
+      url: "https://rockroofing.example",
+      deterministicScore: null,
+      categoryScores: null,
+      extractedEvidence: evidence,
+      reportContext: null,
+    }).user.replace(DISCOVERY_QUERY_TEXT, question);
+  const hvac = {
+    previousCategory: "hvac",
+    previousTaxonomyVersion: "v1",
+    currentCategory: "hvac",
+    currentTaxonomyVersion: "v1",
+  };
+  test("extractConsumerQuestion pulls the tail question from the real prompt", () => {
+    assert.equal(extractConsumerQuestion(realPrompt({ a: 1 })), DISCOVERY_QUERY_TEXT);
+    assert.equal(extractConsumerQuestion("no marker here"), null);
+  });
+  test("same prompt_version + same question, DIFFERENT embedded evidence → match=true", () => {
+    const r = computeQueryConsistency({
+      ...hvac,
+      previousOutputs: [makeValidatorOutput({ provider: "perplexity", queryText: realPrompt({ runDurationMs: 812 }) })],
+      currentOutputs: [makeValidatorOutput({ provider: "perplexity", queryText: realPrompt({ runDurationMs: 1440, title: "New" }) })],
+    });
+    assert.equal(r.perProviderQueryMatch.perplexity, true);
+  });
+  test("different prompt_version → match=false even with identical text", () => {
+    const r = computeQueryConsistency({
+      ...hvac,
+      previousOutputs: [makeValidatorOutput({ provider: "perplexity", queryText: realPrompt({}), promptVersion: "capture@1.0.0" })],
+      currentOutputs: [makeValidatorOutput({ provider: "perplexity", queryText: realPrompt({}), promptVersion: "capture@2.0.0" })],
+    });
+    assert.equal(r.perProviderQueryMatch.perplexity, false);
+  });
+  test("same prompt_version but different consumer question → match=false", () => {
+    const r = computeQueryConsistency({
+      ...hvac,
+      previousOutputs: [makeValidatorOutput({ provider: "perplexity", queryText: realPrompt({}) })],
+      currentOutputs: [makeValidatorOutput({ provider: "perplexity", queryText: realPrompt({}, "Who is the cheapest roofer nearby?") })],
+    });
+    assert.equal(r.perProviderQueryMatch.perplexity, false);
+  });
+  test("legacy records without prompt_version fall back to verbatim compare", () => {
+    const r = computeQueryConsistency({
+      ...hvac,
+      previousOutputs: [makeValidatorOutput({ provider: "perplexity", queryText: realPrompt({ a: 1 }), promptVersion: null })],
+      currentOutputs: [makeValidatorOutput({ provider: "perplexity", queryText: realPrompt({ a: 2 }), promptVersion: null })],
     });
     assert.equal(r.perProviderQueryMatch.perplexity, false);
   });
@@ -326,6 +386,41 @@ async function run(): Promise<void> {
     );
     const gemini = result.liveModel?.providers.find((p) => p.provider === "gemini");
     assert.equal(gemini?.comparable, false);
+  });
+
+  await test("failed competitive capture → mentioned is null (not measured), never false", async () => {
+    const prev = makeValidatorOutput({ provider: "claude", queryText: "q", mentioned: true });
+    const curr = makeValidatorOutput({ provider: "claude", queryText: "q" });
+    curr.competitive!.status = "failed";
+    curr.competitive!.business_named = null;
+    const result = await buildAuditComparison(
+      { auditOrderId: "prev", createdAt: new Date(), industryCategoryNormalized: "hvac", industryTaxonomyVersion: "v1", deterministicScore: null, aiValidations: { outputs: [prev] } },
+      { auditOrderId: "curr", createdAt: new Date(), industryCategoryNormalized: "hvac", industryTaxonomyVersion: "v1", deterministicScore: null, aiValidations: { outputs: [curr] } },
+    );
+    const claude = result.liveModel?.providers.find((p) => p.provider === "claude");
+    assert.equal(claude?.current?.mentioned, null);
+    assert.equal(claude?.mentioned.classification, "NOT_COMPARABLE", "a failed capture must not read as a lost mention");
+  });
+
+  await test("failed provider → citationCount null, recommended denominators count only returned providers", async () => {
+    const prev = [
+      makeValidatorOutput({ provider: "claude", recommended: true }),
+      makeValidatorOutput({ provider: "openai", recommended: false }),
+    ];
+    const curr = [
+      makeValidatorOutput({ provider: "claude", recommended: true }),
+      makeValidatorOutput({ provider: "openai", status: "failed" }),
+    ];
+    const result = await buildAuditComparison(
+      { auditOrderId: "prev", createdAt: new Date(), industryCategoryNormalized: "hvac", industryTaxonomyVersion: "v1", deterministicScore: null, aiValidations: { outputs: prev } },
+      { auditOrderId: "curr", createdAt: new Date(), industryCategoryNormalized: "hvac", industryTaxonomyVersion: "v1", deterministicScore: null, aiValidations: { outputs: curr } },
+    );
+    const openai = result.liveModel?.providers.find((p) => p.provider === "openai");
+    assert.equal(openai?.current?.citationCount, null, "failed provider has no citation count, not 0");
+    const rc = result.liveModel!.recommendedCount;
+    assert.equal(rc.previousProvidersReturned, 2);
+    assert.equal(rc.currentProvidersReturned, 1);
+    assert.equal(rc.current, 1);
   });
 
   await test("competitor new/gone detection", async () => {

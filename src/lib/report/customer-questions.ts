@@ -1,5 +1,5 @@
 /**
- * customer-questions.ts — deterministic "Customer Questions Tested".
+ * customer-questions.ts — deterministic "Questions Customers Ask AI" (formerly "Customer Questions Tested" — renamed because these are generated, never sent to a model).
  *
  * Generates the buyer-intent questions a real customer would ask an AI before
  * choosing a business, built ENTIRELY from data the audit already has (business

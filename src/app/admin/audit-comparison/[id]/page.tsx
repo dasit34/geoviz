@@ -265,9 +265,12 @@ export default async function AdminAuditComparisonPage({
               </tbody>
             </table>
             <p className="mt-3 text-sm text-white/70">
-              Recommended: {comparison.liveModel.recommendedCount.previous} →{" "}
-              {comparison.liveModel.recommendedCount.current} of{" "}
-              {comparison.liveModel.recommendedCount.totalProviders}
+              Recommended: {comparison.liveModel.recommendedCount.previous}/
+              {comparison.liveModel.recommendedCount.previousProvidersReturned} →{" "}
+              {comparison.liveModel.recommendedCount.current}/
+              {comparison.liveModel.recommendedCount.currentProvidersReturned} (providers
+              that returned a result; {comparison.liveModel.recommendedCount.totalProviders}{" "}
+              tested)
             </p>
             {comparison.liveModel.competitors.newlyAppearing.length > 0 ? (
               <p className="mt-2 text-sm text-white/70">

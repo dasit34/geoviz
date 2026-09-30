@@ -310,12 +310,35 @@ check("actual model recommendation count is never confused with the readiness sc
   assert.equal(m.crossModel.recommendedCount, 0, "expected 0 of 4 models to recommend in this fixture");
   assert.equal(m.crossModel.mentionedCount, 2, "expected 2 of 4 models to mention in this fixture");
   assert.doesNotMatch(m.crossModel.recommendedCopy, /%/, "recommendedCopy must be a count sentence, never a percentage");
-  assert.match(m.crossModel.recommendedCopy, /none of the four tested ai systems recommended your business during this audit/i);
+  assert.match(m.crossModel.recommendedCopy, /none of the four ai systems that returned a result recommended your business during this audit/i);
   assert.notEqual(
     m.crossModel.recommendedCount,
     m.recommendationReadiness!.score,
     "the model-recommendation count and the readiness score must stay visibly distinct fields",
   );
+});
+
+check("failed provider / failed capture is 'not measured' — excluded from denominators, never 'No'", () => {
+  const input = structuredClone(RECOMMENDATION_READINESS_CONTRADICTION_INPUT);
+  const outputs = input.providerOutputs as Array<Record<string, unknown>>;
+  // gemini's buyer-intent capture failed (validator still passed)…
+  const gemini = outputs.find((o) => o.provider === "gemini")!;
+  gemini.competitive = { status: "failed", business_named: null, entities: [] };
+  // …and perplexity did not respond at all.
+  const perplexity = outputs.find((o) => o.provider === "perplexity")!;
+  perplexity.status = "failed";
+  perplexity.business_understanding_score = null;
+  perplexity.would_recommend = undefined;
+  perplexity.industry_identified = undefined;
+  perplexity.missing_facts = [];
+  perplexity.competitive = null;
+  const m = buildReportModel(input)!;
+  const g = m.providers.find((p) => p.provider === "gemini")!;
+  assert.equal(g.mentioned, null, "failed capture must be null, not false");
+  assert.equal(m.crossModel.mentionedCount, 2);
+  assert.equal(m.crossModel.mentionMeasuredCount, 2, "only openai + claude captures were measured");
+  assert.ok(m.crossModel.modelsTested < 4, `expected < 4 models tested, got ${m.crossModel.modelsTested}`);
+  assert.doesNotMatch(m.crossModel.recommendedCopy, /\bfour\b/i, "copy must not claim four systems when fewer returned");
 });
 
 check("issue evidence mapping: reviews finding shows its own message, not the category's shared NAP reason", () => {

@@ -2,7 +2,7 @@
 /**
  * scripts/test-customer-questions.ts
  *
- * Guards the deterministic "Customer Questions Tested" generator: real
+ * Guards the deterministic "Questions Customers Ask AI" generator: real
  * buyer-intent questions built from business name / industry / detected city +
  * services, NEVER inventing a city the audit didn't find, never leaking a
  * template placeholder, and never using the word "prompts".

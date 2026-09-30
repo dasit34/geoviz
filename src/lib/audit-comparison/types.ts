@@ -82,8 +82,10 @@ export type ProviderSnapshot = {
   status: string;
   businessUnderstandingScore: number | null;
   wouldRecommend: string | null;
-  mentioned: boolean;
-  citationCount: number;
+  /** null = not measured (capture failed / absent) — never "not mentioned". */
+  mentioned: boolean | null;
+  /** null = provider returned no usable result — never 0. */
+  citationCount: number | null;
   topEntityNamed: string | null;
   queryText: string | null;
 };
@@ -105,8 +107,20 @@ export type CompetitorComparison = {
 export type LiveModelComparison = {
   providers: ProviderComparisonEntry[];
   competitors: CompetitorComparison;
-  /** How many of the tested providers recommended the business, previous vs current. */
-  recommendedCount: { previous: number; current: number; totalProviders: number };
+  /**
+   * How many providers recommended the business, previous vs current.
+   * Each side's denominator is the providers that actually returned a
+   * usable result on that audit (`*ProvidersReturned`), not the number
+   * tested — a failed provider is "not measured", not "didn't recommend".
+   */
+  recommendedCount: {
+    previous: number;
+    current: number;
+    previousProvidersReturned: number;
+    currentProvidersReturned: number;
+    /** Providers GeoViz attempts per audit (display context only). */
+    totalProviders: number;
+  };
 };
 
 // ── Query / category consistency (governs `comparable` above) ──

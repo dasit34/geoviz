@@ -260,11 +260,29 @@ function toSnapshot(o: NormalizedValidationOutput | undefined): ProviderSnapshot
     status: o.status,
     businessUnderstandingScore: o.business_understanding_score,
     wouldRecommend: o.would_recommend ?? null,
-    mentioned: o.competitive?.business_named === true,
-    citationCount: o.cited_sources?.length ?? 0,
+    // Tri-state: null = not measured (competitive capture failed, was
+    // disabled, or predates capture) — never coerced to "not mentioned".
+    mentioned:
+      !o.competitive ||
+      (o.competitive.status && o.competitive.status !== "passed") ||
+      typeof o.competitive.business_named !== "boolean"
+        ? null
+        : o.competitive.business_named,
+    // Null when the provider didn't return a usable result — a failed
+    // call has no citations to count, which is not the same as zero.
+    citationCount:
+      o.status === "passed" && Array.isArray(o.cited_sources)
+        ? o.cited_sources.length
+        : null,
     topEntityNamed: o.competitive?.entities?.[0] ?? null,
     queryText: o.competitive?.query_text ?? null,
   };
+}
+
+/** YES → true; NO / PARTIAL → false; no verdict recorded → null (not measured). */
+function recommendedFlag(s: ProviderSnapshot | null): boolean | null {
+  if (!s || s.wouldRecommend === null) return null;
+  return s.wouldRecommend === "YES";
 }
 
 function buildLiveModel(
@@ -307,8 +325,8 @@ function buildLiveModel(
         : { previous: null, current: null, classification: "NOT_COMPARABLE" },
       recommended: comparable
         ? classifyBooleanDelta(
-            previous ? previous.wouldRecommend === "YES" : null,
-            current ? current.wouldRecommend === "YES" : null,
+            recommendedFlag(previous),
+            recommendedFlag(current),
           )
         : { previous: null, current: null, classification: "NOT_COMPARABLE" },
       citationCount: comparable
@@ -327,9 +345,16 @@ function buildLiveModel(
     persisting: currentlyNamed.filter((c) => previouslyNamed.includes(c)),
   };
 
+  // Denominators are the providers that actually returned a usable
+  // result on each audit — a failed/unavailable provider neither
+  // recommended nor declined to recommend.
+  const returned = (outputs: NormalizedValidationOutput[]) =>
+    outputs.filter((o) => o.status === "passed");
   const recommendedCount = {
-    previous: previousOutputs.filter((o) => o.would_recommend === "YES").length,
-    current: currentOutputs.filter((o) => o.would_recommend === "YES").length,
+    previous: returned(previousOutputs).filter((o) => o.would_recommend === "YES").length,
+    current: returned(currentOutputs).filter((o) => o.would_recommend === "YES").length,
+    previousProvidersReturned: returned(previousOutputs).length,
+    currentProvidersReturned: returned(currentOutputs).length,
     totalProviders: PROVIDER_ORDER.length,
   };
 

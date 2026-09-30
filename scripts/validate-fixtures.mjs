@@ -48,7 +48,7 @@ const FORBIDDEN = [
 const REQUIRED_PAGE_TITLES = [
   "Executive Summary",
   "AI Intelligence",
-  "Customer Questions Tested",
+  "Questions Customers Ask AI",
   "Top Issues",
 ];
 

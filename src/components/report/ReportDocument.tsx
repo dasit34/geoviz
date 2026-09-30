@@ -236,7 +236,7 @@ function ExecutivePage({
           <Stat
             accent="amber"
             k="Live AI Recommendations"
-            v={`${cm.recommendedCount} of 4`}
+            v={ofCount(cm.recommendedCount, cm.modelsTested)}
             note={cm.recommendedCopy}
           />
         ) : (
@@ -305,6 +305,13 @@ function Stat({
 
 /** Join display names into readable prose: ["A"]→"A", ["A","B"]→"A and B",
  *  ["A","B","C"]→"A, B, and C". */
+const NOT_MEASURED = "Not measured";
+
+/** "n of d" against the models that actually returned a result; never "of 0". */
+function ofCount(n: number, d: number): string {
+  return d > 0 ? `${n} of ${d}` : NOT_MEASURED;
+}
+
 function joinNames(names: string[]): string {
   if (names.length <= 1) return names[0] ?? "";
   if (names.length === 2) return `${names[0]} and ${names[1]}`;
@@ -371,23 +378,28 @@ function AIIntelligencePage({
             <Stat
               accent="blue"
               k="Consensus"
-              v={cm.consensusLabel ?? `${cm.recognizedCount}/4 understood`}
+              v={
+                cm.consensusLabel ??
+                (cm.modelsTested > 0
+                  ? `${cm.recognizedCount}/${cm.modelsTested} understood`
+                  : NOT_MEASURED)
+              }
               note={
                 cm.consensusAgreement
                   ? `${cm.consensusAgreement} agreement across models`
-                  : "across the four tested models"
+                  : "across the models that returned a result"
               }
             />
             <Stat
               accent="amber"
               k="Mentioned"
-              v={`${cm.mentionedCount} of 4`}
+              v={ofCount(cm.mentionedCount, cm.mentionMeasuredCount)}
               note="named your business in their answer"
             />
             <Stat
               accent={cm.recommendedCount === 0 ? "amber" : cm.recommendedCount >= 3 ? "green" : "blue"}
               k="Recommended"
-              v={`${cm.recommendedCount} of 4`}
+              v={ofCount(cm.recommendedCount, cm.modelsTested)}
               note={
                 cm.recommendedCount === 0
                   ? "no AI would suggest you to a customer"
@@ -396,12 +408,12 @@ function AIIntelligencePage({
             />
           </div>
 
-          {cm.recommendedCount === 0 && cm.mentionedCount > 0 ? (
+          {cm.recommendedCount === 0 && cm.mentionedCount > 0 && cm.modelsTested > 0 ? (
             <Callout
               kind="issue"
               label="KEY FINDING"
               title={`AI systems know who ${m.meta.businessName} is — but none of them recommend you.`}
-              body={`${cm.mentionedCount} of 4 AI models named your business when asked. Zero of 4 would recommend you to a customer today. Being found is not the same as being chosen — and the gap between those two is what this report addresses.`}
+              body={`${cm.mentionedCount} of ${cm.mentionMeasuredCount} AI models named your business when asked. Zero of ${cm.modelsTested} would recommend you to a customer today. Being found is not the same as being chosen — and the gap between those two is what this report addresses.`}
             />
           ) : null}
 
@@ -443,7 +455,7 @@ function AIIntelligencePage({
             <Callout
               kind="issue"
               label="ENTITY NAME CONSISTENCY"
-              title={`AI recognized this business in ${cm.mentionedCount} of 4 answers, but used inconsistent name variants.`}
+              title={`AI recognized this business in ${cm.mentionedCount} of ${cm.mentionMeasuredCount} answers, but used inconsistent name variants.`}
               body={`Models referred to the business as ${joinNames(cm.entityNameVariants)}. AI can identify the business, but the entity name should be standardized so AI systems recognize one consistent brand.${
                 cm.recommendedCount < cm.mentionedCount
                   ? " AI systems recognized the business, but did not confidently recommend it."
@@ -456,12 +468,12 @@ function AIIntelligencePage({
               label="COMPETITIVE DISPLACEMENT"
               title={
                 cm.topCompetitor
-                  ? `${cm.topCompetitor.name} appears in ${cm.topCompetitor.count} of 4 AI answers`
+                  ? `${cm.topCompetitor.name} appears in ${cm.topCompetitor.count} of ${Math.max(cm.topCompetitor.count, cm.competitorAnswerCount)} AI answers`
                   : cm.competitorsTied!.length === 2
                     ? `${cm.competitorsTied![0]} and ${cm.competitorsTied![1]} appeared most often across the AI answers`
                     : "Competitors were named across the AI answers"
               }
-              body={`Your business is named in ${cm.mentionedCount} of 4. When customers ask AI who to choose, the businesses AI names — not just the ones that rank — win the introduction.`}
+              body={`Your business is named in ${cm.mentionedCount} of ${cm.mentionMeasuredCount}. When customers ask AI who to choose, the businesses AI names — not just the ones that rank — win the introduction.`}
             />
           ) : null}
 
@@ -528,11 +540,11 @@ function ModelMatrixRow({
         {p.understandingScore ?? "—"}
       </td>
       <td className={`rd-v-${confTone}`}>{conf ? conf.toUpperCase() : "—"}</td>
-      <td className={`rd-v-${p.mentioned ? "ok" : "muted"}`}>
-        {p.mentioned ? "Yes" : "No"}
+      <td className={`rd-v-${p.mentioned === true ? "ok" : "muted"}`}>
+        {p.mentioned === null ? NOT_MEASURED : p.mentioned ? "Yes" : "No"}
       </td>
       <td className="rd-matrix-comp">
-        {p.mentioned ? businessName : (p.competitors[0] ?? "—")}
+        {p.mentioned === true ? businessName : (p.competitors[0] ?? "—")}
       </td>
       <td className="rd-matrix-num">{p.citationDomains.length || "—"}</td>
     </tr>
@@ -556,10 +568,12 @@ function EvidencePage({
 
       {m.customerQuestions.length > 0 ? (
         <>
-          <h1 className="rd-title">Customer Questions Tested</h1>
+          <h1 className="rd-title">Questions Customers Ask AI</h1>
           <p className="rd-sub">
-            The buyer-intent questions we tested across AI systems for{" "}
-            {m.meta.businessName}.
+            Buyer-intent questions customers are likely to ask AI systems
+            when looking for a business like {m.meta.businessName}. This
+            audit put one representative buyer question to each AI system
+            (see AI Intelligence); these define what to track next.
           </p>
           <ul className="rd-questions-list">
             {m.customerQuestions.slice(0, 5).map((q) => (
@@ -569,8 +583,8 @@ function EvidencePage({
             ))}
           </ul>
           <p className="rd-questions-foot">
-            These questions test whether AI systems can identify, understand,
-            trust, and recommend the business in real buying situations.
+            These are the buying situations where AI systems need to identify,
+            understand, trust, and recommend the business.
           </p>
           <div className="rd-page-divider" />
         </>
