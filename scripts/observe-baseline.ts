@@ -21,6 +21,7 @@
  * the mocked cost projection light up.
  */
 
+import "./lib/require-nonprod-db";
 import "dotenv/config";
 
 import {

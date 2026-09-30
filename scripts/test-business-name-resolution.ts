@@ -17,6 +17,7 @@
  * input — not a mere case/whitespace/substring variation).
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import {

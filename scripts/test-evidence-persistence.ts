@@ -12,6 +12,7 @@
  *
  * Exit code 0 if all assertions pass; 1 otherwise.
  */
+import "./lib/require-nonprod-db";
 import { persistObservationEvidence } from "../src/lib/intelligence/evidence/persistObservationEvidence";
 import type {
   NormalizedValidationOutput,

@@ -23,6 +23,7 @@
  *   5. runPreflight orchestrator — never throws on degenerate input.
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { extractReadableContent } from "../src/lib/intelligence/preflight/extractReadableContent";
 import { validateSchema } from "../src/lib/intelligence/preflight/schemaValidation";

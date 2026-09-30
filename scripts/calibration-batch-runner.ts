@@ -30,6 +30,7 @@
  * not yet processed.
  */
 
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";

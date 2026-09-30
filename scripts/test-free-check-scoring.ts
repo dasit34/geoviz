@@ -16,6 +16,7 @@
  *   4. strengths/problems/fixes are capped at 3 each.
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { deriveChecks } from "../src/lib/free-check/deriveChecks";
 import type { DeriveChecksInput } from "../src/lib/free-check/deriveChecks";

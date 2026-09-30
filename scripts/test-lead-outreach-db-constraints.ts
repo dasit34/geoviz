@@ -7,6 +7,7 @@
  * unconditionally (even on failure).
  * Run: npx tsx scripts/test-lead-outreach-db-constraints.ts
  */
+import "./lib/require-nonprod-db";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 

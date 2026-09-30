@@ -18,6 +18,7 @@
  *     (legacy audits keep their behavior — fail-soft, no over-strip).
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import {

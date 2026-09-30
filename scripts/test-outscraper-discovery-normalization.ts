@@ -5,6 +5,7 @@
  * confirms the "missing key" error path never throws and never crashes).
  * Run: npx tsx scripts/test-outscraper-discovery-normalization.ts
  */
+import "./lib/require-nonprod-db";
 import { toNormalizedRecord, OutscraperProvider } from "@/lib/discovery/providers/outscraper";
 
 let failures = 0;

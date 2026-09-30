@@ -6,6 +6,7 @@
  * stray trailing space/newline on a Railway secret never reaches an auth header
  * (and a whitespace-only value reads as MISSING, not present-but-doomed).
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import { readApiKey } from "../src/lib/validators/apiKey";

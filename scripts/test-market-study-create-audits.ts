@@ -7,6 +7,7 @@
  *
  *   npx tsx scripts/test-market-study-create-audits.ts
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import {

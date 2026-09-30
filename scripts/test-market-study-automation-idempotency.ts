@@ -15,6 +15,7 @@
  *
  * Requires a live DB connection.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { prisma } from "@/lib/db";
 import { claimDailyRun } from "@/lib/market-studies/automation/runTick";

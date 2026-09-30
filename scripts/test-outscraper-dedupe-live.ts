@@ -7,6 +7,7 @@
  * cleans them up unconditionally (even on failure).
  * Run: npx tsx scripts/test-outscraper-dedupe-live.ts
  */
+import "./lib/require-nonprod-db";
 import { prisma } from "@/lib/db";
 import { importDiscoveredBusiness } from "@/lib/leads/dedupe";
 import type { NormalizedBusinessRecord } from "@/lib/discovery/types";

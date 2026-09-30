@@ -20,6 +20,7 @@
  *
  * Run: npx tsx scripts/test-prepare-for-outreach-route.ts
  */
+import "./lib/require-nonprod-db";
 import { prisma } from "@/lib/db";
 import { POST as prepareForOutreachPOST } from "../src/app/api/admin/leads/prepare-for-outreach/route";
 

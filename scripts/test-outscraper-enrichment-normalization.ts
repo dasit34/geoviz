@@ -3,6 +3,7 @@
  * (pickBestContact) and gating when OUTSCRAPER_API_KEY is unset.
  * Run: npx tsx scripts/test-outscraper-enrichment-normalization.ts
  */
+import "./lib/require-nonprod-db";
 import { pickBestContact, OutscraperEnrichmentProvider } from "@/lib/enrichment/providers/outscraper";
 
 let failures = 0;

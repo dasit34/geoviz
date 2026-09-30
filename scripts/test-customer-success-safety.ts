@@ -25,6 +25,7 @@
  *      personalization that could leak metadata).
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import {
   CUSTOMER_SUCCESS_SUBJECT,

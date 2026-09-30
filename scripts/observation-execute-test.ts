@@ -23,6 +23,7 @@
  *   npm run observation:execute-test
  */
 
+import "./lib/require-nonprod-db";
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 

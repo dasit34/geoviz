@@ -19,8 +19,15 @@
  * calibration dashboard UI.
  */
 
+import { enforceNonProductionDatabase } from "./lib/nonprod-db-guard";
 import { PrismaClient } from "@prisma/client";
 import { parseReportScoreBreakdown } from "../src/lib/parse-report";
+
+// `--archetypes` is an offline projection (no DB). Every other mode reads
+// and can write AuditOrder rows, so it is gated like the other ops scripts.
+if (!process.argv.includes("--archetypes")) {
+  enforceNonProductionDatabase({ allowBreakGlass: true });
+}
 
 const CALIBRATION_PREFIX = "[CAL]";
 

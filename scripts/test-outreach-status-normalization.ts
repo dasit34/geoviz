@@ -3,6 +3,7 @@
  * (partially unverified) raw status shapes to GeoViz's outreach enum.
  * Run: npx tsx scripts/test-outreach-status-normalization.ts
  */
+import "./lib/require-nonprod-db";
 import { normalizeOutreachStatus } from "@/lib/leads/normalizeOutreachStatus";
 
 let failures = 0;

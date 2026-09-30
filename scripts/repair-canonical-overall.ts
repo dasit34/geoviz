@@ -50,6 +50,7 @@
  *     apply.
  */
 
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { parseReportScoreBreakdown } from "../src/lib/parse-report";

@@ -26,6 +26,7 @@
  *     or the corresponding `AuditOrder` row.
  */
 
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import { Prisma, PrismaClient } from "@prisma/client";
 

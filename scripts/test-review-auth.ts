@@ -13,6 +13,7 @@
  * Requires a live DB connection (DATABASE_URL) — same category as
  * `report:validate:live`, not a hermetic unit test.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { prisma } from "../src/lib/db";
 import { POST } from "../src/app/api/admin/orders/[id]/review/route";

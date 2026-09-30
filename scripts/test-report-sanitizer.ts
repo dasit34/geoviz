@@ -18,6 +18,7 @@
  *   8. `containsPreambleBeforeTitle` predicate flips false after run.
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import {
   containsPreambleBeforeTitle,

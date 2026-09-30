@@ -16,6 +16,7 @@
  * Exit: 0 if both renderers reference only the shared constants;
  *       1 if any hardcoded `"Section <number>"` literal is found.
  */
+import "./lib/require-nonprod-db";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { SECTION_EYEBROWS } from "../src/lib/report-sections";

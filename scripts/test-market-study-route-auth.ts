@@ -8,6 +8,7 @@
  *
  *   npx tsx scripts/test-market-study-route-auth.ts
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 process.env.ADMIN_SECRET = process.env.ADMIN_SECRET || "test-admin-secret-1234567890";

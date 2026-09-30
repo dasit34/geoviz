@@ -16,6 +16,7 @@
  *
  * Run: npx tsx scripts/test-prepare-for-outreach.ts
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { prisma } from "@/lib/db";
 import { prepareLeadsForOutreach } from "@/lib/leads/prepareForOutreach";

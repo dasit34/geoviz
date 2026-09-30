@@ -7,6 +7,7 @@
  * creates a new row for a providerLeadId it doesn't recognize.
  * Run: npx tsx scripts/test-outbound-sync-route.ts
  */
+import "./lib/require-nonprod-db";
 import { prisma } from "@/lib/db";
 import { POST as syncPOST } from "../src/app/api/admin/leads/outbound/sync/route";
 

@@ -24,6 +24,7 @@
  *   5. hash invariance            (WEIGHT_HASH + CATEGORY_HASH unchanged)
  */
 
+import "./lib/require-nonprod-db";
 import "dotenv/config";
 import { Prisma, PrismaClient } from "@prisma/client";
 

@@ -15,6 +15,7 @@
  *   - the rubric-weight chip drops to its own line in print.
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

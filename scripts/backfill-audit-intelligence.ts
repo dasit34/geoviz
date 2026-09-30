@@ -40,6 +40,7 @@
  * that output before running the real backfill.
  */
 
+import "./lib/require-nonprod-db-or-break-glass";
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import {

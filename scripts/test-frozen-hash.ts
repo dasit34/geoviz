@@ -9,6 +9,7 @@
  * WEIGHT_HASH is byte-identical across the scheme change, and that
  * historical v1 stamps still verify against the current structure.
  */
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import { BUCKET_MAP } from "../src/lib/scoring/buckets";

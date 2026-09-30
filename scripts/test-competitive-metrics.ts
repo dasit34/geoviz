@@ -15,6 +15,7 @@
  *
  * Exit code 0 if all assertions pass; 1 otherwise.
  */
+import "./lib/require-nonprod-db";
 import { mentionRate } from "../src/lib/intelligence/competitive/mentionRate";
 import { recommendationRate } from "../src/lib/intelligence/competitive/recommendationRate";
 import { shareOfVoice } from "../src/lib/intelligence/competitive/shareOfVoice";

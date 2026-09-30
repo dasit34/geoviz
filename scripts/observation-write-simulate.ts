@@ -13,6 +13,7 @@
  * persistent change unless `--commit` is passed.
  */
 
+import "./lib/require-nonprod-db";
 import "dotenv/config";
 import { Prisma, PrismaClient } from "@prisma/client";
 

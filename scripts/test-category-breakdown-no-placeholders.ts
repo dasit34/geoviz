@@ -21,6 +21,7 @@
  *      placeholder string template.
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

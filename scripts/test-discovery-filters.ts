@@ -2,6 +2,7 @@
  * Tests filterDiscoveryRecords() — provider-agnostic pre-import filters.
  * Run: npx tsx scripts/test-discovery-filters.ts
  */
+import "./lib/require-nonprod-db";
 import { filterDiscoveryRecords } from "@/lib/leads/discoveryFilters";
 import type { NormalizedBusinessRecord } from "@/lib/discovery/types";
 

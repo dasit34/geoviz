@@ -24,6 +24,7 @@
  * source for the prop being threaded.
  */
 
+import "./lib/require-nonprod-db";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 

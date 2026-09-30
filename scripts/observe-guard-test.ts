@@ -19,6 +19,7 @@
  *   npm run observe:guard-test
  */
 
+import "./lib/require-nonprod-db";
 import "dotenv/config";
 
 import { CATEGORY_HASH, WEIGHT_HASH } from "../src/lib/scoring/frozen";

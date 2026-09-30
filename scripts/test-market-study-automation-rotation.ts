@@ -3,6 +3,7 @@
  * deterministic, stateless, no DB. Run:
  *   npx tsx scripts/test-market-study-automation-rotation.ts
  */
+import "./lib/require-nonprod-db";
 import {
   pickTodaysIndustryLocation,
   utcMidnight,

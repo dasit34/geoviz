@@ -22,6 +22,7 @@
  *   7. Sum is clamped to [0, 100] (no negative or >100 outputs).
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import {
   parseReportScoreBreakdown,

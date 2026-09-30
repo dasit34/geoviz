@@ -24,6 +24,7 @@
  *      schema persisted as Json)
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { runIntelligenceIngest } from "../src/lib/intelligence/intelligenceIngest";
 import { detectCms } from "../src/lib/intelligence/detectCms";

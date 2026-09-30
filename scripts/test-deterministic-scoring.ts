@@ -21,6 +21,7 @@
  *      no deterministicScore is present.
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import * as fs from "node:fs";

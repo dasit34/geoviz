@@ -19,6 +19,7 @@
  *   3. Range sanity: emitted overall is clamped to 0..100.
  */
 
+import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 
 import { parseReportScoreBreakdown } from "../src/lib/parse-report";
