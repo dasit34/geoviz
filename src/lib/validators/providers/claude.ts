@@ -60,7 +60,7 @@ const REQUIRED_ENV_VARS = ["ANTHROPIC_API_KEY"] as const;
 // Model + parameters isolated in this file so future swaps are
 // one-line changes. Haiku selected for cost + latency (validator is
 // checking interpretation, not generating reports).
-const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
+export const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 const CLAUDE_TIMEOUT_MS = 15_000;
 const CLAUDE_MAX_TOKENS = 1024;
 const CLAUDE_TEMPERATURE = 0.1;

@@ -13,7 +13,7 @@
 import { mayQueueAuditFor } from "./access";
 import { isMonitoringEnabled } from "./plans";
 import { nextAuditAfter, scheduledRunSessionId } from "./schedule";
-import type { MonitoringStore } from "./types";
+import type { MonitoringStore, MonitoringSubscriptionRecord } from "./types";
 
 export const DEFAULT_MAX_PER_TICK = 3;
 
@@ -26,13 +26,22 @@ export type SchedulerTickResult =
       alreadyQueued: string[];
       skippedInFlight: string[];
       skippedNoAccess: string[];
+      trackingErrors: string[];
     };
+
+/**
+ * Optional prompt-tracking hook, run for each due subscription with the
+ * same `scheduledFor` key as its re-audit (so a retried tick resumes the
+ * same cycle and never re-pays for answers — see tracking/cycle.ts).
+ */
+export type TrackingCycleHook = (sub: MonitoringSubscriptionRecord, cycleKey: string) => Promise<unknown>;
 
 export async function runMonitoringSchedulerTick(deps: {
   store: MonitoringStore;
   now: () => Date;
   env?: Record<string, string | undefined>;
   maxPerTick?: number;
+  runTrackingCycle?: TrackingCycleHook;
 }): Promise<SchedulerTickResult> {
   if (!isMonitoringEnabled(deps.env ?? process.env)) return { outcome: "disabled" };
 
@@ -45,6 +54,7 @@ export async function runMonitoringSchedulerTick(deps: {
     alreadyQueued: [] as string[],
     skippedInFlight: [] as string[],
     skippedNoAccess: [] as string[],
+    trackingErrors: [] as string[],
   };
 
   for (const sub of due) {
@@ -64,6 +74,16 @@ export async function runMonitoringSchedulerTick(deps: {
       queuedAt: now,
     });
     (created.outcome === "created" ? result.queued : result.alreadyQueued).push(sub.id);
+    if (deps.runTrackingCycle) {
+      try {
+        await deps.runTrackingCycle(sub, scheduledFor.toISOString());
+      } catch (err) {
+        // Tracking is resumable (same cycleKey) via the manual trigger; it
+        // must never block the re-audit schedule.
+        console.error(`[monitoring-scheduler] tracking cycle failed for ${sub.id}:`, err);
+        result.trackingErrors.push(sub.id);
+      }
+    }
     await deps.store.advanceSchedule(sub.id, nextAuditAfter(scheduledFor, sub.cadenceDays, now), now);
   }
   return result;

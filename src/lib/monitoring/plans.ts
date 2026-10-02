@@ -13,14 +13,48 @@
  * amount is whatever the Stripe price is set to.
  */
 
+/** Tracking providers the runner knows how to call (src/lib/monitoring/tracking/providers.ts). */
+export type TrackingProvider = "claude" | "openai" | "gemini" | "perplexity";
+export const ALL_TRACKING_PROVIDERS: readonly TrackingProvider[] = ["claude", "openai", "gemini", "perplexity"];
+
+/**
+ * What a plan grants. Feature code reads ONLY these numbers — never the
+ * plan key or price — so a future plan changes limits here, not in logic.
+ */
+export type PlanEntitlements = {
+  /** Scheduled full GeoViz re-audits per billing cycle (via the existing pipeline). */
+  fullReauditsPerCycle: number;
+  historicalScoreTracking: boolean;
+  /** Max simultaneously active tracked prompts (0 = prompt tracking off). */
+  maxActivePrompts: number;
+  /** Max simultaneously active tracked competitors (0 = competitor tracking off). */
+  maxCompetitors: number;
+  citationTracking: boolean;
+  reportHistory: boolean;
+  /** Which AI providers tracked prompts run against. */
+  providers: readonly TrackingProvider[];
+};
+
 export type MonitoringPlan = {
   key: string;
   name: string;
   description: string;
-  /** Days between scheduled re-audits. */
+  /** Days between scheduled monitoring cycles (re-audit + prompt tracking). */
   cadenceDays: number;
   /** Env var holding the Stripe recurring price id. */
   priceEnvVar: string;
+  entitlements: PlanEntitlements;
+};
+
+/** Early Access limits — the monthly plan today. */
+export const EARLY_ACCESS_ENTITLEMENTS: PlanEntitlements = {
+  fullReauditsPerCycle: 1,
+  historicalScoreTracking: true,
+  maxActivePrompts: 10,
+  maxCompetitors: 3,
+  citationTracking: true,
+  reportHistory: true,
+  providers: ALL_TRACKING_PROVIDERS,
 };
 
 export const MONITORING_PLANS: readonly MonitoringPlan[] = [
@@ -28,9 +62,10 @@ export const MONITORING_PLANS: readonly MonitoringPlan[] = [
     key: "monthly",
     name: "Monthly AI Visibility Monitoring",
     description:
-      "A fresh AI visibility audit every month, reviewed before delivery, with score change against your previous audit.",
+      "A fresh AI visibility audit every month plus tracked customer questions, competitor comparison, and citation tracking across AI systems.",
     cadenceDays: 30,
     priceEnvVar: "STRIPE_MONITORING_MONTHLY_PRICE_ID",
+    entitlements: EARLY_ACCESS_ENTITLEMENTS,
   },
 ];
 
@@ -57,6 +92,15 @@ export function configuredPlans(env: Env = process.env): ResolvedPlan[] {
   return MONITORING_PLANS.map((p) => resolvePlan(p.key, env)).filter(
     (p): p is ResolvedPlan => p !== null,
   );
+}
+
+/**
+ * Entitlements for a subscription's plan key. A key no longer in the
+ * catalog keeps Early Access limits (never silently strips a paying
+ * customer's features).
+ */
+export function entitlementsForPlan(key: string | null | undefined): PlanEntitlements {
+  return findPlan(key)?.entitlements ?? EARLY_ACCESS_ENTITLEMENTS;
 }
 
 export function cadenceDaysForPlan(key: string | null | undefined): number {

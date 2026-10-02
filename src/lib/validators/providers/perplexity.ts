@@ -63,7 +63,7 @@ const PROVIDER_NAME = "perplexity";
 const REQUIRED_ENV_VARS = ["PERPLEXITY_API_KEY"] as const;
 
 // Model is isolated in this file so future swaps are a one-line change.
-const PERPLEXITY_MODEL = "sonar";
+export const PERPLEXITY_MODEL = "sonar";
 const PERPLEXITY_ENDPOINT = "https://api.perplexity.ai/chat/completions";
 const PERPLEXITY_TIMEOUT_MS = 15_000;
 const PERPLEXITY_TEMPERATURE = 0.1;

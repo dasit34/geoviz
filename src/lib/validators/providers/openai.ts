@@ -58,7 +58,7 @@ const PROVIDER_NAME = "openai";
 const REQUIRED_ENV_VARS = ["OPENAI_API_KEY"] as const;
 
 // Model is isolated in this file so future swaps are a one-line change.
-const OPENAI_MODEL = "gpt-4.1-mini";
+export const OPENAI_MODEL = "gpt-4.1-mini";
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 const OPENAI_TIMEOUT_MS = 15_000;
 const OPENAI_TEMPERATURE = 0.1;

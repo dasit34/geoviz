@@ -242,8 +242,47 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
   `/monitoring/<token>` (status, next audit, latest/previous score and
   change from **reviewed** audits only, report links, Stripe billing
   portal via `POST /api/monitoring/portal`). No login.
-- **Not in this slice:** organic prompt panel, change detection, alerts,
-  competitor intelligence.
+- **Visibility tracking v1** (`src/lib/monitoring/tracking/`, same flag):
+  durable tracked questions (`TrackedPrompt`, suggested from the audit's
+  detected city/services via `buildCustomerQuestions`, or custom),
+  tracked competitors (`TrackedCompetitor`, customer-entered or promoted
+  from AI answers), and per-cycle runs (`MonitoringCycle` →
+  `PromptRunResult`, one row per question × AI system). Each question is
+  sent **organically** (no evidence, no score, no business name) to the
+  existing pinned validator models via their APIs, web-grounded where
+  available; mentions/position/competitors are detected
+  **deterministically** (`detector.ts`), never self-reported. Failures are
+  `not_measured` — excluded from every rate, never 0. Metrics
+  (`metrics.ts`): mention rate, citation rate, average position, share of
+  voice, per-provider breakdown, like-for-like cycle comparison
+  (only pairs measured in both runs). Citation intelligence + evidence-
+  backed recommendations (5 categories, each citing its trigger). Cycles
+  are idempotent: unique `(subscription, cycleKey)`, each answer claimed
+  before the paid call (no double charges), resumable after crashes.
+  Tracking is NOT stored in `Observation` (that table requires an audit
+  order per row).
+- **Entitlements** (`plans.ts` → `PlanEntitlements`): feature code reads
+  only these numbers. Monthly (Early Access): 1 scheduled full re-audit
+  per billing cycle, historical score tracking, 10 active tracked
+  questions, 3 competitors, citation tracking, report history, providers
+  claude/openai/gemini/perplexity. A new plan = a new catalog entry.
+- **$59 manual re-audit vs. monthly monitoring.** The $59 re-audit is a
+  separate one-time purchase (`/re-audit`, `STRIPE_REAUDIT_PRICE_ID`,
+  `orderType "RE_AUDIT"`, needs an approved prior report) and is
+  unchanged. Monthly monitoring is a subscription that schedules its own
+  re-audits (`"MONITORING_RECHECK"`) plus question tracking. Neither
+  replaces the other; `test-monitoring-token-and-reaudit` pins this.
+- **Staging tools:** `npm run seed:monitoring-staging`,
+  `npm run monitoring:run-cycle -- --subscription <id>` (both refuse
+  production — strict DB guard, no override).
+- **Behind the flag / not live in Production:** everything above.
+  Production has no monitoring price, no scheduler cron, flag unset.
+- **Next layer: supervised improvement / fix workflows** — turn
+  recommendations into operator-reviewed fix packages (schema, llms.txt,
+  content/FAQ drafts) delivered through the Foundation Fix process, with
+  before/after measured by the next monitoring cycle. Never auto-modify
+  customer sites.
+- **Not built yet:** change detection, alerts, automated fixes.
 
 **What this is NOT.** The AI Visibility Layer is **not** an attempt
 to rebuild customer websites. We are not a CMS. We are not a site
@@ -719,7 +758,8 @@ non-production. Enforced in code:
   `daily-market-study-automation`, `recover-missing-checkout-order`,
   `verify-system`, `intelligence:*`, `diagnose:*`, `benchmark:*`,
   `score:validate`, `score:premigration-check`, `monitoring:scheduler`
-  (Railway cron, production runtime).
+  (Railway cron, production runtime). `monitoring:run-cycle` and
+  `seed:monitoring-staging` ARE strictly guarded (staging only).
 
 ## Infrastructure State (as of 2026-09-30)
 

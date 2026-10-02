@@ -13,6 +13,12 @@ Standalone $0→$100M reference. Full stage-by-stage business narrative lives in
 | **$50M** | + Benchmark licensing (Data Licensing v1), early Data Intelligence Network | Licensing deals $50K–500K/yr per licensee | First signed licensing deal with a recognizable brand, automated remediation live with clean incident record |
 | **$100M** | Full "AI Visibility Operating System" — Monitoring, Layer, Alerts, Competitor Intelligence, Benchmarking, Enterprise, API, Data Licensing, Network | Fully segmented GTM pricing (SMB self-serve, mid-market/agency, enterprise, licensing/BD) | Dataset defensibly larger than any named competitor's, path to default-alive |
 
+## Build status (2026-10-02)
+
+- **Live in Production:** $97 AI Visibility Audit, $59 manual re-audit, Foundation Fix (manual).
+- **Built, behind `GEO_MODULE_MONITORING_ENABLED` (off in Production):** monthly AI Visibility Monitoring subscription — Stripe subscription checkout + idempotent webhooks, scheduled full re-audits, tokenized customer dashboard (Overview, Score History, Tracked Questions, Competitors, Citations, Reports, Recommended Actions), visibility tracking v1 (organic tracked questions across OpenAI/Anthropic/Google/Perplexity APIs, competitor share of voice, citation intelligence, evidence-backed recommendations). Entitlements are configurable per plan (Early Access: 10 questions, 3 competitors, 1 full re-audit/cycle).
+- **Next:** supervised improvement/fix workflows (operator-reviewed fix packages, measured by the next monitoring cycle), then change detection and alerts.
+
 ## Which modules unlock which revenue line
 
 See `docs/MODULE_DEPENDENCY_GRAPH.md` "Which modules unlock each stage's exit criteria" for the module-to-stage mapping. In revenue-line terms:

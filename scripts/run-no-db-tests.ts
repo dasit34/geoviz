@@ -60,6 +60,12 @@ const NO_DB_TESTS = [
   "test-monitoring-access",
   "test-monitoring-scheduler",
   "test-monitoring-cancellation",
+  "test-monitoring-token-and-reaudit",
+  // visibility tracking v1
+  "test-tracking-prompts-competitors",
+  "test-tracking-normalize",
+  "test-tracking-metrics",
+  "test-tracking-cycle",
 ];
 
 // `--only <substring>` narrows the run (e.g. `npm run test:monitoring`).
