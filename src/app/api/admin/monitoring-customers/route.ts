@@ -20,7 +20,8 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   const field = (k: string) => (typeof form?.get(k) === "string" ? String(form?.get(k)).trim() : "");
-  const key = readAdminKeyFromRequest(req) ?? field("key");
+  const formKey = field("key");
+  const key = readAdminKeyFromRequest(req) ?? formKey;
   if (!isAuthed() && !isValidAdminKey(key)) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
   const sub = await prisma.monitoringSubscription.findUnique({ where: { id: field("subscriptionId") } });
@@ -28,7 +29,9 @@ export async function POST(req: Request) {
 
   const back = (notice: string) => {
     const url = new URL("/admin/monitoring-customers", resolveAppBaseUrl(req));
-    if (key && !isAuthed()) url.searchParams.set("key", key);
+    // Carry the key back only when the admin page itself posted it (the
+    // page is ?key= authenticated); never echo a header secret into a URL.
+    if (formKey && !isAuthed() && isValidAdminKey(formKey)) url.searchParams.set("key", formKey);
     url.searchParams.set("notice", notice);
     return NextResponse.redirect(url, 303);
   };
