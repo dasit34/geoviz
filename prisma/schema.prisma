@@ -1346,6 +1346,10 @@ model MonitoringSubscription {
   monitoringCycles   MonitoringCycle[]
   websiteScans       WebsiteScan[]
 
+  // Supervised improvement workflows v1 (src/lib/monitoring/improvements/).
+  businessFactSheets BusinessFactSheet[]
+  improvementTasks   ImprovementTask[]
+
   @@index([status, nextAuditAt])
   @@index([businessId])
   @@index([email])
@@ -1653,4 +1657,142 @@ model WebsiteChange {
 
   @@unique([toScanId, changeType, url])
   @@index([subscriptionId, toFetchedAt])
+}
+
+// ── Supervised improvement workflows v1 ─────────────────────────────────
+// Findings → operator/customer-reviewed improvement tasks with deterministic
+// fix drafts, independent scanner verification, and history. Nothing here
+// edits a customer website. See src/lib/monitoring/improvements/.
+
+/// Customer/operator-confirmed business facts used by fix drafts.
+/// Immutable versions — the highest version is current.
+model BusinessFactSheet {
+  id             String                 @id @default(cuid())
+  subscriptionId String
+  subscription   MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  version        Int
+  /// { name, phone, street, city, region, postal, hours, services[], serviceAreas[], licenses[] } — null = missing.
+  facts          Json
+  /// "customer" | "operator"
+  confirmedBy    String
+  createdAt      DateTime               @default(now())
+
+  @@unique([subscriptionId, version])
+}
+
+model ImprovementTask {
+  id                  String                 @id @default(cuid())
+  subscriptionId      String
+  subscription        MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  /// Recommendation id this task came from (stable across recomputation).
+  dedupeKey           String
+  /// "<subscriptionId>:<dedupeKey>" while open; null once verified/dismissed — one open task per finding.
+  openKey             String?                @unique
+  /// "audit" | "tracking" | "website"
+  source              String
+  category            String
+  /// "structured_data" | "title_description" | "page_outline" | "faq" | "identity_checklist" | "citation" | "restore_page" | "general"
+  fixKind             String
+  title               String
+  problem             String
+  /// [{ text, url?, observedAt? }]
+  evidence            Json
+  url                 String?
+  priority            Int
+  priorityReason      String
+  proposedFix         String
+  /// "customer" | "operator" | "unassigned"
+  owner               String                 @default("unassigned")
+  /// "suggested" | "approved" | "in_progress" | "implemented" | "verified" | "dismissed"
+  status              String                 @default("suggested")
+  /// "scanner" | "manual"
+  verificationMethod  String
+  /// Deterministic check spec evaluated by verify.ts.
+  expectation         Json?
+  implementationUrl   String?
+  implementationNotes String?
+  approvedAt          DateTime?
+  implementedAt       DateTime?
+  implementedBy       String?
+  verifiedAt          DateTime?
+  verifiedBy          String?
+  dismissedAt         DateTime?
+  dismissReason       String?
+  occurrences         Int                    @default(1)
+  /// Demonstration data (staging fixture) — badged, never real evidence.
+  isFixture           Boolean                @default(false)
+  lastSeenAt          DateTime               @default(now())
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  drafts        ImprovementDraft[]
+  events        ImprovementEvent[]
+  verifications ImprovementVerification[]
+
+  @@index([subscriptionId, status])
+  @@index([subscriptionId, dedupeKey])
+}
+
+/// Immutable fix-package draft versions.
+model ImprovementDraft {
+  id               String          @id @default(cuid())
+  taskId           String
+  task             ImprovementTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  version          Int
+  kind             String
+  /// "jsonld" | "text" | "markdown" | "checklist"
+  format           String
+  content          String
+  /// Facts the draft needs but that are not confirmed yet.
+  missingFacts     Json
+  factSheetVersion Int?
+  generatorVersion String
+  createdBy        String
+  createdAt        DateTime        @default(now())
+
+  @@unique([taskId, version])
+}
+
+/// Task history (append-only).
+model ImprovementEvent {
+  id         String          @id @default(cuid())
+  taskId     String
+  task       ImprovementTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  /// "customer" | "operator" | "system"
+  actor      String
+  /// "created" | "status_changed" | "note" | "draft_created" | "recurrence" | "verification" | "owner_changed"
+  type       String
+  fromStatus String?
+  toStatus   String?
+  note       String?
+  detail     Json?
+  createdAt  DateTime        @default(now())
+
+  @@index([taskId, createdAt])
+}
+
+/// Independent scanner checks of an implemented task (retryable job).
+model ImprovementVerification {
+  id             String          @id @default(cuid())
+  taskId         String
+  task           ImprovementTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  /// "queued" | "running" | "done"
+  status         String          @default("queued")
+  attempts       Int             @default(0)
+  nextRetryAt    DateTime?
+  claimedAt      DateTime?
+  url            String
+  expected       Json
+  observed       Json?
+  /// "verified" | "not_found" | "could_not_verify"
+  outcome        String?
+  fetchStatus    String?
+  lastError      String?
+  isFixture      Boolean         @default(false)
+  checkedAt      DateTime?
+  createdAt      DateTime        @default(now())
+
+  @@index([status, nextRetryAt])
+  @@index([taskId, createdAt])
 }

@@ -8,12 +8,15 @@
  * Re-queues stale scans, then claims and runs up to
  * MONITORING_WEBSITE_SCANS_PER_RUN queued scans (default 4). Scans are
  * separate jobs: a failure here never touches re-audits or question
- * tracking. Does nothing unless GEO_MODULE_MONITORING_ENABLED="true".
+ * tracking. Then runs queued improvement verifications (one robots.txt +
+ * one page fetch each). Does nothing unless GEO_MODULE_MONITORING_ENABLED="true".
  * Production runtime job — intentionally NOT behind the non-production
  * DB guard (like `monitoring:scheduler`).
  */
 import { prisma } from "../src/lib/db";
 import { isMonitoringEnabled } from "../src/lib/monitoring/plans";
+import { prismaVerificationStore } from "../src/lib/monitoring/improvements/prisma-store";
+import { runQueuedVerifications } from "../src/lib/monitoring/improvements/verify";
 import { runWebsiteScans } from "../src/lib/monitoring/website/service";
 
 async function main(): Promise<void> {
@@ -21,6 +24,11 @@ async function main(): Promise<void> {
   const maxScans = Number(process.env.MONITORING_WEBSITE_SCANS_PER_RUN) || 4;
   const result = await runWebsiteScans({ maxScans });
   console.log(`[monitoring-website-scans] ${JSON.stringify(result)}`);
+  // Improvement verifications (independent checks of "implemented" tasks).
+  // Fixture checks are only ever run by the staging fixture script.
+  const maxChecks = Number(process.env.MONITORING_IMPROVEMENT_CHECKS_PER_RUN) || 10;
+  const checks = await runQueuedVerifications({ store: prismaVerificationStore, now: () => new Date(), maxChecks });
+  console.log(`[monitoring-improvement-checks] ${JSON.stringify(checks)}`);
 }
 
 main()
