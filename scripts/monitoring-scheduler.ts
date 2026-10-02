@@ -14,6 +14,7 @@ import { prismaMonitoringStore } from "../src/lib/monitoring/prisma-store";
 import { runMonitoringSchedulerTick } from "../src/lib/monitoring/scheduler";
 import { createLiveTrackingClient } from "../src/lib/monitoring/tracking/providers";
 import { runTrackingCycleForSubscription } from "../src/lib/monitoring/tracking/service";
+import { enqueueWebsiteScansForSubscription } from "../src/lib/monitoring/website/service";
 
 async function main(): Promise<void> {
   const maxPerTick = Number(process.env.MONITORING_SCHEDULER_MAX_PER_TICK) || undefined;
@@ -23,6 +24,7 @@ async function main(): Promise<void> {
     maxPerTick,
     runTrackingCycle: (sub, cycleKey) =>
       runTrackingCycleForSubscription(sub, { cycleKey, trigger: "scheduler", client: createLiveTrackingClient() }),
+    enqueueWebsiteScans: (sub, cycleKey) => enqueueWebsiteScansForSubscription(sub, cycleKey),
   });
   console.log(`[monitoring-scheduler] ${JSON.stringify(result)}`);
 }

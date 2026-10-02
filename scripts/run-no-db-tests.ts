@@ -70,6 +70,12 @@ const NO_DB_TESTS = [
   "test-tracking-samples",
   "test-tracking-call-states",
   "test-tracking-pricing",
+  // website snapshots + change detection v1
+  "test-website-url-safety",
+  "test-website-robots",
+  "test-website-scan",
+  "test-website-diff",
+  "test-website-jobs",
 ];
 
 // `--only <substring>` narrows the run (e.g. `npm run test:monitoring`).

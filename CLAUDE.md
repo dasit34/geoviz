@@ -312,18 +312,74 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
   (`monitoring:scheduler`, worker env incl. all 4 provider keys); run a
   Stripe test-mode end-to-end on Preview; complete the two deferred smoke
   checks; then enable the flag in Production.
-- **Next build: competitor website snapshots + change detection** —
-  periodic fetches of the customer's and tracked competitors' sites
-  (reuse the preflight fetch/analyzers), stored as immutable snapshots,
-  diffed for schema / content / crawlability / entity changes, and
-  correlated with tracking movement. Then alerts, then supervised fixes.
+- **Website snapshots + change detection v1** (`src/lib/monitoring/website/`,
+  same flag; branch `feat/website-change-tracking-v1`, NOT merged): bounded,
+  immutable snapshots of the customer's site + up to `maxCompetitorSites`
+  competitors with a **confirmed** website (`TrackedCompetitor.domainConfirmedAt`,
+  set only when the customer/operator supplies the URL — never inferred
+  from a name; AI-detected competitors show "Add website").
+  - **Safe fetch** (`safe-fetch.ts`): http/https on 80/443 only, no URL
+    credentials, every DNS answer validated at connect time (blocks
+    loopback/private/link-local/CGNAT/multicast/reserved, IPv6
+    ULA/link-local, IPv4-mapped + NAT64 — anti-rebinding), manual
+    same-site redirects (max 3, each hop re-validated), 10 s timeout,
+    2 MB cap, fixed UA `GeoVizSiteScanner/1.0`. 401/403 = `access_denied`,
+    never retried or bypassed.
+  - **robots.txt** (`robots.ts`, RFC 9309): our group else `*`, longest
+    match, `*`/`$`; 4xx → no restrictions; 5xx/network → the site is not
+    scanned this time. Crawl-delay honored (min 500 ms, cap 5 s).
+  - **Discovery** (`discover.ts`): homepage + same-site about/service/
+    location links + sitemap (one index level, ≤ `maxSitemapUrlsRead`
+    locs), ≤ `maxPagesPerSite`; previously captured pages are re-checked,
+    with slots reserved for new pages.
+  - **Extraction** (`extract.ts`, `SCANNER_VERSION`): title, description,
+    canonical, h1–h3, noise-filtered content blocks (nav/header/footer/
+    aside/forms/cookie banners removed; dates, times, copyright years,
+    "x days ago" normalized out of the fingerprint), JSON-LD types +
+    LocalBusiness fields (reuses preflight `validateSchema` /
+    `checkEntityConsistency`), heuristic services/locations.
+  - **Diff** (`diff.ts`, `DIFF_VERSION`): first scan = "Baseline
+    recorded"; scanner MAJOR change = "Baseline re-recorded"; removed
+    only on a direct-re-check 404/410 (timeouts/5xx/blocked = "couldn't
+    check", never removed); added only when discovery worked in both
+    scans; title/description/headings/schema/services/locations/identity
+    (homepage) changes; material content = 5-word-shingle Jaccard < 0.85
+    AND ≥ 200 changed chars. Before/after excerpts ≤ 300 chars + dates.
+  - **Jobs** (`scan-job.ts`, `prisma-store.ts`): scheduler only ENQUEUES
+    (`WebsiteScan`, unique per subscription/cycleKey/site; failures caught →
+    `websiteErrors`, never blocking re-audits or tracking).
+    `npm run monitoring:website-scans` (Railway cron, production runtime,
+    flag-gated, unguarded) claims atomically, retries transient failures
+    with backoff (10 min / 1 h / 6 h, max 3 attempts), re-queues stale
+    running scans (30 min). Site rules (robots disallow, 401/403) are
+    terminal. Snapshots + changes + scan status are written in one
+    transaction and never updated.
+  - **Entitlements:** `websiteTracking { enabled, maxPagesPerSite: 12,
+    maxSitemapUrlsRead: 200, maxCompetitorSites: 3 }` (Early Access).
+  - **Cost:** no paid APIs; `costUsd = 0` recorded with requests, bytes,
+    duration per scan.
+  - **Dashboard:** "Website Changes" tab — per-site cards (your website /
+    competitor), changes with source URL + before/after excerpts + dates,
+    "Couldn't check" list, timeline interleaving website changes with AI
+    tracking runs under fixed no-causation copy. Website findings
+    (lost LocalBusiness schema, confirmed removed page, identity change,
+    competitor topic you don't cover — framed as an opportunity) feed
+    Recommended Actions. No auto-edits, no alerts.
+  - **Fixture data:** `isFixture = true` rows (staging demo,
+    `scripts/monitoring-website-fixture.ts`, fake `fixture-hvac.example`
+    served from memory) are badged "FIXTURE (demonstration data)", shown
+    in a separate section, and never feed recommendations.
+  - **Staging tools:** `npm run monitoring:scan-sites -- --subscription <id>
+    [--confirm-competitor "Name=domain"]` (strictly guarded).
+  - **Limits:** raw HTML only (no JS rendering — client-rendered or
+    one-page sites capture little); services/locations are heuristic.
 - **Next layer: supervised improvement / fix workflows** — turn
   recommendations into operator-reviewed fix packages (schema, llms.txt,
   content/FAQ drafts) delivered through the Foundation Fix process, with
   before/after measured by the next monitoring cycle. Never auto-modify
   customer sites.
-- **Not built yet:** competitor-website crawling, website-change
-  detection, alerts, supervised/automated fixes.
+- **Not built yet:** alerts, JS-rendered snapshots, supervised/automated
+  fixes.
 
 **What this is NOT.** The AI Visibility Layer is **not** an attempt
 to rebuild customer websites. We are not a CMS. We are not a site
@@ -798,9 +854,11 @@ non-production. Enforced in code:
   `geo-worker` (Railway runs `geo-worker:dev`),
   `daily-market-study-automation`, `recover-missing-checkout-order`,
   `verify-system`, `intelligence:*`, `diagnose:*`, `benchmark:*`,
-  `score:validate`, `score:premigration-check`, `monitoring:scheduler`
-  (Railway cron, production runtime). `monitoring:run-cycle` and
-  `seed:monitoring-staging` ARE strictly guarded (staging only).
+  `score:validate`, `score:premigration-check`, `monitoring:scheduler`,
+  `monitoring:website-scans` (Railway crons, production runtime).
+  `monitoring:run-cycle`, `monitoring:scan-sites`,
+  `scripts/monitoring-website-fixture.ts`, and `seed:monitoring-staging`
+  ARE strictly guarded (staging only).
 
 ## Infrastructure State (as of 2026-10-02)
 

@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { monitoringAccess } from "../access";
 import { entitlementsForPlan } from "../plans";
 import type { MonitoringSubscriptionRecord } from "../types";
+import { decideCompetitorWebsite } from "../website/targets";
 import { buildCitationIntel } from "./citation-intel";
 import { decideCompetitorAdd, detectCompetitors } from "./competitors";
 import { runMonitoringCycle, type RunCycleResult } from "./cycle";
@@ -16,7 +17,7 @@ import { buildEntityMatcher } from "./detector";
 import { compareCycles, computeCycleMetrics, type CycleMetrics } from "./metrics";
 import { prismaTrackingStore, toResultForMetrics } from "./prisma-store";
 import { decidePromptAdd, extractSuggestionContext, suggestPrompts } from "./prompts";
-import { buildRecommendations, issuesFromDeterministicScore } from "./recommendations";
+import { buildRecommendations, issuesFromDeterministicScore, type Recommendation } from "./recommendations";
 import type { CompetitorRef, TrackingProviderClient } from "./types";
 
 export function customerMatcherFor(sub: Pick<MonitoringSubscriptionRecord, "businessName" | "websiteUrl">) {
@@ -66,10 +67,19 @@ export async function addTrackedCompetitor(
     customer: customerMatcherFor(sub),
   });
   if (!d.ok) return { ok: false, message: d.message };
+  // A website typed in by the customer is a confirmed domain (website
+  // tracking scans only those). Detected competitors never get one.
+  let site: { websiteUrl: string; domain: string; domainConfirmedAt: Date } | null = null;
+  if (d.websiteUrl && source === "customer") {
+    const others = await prisma.trackedCompetitor.findMany({ where: { subscriptionId: sub.id, isActive: true, domain: { not: null }, normalizedName: { not: d.normalizedName } }, select: { domain: true } });
+    const w = decideCompetitorWebsite({ websiteUrl: d.websiteUrl, customerWebsiteUrl: sub.websiteUrl, otherCompetitorDomains: others.map((o) => o.domain!) });
+    if (!w.ok) return { ok: false, message: w.message };
+    site = { websiteUrl: w.websiteUrl, domain: w.domain, domainConfirmedAt: new Date() };
+  }
   await prisma.trackedCompetitor.upsert({
     where: { subscriptionId_normalizedName: { subscriptionId: sub.id, normalizedName: d.normalizedName } },
-    create: { subscriptionId: sub.id, name: d.name, normalizedName: d.normalizedName, websiteUrl: d.websiteUrl, domain: d.domain, source },
-    update: { isActive: true, deactivatedAt: null, ...(d.websiteUrl ? { websiteUrl: d.websiteUrl, domain: d.domain } : {}) },
+    create: { subscriptionId: sub.id, name: d.name, normalizedName: d.normalizedName, websiteUrl: site?.websiteUrl ?? null, domain: site?.domain ?? null, domainConfirmedAt: site?.domainConfirmedAt ?? null, source },
+    update: { isActive: true, deactivatedAt: null, ...(site ?? {}) },
   });
   return { ok: true };
 }
@@ -115,7 +125,7 @@ export async function runTrackingCycleForSubscription(
 }
 
 /** Everything the tracking tabs of the status page need. */
-export async function loadTrackingDashboard(sub: MonitoringSubscriptionRecord) {
+export async function loadTrackingDashboard(sub: MonitoringSubscriptionRecord, opts: { websiteFindings?: Recommendation[] } = {}) {
   const ent = entitlementsForPlan(sub.planKey);
   const customerDomain = normalizeDomain(sub.websiteUrl);
   const customer = customerMatcherFor(sub);
@@ -175,6 +185,7 @@ export async function loadTrackingDashboard(sub: MonitoringSubscriptionRecord) {
     citations,
     detectedCompetitors: detected,
     customerName: sub.businessName || customerDomain || "Your business",
+    websiteFindings: opts.websiteFindings,
   });
 
   const promptText = new Map(prompts.map((p) => [p.id, p.text]));
@@ -185,7 +196,7 @@ export async function loadTrackingDashboard(sub: MonitoringSubscriptionRecord) {
     entitlements: ent,
     canEdit: canEditTracking(sub),
     prompts: prompts.map((p) => ({ id: p.id, text: p.text, source: p.source, results: latestByPrompt.get(p.id) ?? [] })),
-    competitors: competitors.map((c) => ({ id: c.id, name: c.name, websiteUrl: c.websiteUrl, source: c.source })),
+    competitors: competitors.map((c) => ({ id: c.id, name: c.name, websiteUrl: c.websiteUrl, domainConfirmed: c.domainConfirmedAt !== null, source: c.source })),
     detectedCompetitors: detected,
     suggestions,
     latestCycle: latestCycle

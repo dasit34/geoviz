@@ -24,6 +24,8 @@
     "market-study:daily-cron": "tsx scripts/daily-market-study-automation.ts",
     "monitoring:scheduler": "tsx scripts/monitoring-scheduler.ts",
     "monitoring:run-cycle": "tsx scripts/monitoring-run-cycle.ts",
+    "monitoring:website-scans": "tsx scripts/monitoring-website-scans.ts",
+    "monitoring:scan-sites": "tsx scripts/monitoring-scan-sites.ts",
     "seed:monitoring-staging": "tsx scripts/seed-monitoring-staging.ts",
     "test:worker-recovery": "tsx scripts/test-worker-recovery.ts",
     "test:checkout-audit-creation": "tsx scripts/test-checkout-audit-creation.ts",

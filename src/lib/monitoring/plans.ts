@@ -35,6 +35,18 @@ export type PlanEntitlements = {
   providers: readonly TrackingProvider[];
   /** Independent samples per (question, AI system) per cycle — answers vary run to run. */
   samplesPerPrompt: number;
+  /** Website snapshots + change detection (src/lib/monitoring/website/). */
+  websiteTracking: WebsiteTrackingEntitlement;
+};
+
+export type WebsiteTrackingEntitlement = {
+  enabled: boolean;
+  /** Pages captured per site per scan (homepage included). */
+  maxPagesPerSite: number;
+  /** Sitemap <loc> entries read per site per scan. */
+  maxSitemapUrlsRead: number;
+  /** Confirmed competitor websites scanned per cycle (in addition to the customer's). */
+  maxCompetitorSites: number;
 };
 
 export type MonitoringPlan = {
@@ -58,6 +70,7 @@ export const EARLY_ACCESS_ENTITLEMENTS: PlanEntitlements = {
   reportHistory: true,
   providers: ALL_TRACKING_PROVIDERS,
   samplesPerPrompt: 2,
+  websiteTracking: { enabled: true, maxPagesPerSite: 12, maxSitemapUrlsRead: 200, maxCompetitorSites: 3 },
 };
 
 export const MONITORING_PLANS: readonly MonitoringPlan[] = [

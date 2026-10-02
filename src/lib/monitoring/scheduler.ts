@@ -27,6 +27,7 @@ export type SchedulerTickResult =
       skippedInFlight: string[];
       skippedNoAccess: string[];
       trackingErrors: string[];
+      websiteErrors: string[];
     };
 
 /**
@@ -36,12 +37,20 @@ export type SchedulerTickResult =
  */
 export type TrackingCycleHook = (sub: MonitoringSubscriptionRecord, cycleKey: string) => Promise<unknown>;
 
+/**
+ * Optional website-tracking hook: ENQUEUES scan jobs only (same cycleKey;
+ * idempotent). Scans run separately (`npm run monitoring:website-scans`),
+ * so a slow or failing website never delays the re-audit or tracking.
+ */
+export type WebsiteScanEnqueueHook = (sub: MonitoringSubscriptionRecord, cycleKey: string) => Promise<unknown>;
+
 export async function runMonitoringSchedulerTick(deps: {
   store: MonitoringStore;
   now: () => Date;
   env?: Record<string, string | undefined>;
   maxPerTick?: number;
   runTrackingCycle?: TrackingCycleHook;
+  enqueueWebsiteScans?: WebsiteScanEnqueueHook;
 }): Promise<SchedulerTickResult> {
   if (!isMonitoringEnabled(deps.env ?? process.env)) return { outcome: "disabled" };
 
@@ -55,6 +64,7 @@ export async function runMonitoringSchedulerTick(deps: {
     skippedInFlight: [] as string[],
     skippedNoAccess: [] as string[],
     trackingErrors: [] as string[],
+    websiteErrors: [] as string[],
   };
 
   for (const sub of due) {
@@ -82,6 +92,14 @@ export async function runMonitoringSchedulerTick(deps: {
         // must never block the re-audit schedule.
         console.error(`[monitoring-scheduler] tracking cycle failed for ${sub.id}:`, err);
         result.trackingErrors.push(sub.id);
+      }
+    }
+    if (deps.enqueueWebsiteScans) {
+      try {
+        await deps.enqueueWebsiteScans(sub, scheduledFor.toISOString());
+      } catch (err) {
+        console.error(`[monitoring-scheduler] website scan enqueue failed for ${sub.id}:`, err);
+        result.websiteErrors.push(sub.id);
       }
     }
     await deps.store.advanceSchedule(sub.id, nextAuditAfter(scheduledFor, sub.cadenceDays, now), now);

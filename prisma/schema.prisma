@@ -1344,6 +1344,7 @@ model MonitoringSubscription {
   trackedPrompts     TrackedPrompt[]
   trackedCompetitors TrackedCompetitor[]
   monitoringCycles   MonitoringCycle[]
+  websiteScans       WebsiteScan[]
 
   @@index([status, nextAuditAt])
   @@index([businessId])
@@ -1403,19 +1404,23 @@ model TrackedPrompt {
 /// A competitor the customer tracks — entered by the customer or
 /// promoted from businesses AI answers named.
 model TrackedCompetitor {
-  id             String                 @id @default(cuid())
-  subscriptionId String
-  subscription   MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  name           String
-  normalizedName String
-  websiteUrl     String?
+  id                String                 @id @default(cuid())
+  subscriptionId    String
+  subscription      MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  name              String
+  normalizedName    String
+  websiteUrl        String?
   /// normalizeDomain(websiteUrl) — matched against cited domains.
-  domain         String?
+  domain            String?
+  /// Set only when the customer (or an operator) supplies the website —
+  /// website-change tracking scans ONLY competitors with this set. A domain
+  /// is never inferred from a business name.
+  domainConfirmedAt DateTime?
   /// "customer" | "detected"
-  source         String
-  isActive       Boolean                @default(true)
-  createdAt      DateTime               @default(now())
-  deactivatedAt  DateTime?
+  source            String
+  isActive          Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  deactivatedAt     DateTime?
 
   @@unique([subscriptionId, normalizedName])
   @@index([subscriptionId, isActive])
@@ -1527,4 +1532,125 @@ model PromptRunResult {
   @@index([callState])
   @@index([subscriptionId, provider])
   @@index([trackedPromptId])
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Website change tracking v1 (src/lib/monitoring/website/). Behind
+// GEO_MODULE_MONITORING_ENABLED. Bounded, robots-respecting scans of the
+// customer's site and up to N confirmed competitor sites. Additive only.
+// ─────────────────────────────────────────────────────────────────
+
+/// One bounded scan of one site, run as a separate retryable job so a
+/// website failure never blocks an audit or a question-tracking cycle.
+model WebsiteScan {
+  id                  String                 @id @default(cuid())
+  subscriptionId      String
+  subscription        MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  trackedCompetitorId String?
+  /// "customer" | "competitor"
+  siteKind            String
+  /// normalizeDomain() of the scanned site.
+  siteDomain          String
+  siteUrl             String
+  /// Monitoring cycle key this scan belongs to (or "manual:<iso>").
+  cycleKey            String
+  /// "queued" | "running" | "completed" | "partial" | "failed" | "blocked"
+  status              String                 @default("queued")
+  attempts            Int                    @default(0)
+  nextRetryAt         DateTime?
+  claimedAt           DateTime?
+  lastError           String?
+  scannerVersion      String
+  /// robots.txt outcome: "rules" | "none (4xx)" | "unavailable" | …
+  robotsOutcome       String?
+  /// Normalized URLs discovered (nav + sitemap) — separates "added" from "newly sampled".
+  discoveredUrls      Json?
+  /// True when the homepage loaded, so discovery is trustworthy.
+  discoveryComplete   Boolean                @default(false)
+  /// "baseline" | "baseline_rerecorded" | "compared" (set after diffing)
+  diffOutcome         String?
+  /// Scan this one was compared against.
+  comparedToScanId    String?
+  /// Demonstration data — never real customer evidence.
+  isFixture           Boolean                @default(false)
+  pagesAttempted      Int                    @default(0)
+  pagesOk             Int                    @default(0)
+  pagesFailed         Int                    @default(0)
+  requests            Int                    @default(0)
+  bytesFetched        Int                    @default(0)
+  durationMs          Int?
+  /// No paid APIs are used; recorded explicitly as 0.
+  costUsd             Decimal                @default(0) @db.Decimal(10, 6)
+  createdAt           DateTime               @default(now())
+  startedAt           DateTime?
+  completedAt         DateTime?
+
+  pages PageSnapshot[]
+
+  @@unique([subscriptionId, cycleKey, siteDomain])
+  @@index([status, nextRetryAt])
+  @@index([subscriptionId, siteDomain, completedAt])
+}
+
+/// Immutable record of one page fetch within a scan. Failed fetches are
+/// stored with their `fetchStatus` and never count as valid snapshots —
+/// a failed fetch never implies a page was removed.
+model PageSnapshot {
+  id                 String      @id @default(cuid())
+  scanId             String
+  scan               WebsiteScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  subscriptionId     String
+  siteDomain         String
+  url                String
+  normalizedUrl      String
+  /// "homepage" | "nav_link" | "sitemap" | "recheck"
+  discoveredVia      String
+  /// "ok" | "not_found" | "access_denied" | "blocked_robots" | "blocked_unsafe" | "redirect_offsite" | "http_error" | "timeout" | "network_error" | "not_html" | "too_large"
+  fetchStatus        String
+  httpStatus         Int?
+  finalUrl           String?
+  /// Failure detail (null when fetchStatus = "ok").
+  fetchError         String?
+  title              String?
+  metaDescription    String?
+  canonicalUrl       String?
+  headings           Json
+  /// Noise-filtered visible content blocks (capped).
+  contentBlocks      Json
+  contentFingerprint String?
+  structuredData     Json?
+  identity           Json?
+  services           Json
+  locations          Json
+  scannerVersion     String
+  fetchedAt          DateTime    @default(now())
+
+  @@unique([scanId, normalizedUrl])
+  @@index([subscriptionId, siteDomain])
+}
+
+/// Immutable detected change between two successful compatible scans.
+model WebsiteChange {
+  id                  String   @id @default(cuid())
+  subscriptionId      String
+  siteDomain          String
+  /// "customer" | "competitor"
+  siteKind            String
+  trackedCompetitorId String?
+  fromScanId          String
+  toScanId            String
+  /// "page_added" | "page_removed" | "title_changed" | "description_changed" | "headings_changed" | "structured_data_changed" | "services_changed" | "locations_changed" | "identity_changed" | "content_changed"
+  changeType          String
+  url                 String
+  beforeExcerpt       String?
+  afterExcerpt        String?
+  detail              Json?
+  fromFetchedAt       DateTime
+  toFetchedAt         DateTime
+  diffVersion         String
+  isFixture           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  @@unique([toScanId, changeType, url])
+  @@index([subscriptionId, toFetchedAt])
 }

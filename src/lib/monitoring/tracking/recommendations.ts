@@ -33,7 +33,9 @@ export type Recommendation = {
   action: string;
   /** Plain-language description of the evidence that triggered this. */
   evidence: string;
-  source: "audit" | "tracking";
+  source: "audit" | "tracking" | "website";
+  /** Source page for website findings. */
+  url?: string;
 };
 
 export type AuditIssue = { id: string; severity: string; category_key: string; message: string };
@@ -51,6 +53,7 @@ function categoryForIssue(issue: AuditIssue): RecommendationCategory {
   }
 }
 
+const SOURCE_ORDER: Record<Recommendation["source"], number> = { tracking: 0, website: 1, audit: 2 };
 const SEVERITY_PRIORITY: Record<string, 1 | 2 | 3> = { critical: 1, warning: 2, info: 3 };
 const pct = (r: number) => `${Math.round(r * 100)}%`;
 
@@ -60,9 +63,11 @@ export function buildRecommendations(input: {
   citations: CitationIntel | null;
   detectedCompetitors: DetectedCompetitor[];
   customerName: string;
+  /** Evidence-backed findings from website change tracking (website/findings.ts). */
+  websiteFindings?: Recommendation[];
   limit?: number;
 }): Recommendation[] {
-  const out: Recommendation[] = [];
+  const out: Recommendation[] = [...(input.websiteFindings ?? [])];
   const auditDate = input.audit?.completedAt.toISOString().slice(0, 10);
 
   for (const issue of input.audit?.issues ?? []) {
@@ -160,7 +165,7 @@ export function buildRecommendations(input: {
   const seen = new Set<string>();
   return out
     .filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)))
-    .sort((a, b) => a.priority - b.priority || (a.source === "tracking" ? -1 : 1))
+    .sort((a, b) => a.priority - b.priority || SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source])
     .slice(0, input.limit ?? 12);
 }
 

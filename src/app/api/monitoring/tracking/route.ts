@@ -10,6 +10,7 @@ import {
   deactivateTrackedPrompt,
   type MutationResult,
 } from "@/lib/monitoring/tracking/service";
+import { setCompetitorWebsite } from "@/lib/monitoring/website/service";
 import { applyApiRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -49,6 +50,10 @@ export async function POST(req: Request) {
     case "track_detected_competitor":
       tab = "competitors";
       result = await addTrackedCompetitor(sub, field("name"), null, "detected");
+      break;
+    case "set_competitor_website":
+      tab = field("returnTab") === "website" ? "website" : "competitors";
+      result = await setCompetitorWebsite(sub, field("id"), field("websiteUrl"));
       break;
     case "remove_competitor":
       tab = "competitors";

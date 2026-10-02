@@ -15,6 +15,7 @@ export const MONITORING_TABS = [
   { key: "prompts", label: "Tracked Questions" },
   { key: "competitors", label: "Competitors" },
   { key: "citations", label: "Citations" },
+  { key: "website", label: "Website Changes" },
   { key: "reports", label: "Reports" },
   { key: "actions", label: "Recommended Actions" },
 ] as const;
@@ -332,7 +333,7 @@ export function CompetitorsSection({
   canEdit,
 }: {
   token: string;
-  competitors: Array<{ id: string; name: string; websiteUrl: string | null; source: string }>;
+  competitors: Array<{ id: string; name: string; websiteUrl: string | null; domainConfirmed?: boolean; source: string }>;
   detected: Array<{ name: string; answers: number; providers: string[] }>;
   metrics: CycleMetrics | null;
   maxCompetitors: number;
@@ -343,7 +344,7 @@ export function CompetitorsSection({
     <div className="mt-8 space-y-8">
       <p className="muted text-sm">
         Compare how often AI answers name you and up to {maxCompetitors} competitors across your tracked questions. This measures
-        presence in AI answers only — it doesn&apos;t crawl or monitor competitors&apos; websites.
+        presence in AI answers only. Website changes for competitors whose website you&apos;ve confirmed appear in the Website Changes tab.
       </p>
       {metrics ? (
         <div className="overflow-x-auto">
@@ -399,7 +400,7 @@ export function CompetitorsSection({
               <input type="hidden" name="token" value={token} />
               <input type="hidden" name="action" value="add_competitor" />
               <input name="name" required placeholder="Competitor business name" className="input-field" />
-              <input name="websiteUrl" placeholder="Their website (optional)" className="input-field" />
+              <input name="websiteUrl" placeholder="Their website (optional — needed to track their website changes)" className="input-field" />
               <button className="btn-ghost" type="submit">Add competitor</button>
             </form>
           ) : null}
@@ -506,6 +507,7 @@ export function ActionsSection({ recommendations }: { recommendations: Recommend
           <p className="mt-2 font-semibold text-white">{r.title}</p>
           <p className="mt-1 text-sm text-white/75">{r.action}</p>
           <p className="mt-2 text-xs text-white/50">Why: {r.evidence}</p>
+          {r.url ? <p className="mono-data mt-1 break-all text-xs text-white/40">Source: {r.url}</p> : null}
         </li>
       ))}
     </ol>
