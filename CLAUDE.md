@@ -282,8 +282,8 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
     Measured on staging: ~$0.33 per 16-sample cycle → ~$1.64 per Early
     Access cycle (10 questions × 4 AI systems × 2 samples = 80 calls).
   - **Competitor scope:** measures competitors' presence in AI answers
-    only. Competitor-website crawling, website-change detection, alerts,
-    and supervised fixes are future work.
+    only. Competitor *websites* are covered by website change tracking
+    (below), only for competitors with a confirmed website.
   - Tracking metrics are separate from the GeoViz audit score and never
     feed it. Tracking is NOT stored in `Observation` (that table requires
     an audit order per row).
@@ -309,11 +309,13 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
   price + set `STRIPE_MONITORING_MONTHLY_PRICE_ID`; add
   `customer.subscription.*` to the production webhook; configure the
   Stripe Customer Portal; create the Railway scheduler cron
-  (`monitoring:scheduler`, worker env incl. all 4 provider keys); run a
-  Stripe test-mode end-to-end on Preview; complete the two deferred smoke
-  checks; then enable the flag in Production.
+  (`monitoring:scheduler`, worker env incl. all 4 provider keys); once #48
+  (and #49) are merged, also create the `monitoring:website-scans` cron
+  (website scans + improvement checks); run a Stripe test-mode end-to-end
+  on Preview; complete the two deferred smoke checks; then enable the flag
+  in Production.
 - **Website snapshots + change detection v1** (`src/lib/monitoring/website/`,
-  same flag; branch `feat/website-change-tracking-v1`, NOT merged): bounded,
+  same flag; branch `feat/website-change-tracking-v1`, PR #48, NOT merged): bounded,
   immutable snapshots of the customer's site + up to `maxCompetitorSites`
   competitors with a **confirmed** website (`TrackedCompetitor.domainConfirmedAt`,
   set only when the customer/operator supplies the URL — never inferred
@@ -374,27 +376,70 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
   - **Limits:** raw HTML only (no JS rendering — client-rendered or
     one-page sites capture little); services/locations are heuristic.
 - **Supervised improvement workflows v1** (`src/lib/monitoring/improvements/`,
-  same flag; branch `feat/supervised-improvements-v1`, stacked on PR #48,
-  NOT merged): findings → `ImprovementTask` (one open task per finding via
-  `openKey`; recurrences add evidence) with statuses Suggested → Approved →
-  In Progress → Implemented (customer/operator claim) → Verified
-  (independent check only) | Dismissed. Drafts are deterministic templates
-  (`drafts.ts`) using ONLY confirmed `BusinessFactSheet` facts (immutable
-  versions); missing facts are `[MISSING: …]`, never invented. Website
-  content is untrusted (`sanitize.ts`) and never copied into JSON-LD.
-  Scanner verification (`verify.ts`, robots + SSRF-safe fetch) → verified /
-  "Change not found yet" / "Could not verify"; operators may verify only
-  citation/general tasks with an evidence URL. Before/after AI metrics use
-  compatible cycles only, with a no-causation disclaimer. Improvements tab +
-  `/admin/improvements`; checks run in `monitoring:website-scans`. No site
-  edits, publishing, emails, or Stripe changes.
-- **Next layer: supervised improvement / fix workflows** — turn
-  recommendations into operator-reviewed fix packages (schema, llms.txt,
-  content/FAQ drafts) delivered through the Foundation Fix process, with
-  before/after measured by the next monitoring cycle. Never auto-modify
-  customer sites.
-- **Not built yet:** alerts, JS-rendered snapshots, supervised/automated
-  fixes.
+  same flag; branch `feat/supervised-improvements-v1`, PR #49 **stacked on
+  #48**, NOT merged). Turns findings into supervised tasks; nothing edits,
+  publishes to, or emails anyone.
+  - **Tasks** (`ImprovementTask`): created from a recommendation id by the
+    customer (status page) or operator — recommendations are recomputed
+    server-side, never trusted from the client. One open task per finding
+    (`openKey` unique while open); a recurring finding adds evidence +
+    `occurrences`; after Verified a recurrence opens a new task; a
+    Dismissed finding isn't re-created unless observed after dismissal.
+    Each task: problem, evidence (text/URL/date), page URL, priority +
+    reason, proposed fix, owner, dates, verification method, history
+    (`ImprovementEvent`, append-only).
+  - **Statuses** (`workflow.ts`): Suggested → Approved → In Progress →
+    Implemented → Verified, or Dismissed (restorable). **Implemented** is a
+    customer/operator claim. **Verified** only by an independent check:
+    the website scanner, or — only for kinds the scanner can't check
+    (citation, general) — an operator with an https evidence URL + note.
+    Customers can never set Verified.
+  - **Facts** (`BusinessFactSheet`, immutable versions): drafts use ONLY
+    confirmed facts. Website-observed values are offered as "found on
+    your website — confirm", never used directly.
+  - **Drafts** (`drafts.ts`, `improvement-drafts@1.0.0`, deterministic
+    templates, no LLM, immutable versions in `ImprovementDraft`): LocalBusiness
+    JSON-LD, title/description suggestions (≤ 60 / ≤ 155), service/location
+    page outline (only for a CONFIRMED service/area), FAQ (tracked
+    questions + `buildCustomerQuestions`, answers left as writing prompts),
+    identity checklist (confirmed vs observed), citation checklist (only
+    domains observed in tracked answers), restore-page steps. Missing facts
+    → `[MISSING: …]` + a "Needs from you" list. **Never** invents
+    addresses, credentials, reviews, services, or locations.
+  - **Untrusted input** (`sanitize.ts`): fetched website text is stripped of
+    markup/control characters, length-capped, shown only as a quoted
+    excerpt, and never placed in JSON-LD values; JSON-LD is serialized with
+    `<`/`>`/`&` escaped; drafts download as `text/plain` attachments
+    (`nosniff`). Implementation URLs must be on the customer's own site.
+  - **Verification** (`verify.ts`, `expectations.ts`, `ImprovementVerification`
+    jobs): queued when a scanner-checkable task is marked Implemented; one
+    robots.txt + one page fetch through the SSRF-safe fetcher; outcomes
+    **Verified** / **Change not found yet** (fetched, change absent — task
+    stays Implemented) / **Could not verify** (403, robots-blocked,
+    unreachable after 3 attempts with backoff). Shows expected, observed,
+    URL, timestamp, plus "a change on your page doesn't mean it's
+    indexed". Runs inside `npm run monitoring:website-scans`; fixture checks
+    are never claimed by that runner.
+  - **Before/after** (`impact.ts`): last completed tracking run before the
+    implementation date vs. first after; deltas only across
+    configuration-compatible pairs; coverage shown; "Awaiting next
+    measurement" until a later run exists; fixed disclaimer that this
+    doesn't show the change caused anything.
+  - **Surfaces:** Improvements tab (facts, To do, Implemented — being
+    checked, Verified, findings → "Create task", Dismissed) and "Create
+    improvement task" on Recommended Actions; `POST
+    /api/monitoring/improvements`, `GET /api/monitoring/improvements/draft`
+    (token-scoped; writes need an active subscription); operator review at
+    `/admin/improvements` + `POST /api/admin/improvements` (admin session
+    or `ADMIN_SECRET`).
+  - **Staging tool:** `scripts/monitoring-improvements-staging.ts
+    --subscription <id> [--confirm-facts json] [--create <recId>]
+    [--implement <taskId> --url <page>] [--run-checks] [--fixture-demo]`
+    (strictly guarded).
+  - **Limits:** template copy, not tailored writing; raw-HTML checks only;
+    citation/listing checks are manual; before/after is correlation only.
+- **Not built yet:** alerts, JS-rendered snapshots/verification,
+  automated fixes, CMS publishing.
 
 **What this is NOT.** The AI Visibility Layer is **not** an attempt
 to rebuild customer websites. We are not a CMS. We are not a site
@@ -870,10 +915,12 @@ non-production. Enforced in code:
   `daily-market-study-automation`, `recover-missing-checkout-order`,
   `verify-system`, `intelligence:*`, `diagnose:*`, `benchmark:*`,
   `score:validate`, `score:premigration-check`, `monitoring:scheduler`,
-  `monitoring:website-scans` (Railway crons, production runtime).
+  `monitoring:website-scans` (Railway crons, production runtime; the
+  latter also runs improvement verifications).
   `monitoring:run-cycle`, `monitoring:scan-sites`,
-  `scripts/monitoring-website-fixture.ts`, and `seed:monitoring-staging`
-  ARE strictly guarded (staging only).
+  `scripts/monitoring-website-fixture.ts`,
+  `scripts/monitoring-improvements-staging.ts`, and
+  `seed:monitoring-staging` ARE strictly guarded (staging only).
 
 ## Infrastructure State (as of 2026-10-02)
 
@@ -888,7 +935,11 @@ non-production. Enforced in code:
 - **Merged:** #42 (pre-monitoring snapshot), #43 (Monitoring Stage 0
   integrity fixes), #44 (fail-closed DB guard), #45 (subscription
   monitoring slice, merge `0720077`), #46 (visibility tracking v1 +
-  reliability, merge `4e7a322`). Production healthy after each; the build
+  reliability, merge `4e7a322`), #47 (release docs, `afb29ce`).
+  **Open, not merged:** #48 website change tracking v1 (migration
+  `20261002200000`), #49 supervised improvements v1 stacked on #48
+  (migration `20261003100000`) — both applied to staging only.
+  Production healthy after each merge; the build
   guard allows only `VERCEL_ENV=production` builds to migrate production
   (`autoExposeSystemEnvs` is on).
 - **Production schema:** 37 migrations. Monitoring tables
