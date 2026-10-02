@@ -1426,25 +1426,31 @@ model TrackedCompetitor {
 /// a retried or concurrent trigger resumes the same cycle instead of
 /// starting a second one.
 model MonitoringCycle {
-  id             String                 @id @default(cuid())
-  subscriptionId String
-  subscription   MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  cycleKey       String
+  id               String                 @id @default(cuid())
+  subscriptionId   String
+  subscription     MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  cycleKey         String
   /// "scheduler" | "manual"
-  trigger        String
-  /// "running" | "completed" | "partial" | "failed"
-  status         String
+  trigger          String
+  /// "running" | "completed" | "partial" | "failed" | "needs_review"
+  status           String
   /// Snapshot of what this cycle covered (for honest comparisons).
-  promptIds      Json
-  providers      Json
+  promptIds        Json
+  providers        Json
   /// Tracked competitors at run time: Array<{id, name, normalizedName, domain}>.
-  competitors    Json
+  competitors      Json
   /// Metrics computed when the cycle finished (versioned, see metrics.ts).
-  summary        Json?
-  metricsVersion String?
-  startedAt      DateTime               @default(now())
-  completedAt    DateTime?
-  lastError      String?
+  summary          Json?
+  metricsVersion   String?
+  /// Samples per (question, AI system) this cycle was planned with.
+  samplesPerPrompt Int                    @default(1)
+  /// Samples whose provider outcome is unknown (possibly billed) — operator review.
+  unknownOutcomes  Int                    @default(0)
+  /// Sum of per-sample cost (provider-reported where available, else estimated).
+  estimatedCostUsd Decimal?               @db.Decimal(10, 6)
+  startedAt        DateTime               @default(now())
+  completedAt      DateTime?
+  lastError        String?
 
   results PromptRunResult[]
 
@@ -1452,10 +1458,12 @@ model MonitoringCycle {
   @@index([subscriptionId, startedAt])
 }
 
-/// One provider's answer to one tracked prompt in one cycle. The
-/// (cycle, prompt, provider) unique key is claimed BEFORE the provider is
-/// called, so a retry never pays for the same answer twice. Rows are
-/// never rewritten once measured — history is real, not overwritten.
+/// One SAMPLE of one provider's answer to one tracked prompt in one cycle.
+/// The (cycle, prompt, provider, sample) row is claimed and moved to
+/// `in_flight` BEFORE the paid request is sent — see
+/// src/lib/monitoring/tracking/cycle.ts for the call-state machine and the
+/// at-most-once automatic-request guarantee. Rows are never rewritten once
+/// final — history is real, not overwritten.
 model PromptRunResult {
   id                     String          @id @default(cuid())
   cycleId                String
@@ -1464,9 +1472,33 @@ model PromptRunResult {
   trackedPrompt          TrackedPrompt   @relation(fields: [trackedPromptId], references: [id], onDelete: Cascade)
   subscriptionId         String
   provider               String
+  /// 0-based sample number within (cycle, prompt, provider).
+  sampleIndex            Int             @default(0)
   model                  String?
   /// "pending" | "measured" | "not_measured"
   status                 String
+  /// Provider call: "pending" | "in_flight" | "completed" | "failed" | "unknown"
+  /// (unknown = a request may have been processed and billed; never auto-retried).
+  callState              String          @default("completed")
+  /// Provider-side id for retrieving the result after a crash (OpenAI background mode).
+  providerRequestId      String?
+  requestStartedAt       DateTime?
+  promptVersion          String?
+  extractorVersion       String?
+  /// Exact search/grounding configuration used for this sample.
+  searchSettings         Json?
+  /// promptVersion|provider|model|search|extractor|detector — samples compare only within one fingerprint.
+  configFingerprint      String?
+  /// "ranked" | "not_in_list" | "no_ordered_list" | "not_measured"
+  positionStatus         String?
+  /// Provider response captured BEFORE normalization (text, native citations, search queries, usage, ids). Size-capped.
+  rawResponse            Json?
+  inputTokens            Int?
+  outputTokens           Int?
+  searchCalls            Int?
+  costUsd                Decimal?        @db.Decimal(10, 6)
+  /// "provider_reported" | "estimated"
+  costSource             String?
   /// Why not measured: "provider_error" | "timeout" | "unavailable" | "parse_error" | "stale_claim".
   errorCode              String?
   errorMessage           String?
@@ -1491,7 +1523,8 @@ model PromptRunResult {
   completedAt            DateTime?
   latencyMs              Int?
 
-  @@unique([cycleId, trackedPromptId, provider])
+  @@unique([cycleId, trackedPromptId, provider, sampleIndex])
+  @@index([callState])
   @@index([subscriptionId, provider])
   @@index([trackedPromptId])
 }

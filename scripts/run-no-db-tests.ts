@@ -66,6 +66,10 @@ const NO_DB_TESTS = [
   "test-tracking-normalize",
   "test-tracking-metrics",
   "test-tracking-cycle",
+  "test-tracking-list-extractor",
+  "test-tracking-samples",
+  "test-tracking-call-states",
+  "test-tracking-pricing",
 ];
 
 // `--only <substring>` narrows the run (e.g. `npm run test:monitoring`).

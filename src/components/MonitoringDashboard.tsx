@@ -66,18 +66,45 @@ function Tile({ label, value, sub }: { label: string; value: React.ReactNode; su
   );
 }
 
+export function CoverageNote({ metrics, samplesPerPrompt }: { metrics: CycleMetrics | null; samplesPerPrompt: number | null }) {
+  if (!metrics) return null;
+  return (
+    <p className="text-xs text-white/55">
+      Based on {metrics.answers} AI answers{samplesPerPrompt ? ` (${samplesPerPrompt} per question per AI system)` : ""} ·{" "}
+      {metrics.measured} measured ({pct(metrics.coverage)} coverage)
+      {metrics.unknownOutcomes > 0 ? ` · ${metrics.unknownOutcomes} under review` : ""}. Percentages use measured answers only.
+    </p>
+  );
+}
+
+function ComparisonNote({ comparison }: { comparison: CycleComparison | null }) {
+  if (!comparison) return null;
+  if (!comparison.comparable) {
+    return <p className="text-xs text-severity-warning">Change vs. last run: not comparable — {comparison.reason?.replace(/^Not comparable: /, "")}</p>;
+  }
+  return (
+    <p className="text-xs text-white/50">
+      Changes compare {comparison.comparablePairs} question/AI-system pair{comparison.comparablePairs === 1 ? "" : "s"} measured the same way in both runs
+      {comparison.incompatiblePairs.length > 0 ? ` (${comparison.incompatiblePairs.length} not comparable: ${comparison.incompatiblePairs[0]!.reason})` : ""}.
+    </p>
+  );
+}
+
 export function OverviewSection({
   view,
   metrics,
   comparison,
+  samplesPerPrompt,
 }: {
   view: MonitoringStatusView;
   metrics: CycleMetrics | null;
   comparison: CycleComparison | null;
+  samplesPerPrompt: number | null;
 }) {
   const latestReport = view.audits.find((a) => a.state === "report_ready");
   return (
     <div className="mt-8 space-y-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">GeoViz audit score</p>
       <div className="grid gap-4 md:grid-cols-4">
         <Tile label="GeoViz score" value={view.latestScore ?? "—"} sub={`Previous: ${view.previousScore ?? "—"}`} />
         <Tile
@@ -92,6 +119,8 @@ export function OverviewSection({
           sub={latestReport?.reportUrl ? <a className="text-accent underline" href={latestReport.reportUrl}>Open report</a> : "In progress"}
         />
       </div>
+      <p className="pt-4 text-xs font-semibold uppercase tracking-[0.2em] text-white/45">AI answer tracking</p>
+      <CoverageNote metrics={metrics} samplesPerPrompt={samplesPerPrompt} />
       <div className="grid gap-4 md:grid-cols-3">
         <Tile
           label="How often AI names you"
@@ -106,9 +135,10 @@ export function OverviewSection({
         <Tile
           label="Your share of AI mentions"
           value={pct(metrics?.shareOfVoice)}
-          sub={metrics ? <>vs. your tracked competitors · <Change d={comparison?.shareOfVoice} /></> : "Add competitors to compare"}
+          sub={metrics && metrics.competitors.length > 0 ? <>vs. your tracked competitors · <Change d={comparison?.shareOfVoice} /></> : "Track competitors to compare"}
         />
       </div>
+      <ComparisonNote comparison={comparison} />
       {metrics && metrics.notMeasured > 0 ? (
         <p className="text-xs text-white/45">
           {metrics.notMeasured} answer{metrics.notMeasured === 1 ? "" : "s"} couldn&apos;t be measured this run (an AI provider didn&apos;t respond). They&apos;re left out of every percentage — never counted as a &quot;no&quot;.
@@ -163,7 +193,7 @@ export function ScoreHistorySection({
                   <td className="py-1.5 text-white/70">{fmtDate(c.startedAt)}</td>
                   <td className="mono-data">{pct(c.summary?.mentionRate)}</td>
                   <td className="mono-data">{pct(c.summary?.citationRate)}</td>
-                  <td className="mono-data">{pct(c.summary?.shareOfVoice)}</td>
+                  <td className="mono-data">{c.summary?.competitors?.length ? pct(c.summary.shareOfVoice) : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -178,14 +208,27 @@ type PromptRow = {
   id: string;
   text: string;
   source: string;
-  results: Array<{ provider: string; status: string; mentioned: boolean | null; position: number | null; errorCode: string | null }>;
+  results: Array<{ provider: string; status: string; mentioned: boolean | null; position: number | null; positionStatus: string | null; callState: string }>;
 };
 
-function cellFor(r: PromptRow["results"][number] | undefined) {
-  if (!r || r.status === "pending") return <span className="text-white/35">—</span>;
-  if (r.status !== "measured") return <span className="text-white/45">Not measured</span>;
-  if (r.mentioned) return <span className="text-severity-info">Named{r.position ? ` (#${r.position})` : ""}</span>;
-  return <span className="text-white/60">Not named</span>;
+/** "Named k/n" over measured samples; ranked positions only from clear ordered lists. */
+function cellFor(samples: PromptRow["results"]) {
+  if (samples.length === 0) return <span className="text-white/35">—</span>;
+  const measured = samples.filter((r) => r.status === "measured");
+  if (measured.length === 0) {
+    const review = samples.some((r) => r.callState === "unknown");
+    return <span className="text-white/45">{review ? "Under review" : samples.some((r) => r.callState === "pending" || r.callState === "in_flight") ? "Running" : "Not measured"}</span>;
+  }
+  const named = measured.filter((r) => r.mentioned === true);
+  const ranks = named.filter((r) => r.positionStatus === "ranked" && r.position).map((r) => `#${r.position}`);
+  const tone = named.length > 0 ? "text-severity-info" : "text-white/60";
+  return (
+    <span className={tone}>
+      {named.length > 0 ? "Named" : "Not named"} {named.length}/{measured.length}
+      {ranks.length > 0 ? <span className="text-white/45"> ({ranks.join(", ")})</span> : null}
+      {measured.length < samples.length ? <span className="text-white/35"> · {samples.length - measured.length} not measured</span> : null}
+    </span>
+  );
 }
 
 export function PromptsSection({
@@ -207,8 +250,8 @@ export function PromptsSection({
     <div className="mt-8 space-y-8">
       <p className="muted text-sm">
         The questions customers ask AI before choosing a business. Each run asks every question to each AI system below
-        (through its API, with web search where available) and records whether you were named. Tracking {prompts.length} of{" "}
-        {maxActivePrompts} questions.
+        (through its API, with web search where available) several times and records whether you were named. &quot;#2&quot; appears only
+        when an answer gave a clear numbered list. Tracking {prompts.length} of {maxActivePrompts} questions.
       </p>
       {prompts.length === 0 ? (
         <p className="text-sm text-white/60">No questions tracked yet — add a suggestion or your own below.</p>
@@ -226,7 +269,7 @@ export function PromptsSection({
               {prompts.map((p) => (
                 <tr key={p.id} className="border-t border-white/[0.06] align-top">
                   <td className="py-2 pr-3 text-white">{p.text}</td>
-                  {providers.map((prov) => <td key={prov} className="py-2 pr-3">{cellFor(p.results.find((r) => r.provider === prov))}</td>)}
+                  {providers.map((prov) => <td key={prov} className="py-2 pr-3">{cellFor(p.results.filter((r) => r.provider === prov))}</td>)}
                   {canEdit ? (
                     <td className="py-2">
                       <form action="/api/monitoring/tracking" method="POST">
@@ -298,7 +341,10 @@ export function CompetitorsSection({
   const providers = metrics ? Object.keys(metrics.byProvider) : [];
   return (
     <div className="mt-8 space-y-8">
-      <p className="muted text-sm">Compare how often AI names you and up to {maxCompetitors} competitors across your tracked questions.</p>
+      <p className="muted text-sm">
+        Compare how often AI answers name you and up to {maxCompetitors} competitors across your tracked questions. This measures
+        presence in AI answers only — it doesn&apos;t crawl or monitor competitors&apos; websites.
+      </p>
       {metrics ? (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">

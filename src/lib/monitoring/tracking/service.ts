@@ -17,7 +17,7 @@ import { compareCycles, computeCycleMetrics, type CycleMetrics } from "./metrics
 import { prismaTrackingStore, toResultForMetrics } from "./prisma-store";
 import { decidePromptAdd, extractSuggestionContext, suggestPrompts } from "./prompts";
 import { buildRecommendations, issuesFromDeterministicScore } from "./recommendations";
-import type { CompetitorRef, TrackingProviderRunner } from "./types";
+import type { CompetitorRef, TrackingProviderClient } from "./types";
 
 export function customerMatcherFor(sub: Pick<MonitoringSubscriptionRecord, "businessName" | "websiteUrl">) {
   return buildEntityMatcher({ id: "customer", name: sub.businessName || normalizeDomain(sub.websiteUrl) || sub.websiteUrl, websiteUrl: sub.websiteUrl });
@@ -88,7 +88,7 @@ async function activeCompetitorRefs(subscriptionId: string): Promise<CompetitorR
 /** Run (or resume) one tracking cycle for a subscription. */
 export async function runTrackingCycleForSubscription(
   sub: MonitoringSubscriptionRecord,
-  opts: { cycleKey: string; trigger: "scheduler" | "manual"; runner: TrackingProviderRunner },
+  opts: { cycleKey: string; trigger: "scheduler" | "manual"; client: TrackingProviderClient; retryUnknown?: boolean },
 ): Promise<RunCycleResult> {
   const ent = entitlementsForPlan(sub.planKey);
   if (ent.maxActivePrompts <= 0) return { outcome: "skipped", reason: "plan has no prompt tracking" };
@@ -101,7 +101,9 @@ export async function runTrackingCycleForSubscription(
   const competitors = ent.maxCompetitors > 0 ? (await activeCompetitorRefs(sub.id)).slice(0, ent.maxCompetitors) : [];
   return runMonitoringCycle({
     store: prismaTrackingStore,
-    runner: opts.runner,
+    client: opts.client,
+    samplesPerPrompt: ent.samplesPerPrompt,
+    retryUnknown: opts.retryUnknown,
     subject: { subscriptionId: sub.id, businessName: sub.businessName, websiteUrl: sub.websiteUrl, customerDomain: normalizeDomain(sub.websiteUrl) },
     activePrompts: prompts,
     activeCompetitors: competitors,
@@ -122,10 +124,10 @@ export async function loadTrackingDashboard(sub: MonitoringSubscriptionRecord) {
     prisma.trackedPrompt.findMany({ where: { subscriptionId: sub.id, isActive: true }, orderBy: { createdAt: "asc" } }),
     prisma.trackedCompetitor.findMany({ where: { subscriptionId: sub.id, isActive: true }, orderBy: { createdAt: "asc" } }),
     prisma.monitoringCycle.findMany({
-      where: { subscriptionId: sub.id, status: { in: ["completed", "partial"] } },
+      where: { subscriptionId: sub.id, status: { in: ["completed", "partial", "needs_review"] } },
       orderBy: { startedAt: "desc" },
       take: 12,
-      select: { id: true, startedAt: true, status: true, summary: true, competitors: true },
+      select: { id: true, startedAt: true, status: true, summary: true, competitors: true, samplesPerPrompt: true, unknownOutcomes: true },
     }),
   ]);
   const competitorRefs: CompetitorRef[] = competitors.map((c) => ({ id: c.id, name: c.name, normalizedName: c.normalizedName, domain: c.domain }));
@@ -186,7 +188,9 @@ export async function loadTrackingDashboard(sub: MonitoringSubscriptionRecord) {
     competitors: competitors.map((c) => ({ id: c.id, name: c.name, websiteUrl: c.websiteUrl, source: c.source })),
     detectedCompetitors: detected,
     suggestions,
-    latestCycle: latestCycle ? { id: latestCycle.id, startedAt: latestCycle.startedAt, status: latestCycle.status } : null,
+    latestCycle: latestCycle
+      ? { id: latestCycle.id, startedAt: latestCycle.startedAt, status: latestCycle.status, samplesPerPrompt: latestCycle.samplesPerPrompt, unknownOutcomes: latestCycle.unknownOutcomes }
+      : null,
     cycleHistory: cycles.map((c) => ({ id: c.id, startedAt: c.startedAt, status: c.status, summary: c.summary as CycleMetrics | null })),
     metrics,
     comparison,

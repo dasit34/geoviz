@@ -20,11 +20,12 @@ const customer = buildEntityMatcher({ id: "customer", name: "Rock Roofing LLC", 
 (async () => {
   console.log("[tracking-prompts-competitors] running...");
 
-  await h.check("Early Access monthly plan grants 1 re-audit/cycle, 10 prompts, 3 competitors, 4 providers", () => {
+  await h.check("Early Access monthly plan grants 1 re-audit/cycle, 10 prompts, 3 competitors, 4 providers, 2 samples", () => {
     const e = entitlementsForPlan("monthly");
     assert.equal(e.fullReauditsPerCycle, 1);
     assert.equal(e.maxActivePrompts, 10);
     assert.equal(e.maxCompetitors, 3);
+    assert.equal(e.samplesPerPrompt, 2);
     assert.deepEqual([...e.providers].sort(), ["claude", "gemini", "openai", "perplexity"]);
     assert.ok(e.historicalScoreTracking && e.citationTracking && e.reportHistory);
     assert.ok(!("price" in (findPlan("monthly") ?? {})), "entitlements carry no pricing");
@@ -103,7 +104,7 @@ const customer = buildEntityMatcher({ id: "customer", name: "Rock Roofing LLC", 
   });
 
   await h.check("detected competitors: aggregated from measured answers, excluding the customer and tracked ones", () => {
-    const base = { provider: "openai", mentioned: false, position: null, citedDomains: [], competitorIdsMentioned: [] };
+    const base = { provider: "openai", sampleIndex: 0, callState: "completed", mentioned: false, position: null, positionStatus: "no_ordered_list", configFingerprint: "fp", citedDomains: [], competitorIdsMentioned: [], costUsd: null };
     const d = detectCompetitors([
       { ...base, trackedPromptId: "p1", status: "measured", namedBusinesses: ["Acme Roofing", "Rock Roofing", "Best Roofs"] },
       { ...base, trackedPromptId: "p2", status: "measured", provider: "gemini", namedBusinesses: ["Acme Roofing LLC"] },

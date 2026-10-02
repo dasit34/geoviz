@@ -12,7 +12,7 @@
 import { prisma } from "../src/lib/db";
 import { prismaMonitoringStore } from "../src/lib/monitoring/prisma-store";
 import { runMonitoringSchedulerTick } from "../src/lib/monitoring/scheduler";
-import { createLiveTrackingRunner } from "../src/lib/monitoring/tracking/providers";
+import { createLiveTrackingClient } from "../src/lib/monitoring/tracking/providers";
 import { runTrackingCycleForSubscription } from "../src/lib/monitoring/tracking/service";
 
 async function main(): Promise<void> {
@@ -22,7 +22,7 @@ async function main(): Promise<void> {
     now: () => new Date(),
     maxPerTick,
     runTrackingCycle: (sub, cycleKey) =>
-      runTrackingCycleForSubscription(sub, { cycleKey, trigger: "scheduler", runner: createLiveTrackingRunner() }),
+      runTrackingCycleForSubscription(sub, { cycleKey, trigger: "scheduler", client: createLiveTrackingClient() }),
   });
   console.log(`[monitoring-scheduler] ${JSON.stringify(result)}`);
 }

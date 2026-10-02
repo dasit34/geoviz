@@ -33,6 +33,8 @@ export type PlanEntitlements = {
   reportHistory: boolean;
   /** Which AI providers tracked prompts run against. */
   providers: readonly TrackingProvider[];
+  /** Independent samples per (question, AI system) per cycle — answers vary run to run. */
+  samplesPerPrompt: number;
 };
 
 export type MonitoringPlan = {
@@ -55,6 +57,7 @@ export const EARLY_ACCESS_ENTITLEMENTS: PlanEntitlements = {
   citationTracking: true,
   reportHistory: true,
   providers: ALL_TRACKING_PROVIDERS,
+  samplesPerPrompt: 2,
 };
 
 export const MONITORING_PLANS: readonly MonitoringPlan[] = [

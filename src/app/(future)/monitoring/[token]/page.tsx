@@ -72,7 +72,9 @@ export default async function MonitoringStatusPage({
         <MonitoringTabs token={params.token} active={tab} />
         {notice ? <p role="status" className="mt-4 text-sm text-severity-warning">{notice}</p> : null}
 
-        {tab === "overview" ? <OverviewSection view={view} metrics={tracking.metrics} comparison={tracking.comparison} /> : null}
+        {tab === "overview" ? (
+          <OverviewSection view={view} metrics={tracking.metrics} comparison={tracking.comparison} samplesPerPrompt={tracking.latestCycle?.samplesPerPrompt ?? null} />
+        ) : null}
         {tab === "history" ? <ScoreHistorySection view={view} cycleHistory={tracking.cycleHistory} /> : null}
         {tab === "prompts" ? (
           <PromptsSection

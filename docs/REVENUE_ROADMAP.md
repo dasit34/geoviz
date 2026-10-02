@@ -17,6 +17,8 @@ Standalone $0→$100M reference. Full stage-by-stage business narrative lives in
 
 - **Live in Production:** $97 AI Visibility Audit, $59 manual re-audit, Foundation Fix (manual).
 - **Built, behind `GEO_MODULE_MONITORING_ENABLED` (off in Production):** monthly AI Visibility Monitoring subscription — Stripe subscription checkout + idempotent webhooks, scheduled full re-audits, tokenized customer dashboard (Overview, Score History, Tracked Questions, Competitors, Citations, Reports, Recommended Actions), visibility tracking v1 (organic tracked questions across OpenAI/Anthropic/Google/Perplexity APIs, competitor share of voice, citation intelligence, evidence-backed recommendations). Entitlements are configurable per plan (Early Access: 10 questions, 3 competitors, 1 full re-audit/cycle).
+- **Measurement reliability (PR #46):** 2 samples per question per AI system, coverage shown on every metric, positions only from clear ordered lists, configuration-aware comparisons, explicit provider-call states with an at-most-one-automatic-request guarantee (unknown outcomes go to operator review). Measured operating cost ≈ $1.64 per Early Access cycle (80 API calls; conservative Gemini grounding estimate).
+- **Scope note:** competitor tracking measures presence in AI answers only; competitor-website crawling, website-change detection, and alerts are not built.
 - **Next:** supervised improvement/fix workflows (operator-reviewed fix packages, measured by the next monitoring cycle), then change detection and alerts.
 
 ## Which modules unlock which revenue line
