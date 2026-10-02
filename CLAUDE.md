@@ -199,9 +199,12 @@ Binding rules for monitoring work:
   scoring, and report rendering keep working unchanged** at every
   stage. Subscription billing ships last, as an additive Stripe
   branch that never touches the one-time payment path.
-- The customer view is a **tokenized, no-login status page**
-  (same access model as `/report/[id]/print`, with its own rotatable
-  token) — NOT a login system or a general SaaS dashboard.
+- The customer view is the signed-in monitoring dashboard behind the
+  **approved monitoring-only customer login** (operator decision
+  2026-10-04; see "Monitoring customer login" below). It is the ONLY
+  customer login in GeoViz: passwordless emailed links, no passwords,
+  social login, teams, roles, or multi-user organizations. The $97 audit
+  and $59 re-audit stay account-free. Still NOT a general SaaS dashboard.
 - Historical scans are **immutable** once finalized; deterministic
   measurements and LLM-written explanations are stored separately.
 - Provider failures are recorded as "not measured", never as a
@@ -238,10 +241,57 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
   report pages, verification page, and customer emails handle it.
   Deterministic `stripeSessionId` per (subscription, due date) makes
   scheduling idempotent; in-flight audits block pile-ups; max 3/tick.
-- **Customer surface**: `/monitoring` (plans), `/monitoring/success`,
-  `/monitoring/<token>` (status, next audit, latest/previous score and
-  change from **reviewed** audits only, report links, Stripe billing
-  portal via `POST /api/monitoring/portal`). No login.
+- **Customer surface**: `/monitoring` (plans), `/monitoring/success`
+  ("check your email" — the Stripe session id grants nothing),
+  `/monitoring/sign-in`, `/monitoring/account` (business chooser when one
+  email owns several), `/monitoring/account/<subscriptionId>` (status,
+  next audit, latest/previous score and change from **reviewed** audits
+  only, report links, tabs, Settings with billing). Legacy
+  `/monitoring/<token>` links only redirect to sign-in.
+- **Monitoring customer login** (`src/lib/monitoring/auth/`, same flag;
+  branch `feat/monitoring-customer-login`, migration
+  `20261004100000_monitoring_customer_login`, additive):
+  - **Accounts** (`MonitoringCustomer`, unique lowercased email): created
+    or connected automatically by the webhook after a monitoring purchase
+    (`linkCustomer`), or lazily on a sign-in request — every
+    `MonitoringSubscription` with that email is linked (`customerId`).
+    Only emails with a monitoring subscription ever get an account.
+    Email changes are admin-assisted during Early Access.
+  - **Links** (`MonitoringLoginToken`): 256-bit random secrets, SHA-256
+    stored only; single use (atomic consume); welcome 24 h, requested
+    15 min, admin 24 h; a newer link invalidates older unused ones. The
+    secret rides in the URL **fragment** (`/monitoring/auth/verify#t=…`):
+    never sent to a server, never in logs or Referer. The page shows a
+    **Continue** button that POSTs it — email scanners that open the link
+    consume nothing. Never log link URLs or secrets.
+  - **Sessions** (`MonitoringSession`): random cookie secret, SHA-256
+    stored; `__Host-geoviz_monitoring`, HttpOnly, Secure, SameSite=Lax,
+    Path=/, **30-day absolute** expiry; revoked on sign-out; operator
+    "Sign out everywhere".
+  - **Rate limits** (`MonitoringAuthRateLimit`, database-backed fixed
+    windows, hashed keys): link requests 10/IP/15 min + 5/email/hour
+    (applied identically to unknown emails — no enumeration), link
+    verification 30/IP/15 min.
+  - **Authorization**: every customer data route/page calls
+    `requireOwnedSubscription` (session + `customerId` match; unknown and
+    other customers' ids are the same 404); every state-changing POST
+    checks `isSameOriginRequest` first.
+  - **Cancellation & reactivation** (`billing-actions.ts`): the app's
+    cancel button always sets `cancel_at_period_end` (access stays active
+    until the paid-through date, then read-only); "Keep monitoring" undoes
+    it; an ended record offers **Reactivate** → subscription checkout on
+    the existing Stripe customer with metadata
+    `reactivatesMonitoringSubscriptionId`. The sync **reattaches** the new
+    Stripe subscription to the SAME record (old id →
+    `priorStripeSubscriptionIds`; questions, competitors, cycles, reports
+    kept); a plain repurchase with the same email + website also
+    reattaches to an ended record; late events for a prior id are
+    ignored; active records are never taken over.
+  - **Admin**: `/admin/monitoring-customers` — "Send sign-in link"
+    (emails the account owner; the operator never sees the link) and
+    "Sign out everywhere".
+  - **Stripe Billing Portal** must be configured to cancel **at period
+    end** (Production launch step).
 - **Visibility tracking v1** (`src/lib/monitoring/tracking/`, same flag):
   durable tracked questions (`TrackedPrompt`, suggested from the audit's
   detected city/services via `buildCustomerQuestions`, or custom),
@@ -313,7 +363,11 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
   (and #49) are merged, also create the `monitoring:website-scans` cron
   (website scans + improvement checks); run a Stripe test-mode end-to-end
   on Preview; complete the two deferred smoke checks; then enable the flag
-  in Production.
+  in Production. Customer login adds: merge `feat/monitoring-customer-login`
+  (its migration applies on the Production build); set the Production
+  Billing Portal's subscription-cancel mode to **at period end**; confirm
+  Resend click tracking is OFF for the sending domain (sign-in links must
+  not pass through a tracking redirect).
 - **Website snapshots + change detection v1** (`src/lib/monitoring/website/`,
   same flag; branch `feat/website-change-tracking-v1`, PR #48, NOT merged): bounded,
   immutable snapshots of the customer's site + up to `maxCompetitorSites`
@@ -471,9 +525,11 @@ Build ONLY:
 - Email notification
 
 DO NOT BUILD:
-- dashboards (exception: the approved tokenized, no-login monitoring
-  status page — see "Recurring product — AI Visibility Monitoring")
-- login systems
+- dashboards (exception: the approved signed-in monitoring dashboard —
+  see "Recurring product — AI Visibility Monitoring")
+- login systems (exception: the approved monitoring-only passwordless
+  customer login — no passwords, social login, teams, roles, or
+  organizations; the $97/$59 flows stay account-free)
 - white-label features
 - automation pipelines (exception: the approved monitoring recheck
   scheduler, operator review stays mandatory)
@@ -946,9 +1002,12 @@ non-production. Enforced in code:
   integrity fixes), #44 (fail-closed DB guard), #45 (subscription
   monitoring slice, merge `0720077`), #46 (visibility tracking v1 +
   reliability, merge `4e7a322`), #47 (release docs, `afb29ce`).
-  **Open, not merged:** #48 website change tracking v1 (migration
-  `20261002200000`), #49 supervised improvements v1 stacked on #48
-  (migration `20261003100000`) — both applied to staging only.
+  #48 website change tracking v1 (migration `20261002200000`) and #49
+  supervised improvements v1 (migration `20261003100000`) were later
+  merged to `main` (`44f8924`, `7f3807c`).
+  **Open, not merged:** `feat/monitoring-customer-login` (monitoring-only
+  passwordless login, migration `20261004100000`) — applied to staging
+  only.
   Production healthy after each merge; the build
   guard allows only `VERCEL_ENV=production` builds to migrate production
   (`autoExposeSystemEnvs` is on).

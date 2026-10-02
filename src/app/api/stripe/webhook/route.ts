@@ -12,7 +12,9 @@ import {
 } from "@/lib/monitoring/webhook";
 import { prismaMonitoringStore, resolveMonitoringBusiness } from "@/lib/monitoring/prisma-store";
 import { stripeSubscriptionGateway } from "@/lib/monitoring/stripe-gateway";
-import { sendMonitoringWelcomeEmail } from "@/lib/monitoring/emails";
+import { monitoringAuthDeps } from "@/lib/monitoring/auth/http";
+import { prismaMonitoringAuthStore } from "@/lib/monitoring/auth/prisma-auth-store";
+import { sendWelcomeLink } from "@/lib/monitoring/auth/service";
 
 /**
  * Webhook-specific FROM fallback. We deliberately do NOT inherit
@@ -88,7 +90,13 @@ export async function POST(req: Request) {
         stripe: stripeSubscriptionGateway(),
         now: () => new Date(),
         resolveBusiness: resolveMonitoringBusiness,
-        sendWelcomeEmail: (sub) => sendMonitoringWelcomeEmail(resolveAppBaseUrl(req), sub),
+        linkCustomer: async (sub) => {
+          const customer = await prismaMonitoringAuthStore.ensureCustomerForEmail(sub.email, sub.stripeCustomerId);
+          return customer ? { ...sub, customerId: customer.id } : sub;
+        },
+        sendWelcomeEmail: async (sub) => {
+          await sendWelcomeLink(sub, monitoringAuthDeps(req));
+        },
       });
       console.log(`[stripe-webhook] monitoring event=${event.id} type=${event.type} outcome=${result.outcome}`);
       return new Response("OK", { status: 200 });

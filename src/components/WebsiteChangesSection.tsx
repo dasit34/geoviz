@@ -57,7 +57,7 @@ function siteStatus(site: WebsiteSiteView): { line: string; tone: string } {
   return { line: `Last checked ${fmtDate(l.completedAt)}.`, tone: "text-white/80" };
 }
 
-function SiteCard({ site, token, canEdit, changeCount }: { site: WebsiteSiteView; token: string; canEdit: boolean; changeCount: number }) {
+function SiteCard({ site, subscriptionId, canEdit, changeCount }: { site: WebsiteSiteView; subscriptionId: string; canEdit: boolean; changeCount: number }) {
   const s = siteStatus(site);
   const l = site.latest;
   return (
@@ -78,7 +78,7 @@ function SiteCard({ site, token, canEdit, changeCount }: { site: WebsiteSiteView
       ) : null}
       {site.needsWebsite && canEdit && site.competitorId ? (
         <form action="/api/monitoring/tracking" method="POST" className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input type="hidden" name="token" value={token} />
+          <input type="hidden" name="subscriptionId" value={subscriptionId} />
           <input type="hidden" name="action" value="set_competitor_website" />
           <input type="hidden" name="returnTab" value="website" />
           <input type="hidden" name="id" value={site.competitorId} />
@@ -177,14 +177,14 @@ function Timeline({ changes, cycles }: { changes: WebsiteChangeView[]; cycles: C
 }
 
 export function WebsiteChangesSection({
-  token,
+  subscriptionId,
   sites,
   changes,
   cycles,
   limits,
   canEdit,
 }: {
-  token: string;
+  subscriptionId: string;
   sites: WebsiteSiteView[];
   changes: WebsiteChangeView[];
   cycles: CycleRow[];
@@ -211,7 +211,7 @@ export function WebsiteChangesSection({
 
       <div className="grid gap-4 md:grid-cols-2">
         {sites.map((s) => (
-          <SiteCard key={`${s.siteKind}:${s.competitorId ?? s.domain}`} site={s} token={token} canEdit={canEdit} changeCount={countFor(s.domain)} />
+          <SiteCard key={`${s.siteKind}:${s.competitorId ?? s.domain}`} site={s} subscriptionId={subscriptionId} canEdit={canEdit} changeCount={countFor(s.domain)} />
         ))}
       </div>
 

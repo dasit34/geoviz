@@ -47,6 +47,25 @@ export function createFakeStore(): FakeStore {
       const s = byStripeId(sid);
       return s ? { ...s } : null;
     },
+    async findByPriorSubscriptionId(sid) {
+      const s = [...subs.values()].find((x) => x.priorStripeSubscriptionIds.includes(sid));
+      return s ? { ...s } : null;
+    },
+    async findById(id) {
+      const s = subs.get(id);
+      return s ? { ...s } : null;
+    },
+    async findByEmail(email) {
+      return [...subs.values()].filter((x) => x.email === email).map((x) => ({ ...x }));
+    },
+    async reattach(id, from, to, patch) {
+      const s = subs.get(id);
+      if (!s || s.stripeSubscriptionId !== from) return null;
+      if (byStripeId(to)) return null;
+      const next = { ...s, ...patch, stripeSubscriptionId: to, priorStripeSubscriptionIds: [...s.priorStripeSubscriptionIds, from] };
+      subs.set(id, next);
+      return { ...next };
+    },
     async create(data) {
       if (byStripeId(data.stripeSubscriptionId)) throw new DuplicateSubscriptionError(data.stripeSubscriptionId);
       const rec: MonitoringSubscriptionRecord = {
@@ -54,6 +73,8 @@ export function createFakeStore(): FakeStore {
         lastAuditQueuedAt: null,
         welcomeEmailSentAt: null,
         ...data,
+        customerId: data.customerId ?? null,
+        priorStripeSubscriptionIds: [],
         id: `msub_${++seq}`,
         createdAt: new Date(data.lastSyncedAt),
       };
@@ -160,17 +181,24 @@ export function monitoringSnapshot(overrides: Partial<SubscriptionSnapshot> = {}
 
 export function webhookDeps(store: FakeStore, stripe: StripeSubscriptionGateway, clock: { now: Date }) {
   const sentWelcome: string[] = [];
+  const linkedCustomers: string[] = [];
   const deps: WebhookDeps = {
     store,
     stripe,
     now: () => clock.now,
     resolveBusiness: async () => ({ businessId: "biz_1", baselineAuditOrderId: "order_baseline" }),
     newAccessToken: () => `tok_${Math.random().toString(36).slice(2)}_0123456789abcdef`,
+    linkCustomer: async (sub) => {
+      const linked = { ...sub, customerId: `cust_${sub.email}` };
+      store.subs.set(sub.id, { ...store.subs.get(sub.id)!, customerId: linked.customerId });
+      linkedCustomers.push(sub.id);
+      return linked;
+    },
     sendWelcomeEmail: async (sub) => {
       sentWelcome.push(sub.id);
     },
   };
-  return { deps, sentWelcome };
+  return { deps, sentWelcome, linkedCustomers };
 }
 
 export function subscriptionEvent(id: string, type: string, subscriptionId = "sub_123") {

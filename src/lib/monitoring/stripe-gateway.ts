@@ -34,15 +34,25 @@ export function stripeSubscriptionGateway(stripe: Stripe = getStripe()): StripeS
   };
 }
 
-/** Customer-facing Stripe Billing Portal session (manage payment method / cancel). */
+/**
+ * Customer-facing Stripe Billing Portal session (payment method, invoices).
+ * When `STRIPE_MONITORING_PORTAL_CONFIGURATION_ID` is set, that portal
+ * configuration is used — it is created with subscription cancellation
+ * at the END of the billing period (never immediate) and no email edits
+ * (sign-in email changes are admin-assisted). Otherwise the account's
+ * default portal configuration applies.
+ */
 export async function createBillingPortalUrl(args: {
   customerId: string;
   returnUrl: string;
   stripe?: Stripe;
+  configurationId?: string | null;
 }): Promise<string> {
+  const configuration = (args.configurationId ?? process.env.STRIPE_MONITORING_PORTAL_CONFIGURATION_ID ?? "").trim();
   const session = await (args.stripe ?? getStripe()).billingPortal.sessions.create({
     customer: args.customerId,
     return_url: args.returnUrl,
+    ...(configuration ? { configuration } : {}),
   });
   return session.url;
 }

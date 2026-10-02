@@ -26,6 +26,39 @@ export const prismaMonitoringStore: MonitoringStore = {
     return prisma.monitoringSubscription.findUnique({ where: { stripeSubscriptionId } });
   },
 
+  async findByPriorSubscriptionId(stripeSubscriptionId) {
+    return prisma.monitoringSubscription.findFirst({ where: { priorStripeSubscriptionIds: { has: stripeSubscriptionId } } });
+  },
+
+  async findById(id) {
+    return prisma.monitoringSubscription.findUnique({ where: { id } });
+  },
+
+  async findByEmail(email) {
+    return prisma.monitoringSubscription.findMany({ where: { email }, orderBy: { createdAt: "desc" }, take: 50 });
+  },
+
+  async reattach(id, fromStripeSubscriptionId, toStripeSubscriptionId, patch) {
+    // Conditional on the record still pointing at the old subscription, so
+    // exactly one concurrent event performs the reattach.
+    try {
+      const { count } = await prisma.monitoringSubscription.updateMany({
+        where: { id, stripeSubscriptionId: fromStripeSubscriptionId },
+        data: {
+          ...patch,
+          stripeSubscriptionId: toStripeSubscriptionId,
+          priorStripeSubscriptionIds: { push: fromStripeSubscriptionId },
+        },
+      });
+      if (count !== 1) return null;
+    } catch (err) {
+      // The new id already exists on some record — the race was lost.
+      if (isUniqueViolation(err)) return null;
+      throw err;
+    }
+    return prisma.monitoringSubscription.findUnique({ where: { id } });
+  },
+
   async create(data) {
     try {
       return await prisma.monitoringSubscription.create({ data });

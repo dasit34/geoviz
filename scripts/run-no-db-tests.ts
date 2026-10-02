@@ -61,6 +61,10 @@ const NO_DB_TESTS = [
   "test-monitoring-scheduler",
   "test-monitoring-cancellation",
   "test-monitoring-token-and-reaudit",
+  // monitoring-only customer login
+  "test-monitoring-auth",
+  "test-monitoring-reactivation",
+  "test-monitoring-session-authz",
   // visibility tracking v1
   "test-tracking-prompts-competitors",
   "test-tracking-normalize",

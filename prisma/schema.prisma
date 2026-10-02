@@ -1303,7 +1303,18 @@ model MonitoringSubscription {
   stripePriceId String?
 
   stripeSubscriptionId    String  @unique
+  /// Earlier Stripe subscriptions for this same monitoring record. A
+  /// reactivation reattaches the new Stripe subscription here (history,
+  /// questions, and competitors carry over); late events for any id in
+  /// this list are ignored, never re-created as a new record.
+  priorStripeSubscriptionIds String[] @default([])
   stripeCustomerId        String?
+
+  /// Signed-in account that owns this monitoring record (monitoring-only
+  /// customer login). Null until linked by email — linking is lazy and
+  /// idempotent (src/lib/monitoring/auth/).
+  customerId String?
+  customer   MonitoringCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   /// Set from checkout.session.completed; null until that event lands.
   stripeCheckoutSessionId String? @unique
 
@@ -1353,6 +1364,76 @@ model MonitoringSubscription {
   @@index([status, nextAuditAt])
   @@index([businessId])
   @@index([email])
+  @@index([customerId])
+}
+
+/// Monitoring customer account — the ONLY customer login in GeoViz
+/// (approved monitoring-only exception; the $97 audit and $59 re-audit
+/// stay account-free). Passwordless: identity is the email address that
+/// bought monitoring; sign-in is by single-use emailed link.
+model MonitoringCustomer {
+  id               String    @id @default(cuid())
+  /// Lowercased + trimmed. Changes are admin-assisted during Early Access.
+  email            String    @unique
+  stripeCustomerId String?
+  lastSignInAt     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  subscriptions MonitoringSubscription[]
+  loginTokens   MonitoringLoginToken[]
+  sessions      MonitoringSession[]
+
+  @@index([stripeCustomerId])
+}
+
+/// Emailed sign-in link. Only the SHA-256 of the secret is stored; the
+/// secret itself exists only in the email. Single use (consumedAt), short
+/// lived (expiresAt), and superseded when a newer link is issued
+/// (invalidatedAt).
+model MonitoringLoginToken {
+  id            String             @id @default(cuid())
+  customerId    String
+  customer      MonitoringCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tokenHash     String             @unique
+  /// "welcome" (24 h, sent after purchase) | "sign_in" (15 min, requested) | "admin" (operator-sent, 24 h).
+  purpose       String
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  invalidatedAt DateTime?
+  createdAt     DateTime           @default(now())
+
+  @@index([customerId, createdAt])
+}
+
+/// Signed-in browser session. The cookie carries a random secret; only
+/// its SHA-256 is stored. Absolute 30-day expiry; revocable.
+model MonitoringSession {
+  id         String             @id @default(cuid())
+  customerId String
+  customer   MonitoringCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tokenHash  String             @unique
+  expiresAt  DateTime
+  lastSeenAt DateTime           @default(now())
+  revokedAt  DateTime?
+  userAgent  String?
+  createdAt  DateTime           @default(now())
+
+  @@index([customerId])
+}
+
+/// Fixed-window request counters for the monitoring sign-in endpoints.
+/// Database-backed so limits hold across Vercel function instances (the
+/// in-memory limiter in src/lib/rate-limit.ts is per instance). Keys are
+/// hashed — never a raw IP or email.
+model MonitoringAuthRateLimit {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@id([key, windowStart])
+  @@index([windowStart])
 }
 
 /// Idempotency ledger for Stripe events handled by the monitoring

@@ -1,7 +1,8 @@
 /* eslint-disable no-console */
 /**
- * scripts/test-monitoring-token-and-reaudit.ts — tokenized customer access
- * rules, and preservation of the existing $59 manual re-audit.
+ * scripts/test-monitoring-token-and-reaudit.ts — customer access rules
+ * (signed-in monitoring accounts; legacy private links only redirect to
+ * sign-in), and preservation of the existing $59 manual re-audit.
  */
 import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
@@ -31,17 +32,28 @@ const h = harness("monitoring-token-and-reaudit");
     }
   });
 
-  await h.check("every customer monitoring route requires the token and is flag-gated", () => {
+  await h.check("every customer monitoring data route requires a session + ownership and is flag-gated", () => {
     for (const f of [
-      "src/app/(future)/monitoring/[token]/page.tsx",
+      "src/app/(future)/monitoring/account/[subscriptionId]/page.tsx",
       "src/app/api/monitoring/tracking/route.ts",
+      "src/app/api/monitoring/improvements/route.ts",
+      "src/app/api/monitoring/improvements/draft/route.ts",
       "src/app/api/monitoring/portal/route.ts",
+      "src/app/api/monitoring/account/route.ts",
     ]) {
       const src = readFileSync(f, "utf8");
       assert.match(src, /isMonitoringEnabled\(\)/, `${f} flag-gated`);
-      assert.match(src, /findSubscriptionByToken\(/, `${f} token-checked`);
+      assert.match(src, /requireOwnedSubscription\(/, `${f} session + ownership checked`);
+      assert.doesNotMatch(src, /findSubscriptionByToken\(/, `${f} must not accept bearer tokens`);
       assert.match(src, /robots|applyApiRateLimit|checkPageRateLimit/, `${f} rate-limited or noindex`);
     }
+  });
+
+  await h.check("legacy /monitoring/<token> links redirect to sign-in without looking the token up", () => {
+    const src = readFileSync("src/app/(future)/monitoring/[token]/page.tsx", "utf8");
+    assert.match(src, /isMonitoringEnabled\(\)/);
+    assert.match(src, /redirect\("\/monitoring\/sign-in\?from=link"\)/);
+    assert.doesNotMatch(src, /findSubscriptionByToken|prisma/);
   });
 
   await h.check("$59 re-audit checkout is unchanged: one-time payment, its own price, RE_AUDIT metadata", () => {

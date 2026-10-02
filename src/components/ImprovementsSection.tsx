@@ -39,26 +39,26 @@ function StatusPill({ status }: { status: TaskStatus }) {
   return <span className={`pill text-[10px] ${tone}`}>{STATUS_LABELS[status]}</span>;
 }
 
-function Hidden({ token, taskId, action }: { token: string; taskId?: string; action: string }) {
+function Hidden({ subscriptionId, taskId, action }: { subscriptionId: string; taskId?: string; action: string }) {
   return (
     <>
-      <input type="hidden" name="token" value={token} />
+      <input type="hidden" name="subscriptionId" value={subscriptionId} />
       <input type="hidden" name="action" value={action} />
       {taskId ? <input type="hidden" name="taskId" value={taskId} /> : null}
     </>
   );
 }
 
-function ActionButton({ token, taskId, action, label, ghost = true }: { token: string; taskId: string; action: string; label: string; ghost?: boolean }) {
+function ActionButton({ subscriptionId, taskId, action, label, ghost = true }: { subscriptionId: string; taskId: string; action: string; label: string; ghost?: boolean }) {
   return (
     <form action="/api/monitoring/improvements" method="POST">
-      <Hidden token={token} taskId={taskId} action={action} />
+      <Hidden subscriptionId={subscriptionId} taskId={taskId} action={action} />
       <button type="submit" className={ghost ? "btn-ghost px-3 py-1 text-xs" : "btn-primary px-3 py-1 text-xs"}>{label}</button>
     </form>
   );
 }
 
-function FactsCard({ token, d }: { token: string; d: ImprovementsDashboard }) {
+function FactsCard({ subscriptionId, d }: { subscriptionId: string; d: ImprovementsDashboard }) {
   const f: BusinessFacts | null = d.facts?.facts ?? null;
   const val = (k: keyof BusinessFacts): string => {
     const v = f?.[k];
@@ -80,7 +80,7 @@ function FactsCard({ token, d }: { token: string; d: ImprovementsDashboard }) {
       </p>
       {d.canEdit ? (
         <form action="/api/monitoring/improvements" method="POST" className="mt-4 grid gap-3 md:grid-cols-2">
-          <Hidden token={token} action="save_facts" />
+          <Hidden subscriptionId={subscriptionId} action="save_facts" />
           {keys.map((k) => {
             const list = k === "services" || k === "serviceAreas" || k === "licenses";
             const suggested = !d.facts ? d.factSuggestions[k] : undefined;
@@ -131,7 +131,7 @@ function Impact({ impact }: { impact: ImpactView }) {
   );
 }
 
-function TaskCard({ t, token, canEdit }: { t: Task; token: string; canEdit: boolean }) {
+function TaskCard({ t, subscriptionId, canEdit }: { t: Task; subscriptionId: string; canEdit: boolean }) {
   const draft = t.drafts[0];
   const older = t.drafts.slice(1);
   const v = t.verifications[0];
@@ -170,8 +170,8 @@ function TaskCard({ t, token, canEdit }: { t: Task; token: string; canEdit: bool
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs uppercase tracking-[0.14em] text-white/40">Draft · version {draft.version} · {fmtDate(draft.createdAt)}</p>
             <CopyButton text={draft.content} />
-            <a className="btn-ghost px-3 py-1 text-xs" href={`/api/monitoring/improvements/draft?token=${encodeURIComponent(token)}&draftId=${draft.id}`}>Download</a>
-            {canEdit && open && !t.isFixture ? <ActionButton token={token} taskId={t.id} action="regenerate_draft" label="Refresh draft" /> : null}
+            <a className="btn-ghost px-3 py-1 text-xs" href={`/api/monitoring/improvements/draft?subscriptionId=${encodeURIComponent(subscriptionId)}&draftId=${draft.id}`}>Download</a>
+            {canEdit && open && !t.isFixture ? <ActionButton subscriptionId={subscriptionId} taskId={t.id} action="regenerate_draft" label="Refresh draft" /> : null}
           </div>
           {draft.missingFacts.length > 0 ? <p className="mt-1 text-xs text-severity-warning">Needs from you: {draft.missingFacts.join(", ")}</p> : null}
           <pre className="mono-data mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md border border-white/[0.06] bg-ink-900/60 p-3 text-xs text-white/80">{draft.content}</pre>
@@ -220,13 +220,13 @@ function TaskCard({ t, token, canEdit }: { t: Task; token: string; canEdit: bool
       {canEdit && !t.isFixture ? (
         <div className="mt-4 space-y-3">
           <div className="flex flex-wrap gap-2">
-            {t.status === "suggested" ? <ActionButton token={token} taskId={t.id} action="approve" label="Approve" ghost={false} /> : null}
-            {t.status === "approved" ? <ActionButton token={token} taskId={t.id} action="start" label="Start" /> : null}
-            {t.status === "implemented" ? <ActionButton token={token} taskId={t.id} action="reopen" label="Reopen" /> : null}
-            {t.status === "dismissed" ? <ActionButton token={token} taskId={t.id} action="restore" label="Restore" /> : null}
+            {t.status === "suggested" ? <ActionButton subscriptionId={subscriptionId} taskId={t.id} action="approve" label="Approve" ghost={false} /> : null}
+            {t.status === "approved" ? <ActionButton subscriptionId={subscriptionId} taskId={t.id} action="start" label="Start" /> : null}
+            {t.status === "implemented" ? <ActionButton subscriptionId={subscriptionId} taskId={t.id} action="reopen" label="Reopen" /> : null}
+            {t.status === "dismissed" ? <ActionButton subscriptionId={subscriptionId} taskId={t.id} action="restore" label="Restore" /> : null}
             {open && t.status !== "implemented" ? (
               <form action="/api/monitoring/improvements" method="POST" className="flex gap-2">
-                <Hidden token={token} taskId={t.id} action="dismiss" />
+                <Hidden subscriptionId={subscriptionId} taskId={t.id} action="dismiss" />
                 <input name="reason" placeholder="Why dismiss? (optional)" className="input-field py-1 text-xs" />
                 <button className="btn-ghost px-3 py-1 text-xs" type="submit">Dismiss</button>
               </form>
@@ -234,7 +234,7 @@ function TaskCard({ t, token, canEdit }: { t: Task; token: string; canEdit: bool
           </div>
           {t.status === "approved" || t.status === "in_progress" ? (
             <form action="/api/monitoring/improvements" method="POST" className="space-y-2">
-              <Hidden token={token} taskId={t.id} action="mark_implemented" />
+              <Hidden subscriptionId={subscriptionId} taskId={t.id} action="mark_implemented" />
               <textarea name="notes" rows={2} placeholder="What did you change? (optional)" className="input-field text-xs" />
               {t.fixKind === "page_outline" || t.fixKind === "faq" ? (
                 <input name="implementationUrl" required placeholder="Address of the page you published (on your website)" className="input-field text-xs" />
@@ -243,7 +243,7 @@ function TaskCard({ t, token, canEdit }: { t: Task; token: string; canEdit: bool
             </form>
           ) : null}
           <form action="/api/monitoring/improvements" method="POST" className="flex flex-col gap-2 sm:flex-row">
-            <Hidden token={token} taskId={t.id} action="add_note" />
+            <Hidden subscriptionId={subscriptionId} taskId={t.id} action="add_note" />
             <input name="note" placeholder="Add a note" className="input-field py-1 text-xs" />
             <button className="btn-ghost shrink-0 px-3 py-1 text-xs" type="submit">Add note</button>
           </form>
@@ -268,7 +268,7 @@ function TaskCard({ t, token, canEdit }: { t: Task; token: string; canEdit: bool
   );
 }
 
-export function ImprovementsSection({ token, d }: { token: string; d: ImprovementsDashboard }) {
+export function ImprovementsSection({ subscriptionId, d }: { subscriptionId: string; d: ImprovementsDashboard }) {
   const todo = d.tasks.filter((t) => ["suggested", "approved", "in_progress"].includes(t.status));
   const implemented = d.tasks.filter((t) => t.status === "implemented");
   const verified = d.tasks.filter((t) => t.status === "verified");
@@ -280,27 +280,27 @@ export function ImprovementsSection({ token, d }: { token: string; d: Improvemen
         person) make the change; when you mark it implemented, we check your website independently. We never edit your website.
       </p>
 
-      <FactsCard token={token} d={d} />
+      <FactsCard subscriptionId={subscriptionId} d={d} />
 
       <div>
         <h3 className="h3">To do</h3>
         {d.tasks.length === 0 ? <p className="muted mt-2 text-sm">No improvement tasks yet — create one from a finding below.</p> : null}
         {d.tasks.length > 0 && todo.length === 0 ? <p className="muted mt-2 text-sm">Nothing waiting on you right now.</p> : null}
-        <ul className="mt-4 space-y-3">{todo.map((t) => <TaskCard key={t.id} t={t} token={token} canEdit={d.canEdit} />)}</ul>
+        <ul className="mt-4 space-y-3">{todo.map((t) => <TaskCard key={t.id} t={t} subscriptionId={subscriptionId} canEdit={d.canEdit} />)}</ul>
       </div>
 
       {implemented.length > 0 ? (
         <div>
           <h3 className="h3">Implemented — being checked</h3>
           <p className="mt-2 text-xs text-white/55">You marked these done. We check the page; until a check passes they stay here.</p>
-          <ul className="mt-4 space-y-3">{implemented.map((t) => <TaskCard key={t.id} t={t} token={token} canEdit={d.canEdit} />)}</ul>
+          <ul className="mt-4 space-y-3">{implemented.map((t) => <TaskCard key={t.id} t={t} subscriptionId={subscriptionId} canEdit={d.canEdit} />)}</ul>
         </div>
       ) : null}
 
       {verified.length > 0 ? (
         <div>
           <h3 className="h3">Verified</h3>
-          <ul className="mt-4 space-y-3">{verified.map((t) => <TaskCard key={t.id} t={t} token={token} canEdit={d.canEdit} />)}</ul>
+          <ul className="mt-4 space-y-3">{verified.map((t) => <TaskCard key={t.id} t={t} subscriptionId={subscriptionId} canEdit={d.canEdit} />)}</ul>
         </div>
       ) : null}
 
@@ -319,7 +319,7 @@ export function ImprovementsSection({ token, d }: { token: string; d: Improvemen
                 </div>
                 {d.canEdit ? (
                   <form action="/api/monitoring/improvements" method="POST" className="shrink-0">
-                    <Hidden token={token} action="create_from_recommendation" />
+                    <Hidden subscriptionId={subscriptionId} action="create_from_recommendation" />
                     <input type="hidden" name="recommendationId" value={r.id} />
                     <button className="btn-ghost px-3 py-1 text-xs" type="submit">Create task</button>
                   </form>
@@ -333,7 +333,7 @@ export function ImprovementsSection({ token, d }: { token: string; d: Improvemen
       {dismissed.length > 0 ? (
         <details>
           <summary className="cursor-pointer text-sm text-white/60">Dismissed ({dismissed.length})</summary>
-          <ul className="mt-4 space-y-3">{dismissed.map((t) => <TaskCard key={t.id} t={t} token={token} canEdit={d.canEdit} />)}</ul>
+          <ul className="mt-4 space-y-3">{dismissed.map((t) => <TaskCard key={t.id} t={t} subscriptionId={subscriptionId} canEdit={d.canEdit} />)}</ul>
         </details>
       ) : null}
     </div>

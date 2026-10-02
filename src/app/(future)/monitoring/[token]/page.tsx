@@ -1,147 +1,17 @@
-import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
-import { Footer } from "@/components/Footer";
-import { Header } from "@/components/Header";
-import { ImprovementsSection } from "@/components/ImprovementsSection";
-import { WebsiteChangesSection } from "@/components/WebsiteChangesSection";
-import {
-  ActionsSection,
-  CitationsSection,
-  CompetitorsSection,
-  MONITORING_TABS,
-  MonitoringTabs,
-  OverviewSection,
-  PromptsSection,
-  ReportsSection,
-  ScoreHistorySection,
-  type MonitoringTabKey,
-} from "@/components/MonitoringDashboard";
-import { loadImprovementsDashboard } from "@/lib/monitoring/improvements/service";
-import { findPlan, isMonitoringEnabled } from "@/lib/monitoring/plans";
-import { findSubscriptionByToken, loadStatusAuditRows } from "@/lib/monitoring/prisma-store";
-import { buildMonitoringStatusView } from "@/lib/monitoring/status-view";
-import { loadTrackingDashboard } from "@/lib/monitoring/tracking/service";
-import { loadWebsiteDashboard } from "@/lib/monitoring/website/service";
-import { checkPageRateLimit } from "@/lib/rate-limit";
+import { isMonitoringEnabled } from "@/lib/monitoring/plans";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const metadata = {
-  title: "Your AI Visibility Monitoring · GeoViz",
-  robots: { index: false, follow: false },
-};
+export const metadata = { robots: { index: false, follow: false } };
 
 /**
- * Customer monitoring dashboard. The random token in the URL is the only
- * credential — no login (same capability model as report pages).
+ * Legacy private-link URL (`/monitoring/<accessToken>`). Bearer links no
+ * longer grant access: every visit goes to the sign-in flow, and the token
+ * is never looked up, so this page reveals nothing about whether it was
+ * valid.
  */
-export default async function MonitoringStatusPage({
-  params,
-  searchParams,
-}: {
-  params: { token: string };
-  searchParams?: { tab?: string; notice?: string };
-}) {
+export default function LegacyMonitoringLinkPage() {
   if (!isMonitoringEnabled()) notFound();
-
-  const rl = checkPageRateLimit({ headers: headers(), routeKey: "page:monitoring:status", limit: 60, windowMs: 5 * 60_000 });
-  if (rl.blocked) {
-    return (
-      <main>
-        <Header />
-        <section className="container-page py-24 text-center"><p className="muted">Too many requests. Please try again shortly.</p></section>
-        <Footer />
-      </main>
-    );
-  }
-
-  const sub = await findSubscriptionByToken(params.token);
-  if (!sub) notFound();
-
-  const tab: MonitoringTabKey = MONITORING_TABS.some((t) => t.key === searchParams?.tab) ? (searchParams!.tab as MonitoringTabKey) : "overview";
-  const website = await loadWebsiteDashboard(sub);
-  const [rows, tracking] = await Promise.all([loadStatusAuditRows(sub), loadTrackingDashboard(sub, { websiteFindings: website.findings })]);
-  const view = buildMonitoringStatusView(sub, rows, new Date());
-  const improvements =
-    tab === "improvements" || tab === "actions"
-      ? await loadImprovementsDashboard(sub, tracking.recommendations)
-      : null;
-  const planName = findPlan(view.planKey)?.name ?? "AI Visibility Monitoring";
-  const notice = typeof searchParams?.notice === "string" ? searchParams.notice.slice(0, 200) : null;
-
-  return (
-    <main>
-      <Header />
-      <section className="container-page py-14 md:py-16">
-        <p className="section-eyebrow">{planName}</p>
-        <h1 className="mt-4 text-3xl font-bold tracking-tight text-white">{view.businessName || view.websiteUrl}</h1>
-        <p className="muted mt-2 text-sm">{view.websiteUrl} · {view.access.label}</p>
-
-        <MonitoringTabs token={params.token} active={tab} />
-        {notice ? <p role="status" className="mt-4 text-sm text-severity-warning">{notice}</p> : null}
-
-        {tab === "overview" ? (
-          <OverviewSection view={view} metrics={tracking.metrics} comparison={tracking.comparison} samplesPerPrompt={tracking.latestCycle?.samplesPerPrompt ?? null} />
-        ) : null}
-        {tab === "history" ? <ScoreHistorySection view={view} cycleHistory={tracking.cycleHistory} /> : null}
-        {tab === "prompts" ? (
-          <PromptsSection
-            token={params.token}
-            prompts={tracking.prompts}
-            providers={tracking.entitlements.providers}
-            suggestions={tracking.suggestions}
-            maxActivePrompts={tracking.entitlements.maxActivePrompts}
-            canEdit={tracking.canEdit}
-          />
-        ) : null}
-        {tab === "competitors" ? (
-          <CompetitorsSection
-            token={params.token}
-            competitors={tracking.competitors}
-            detected={tracking.detectedCompetitors}
-            metrics={tracking.metrics}
-            maxCompetitors={tracking.entitlements.maxCompetitors}
-            canEdit={tracking.canEdit}
-          />
-        ) : null}
-        {tab === "citations" ? <CitationsSection citations={tracking.citations} /> : null}
-        {tab === "website" ? (
-          <WebsiteChangesSection
-            token={params.token}
-            sites={website.sites}
-            changes={website.changes}
-            cycles={tracking.cycleHistory}
-            limits={website.limits}
-            canEdit={tracking.canEdit}
-          />
-        ) : null}
-        {tab === "reports" ? <ReportsSection view={view} /> : null}
-        {tab === "actions" ? (
-          <ActionsSection
-            recommendations={tracking.recommendations}
-            token={params.token}
-            canEdit={tracking.canEdit}
-            taskByRecommendation={improvements?.taskByRecommendation ?? {}}
-          />
-        ) : null}
-        {tab === "improvements" && improvements ? <ImprovementsSection token={params.token} d={improvements} /> : null}
-
-        {view.canManageBilling ? (
-          <form action="/api/monitoring/portal" method="POST" className="mt-14">
-            <input type="hidden" name="token" value={params.token} />
-            <button type="submit" className="btn-ghost">Manage billing or cancel</button>
-            <p className="mt-2 text-xs text-white/45">Opens Stripe&apos;s secure billing portal.</p>
-          </form>
-        ) : null}
-
-        <p className="mt-12 max-w-3xl text-xs text-white/40">
-          AI answers come from each provider&apos;s API (with web search where available), not the consumer ChatGPT, Claude, Gemini,
-          or Perplexity apps, and can vary from run to run. Scores and rates are directional measurements, not a guarantee of
-          rankings or AI recommendations.
-        </p>
-      </section>
-      <Footer />
-    </main>
-  );
+  redirect("/monitoring/sign-in?from=link");
 }

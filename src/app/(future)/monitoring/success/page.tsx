@@ -1,55 +1,39 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { prisma } from "@/lib/db";
+import { getSignedInCustomerId } from "@/lib/monitoring/auth/session";
 import { isMonitoringEnabled } from "@/lib/monitoring/plans";
-import { getStripe } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Monitoring activated · GeoViz", robots: { index: false, follow: false } };
 
 /**
- * Stripe subscription-checkout return page. Resolves the checkout
- * session → subscription → the customer's private status page. The
- * webhook may land a few seconds after the redirect, so until the row
- * exists this page refreshes itself.
+ * Stripe subscription-checkout return page. The checkout session id in the
+ * URL is NOT a credential: access comes only from the single-use sign-in
+ * link emailed to the purchase address (the webhook sends it once the
+ * subscription is recorded).
  */
-export default async function MonitoringSuccessPage({
-  searchParams,
-}: {
-  searchParams?: { session_id?: string };
-}) {
+export default async function MonitoringSuccessPage() {
   if (!isMonitoringEnabled()) notFound();
-  const sessionId = searchParams?.session_id ?? "";
-  if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId)) notFound();
-
-  let token: string | null = null;
-  try {
-    const session = await getStripe().checkout.sessions.retrieve(sessionId);
-    const subscriptionId =
-      typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
-    if (session.mode === "subscription" && subscriptionId) {
-      const sub = await prisma.monitoringSubscription.findUnique({
-        where: { stripeSubscriptionId: subscriptionId },
-        select: { accessToken: true },
-      });
-      token = sub?.accessToken ?? null;
-    }
-  } catch (err) {
-    console.error("[monitoring-success] session lookup failed:", err);
-  }
-  if (token) redirect(`/monitoring/${token}`);
+  const signedIn = Boolean(await getSignedInCustomerId());
 
   return (
     <main>
-      <meta httpEquiv="refresh" content="5" />
       <Header />
-      <section className="container-page py-24 text-center">
-        <h1 className="h2">Activating your monitoring…</h1>
-        <p className="muted mx-auto mt-4 max-w-md">
-          Payment received. We&apos;re setting up your monitoring page — this usually takes a few
-          seconds and this page will refresh on its own. We&apos;ve also emailed you the link.
+      <section className="container-page max-w-xl py-24 text-center">
+        <p className="section-eyebrow">AI Visibility Monitoring</p>
+        <h1 className="h2 mt-4">Payment received — monitoring is activating</h1>
+        <p className="muted mx-auto mt-4 text-sm">
+          We&apos;ve emailed a sign-in link to the address you used at checkout. Open it on this device and press Continue to
+          see your monitoring dashboard. The link works once and is valid for 24 hours.
+        </p>
+        <p className="mt-8 text-sm">
+          {signedIn ? (
+            <a href="/monitoring/account" className="btn-primary inline-block">Go to your dashboard</a>
+          ) : (
+            <a href="/monitoring/sign-in" className="text-accent underline">Didn&apos;t get the email? Send a new sign-in link</a>
+          )}
         </p>
       </section>
       <Footer />

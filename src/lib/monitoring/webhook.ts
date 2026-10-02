@@ -42,6 +42,13 @@ export function isMonitoringStripeEvent(event: MonitoringStripeEvent): boolean {
 
 export type WebhookDeps = SyncDeps & {
   stripe: StripeSubscriptionGateway;
+  /**
+   * Monitoring-only customer login: create or connect the buyer's account
+   * (by email) and link this record to it. Idempotent; returns the record
+   * with `customerId` set.
+   */
+  linkCustomer: (sub: MonitoringSubscriptionRecord) => Promise<MonitoringSubscriptionRecord>;
+  /** Welcome email with a single-use 24-hour sign-in link. */
   sendWelcomeEmail: (sub: MonitoringSubscriptionRecord) => Promise<void>;
 };
 
@@ -87,6 +94,7 @@ async function process(event: MonitoringStripeEvent, deps: WebhookDeps): Promise
   if (sync.outcome === "ignored") return { outcome: "ignored", reason: sync.reason };
 
   let sub = sync.subscription;
+  if (!sub.customerId) sub = await deps.linkCustomer(sub);
   if (isCheckout && typeof obj.id === "string" && sub.stripeCheckoutSessionId !== obj.id) {
     await deps.store.setCheckoutSessionId(sub.id, obj.id);
     sub = { ...sub, stripeCheckoutSessionId: obj.id };

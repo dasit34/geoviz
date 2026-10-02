@@ -19,6 +19,7 @@ export const MONITORING_TABS = [
   { key: "reports", label: "Reports" },
   { key: "actions", label: "Recommended Actions" },
   { key: "improvements", label: "Improvements" },
+  { key: "settings", label: "Settings" },
 ] as const;
 export type MonitoringTabKey = (typeof MONITORING_TABS)[number]["key"];
 
@@ -41,13 +42,13 @@ function Change({ d, asPoints }: { d: MetricDelta | null | undefined; asPoints?:
   return <span className={tone}>{`${sign}${v}${asPoints ? "" : " pts"}`}</span>;
 }
 
-export function MonitoringTabs({ token, active }: { token: string; active: MonitoringTabKey }) {
+export function MonitoringTabs({ subscriptionId, active }: { subscriptionId: string; active: MonitoringTabKey }) {
   return (
     <nav className="mt-10 flex flex-wrap gap-1 border-b border-white/10" aria-label="Monitoring sections">
       {MONITORING_TABS.map((t) => (
         <a
           key={t.key}
-          href={`/monitoring/${token}?tab=${t.key}`}
+          href={`/monitoring/account/${subscriptionId}?tab=${t.key}`}
           className={`px-3 py-2 text-sm ${active === t.key ? "border-b-2 border-accent text-white" : "text-white/55 hover:text-white"}`}
           aria-current={active === t.key ? "page" : undefined}
         >
@@ -234,14 +235,14 @@ function cellFor(samples: PromptRow["results"]) {
 }
 
 export function PromptsSection({
-  token,
+  subscriptionId,
   prompts,
   providers,
   suggestions,
   maxActivePrompts,
   canEdit,
 }: {
-  token: string;
+  subscriptionId: string;
   prompts: PromptRow[];
   providers: readonly string[];
   suggestions: string[];
@@ -275,7 +276,7 @@ export function PromptsSection({
                   {canEdit ? (
                     <td className="py-2">
                       <form action="/api/monitoring/tracking" method="POST">
-                        <input type="hidden" name="token" value={token} />
+                        <input type="hidden" name="subscriptionId" value={subscriptionId} />
                         <input type="hidden" name="action" value="remove_prompt" />
                         <input type="hidden" name="id" value={p.id} />
                         <button className="text-xs text-white/50 underline" type="submit">Remove</button>
@@ -291,7 +292,7 @@ export function PromptsSection({
       {canEdit ? (
         <div className="grid gap-6 md:grid-cols-2">
           <form action="/api/monitoring/tracking" method="POST" className="card space-y-3 p-5">
-            <input type="hidden" name="token" value={token} />
+            <input type="hidden" name="subscriptionId" value={subscriptionId} />
             <input type="hidden" name="action" value="add_prompt" />
             <label htmlFor="text" className="text-sm text-white/70">Add your own question</label>
             <input id="text" name="text" required minLength={10} maxLength={300} placeholder="Who is the best roofer near Toledo?" className="input-field" />
@@ -307,7 +308,7 @@ export function PromptsSection({
                   <li key={s} className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-white/80">{s}</span>
                     <form action="/api/monitoring/tracking" method="POST">
-                      <input type="hidden" name="token" value={token} />
+                      <input type="hidden" name="subscriptionId" value={subscriptionId} />
                       <input type="hidden" name="action" value="add_suggested_prompt" />
                       <input type="hidden" name="text" value={s} />
                       <button className="text-xs text-accent underline" type="submit">Track</button>
@@ -326,14 +327,14 @@ export function PromptsSection({
 }
 
 export function CompetitorsSection({
-  token,
+  subscriptionId,
   competitors,
   detected,
   metrics,
   maxCompetitors,
   canEdit,
 }: {
-  token: string;
+  subscriptionId: string;
   competitors: Array<{ id: string; name: string; websiteUrl: string | null; domainConfirmed?: boolean; source: string }>;
   detected: Array<{ name: string; answers: number; providers: string[] }>;
   metrics: CycleMetrics | null;
@@ -387,7 +388,7 @@ export function CompetitorsSection({
                 <span className="text-white">{c.name}{c.websiteUrl ? <span className="ml-2 text-xs text-white/40">{c.websiteUrl}</span> : null}</span>
                 {canEdit ? (
                   <form action="/api/monitoring/tracking" method="POST">
-                    <input type="hidden" name="token" value={token} />
+                    <input type="hidden" name="subscriptionId" value={subscriptionId} />
                     <input type="hidden" name="action" value="remove_competitor" />
                     <input type="hidden" name="id" value={c.id} />
                     <button className="text-xs text-white/50 underline" type="submit">Remove</button>
@@ -398,7 +399,7 @@ export function CompetitorsSection({
           </ul>
           {canEdit ? (
             <form action="/api/monitoring/tracking" method="POST" className="mt-4 space-y-2">
-              <input type="hidden" name="token" value={token} />
+              <input type="hidden" name="subscriptionId" value={subscriptionId} />
               <input type="hidden" name="action" value="add_competitor" />
               <input name="name" required placeholder="Competitor business name" className="input-field" />
               <input name="websiteUrl" placeholder="Their website (optional — needed to track their website changes)" className="input-field" />
@@ -417,7 +418,7 @@ export function CompetitorsSection({
                   <span className="text-white/80">{d.name} <span className="text-xs text-white/40">named in {d.answers} answer{d.answers === 1 ? "" : "s"}</span></span>
                   {canEdit ? (
                     <form action="/api/monitoring/tracking" method="POST">
-                      <input type="hidden" name="token" value={token} />
+                      <input type="hidden" name="subscriptionId" value={subscriptionId} />
                       <input type="hidden" name="action" value="track_detected_competitor" />
                       <input type="hidden" name="name" value={d.name} />
                       <button className="text-xs text-accent underline" type="submit">Track</button>
@@ -498,12 +499,12 @@ export function ReportsSection({ view }: { view: MonitoringStatusView }) {
 
 export function ActionsSection({
   recommendations,
-  token,
+  subscriptionId,
   canEdit = false,
   taskByRecommendation = {},
 }: {
   recommendations: Recommendation[];
-  token?: string;
+  subscriptionId?: string;
   canEdit?: boolean;
   /** recommendation id → open improvement task id */
   taskByRecommendation?: Record<string, string>;
@@ -520,11 +521,11 @@ export function ActionsSection({
           <p className="mt-1 text-sm text-white/75">{r.action}</p>
           <p className="mt-2 text-xs text-white/50">Why: {r.evidence}</p>
           {r.url ? <p className="mono-data mt-1 break-all text-xs text-white/40">Source: {r.url}</p> : null}
-          {token && taskByRecommendation[r.id] ? (
-            <a href={`/monitoring/${token}?tab=improvements#task-${taskByRecommendation[r.id]}`} className="mt-3 inline-block text-xs text-accent underline">Task created — view it</a>
-          ) : token && canEdit ? (
+          {subscriptionId && taskByRecommendation[r.id] ? (
+            <a href={`/monitoring/account/${subscriptionId}?tab=improvements#task-${taskByRecommendation[r.id]}`} className="mt-3 inline-block text-xs text-accent underline">Task created — view it</a>
+          ) : subscriptionId && canEdit ? (
             <form action="/api/monitoring/improvements" method="POST" className="mt-3">
-              <input type="hidden" name="token" value={token} />
+              <input type="hidden" name="subscriptionId" value={subscriptionId} />
               <input type="hidden" name="action" value="create_from_recommendation" />
               <input type="hidden" name="recommendationId" value={r.id} />
               <button className="btn-ghost px-3 py-1 text-xs" type="submit">Create improvement task</button>
