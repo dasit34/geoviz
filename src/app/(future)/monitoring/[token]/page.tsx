@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { WebsiteChangesSection } from "@/components/WebsiteChangesSection";
 import {
   ActionsSection,
   CitationsSection,
@@ -19,6 +20,7 @@ import { findPlan, isMonitoringEnabled } from "@/lib/monitoring/plans";
 import { findSubscriptionByToken, loadStatusAuditRows } from "@/lib/monitoring/prisma-store";
 import { buildMonitoringStatusView } from "@/lib/monitoring/status-view";
 import { loadTrackingDashboard } from "@/lib/monitoring/tracking/service";
+import { loadWebsiteDashboard } from "@/lib/monitoring/website/service";
 import { checkPageRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +58,8 @@ export default async function MonitoringStatusPage({
   if (!sub) notFound();
 
   const tab: MonitoringTabKey = MONITORING_TABS.some((t) => t.key === searchParams?.tab) ? (searchParams!.tab as MonitoringTabKey) : "overview";
-  const [rows, tracking] = await Promise.all([loadStatusAuditRows(sub), loadTrackingDashboard(sub)]);
+  const website = await loadWebsiteDashboard(sub);
+  const [rows, tracking] = await Promise.all([loadStatusAuditRows(sub), loadTrackingDashboard(sub, { websiteFindings: website.findings })]);
   const view = buildMonitoringStatusView(sub, rows, new Date());
   const planName = findPlan(view.planKey)?.name ?? "AI Visibility Monitoring";
   const notice = typeof searchParams?.notice === "string" ? searchParams.notice.slice(0, 200) : null;
@@ -97,6 +100,16 @@ export default async function MonitoringStatusPage({
           />
         ) : null}
         {tab === "citations" ? <CitationsSection citations={tracking.citations} /> : null}
+        {tab === "website" ? (
+          <WebsiteChangesSection
+            token={params.token}
+            sites={website.sites}
+            changes={website.changes}
+            cycles={tracking.cycleHistory}
+            limits={website.limits}
+            canEdit={tracking.canEdit}
+          />
+        ) : null}
         {tab === "reports" ? <ReportsSection view={view} /> : null}
         {tab === "actions" ? <ActionsSection recommendations={tracking.recommendations} /> : null}
 
