@@ -33,11 +33,25 @@ const SCHEMA_TYPE: Record<string, string> = {
 export type Expectation =
   | { type: "structured_data"; url: string; name: string | null; phoneDigits: string | null }
   | { type: "title_description"; url: string; beforeTitle: string | null; beforeDescription: string | null; mustIncludeAny: string[] }
-  | { type: "page_with_keyword"; keyword: string }
-  | { type: "faq_present"; questions: string[] }
+  | { type: "page_with_keyword"; keyword: string; baseline?: ContentBaseline | null }
+  | { type: "faq_present"; questions: string[]; baseline?: ContentBaseline | null }
   | { type: "identity_match"; url: string; name: string | null; phoneDigits: string | null; street: string | null }
   | { type: "page_available"; url: string }
   | { type: "manual"; instructions: string };
+
+/**
+ * What the site looked like BEFORE the implementation claim: the latest
+ * successful scan completed before `implementedAt`. Frozen when the check is
+ * queued, so later scans or draft edits can't move it.
+ */
+export type ContentBaseline = {
+  scanId: string;
+  at: string;
+  /** Proposed items (questions / keyword) already on captured pages. */
+  present: Array<{ text: string; url: string }>;
+  /** Was the implementation page captured / at least discovered in that scan? */
+  implementationPage: { captured: boolean; discovered: boolean };
+};
 
 export type ObservedPage = {
   url: string;

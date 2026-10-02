@@ -48,6 +48,9 @@ export async function POST(req: Request) {
     case "manual_verify":
       result = await transitionTask(sub, { taskId, to: "verified", notes: field("notes"), evidenceUrl: field("evidenceUrl") }, "operator");
       break;
+    case "revoke_verification":
+      result = await transitionTask(sub, { taskId, to: "implemented", notes: field("notes") }, "operator");
+      break;
     case "dismiss":
       result = await transitionTask(sub, { taskId, to: "dismissed", reason: field("reason") }, "operator");
       break;

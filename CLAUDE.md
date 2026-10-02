@@ -415,8 +415,18 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
     jobs): queued when a scanner-checkable task is marked Implemented; one
     robots.txt + one page fetch through the SSRF-safe fetcher; outcomes
     **Verified** / **Change not found yet** (fetched, change absent — task
-    stays Implemented) / **Could not verify** (403, robots-blocked,
-    unreachable after 3 attempts with backoff). Shows expected, observed,
+    stays Implemented) / **Already on your site before this task** /
+    **Could not verify** (403, robots-blocked, unreachable after 3 attempts
+    with backoff). **FAQ and new-page checks look only for the PROPOSED
+    content** (drafted questions as a heading or question-sized block, ≥ 85%
+    of significant words; page keyword in title/headings) — unrelated FAQ
+    markup never counts — and compare it with a **baseline frozen when the
+    check is queued**: the latest successful scan completed before
+    `implementedAt`. New vs. baseline → Verified ("newly observed"); all
+    already in baseline → `already_present`; none → "Proposed content not
+    found"; no baseline, or the page existed but wasn't captured → Could not
+    verify (never verified without a baseline). Operators can revoke a wrong
+    verification (`verified → implemented`, note required) and re-queue. Shows expected, observed,
     URL, timestamp, plus "a change on your page doesn't mean it's
     indexed". Runs inside `npm run monitoring:website-scans`; fixture checks
     are never claimed by that runner.

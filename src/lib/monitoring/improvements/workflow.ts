@@ -6,6 +6,7 @@
  *   in_progress → implemented | dismissed
  *   implemented → verified (system check, or operator for manual-only kinds) | in_progress (reopen)
  *   dismissed → suggested (restore)
+ *   verified → implemented (operator revoke, note required — correcting a bad check)
  *
  * "Implemented" is a claim by the customer or operator. "Verified" needs an
  * independent check — a customer can never set it.
@@ -43,7 +44,8 @@ const TRANSITIONS: Record<TaskStatus, Partial<Record<TaskStatus, readonly Actor[
   approved: { in_progress: ["customer", "operator"], implemented: ["customer", "operator"], dismissed: ["customer", "operator"] },
   in_progress: { implemented: ["customer", "operator"], dismissed: ["customer", "operator"] },
   implemented: { verified: ["system", "operator"], in_progress: ["customer", "operator"] },
-  verified: {},
+  // Operator-only correction when a verification is later found invalid.
+  verified: { implemented: ["operator"] },
   dismissed: { suggested: ["customer", "operator"] },
 };
 

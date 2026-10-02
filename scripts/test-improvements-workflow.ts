@@ -26,7 +26,13 @@ const T = new Date("2026-10-02T00:00:00Z");
     for (const from of TASK_STATUSES) assert.equal(canTransition({ from, to: "verified", actor: "customer", fixKind: "citation" }).ok, false, from);
     assert.equal(canTransition({ from: "suggested", to: "implemented", actor: "customer", fixKind: "faq" }).ok, false);
     assert.equal(canTransition({ from: "in_progress", to: "verified", actor: "system", fixKind: "faq" }).ok, false, "must be implemented first");
-    for (const to of TASK_STATUSES) assert.equal(canTransition({ from: "verified", to, actor: "operator", fixKind: "citation" }).ok, false);
+    for (const to of TASK_STATUSES) if (to !== "implemented") assert.equal(canTransition({ from: "verified", to, actor: "operator", fixKind: "citation" }).ok, false, to);
+  });
+
+  await h.check("revoking a verification (verified → implemented) is operator-only", () => {
+    assert.equal(canTransition({ from: "verified", to: "implemented", actor: "operator", fixKind: "faq" }).ok, true);
+    assert.equal(canTransition({ from: "verified", to: "implemented", actor: "customer", fixKind: "faq" }).ok, false);
+    assert.equal(canTransition({ from: "verified", to: "implemented", actor: "system", fixKind: "faq" }).ok, false);
   });
 
   await h.check("operators verify only kinds the scanner can't check", () => {

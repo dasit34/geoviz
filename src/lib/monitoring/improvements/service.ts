@@ -16,7 +16,7 @@ import type { CompetitorRef } from "../tracking/types";
 import type { MonitoringSubscriptionRecord } from "../types";
 import { loadWebsiteDashboard } from "../website/service";
 import { generateDraft, GENERATOR_VERSION, type Expectation, type ObservedPage } from "./drafts";
-import { checkUrlFor, describeExpected } from "./expectations";
+import { buildContentBaseline, checkUrlFor, describeExpected } from "./expectations";
 import { parseFacts, suggestFactsFromObserved, validateFacts, type BusinessFacts } from "./facts";
 import { buildImpact, type CycleForImpact } from "./impact";
 import { sameSiteUrl, untrustedText } from "./sanitize";
@@ -186,7 +186,14 @@ export async function transitionTask(sub: Sub, input: TransitionInput, actor: "c
   let implementationUrl: string | null = task.implementationUrl;
 
   if (input.to === "approved") data.approvedAt = now;
-  if (input.to === "implemented") {
+  if (input.to === "implemented" && from === "verified") {
+    // Operator revoke: the original implementation claim/date stand; only the verification is withdrawn.
+    if (!note) return { ok: false, message: "Revoking a verification needs a note explaining why." };
+    const open = await prisma.improvementTask.findUnique({ where: { openKey: openKeyFor(sub.id, task.dedupeKey) }, select: { id: true } });
+    if (open) return { ok: false, message: "There's already an open task for this finding." };
+    Object.assign(data, { verifiedAt: null, verifiedBy: null, openKey: openKeyFor(sub.id, task.dedupeKey) });
+    note = `Verification revoked: ${note}`;
+  } else if (input.to === "implemented") {
     if (input.implementationUrl) {
       implementationUrl = sameSiteUrl(input.implementationUrl, normalizeDomain(sub.websiteUrl));
       if (!implementationUrl) return { ok: false, message: "Enter a page address on your own website." };
@@ -222,6 +229,32 @@ export async function transitionTask(sub: Sub, input: TransitionInput, actor: "c
   return { ok: true };
 }
 
+/**
+ * Baseline frozen for a check: the latest successful scan of the page's site
+ * completed BEFORE the implementation claim (null when none exists — the
+ * check then can't prove the content is new).
+ */
+async function baselineBefore(subscriptionId: string, url: string, implementationUrl: string | null, implementedAt: Date | null, isFixture: boolean, exp: Expectation) {
+  const siteDomain = normalizeDomain(url);
+  if (!siteDomain || !implementedAt) return null;
+  const scan = await prisma.websiteScan.findFirst({
+    where: { subscriptionId, siteDomain, isFixture, status: { in: ["completed", "partial"] }, completedAt: { lt: implementedAt } },
+    orderBy: { completedAt: "desc" },
+    select: { id: true, completedAt: true, discoveredUrls: true },
+  });
+  if (!scan?.completedAt) return null;
+  const pages = await prisma.pageSnapshot.findMany({ where: { scanId: scan.id, fetchStatus: "ok" }, select: { url: true, normalizedUrl: true, title: true, headings: true, contentBlocks: true } });
+  return buildContentBaseline({
+    exp,
+    implementationUrl,
+    scan: { id: scan.id, completedAt: scan.completedAt, discoveredUrls: strArr(scan.discoveredUrls) },
+    pages: pages.map((p) => {
+      const h = (p.headings ?? {}) as { h1?: unknown; h2?: unknown; h3?: unknown };
+      return { url: p.url, normalizedUrl: p.normalizedUrl, title: p.title, headings: { h1: strArr(h.h1), h2: strArr(h.h2), h3: strArr(h.h3) }, contentBlocks: strArr(p.contentBlocks) };
+    }),
+  });
+}
+
 /** Queue an independent scanner check (no-op for manual tasks or a missing page address). */
 export async function queueVerification(sub: Sub, taskId: string, isFixture = false): Promise<MutationResult> {
   const task = await taskFor(sub.id, taskId);
@@ -236,7 +269,10 @@ export async function queueVerification(sub: Sub, taskId: string, isFixture = fa
   }
   const pending = await prisma.improvementVerification.count({ where: { taskId, status: { in: ["queued", "running"] } } });
   if (pending > 0) return { ok: true };
-  await prisma.improvementVerification.create({ data: { taskId, subscriptionId: sub.id, url, expected: json(expectation), isFixture: isFixture || task.isFixture } });
+  const expected = expectation.type === "faq_present" || expectation.type === "page_with_keyword"
+    ? { ...expectation, baseline: await baselineBefore(sub.id, url, task.implementationUrl, task.implementedAt, isFixture || task.isFixture, expectation) }
+    : expectation;
+  await prisma.improvementVerification.create({ data: { taskId, subscriptionId: sub.id, url, expected: json(expected), isFixture: isFixture || task.isFixture } });
   return { ok: true };
 }
 
@@ -341,7 +377,8 @@ export async function loadImprovementsDashboard(sub: Sub, recommendations: Recom
       drafts: t.drafts.map((d) => ({ ...d, missingFacts: strArr(d.missingFacts) })),
       verifications: t.verifications.map((v) => {
         const o = (v.observed ?? {}) as { expected?: string; observed?: string };
-        return { id: v.id, status: v.status, outcome: v.outcome, url: v.url, expected: o.expected ?? describeExpected(v.expected as Expectation), observed: o.observed ?? null, checkedAt: v.checkedAt, attempts: v.attempts, nextRetryAt: v.nextRetryAt, lastError: v.lastError, fetchStatus: v.fetchStatus };
+        const baselineAt = ((v.expected ?? {}) as { baseline?: { at?: string } | null }).baseline?.at ?? null;
+        return { id: v.id, status: v.status, outcome: v.outcome, url: v.url, baselineAt, expected: o.expected ?? describeExpected(v.expected as Expectation), observed: o.observed ?? null, checkedAt: v.checkedAt, attempts: v.attempts, nextRetryAt: v.nextRetryAt, lastError: v.lastError, fetchStatus: v.fetchStatus };
       }),
       // Demonstration tasks never borrow the subscription's real measurements.
       impact: t.isFixture ? ({ state: "not_implemented" } as const) : buildImpact({ implementedAt: t.implementedAt, cycles, customerDomain, competitors }),

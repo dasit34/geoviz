@@ -20,7 +20,19 @@ const fmtDate = (d: Date | string | null | undefined) =>
 const pct = (r: number | null | undefined) => (r === null || r === undefined ? "Not measured" : `${Math.round(r * 100)}%`);
 const pts = (c: number | null) => (c === null ? "—" : `${c > 0 ? "+" : ""}${Math.round(c * 100)} pts`);
 const PRIORITY = { 1: "Do first", 2: "Next", 3: "Later" } as Record<number, string>;
-const VERIFY_LABEL: Record<string, string> = { verified: "Verified", not_found: "Change not found yet", could_not_verify: "Could not verify" };
+const VERIFY_LABEL: Record<string, string> = {
+  verified: "Verified",
+  not_found: "Change not found yet",
+  already_present: "Already on your site before this task",
+  could_not_verify: "Could not verify",
+};
+/** FAQ / new-page checks look for the proposed content specifically. */
+const verifyLabel = (outcome: string | null, fixKind: string) => {
+  const proposed = fixKind === "faq" || fixKind === "page_outline";
+  if (proposed && outcome === "verified") return "Verified — newly observed after your change";
+  if (proposed && outcome === "not_found") return "Proposed content not found";
+  return VERIFY_LABEL[outcome ?? ""] ?? "Checked";
+};
 
 function StatusPill({ status }: { status: TaskStatus }) {
   const tone = status === "verified" ? "text-severity-info border-severity-info/40" : status === "implemented" ? "text-accent border-accent/40" : status === "dismissed" ? "text-white/40" : "text-white/70";
@@ -190,11 +202,13 @@ function TaskCard({ t, token, canEdit }: { t: Task; token: string; canEdit: bool
       {v ? (
         <div className="mt-3 rounded-md border border-white/[0.06] p-3 text-xs">
           <p className="font-semibold text-white/80">
-            {v.status === "done" ? VERIFY_LABEL[v.outcome ?? ""] ?? "Checked" : v.attempts > 0 ? "Couldn't reach the page yet — will retry" : "Check queued"}
+            {v.status === "done" ? verifyLabel(v.outcome, t.fixKind) : v.attempts > 0 ? "Couldn't reach the page yet — will retry" : "Check queued"}
             {v.checkedAt ? <span className="ml-2 font-normal text-white/45">{new Date(v.checkedAt).toISOString().replace("T", " ").slice(0, 16)} UTC</span> : null}
           </p>
           <p className="mt-1 text-white/60">Expected: {v.expected}</p>
           {v.observed ? <p className="text-white/60">Observed: {v.observed}</p> : null}
+          {v.outcome === "already_present" ? <p className="mt-1 text-white/55">Nothing new to verify. Add the drafted content that isn&apos;t on your site yet, or dismiss this task.</p> : null}
+          {v.baselineAt ? <p className="text-white/45">Compared with your site as scanned on {fmtDate(v.baselineAt)} (before you marked this implemented).</p> : null}
           <p className="mono-data break-all text-white/45">{v.url}</p>
           <p className="mt-1 text-white/40">A change being on your page doesn&apos;t mean search engines or AI systems have indexed it yet.</p>
         </div>

@@ -84,6 +84,14 @@ export default async function ImprovementsAdminPage({ searchParams }: { searchPa
                   <input name="reason" placeholder="reason" className="input-field py-1 text-xs" />
                   <button className="btn-ghost px-3 py-1 text-xs" type="submit">dismiss</button>
                 </form>
+                {t.status === "verified" ? (
+                  <form action="/api/admin/improvements" method="POST" className="flex flex-wrap gap-1">
+                    <Hidden t={t} />
+                    <input type="hidden" name="action" value="revoke_verification" />
+                    <input name="notes" required placeholder="why the verification was wrong" className="input-field py-1 text-xs" />
+                    <button className="btn-ghost px-3 py-1 text-xs" type="submit">revoke verification</button>
+                  </form>
+                ) : null}
                 {manual && t.status === "implemented" ? (
                   <form action="/api/admin/improvements" method="POST" className="flex flex-wrap gap-1">
                     <Hidden t={t} />

@@ -11,7 +11,7 @@ import { harness } from "./lib/monitoring-fakes";
 import { fakeSite, html, type FakeRoute } from "./lib/website-fakes";
 import type { Expectation } from "../src/lib/monitoring/improvements/drafts";
 import { checkPage, runQueuedVerifications, VERIFY_BACKOFF_MS, VERIFY_MAX_ATTEMPTS, type ClaimedVerification, type VerificationStore } from "../src/lib/monitoring/improvements/verify";
-import { evaluate } from "../src/lib/monitoring/improvements/expectations";
+import { buildContentBaseline, evaluate, keywordMatches, textMatches } from "../src/lib/monitoring/improvements/expectations";
 
 const h = harness("improvements-verify");
 const lb = { "@context": "https://schema.org", "@type": "HVACBusiness", name: "Acme HVAC", telephone: "(614) 555-0100" };
@@ -43,11 +43,77 @@ const check = async (url: string, exp: Expectation, routes = site) => evaluate(e
     assert.equal((await check("https://acme.example/", { type: "title_description", url: "https://acme.example/", beforeTitle: "Acme HVAC | Furnace Repair in Columbus", beforeDescription: "Acme HVAC in Columbus.", mustIncludeAny: ["Columbus"] })).outcome, "not_found");
   });
 
-  await h.check("published page with keyword / FAQ questions; 404 → change not found yet", async () => {
-    assert.equal((await check("https://acme.example/furnace-repair", { type: "page_with_keyword", keyword: "Furnace Repair" })).outcome, "verified");
-    assert.equal((await check("https://acme.example/furnace-repair", { type: "page_with_keyword", keyword: "Heat Pumps" })).outcome, "not_found");
-    assert.equal((await check("https://acme.example/furnace-repair", { type: "faq_present", questions: ["How much does furnace repair cost in Columbus?"] })).outcome, "verified");
-    assert.equal((await check("https://acme.example/old", { type: "page_with_keyword", keyword: "x" })).outcome, "not_found");
+  // ── Proposed-content checks (FAQ / new page): baseline-aware ──────────
+  const B = (present: Array<{ text: string; url: string }>, impl: { captured: boolean; discovered: boolean } = { captured: false, discovered: false }) =>
+    ({ scanId: "scan_before", at: "2026-10-01T00:00:00.000Z", present, implementationPage: impl });
+  const Q1 = "How much does furnace repair cost in Columbus?";
+  const Q2 = "Do you offer same-day AC repair in Dublin?";
+  const faqSite: Record<string, FakeRoute> = {
+    ...site,
+    "/unrelated-faq": { status: 200, body: html({ title: "FAQ", h1: "FAQ", h2: ["What payment methods do you accept?"], paragraphs: ["We accept cards."], jsonLd: { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: [] } }) },
+    "/faq-both": { status: 200, body: html({ title: "FAQ", h1: "FAQ", h2: [Q1, "Do you offer same day AC repairs in Dublin, Ohio?"], paragraphs: ["Real answers."] }) },
+  };
+  const faq = (baseline: ReturnType<typeof B> | null): Expectation => ({ type: "faq_present", questions: [Q1, Q2], baseline });
+
+  await h.check("REGRESSION: existing/unrelated FAQ markup alone never verifies", async () => {
+    const r = await check("https://acme.example/unrelated-faq", faq(B([])), faqSite);
+    assert.equal(r.outcome, "not_found");
+    assert.match(r.observed, /Proposed content not found: 0 of 2 .*other FAQ content, which doesn't count/);
+  });
+
+  await h.check("proposed content already present in the baseline → already_present (not verified)", async () => {
+    const r = await check("https://acme.example/furnace-repair", faq(B([{ text: Q1, url: "https://acme.example/furnace-repair" }], { captured: true, discovered: true })), faqSite);
+    assert.equal(r.outcome, "already_present");
+    assert.match(r.observed, /already on your site before this task \(2026-10-01 snapshot\)/);
+  });
+
+  await h.check("proposed content newly observed after implementation → verified, listing what's new vs. old", async () => {
+    const r = await check("https://acme.example/faq-both", faq(B([{ text: Q1, url: "https://acme.example/furnace-repair" }])), faqSite);
+    assert.equal(r.outcome, "verified");
+    assert.match(r.observed, /Newly observed after your change: "Do you offer same-day AC repair in Dublin\?"; already on your site before/);
+  });
+
+  await h.check("proposed content missing → not_found", async () => {
+    assert.equal((await check("https://acme.example/", faq(B([])), faqSite)).outcome, "not_found");
+    assert.equal((await check("https://acme.example/old", faq(B([])), faqSite)).outcome, "not_found");
+  });
+
+  await h.check("unable to check: fetch failure, robots block, no baseline, or uncaptured pre-existing page", async () => {
+    for (const path of ["/locked", "/slow", "/private/page"]) assert.equal((await check(`https://acme.example${path}`, faq(B([])), faqSite)).outcome, "could_not_verify", path);
+    const none = await check("https://acme.example/faq-both", faq(null), faqSite);
+    assert.equal(none.outcome, "could_not_verify", "no earlier snapshot → never verified");
+    assert.match(none.observed, /no earlier snapshot/);
+    const legacy = await check("https://acme.example/faq-both", { type: "faq_present", questions: [Q1] }, faqSite);
+    assert.equal(legacy.outcome, "could_not_verify", "checks queued without a baseline field are never verified");
+    assert.equal((await check("https://acme.example/faq-both", faq(B([], { captured: false, discovered: true })), faqSite)).outcome, "could_not_verify");
+  });
+
+  await h.check("matching tolerates small wording edits but not unrelated questions", () => {
+    assert.equal(textMatches(Q2, ["Do you offer same day AC repairs in Dublin, Ohio?"]), true);
+    assert.equal(textMatches(Q2, ["What payment methods do you accept?"]), false);
+    assert.equal(textMatches(Q1, ["furnace", "repair", "cost", "columbus"]), false, "words must co-occur in one heading/block");
+    // REGRESSION (staging): a prose paragraph sharing common words is not the question.
+    const prose = "Columbus Heating & Cooling has been proudly serving the Columbus, OH community and surrounding areas for over a decade. We are a family-owned and operated HVAC company committed to providing honest, high-quality service.";
+    assert.equal(textMatches("Is Columbus Heating & Cooling a trustworthy HVAC company?", [prose]), false);
+    assert.equal(textMatches("Is Columbus Heating & Cooling a trustworthy HVAC company?", ["Is Columbus Heating and Cooling a trustworthy HVAC company?"]), true);
+    assert.equal(keywordMatches("Furnace Repair", ["Furnace Repair in Columbus"]), true);
+    assert.equal(keywordMatches("Furnace Repair", ["Repair services"]), false);
+  });
+
+  await h.check("baseline builder: present items, implementation page captured/discovered", () => {
+    const pages = [{ url: "https://acme.example/faq", normalizedUrl: "acme.example/faq", title: "FAQ", headings: { h1: [], h2: [Q1], h3: [] }, contentBlocks: [] }];
+    const b = buildContentBaseline({ exp: faq(null), implementationUrl: "https://www.acme.example/faq/", scan: { id: "s", completedAt: new Date("2026-10-01"), discoveredUrls: ["acme.example/faq"] }, pages })!;
+    assert.deepEqual(b.present, [{ text: Q1, url: "https://acme.example/faq" }]);
+    assert.deepEqual(b.implementationPage, { captured: true, discovered: true });
+    assert.equal(buildContentBaseline({ exp: faq(null), implementationUrl: null, scan: null, pages }), null);
+  });
+
+  await h.check("new page with keyword: already on that URL before → already_present; brand-new page → verified", async () => {
+    const kw = (baseline: ReturnType<typeof B> | null): Expectation => ({ type: "page_with_keyword", keyword: "Furnace Repair", baseline });
+    assert.equal((await check("https://acme.example/furnace-repair", kw(B([{ text: "Furnace Repair", url: "https://acme.example/furnace-repair" }], { captured: true, discovered: true })))).outcome, "already_present");
+    assert.equal((await check("https://acme.example/furnace-repair", kw(B([])))).outcome, "verified");
+    assert.equal((await check("https://acme.example/furnace-repair", { type: "page_with_keyword", keyword: "Heat Pumps", baseline: B([]) })).outcome, "not_found");
+    assert.equal((await check("https://acme.example/furnace-repair", kw(null))).outcome, "could_not_verify");
   });
 
   await h.check("identity match + restored page", async () => {

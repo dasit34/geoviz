@@ -95,6 +95,25 @@ const B = `test_impr_b_${stamp}`;
       const events = await prisma.improvementEvent.findMany({ where: { taskId: task.id }, orderBy: { createdAt: "asc" } });
       assert.ok(events.some((e) => e.type === "verification") && events.some((e) => e.toStatus === "verified" && e.actor === "system"));
     });
+    await h.check("FAQ check baseline is frozen to the scan BEFORE implementation (later scans ignored)", async () => {
+      const Q = "How much does furnace repair cost in Columbus?";
+      const mkScan = async (key: string, completedAt: Date, h2: string[]) => {
+        const scan = await prisma.websiteScan.create({ data: { subscriptionId: A, siteKind: "customer", siteDomain: "store-test.example", siteUrl: "https://store-test.example/", cycleKey: key, status: "completed", scannerVersion: "site-scanner@1.0.0", completedAt, discoveredUrls: [], discoveryComplete: true } });
+        await prisma.pageSnapshot.create({ data: { scanId: scan.id, subscriptionId: A, siteDomain: "store-test.example", url: "https://store-test.example/faq", normalizedUrl: "store-test.example/faq", discoveredVia: "nav_link", fetchStatus: "ok", headings: { h1: ["FAQ"], h2, h3: [] }, contentBlocks: [], services: [], locations: [], scannerVersion: "site-scanner@1.0.0", fetchedAt: completedAt } });
+        return scan;
+      };
+      const implementedAt = new Date(Date.now() - 60_000);
+      const before = await mkScan("before", new Date(implementedAt.getTime() - 86_400_000), ["Other question?"]);
+      await mkScan("after", new Date(implementedAt.getTime() + 30_000), [Q]);
+      const faqTask = await prisma.improvementTask.create({
+        data: { subscriptionId: A, dedupeKey: "audit:content.no_faq", openKey: `${A}:audit:content.no_faq`, source: "audit", category: "website_content", fixKind: "faq", title: "No FAQ", problem: "No FAQ", evidence: [], priority: 2, priorityReason: "x", proposedFix: "x", verificationMethod: "scanner", expectation: { type: "faq_present", questions: [Q] }, status: "implemented", implementedAt, implementationUrl: "https://store-test.example/faq" },
+      });
+      assert.deepEqual(await queueVerification(subA, faqTask.id), { ok: true });
+      const v = await prisma.improvementVerification.findFirstOrThrow({ where: { taskId: faqTask.id } });
+      const b = (v.expected as { baseline: { scanId: string; present: unknown[] } }).baseline;
+      assert.equal(b.scanId, before.id, "uses the pre-implementation scan");
+      assert.deepEqual(b.present, [], "the question only appeared after implementation");
+    });
   } finally {
     await prisma.monitoringSubscription.deleteMany({ where: { id: { in: [A, B] } } });
     console.log(`  cleanup: ${await prisma.improvementTask.count({ where: { subscriptionId: { in: [A, B] } } })} tasks left`);
