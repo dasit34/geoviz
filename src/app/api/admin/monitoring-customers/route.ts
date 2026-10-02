@@ -16,6 +16,8 @@ export const runtime = "nodejs";
  *  - send_sign_in_link: emails the account owner a single-use 24-hour link
  *    (always to the account's own email — the operator never sees the link).
  *  - revoke_sessions: signs the customer out everywhere.
+ *  - resolve_duplicate: marks a duplicate paid subscription reviewed (after
+ *    the operator refunded / canceled it in Stripe — GeoViz never does).
  */
 export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
@@ -35,6 +37,14 @@ export async function POST(req: Request) {
     url.searchParams.set("notice", notice);
     return NextResponse.redirect(url, 303);
   };
+
+  if (field("action") === "resolve_duplicate") {
+    const { count } = await prisma.monitoringDuplicateSubscription.updateMany({
+      where: { id: field("duplicateId"), monitoringSubscriptionId: sub.id, resolvedAt: null },
+      data: { resolvedAt: new Date() },
+    });
+    return back(count === 1 ? "Duplicate marked resolved." : "Nothing to resolve.");
+  }
 
   const customer = sub.customerId
     ? await prismaMonitoringAuthStore.findCustomerById(sub.customerId)

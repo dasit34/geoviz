@@ -5,6 +5,7 @@
  * so idempotency behaviour is exercised without a database.
  */
 import {
+  DuplicateBusinessRecordError,
   DuplicateSubscriptionError,
   type MonitoringStore,
   type MonitoringSubscriptionRecord,
@@ -21,8 +22,11 @@ export type FakeOrder = {
   queuedAt: Date;
 };
 
+export type FakeDuplicate = { stripeSubscriptionId: string; monitoringSubscriptionId: string; status: string; events: number };
+
 export type FakeStore = MonitoringStore & {
   subs: Map<string, MonitoringSubscriptionRecord>;
+  duplicates: Map<string, FakeDuplicate>;
   orders: FakeOrder[];
   events: Map<string, { type: string; processedAt: Date | null; attempts: number; lastError: string | null }>;
 };
@@ -31,7 +35,11 @@ export function createFakeStore(): FakeStore {
   const subs = new Map<string, MonitoringSubscriptionRecord>();
   const orders: FakeOrder[] = [];
   const events = new Map<string, { type: string; processedAt: Date | null; attempts: number; lastError: string | null }>();
+  const duplicates = new Map<string, FakeDuplicate>();
   let seq = 0;
+  // Mirrors the (email, siteKey) unique index (NULL siteKeys never collide).
+  const bySiteKey = (email: string, siteKey: string | null) =>
+    siteKey === null ? null : [...subs.values()].find((s) => s.email === email && s.siteKey === siteKey) ?? null;
   const byStripeId = (sid: string) => [...subs.values()].find((s) => s.stripeSubscriptionId === sid) ?? null;
   const mustGet = (id: string) => {
     const s = subs.get(id);
@@ -43,6 +51,28 @@ export function createFakeStore(): FakeStore {
     subs,
     orders,
     events,
+    duplicates,
+    async findBySiteKey(email, siteKey) {
+      const s = bySiteKey(email, siteKey);
+      return s ? { ...s } : null;
+    },
+    async claimSiteKey(id, siteKey) {
+      const s = subs.get(id);
+      if (!s || s.siteKey !== null || bySiteKey(s.email, siteKey)) return false;
+      subs.set(id, { ...s, siteKey });
+      return true;
+    },
+    async recordDuplicateSubscription({ stripeSubscriptionId, monitoringSubscriptionId, status }) {
+      const d = duplicates.get(stripeSubscriptionId);
+      if (d) {
+        d.status = status;
+        d.events += 1;
+      } else duplicates.set(stripeSubscriptionId, { stripeSubscriptionId, monitoringSubscriptionId, status, events: 1 });
+    },
+    async findDuplicateSubscription(stripeSubscriptionId) {
+      const d = duplicates.get(stripeSubscriptionId);
+      return d ? { monitoringSubscriptionId: d.monitoringSubscriptionId } : null;
+    },
     async findBySubscriptionId(sid) {
       const s = byStripeId(sid);
       return s ? { ...s } : null;
@@ -68,6 +98,7 @@ export function createFakeStore(): FakeStore {
     },
     async create(data) {
       if (byStripeId(data.stripeSubscriptionId)) throw new DuplicateSubscriptionError(data.stripeSubscriptionId);
+      if (bySiteKey(data.email, data.siteKey)) throw new DuplicateBusinessRecordError(data.siteKey ?? data.websiteUrl);
       const rec: MonitoringSubscriptionRecord = {
         stripeCheckoutSessionId: null,
         lastAuditQueuedAt: null,

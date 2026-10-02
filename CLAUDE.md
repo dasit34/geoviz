@@ -287,6 +287,20 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
     kept); a plain repurchase with the same email + website also
     reattaches to an ended record; late events for a prior id are
     ignored; active records are never taken over.
+  - **One record per business (database-enforced)**: `MonitoringSubscription
+    @@unique([email, siteKey])`, `siteKey = normalizeDomain(websiteUrl)`
+    (migration `20261005100000_monitoring_one_record_per_business`). The
+    sync converges on that row (create → unique collision → re-read;
+    reattach is a conditional `UPDATE … WHERE stripeSubscriptionId = old`,
+    so exactly one concurrent reactivation wins). Any other paid
+    subscription for the same (email, business) — two reactivations paid at
+    once, a second purchase while active — is NEVER a second record: it is
+    upserted into `MonitoringDuplicateSubscription` (no account link, no
+    email) and listed at `/admin/monitoring-customers` for the operator to
+    refund/cancel in Stripe and mark resolved. GeoViz never changes it in
+    Stripe. Legacy rows: `scripts/backfill-monitoring-site-keys.ts`
+    (idempotent) or lazy claim on sync. Regression:
+    `scripts/test-monitoring-reactivation-race-db.ts` (non-prod DB).
   - **Admin**: `/admin/monitoring-customers` — "Send sign-in link"
     (emails the account owner; the operator never sees the link) and
     "Sign out everywhere".
@@ -367,7 +381,10 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
   (its migration applies on the Production build); set the Production
   Billing Portal's subscription-cancel mode to **at period end**; confirm
   Resend click tracking is OFF for the sending domain (sign-in links must
-  not pass through a tracking redirect).
+  not pass through a tracking redirect — verified OFF for `mail.geoviz.ai`
+  via the Resend API on 2026-10-05); run
+  `scripts/backfill-monitoring-site-keys.ts` (Production has 0 monitoring
+  rows today, so it is a no-op unless rows appear first).
 - **Website snapshots + change detection v1** (`src/lib/monitoring/website/`,
   same flag; branch `feat/website-change-tracking-v1`, PR #48, NOT merged): bounded,
   immutable snapshots of the customer's site + up to `maxCompetitorSites`
@@ -1006,8 +1023,8 @@ non-production. Enforced in code:
   supervised improvements v1 (migration `20261003100000`) were later
   merged to `main` (`44f8924`, `7f3807c`).
   **Open, not merged:** `feat/monitoring-customer-login` (monitoring-only
-  passwordless login, migration `20261004100000`) — applied to staging
-  only.
+  passwordless login, migrations `20261004100000` + `20261005100000`) —
+  applied to staging only.
   Production healthy after each merge; the build
   guard allows only `VERCEL_ENV=production` builds to migrate production
   (`autoExposeSystemEnvs` is on).

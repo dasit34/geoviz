@@ -55,6 +55,12 @@ export type WebhookDeps = SyncDeps & {
 export type MonitoringWebhookResult =
   | { outcome: "duplicate" }
   | { outcome: "ignored"; reason: string }
+  /**
+   * A paid subscription that lost to the record already attached to this
+   * business (e.g. two reactivations paid at once). No record, account link,
+   * or email is created for it; it is listed for operator review.
+   */
+  | { outcome: "duplicate_subscription"; monitoringSubscriptionId: string }
   | { outcome: "synced"; sync: SyncResult; welcomeEmailSent: boolean };
 
 function idOf(value: unknown): string | null {
@@ -92,6 +98,12 @@ async function process(event: MonitoringStripeEvent, deps: WebhookDeps): Promise
   const snapshot = await deps.stripe.retrieveSubscription(subscriptionId);
   const sync = await syncSubscription(snapshot, deps);
   if (sync.outcome === "ignored") return { outcome: "ignored", reason: sync.reason };
+  if (sync.outcome === "duplicate") {
+    console.warn(
+      `[monitoring-webhook] duplicate paid subscription ${subscriptionId} for record ${sync.monitoringSubscriptionId} — needs operator review (refund/cancel in Stripe)`,
+    );
+    return { outcome: "duplicate_subscription", monitoringSubscriptionId: sync.monitoringSubscriptionId };
+  }
 
   let sub = sync.subscription;
   if (!sub.customerId) sub = await deps.linkCustomer(sub);

@@ -66,6 +66,8 @@ export type MonitoringSubscriptionRecord = {
   endedAt: Date | null;
   lastSyncedAt: Date;
   websiteUrl: string;
+  /** normalizeDomain(websiteUrl); unique together with `email` (null only on legacy rows). */
+  siteKey: string | null;
   businessName: string | null;
   email: string;
   businessId: string | null;
@@ -116,8 +118,25 @@ export interface MonitoringStore {
   /** The record that previously used this Stripe subscription id (reactivated since), if any. */
   findByPriorSubscriptionId(stripeSubscriptionId: string): Promise<MonitoringSubscriptionRecord | null>;
   findById(id: string): Promise<MonitoringSubscriptionRecord | null>;
-  /** All records bought with this (lowercased) email — reactivation candidates. */
+  /** All records bought with this (lowercased) email (legacy siteKey fallback). */
   findByEmail(email: string): Promise<MonitoringSubscriptionRecord[]>;
+  /** The ONE record for (email, siteKey) — database-unique. */
+  findBySiteKey(email: string, siteKey: string): Promise<MonitoringSubscriptionRecord | null>;
+  /**
+   * Give a legacy row (siteKey null) its siteKey. False when the row already
+   * has one or another row holds (email, siteKey) — never throws on that.
+   */
+  claimSiteKey(id: string, siteKey: string): Promise<boolean>;
+  /** Paid subscription that lost to an existing record — upserted per Stripe subscription. */
+  recordDuplicateSubscription(args: {
+    stripeSubscriptionId: string;
+    monitoringSubscriptionId: string;
+    stripeCustomerId: string | null;
+    status: string;
+    now: Date;
+  }): Promise<void>;
+  /** The record a known duplicate Stripe subscription lost to, or null. */
+  findDuplicateSubscription(stripeSubscriptionId: string): Promise<{ monitoringSubscriptionId: string } | null>;
   /**
    * Atomically move `id` from `fromStripeSubscriptionId` to a new Stripe
    * subscription (old id appended to priorStripeSubscriptionIds) and apply
@@ -152,6 +171,14 @@ export interface MonitoringStore {
     queuedAt: Date;
   }): Promise<CreateOrderResult>;
   advanceSchedule(id: string, nextAuditAt: Date, queuedAt: Date): Promise<void>;
+}
+
+/** `create` hit the (email, siteKey) unique index — another record owns this business. */
+export class DuplicateBusinessRecordError extends Error {
+  constructor(siteKey: string) {
+    super(`monitoring record already exists for ${siteKey} under this email`);
+    this.name = "DuplicateBusinessRecordError";
+  }
 }
 
 export class DuplicateSubscriptionError extends Error {

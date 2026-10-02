@@ -184,7 +184,7 @@ const deps = (routes: Record<string, Record<string, FakeRoute>>) => (scan: Claim
   await h.check("scheduler: website enqueue failure never blocks the re-audit or question tracking", async () => {
     const mstore = createFakeStore();
     mstore.subs.set("sub_x", {
-      id: "sub_x", accessToken: "t", planKey: "monitoring_monthly", stripePriceId: null, stripeSubscriptionId: "stripe_x", priorStripeSubscriptionIds: [], customerId: null, stripeCustomerId: null, stripeCheckoutSessionId: null,
+      id: "sub_x", accessToken: "t", planKey: "monitoring_monthly", stripePriceId: null, stripeSubscriptionId: "stripe_x", priorStripeSubscriptionIds: [], customerId: null, siteKey: null, stripeCustomerId: null, stripeCheckoutSessionId: null,
       status: "active", cancelAtPeriodEnd: false, currentPeriodEnd: new Date(T0.getTime() + 30 * 86400000), canceledAt: null, endedAt: null, lastSyncedAt: T0,
       websiteUrl: "https://a.example", businessName: "A", email: "a@a.example", businessId: null, baselineAuditOrderId: null, cadenceDays: 30, nextAuditAt: T0, lastAuditQueuedAt: null, welcomeEmailSentAt: null, createdAt: T0,
     } as never);

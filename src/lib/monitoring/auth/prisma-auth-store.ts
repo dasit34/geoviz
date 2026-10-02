@@ -13,14 +13,10 @@ const isUniqueViolation = (err: unknown) =>
 
 const customerSelect = { id: true, email: true, stripeCustomerId: true, lastSignInAt: true, createdAt: true } as const;
 
+/** Create-if-missing without a unique-violation round trip (INSERT … ON CONFLICT DO NOTHING). */
 async function upsertCustomer(email: string): Promise<MonitoringCustomerRecord> {
-  try {
-    return await prisma.monitoringCustomer.upsert({ where: { email }, create: { email }, update: {}, select: customerSelect });
-  } catch (err) {
-    // Concurrent create of the same email — the other writer won.
-    if (!isUniqueViolation(err)) throw err;
-    return prisma.monitoringCustomer.findUniqueOrThrow({ where: { email }, select: customerSelect });
-  }
+  await prisma.monitoringCustomer.createMany({ data: [{ email }], skipDuplicates: true });
+  return prisma.monitoringCustomer.findUniqueOrThrow({ where: { email }, select: customerSelect });
 }
 
 let rateLimitCalls = 0;

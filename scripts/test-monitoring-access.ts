@@ -18,7 +18,7 @@ const base = { cancelAtPeriodEnd: false, currentPeriodEnd: periodEnd };
 function sub(overrides: Partial<MonitoringSubscriptionRecord> = {}): MonitoringSubscriptionRecord {
   return {
     id: "msub_1", accessToken: "tok_0123456789abcdefghij", planKey: "monthly", stripePriceId: "price_x",
-    stripeSubscriptionId: "sub_1", priorStripeSubscriptionIds: [], customerId: "cust_1", stripeCustomerId: "cus_1", stripeCheckoutSessionId: "cs_1",
+    stripeSubscriptionId: "sub_1", priorStripeSubscriptionIds: [], customerId: "cust_1", siteKey: "rockroofing.example", stripeCustomerId: "cus_1", stripeCheckoutSessionId: "cs_1",
     status: "active", cancelAtPeriodEnd: false, currentPeriodEnd: periodEnd, canceledAt: null, endedAt: null,
     lastSyncedAt: T0, websiteUrl: "https://rockroofing.example", businessName: "Rock Roofing",
     email: "o@r.example", businessId: "biz_1", baselineAuditOrderId: "o_base", cadenceDays: 30,

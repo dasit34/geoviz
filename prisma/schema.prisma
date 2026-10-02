@@ -1331,6 +1331,12 @@ model MonitoringSubscription {
 
   // What is monitored (from checkout metadata, validated at checkout).
   websiteUrl           String
+  /// normalizeDomain(websiteUrl) — the business identity key. Together with
+  /// `email` it is UNIQUE: one monitoring record per (buyer email, business
+  /// website). This is the database-enforced guard that makes concurrent or
+  /// repeated reactivation payments converge on ONE record (see
+  /// subscription-sync.ts). Null only on legacy rows not yet backfilled.
+  siteKey              String?
   businessName         String?
   email                String
   businessId           String?
@@ -1361,10 +1367,35 @@ model MonitoringSubscription {
   businessFactSheets BusinessFactSheet[]
   improvementTasks   ImprovementTask[]
 
+  duplicateSubscriptions MonitoringDuplicateSubscription[]
+
+  @@unique([email, siteKey])
   @@index([status, nextAuditAt])
   @@index([businessId])
   @@index([email])
   @@index([customerId])
+}
+
+/// A paid monitoring Stripe subscription that lost the race to an existing
+/// record for the same (email, business) — e.g. two reactivation checkouts
+/// paid at once, or a second purchase while monitoring is already active.
+/// It is never turned into a second monitoring record; it is recorded here
+/// (one row per Stripe subscription, upserted on every event) for operator
+/// review — refund / cancel in Stripe. GeoViz never changes it automatically.
+model MonitoringDuplicateSubscription {
+  id                       String                 @id @default(cuid())
+  stripeSubscriptionId     String                 @unique
+  monitoringSubscriptionId String
+  monitoringSubscription   MonitoringSubscription @relation(fields: [monitoringSubscriptionId], references: [id], onDelete: Cascade)
+  stripeCustomerId         String?
+  /// Latest Stripe status seen for the duplicate subscription.
+  status                   String
+  detectedAt               DateTime               @default(now())
+  lastEventAt              DateTime               @default(now())
+  /// Set by an operator once refunded / canceled in Stripe.
+  resolvedAt               DateTime?
+
+  @@index([monitoringSubscriptionId])
 }
 
 /// Monitoring customer account — the ONLY customer login in GeoViz

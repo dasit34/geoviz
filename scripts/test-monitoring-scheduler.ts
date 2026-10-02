@@ -102,7 +102,8 @@ async function subscribed(subscriptionId = "sub_123", clock = { now: T0 }) {
     const stripe = createFakeStripe();
     const { deps } = webhookDeps(store, stripe.gateway, { now: T0 });
     for (const id of ["sub_a", "sub_b", "sub_c", "sub_d"]) {
-      stripe.set(monitoringSnapshot({ id }));
+      // Four different businesses (one record per email + website).
+      stripe.set(monitoringSnapshot({ id, metadata: { ...monitoringSnapshot().metadata, websiteUrl: `https://${id}.example` } }));
       await handleMonitoringStripeEvent(checkoutEvent(`evt_${id}`, id), deps);
     }
     await runMonitoringSchedulerTick({ store, now: () => T0, env: ENABLED, maxPerTick: 2 });

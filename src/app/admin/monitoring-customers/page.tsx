@@ -37,6 +37,15 @@ export default async function MonitoringCustomersAdminPage({
       },
     },
   });
+  const duplicates = await prisma.monitoringDuplicateSubscription.findMany({
+    where: { resolvedAt: null },
+    orderBy: { detectedAt: "desc" },
+    take: 100,
+    select: {
+      id: true, stripeSubscriptionId: true, stripeCustomerId: true, status: true, detectedAt: true, lastEventAt: true,
+      monitoringSubscription: { select: { id: true, businessName: true, websiteUrl: true, stripeSubscriptionId: true } },
+    },
+  });
   const now = new Date();
   const notice = typeof searchParams?.notice === "string" ? searchParams.notice.slice(0, 200) : null;
 
@@ -48,6 +57,36 @@ export default async function MonitoringCustomersAdminPage({
         is never shown here.
       </p>
       {notice ? <p role="status" className="mt-4 text-sm text-severity-info">{notice}</p> : null}
+      {duplicates.length > 0 ? (
+        <section className="card mt-8 border-severity-warning/40 p-5">
+          <h2 className="h3 text-severity-warning">Duplicate paid subscriptions — needs review</h2>
+          <p className="muted mt-2 text-xs">
+            A second monitoring subscription was paid for a business that already has an attached subscription (e.g. two
+            reactivations at once). GeoViz kept ONE monitoring record and did not change these in Stripe. Refund / cancel the
+            duplicate in the Stripe Dashboard, then mark it resolved.
+          </p>
+          <ul className="mt-4 space-y-2 text-sm">
+            {duplicates.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-2">
+                <span>
+                  <span className="text-white">{d.monitoringSubscription.businessName || d.monitoringSubscription.websiteUrl}</span>{" "}
+                  <span className="mono-data text-xs text-white/55">
+                    duplicate {d.stripeSubscriptionId} ({d.status}) · attached {d.monitoringSubscription.stripeSubscriptionId} ·
+                    customer {d.stripeCustomerId ?? "—"} · detected {fmt(d.detectedAt)}
+                  </span>
+                </span>
+                <form action="/api/admin/monitoring-customers" method="POST">
+                  <input type="hidden" name="key" value={key} />
+                  <input type="hidden" name="subscriptionId" value={d.monitoringSubscription.id} />
+                  <input type="hidden" name="duplicateId" value={d.id} />
+                  <input type="hidden" name="action" value="resolve_duplicate" />
+                  <button type="submit" className="btn-ghost px-2 py-1 text-xs">Mark resolved</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <table className="mt-8 w-full text-left text-sm">
         <thead className="text-xs text-white/50">
           <tr>

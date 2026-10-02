@@ -16,9 +16,9 @@ import { normalizeDomain } from "@/lib/business/normalize-domain";
 import { mayQueueAuditFor } from "./access";
 import { cadenceDaysForPlan } from "./plans";
 import {
+  DuplicateBusinessRecordError,
   DuplicateSubscriptionError,
   MONITORING_PRODUCT_MARKER,
-  REACTIVATES_METADATA_KEY,
   type MonitoringStore,
   type MonitoringSubscriptionRecord,
   type SubscriptionSnapshot,
@@ -40,10 +40,25 @@ export type SyncResult =
   | { outcome: "created"; subscription: MonitoringSubscriptionRecord }
   | { outcome: "updated"; subscription: MonitoringSubscriptionRecord }
   /** A new Stripe subscription reattached to an ended record — history kept. */
-  | { outcome: "reactivated"; subscription: MonitoringSubscriptionRecord };
+  | { outcome: "reactivated"; subscription: MonitoringSubscriptionRecord }
+  /** Paid subscription that lost to the record already attached to this business. */
+  | { outcome: "duplicate"; monitoringSubscriptionId: string; reason: string };
 
 /** Stripe statuses after which a subscription can never bill again. */
 const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
+
+/** Bounded find → create/reattach attempts; every lost race re-reads the database. */
+const MAX_CONVERGE_ATTEMPTS = 4;
+
+/**
+ * Business identity key. Together with the buyer email it is UNIQUE in the
+ * database (`MonitoringSubscription @@unique([email, siteKey])`), so there
+ * is at most one monitoring record per (email, business website) no matter
+ * how many subscriptions are paid or how events interleave.
+ */
+export function siteKeyFor(websiteUrl: string): string {
+  return normalizeDomain(websiteUrl) ?? websiteUrl.trim().toLowerCase();
+}
 
 function sameSite(a: string, b: string): boolean {
   const na = normalizeDomain(a);
@@ -51,30 +66,25 @@ function sameSite(a: string, b: string): boolean {
 }
 
 /**
- * The ended record a new subscription should reattach to, if any:
- * the one named in the reactivation checkout's metadata, else the most
- * recent ended record bought with the same email for the same website.
- * Only ENDED records qualify — an active or past-due record is never
- * taken over — and the email + website must match either way.
+ * The ONE record for (email, siteKey). Legacy rows created before siteKey
+ * existed are claimed (siteKey set atomically) on first contact, so the
+ * unique index covers them from then on.
  */
-async function findReattachTarget(
-  snapshot: SubscriptionSnapshot,
+async function findBusinessRecord(
   email: string,
+  siteKey: string,
   websiteUrl: string,
   store: MonitoringStore,
 ): Promise<MonitoringSubscriptionRecord | null> {
-  const eligible = (r: MonitoringSubscriptionRecord | null): r is MonitoringSubscriptionRecord =>
-    r !== null && ENDED_STATUSES.has(r.status) && r.email === email && sameSite(r.websiteUrl, websiteUrl);
-
-  const explicitId = snapshot.metadata[REACTIVATES_METADATA_KEY]?.trim();
-  if (explicitId) {
-    const named = await store.findById(explicitId);
-    if (eligible(named)) return named;
-  }
-  const candidates = (await store.findByEmail(email))
-    .filter(eligible)
+  const keyed = await store.findBySiteKey(email, siteKey);
+  if (keyed) return keyed;
+  const legacy = (await store.findByEmail(email))
+    .filter((r) => r.siteKey === null && sameSite(r.websiteUrl, websiteUrl))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  return candidates[0] ?? null;
+  for (const row of legacy) {
+    if (await store.claimSiteKey(row.id, siteKey)) return { ...row, siteKey };
+  }
+  return store.findBySiteKey(email, siteKey);
 }
 
 export function generateAccessToken(): string {
@@ -114,50 +124,86 @@ export async function syncSubscription(snapshot: SubscriptionSnapshot, deps: Syn
     return { outcome: "ignored", reason: "superseded Stripe subscription (record was reactivated)" };
   }
 
+  // Any later event for a subscription already classified as a duplicate
+  // only refreshes its ledger row.
+  const knownDuplicate = await deps.store.findDuplicateSubscription(snapshot.id);
+  if (knownDuplicate) return recordDuplicate(snapshot, knownDuplicate.monitoringSubscriptionId, deps, now);
+
   const websiteUrl = snapshot.metadata.websiteUrl?.trim();
   const email = snapshot.metadata.email?.trim().toLowerCase();
   if (!websiteUrl || !email) {
     return { outcome: "ignored", reason: "monitoring subscription is missing websiteUrl/email metadata" };
   }
-
+  const siteKey = siteKeyFor(websiteUrl);
   const patch = billingPatch(snapshot, now);
 
-  // Reactivation: reconnect to the ended record so questions, competitors,
-  // cycles, reports, and history carry over.
-  const target = await findReattachTarget(snapshot, email, websiteUrl, deps.store);
-  if (target) {
-    const nextAuditAt = mayQueueAuditFor(patch, now, now) ? now : null;
-    const reattached = await deps.store.reattach(target.id, target.stripeSubscriptionId, snapshot.id, {
-      ...patch,
-      nextAuditAt,
-      stripeCheckoutSessionId: null,
-    });
-    if (reattached) return { outcome: "reactivated", subscription: reattached };
-    // A concurrent event for this same new subscription reattached first.
-    const raced = await deps.store.findBySubscriptionId(snapshot.id);
-    if (raced) return update(raced, snapshot, deps, now);
-  }
+  // Converge on the single (email, siteKey) record. Correctness rests on the
+  // database: the unique index makes concurrent creates collide, and the
+  // conditional reattach (WHERE stripeSubscriptionId = old) lets exactly one
+  // concurrent reactivation win. A loser re-reads and becomes either an
+  // update of its own row or a recorded duplicate — never a second record.
+  for (let attempt = 0; attempt < MAX_CONVERGE_ATTEMPTS; attempt++) {
+    const owner = await findBusinessRecord(email, siteKey, websiteUrl, deps.store);
 
+    if (!owner) {
+      const created = await tryCreate(snapshot, { email, siteKey, websiteUrl, patch }, deps, now);
+      if (created) return created;
+      continue; // another subscription created this business's record first
+    }
+
+    if (owner.stripeSubscriptionId === snapshot.id) return update(owner, snapshot, deps, now);
+
+    if (ENDED_STATUSES.has(owner.status)) {
+      // Reactivation: reconnect the ended record (history, questions,
+      // competitors, cycles, reports all stay on it).
+      const nextAuditAt = mayQueueAuditFor(patch, now, now) ? now : null;
+      const reattached = await deps.store.reattach(owner.id, owner.stripeSubscriptionId, snapshot.id, {
+        ...patch,
+        nextAuditAt,
+        stripeCheckoutSessionId: null,
+      });
+      if (reattached) return { outcome: "reactivated", subscription: reattached };
+      const mine = await deps.store.findBySubscriptionId(snapshot.id);
+      if (mine) return update(mine, snapshot, deps, now);
+      continue; // a different new subscription reattached first — re-read
+    }
+
+    // The record is live on another Stripe subscription: this paid
+    // subscription is a duplicate (double reactivation, second purchase).
+    return recordDuplicate(snapshot, owner.id, deps, now);
+  }
+  // Only reachable under extreme contention; the webhook returns 500 and
+  // Stripe redelivers, which re-runs this loop from a fresh read.
+  throw new Error(`monitoring sync did not converge for ${snapshot.id}`);
+}
+
+async function tryCreate(
+  snapshot: SubscriptionSnapshot,
+  ctx: { email: string; siteKey: string; websiteUrl: string; patch: ReturnType<typeof billingPatch> },
+  deps: SyncDeps,
+  now: Date,
+): Promise<SyncResult | null> {
   const cadenceDays = cadenceDaysForPlan(snapshot.metadata.planKey);
   // First audit is due immediately once the subscription is paid up.
-  const firstAuditDue = mayQueueAuditFor(patch, now, now) ? now : null;
+  const firstAuditDue = mayQueueAuditFor(ctx.patch, now, now) ? now : null;
 
   let business = { businessId: null as string | null, baselineAuditOrderId: null as string | null };
   try {
-    business = await deps.resolveBusiness(websiteUrl);
+    business = await deps.resolveBusiness(ctx.websiteUrl);
   } catch (err) {
     console.warn("[monitoring-sync] business resolution failed (non-fatal):", err);
   }
 
   try {
     const created = await deps.store.create({
-      ...patch,
+      ...ctx.patch,
       accessToken: (deps.newAccessToken ?? generateAccessToken)(),
       planKey: snapshot.metadata.planKey || "monthly",
       stripeSubscriptionId: snapshot.id,
-      websiteUrl,
+      websiteUrl: ctx.websiteUrl,
+      siteKey: ctx.siteKey,
       businessName: snapshot.metadata.businessName?.trim() || null,
-      email,
+      email: ctx.email,
       businessId: business.businessId,
       baselineAuditOrderId: business.baselineAuditOrderId,
       cadenceDays,
@@ -165,12 +211,33 @@ export async function syncSubscription(snapshot: SubscriptionSnapshot, deps: Syn
     });
     return { outcome: "created", subscription: created };
   } catch (err) {
+    if (err instanceof DuplicateBusinessRecordError) return null;
     if (!(err instanceof DuplicateSubscriptionError)) throw err;
-    // A concurrent event created the row first — apply as an update.
+    // A concurrent event for this same subscription created the row first.
     const raced = await deps.store.findBySubscriptionId(snapshot.id);
     if (!raced) throw err;
     return update(raced, snapshot, deps, now);
   }
+}
+
+async function recordDuplicate(
+  snapshot: SubscriptionSnapshot,
+  monitoringSubscriptionId: string,
+  deps: SyncDeps,
+  now: Date,
+): Promise<SyncResult> {
+  await deps.store.recordDuplicateSubscription({
+    stripeSubscriptionId: snapshot.id,
+    monitoringSubscriptionId,
+    stripeCustomerId: snapshot.customerId,
+    status: snapshot.status,
+    now,
+  });
+  return {
+    outcome: "duplicate",
+    monitoringSubscriptionId,
+    reason: "another subscription is already attached to this business — recorded for operator review",
+  };
 }
 
 async function update(
