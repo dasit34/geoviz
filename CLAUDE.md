@@ -302,8 +302,21 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
 - **Staging tools:** `npm run seed:monitoring-staging`,
   `npm run monitoring:run-cycle -- --subscription <id>` (both refuse
   production — strict DB guard, no override).
-- **Behind the flag / not live in Production:** everything above.
-  Production has no monitoring price, no scheduler cron, flag unset.
+- **Released state (2026-10-02):** all of the above is merged to `main`
+  and deployed (tables live, empty) but **behind the flag and OFF in
+  Production** — no monitoring price, no scheduler cron, flag unset.
+- **Remaining launch steps (in order):** create the recurring Stripe
+  price + set `STRIPE_MONITORING_MONTHLY_PRICE_ID`; add
+  `customer.subscription.*` to the production webhook; configure the
+  Stripe Customer Portal; create the Railway scheduler cron
+  (`monitoring:scheduler`, worker env incl. all 4 provider keys); run a
+  Stripe test-mode end-to-end on Preview; complete the two deferred smoke
+  checks; then enable the flag in Production.
+- **Next build: competitor website snapshots + change detection** —
+  periodic fetches of the customer's and tracked competitors' sites
+  (reuse the preflight fetch/analyzers), stored as immutable snapshots,
+  diffed for schema / content / crawlability / entity changes, and
+  correlated with tracking movement. Then alerts, then supervised fixes.
 - **Next layer: supervised improvement / fix workflows** — turn
   recommendations into operator-reviewed fix packages (schema, llms.txt,
   content/FAQ drafts) delivered through the Foundation Fix process, with
@@ -789,7 +802,7 @@ non-production. Enforced in code:
   (Railway cron, production runtime). `monitoring:run-cycle` and
   `seed:monitoring-staging` ARE strictly guarded (staging only).
 
-## Infrastructure State (as of 2026-09-30)
+## Infrastructure State (as of 2026-10-02)
 
 - **Environments.** Production: Vercel `geoviz` (Production scope) +
   Railway project `refreshing-love` (`geoviz` worker + Postgres,
@@ -800,9 +813,26 @@ non-production. Enforced in code:
   are Preview-scoped; Production's `DATABASE_URL` is Production-only.
   Preview builds can never migrate or read production.
 - **Merged:** #42 (pre-monitoring snapshot), #43 (Monitoring Stage 0
-  integrity fixes), #44 (fail-closed DB guard). Production healthy after
-  each; the build guard allows only `VERCEL_ENV=production` builds to
-  migrate production (`autoExposeSystemEnvs` is on).
+  integrity fixes), #44 (fail-closed DB guard), #45 (subscription
+  monitoring slice, merge `0720077`), #46 (visibility tracking v1 +
+  reliability, merge `4e7a322`). Production healthy after each; the build
+  guard allows only `VERCEL_ENV=production` builds to migrate production
+  (`autoExposeSystemEnvs` is on).
+- **Production schema:** 37 migrations. Monitoring tables
+  (`MonitoringSubscription`, `StripeWebhookEvent`) and tracking tables
+  (`TrackedPrompt`, `TrackedCompetitor`, `MonitoringCycle`,
+  `PromptRunResult`) exist and are **empty**. **Monitoring is OFF in
+  Production**: `GEO_MODULE_MONITORING_ENABLED` and
+  `STRIPE_MONITORING_MONTHLY_PRICE_ID` unset (Vercel Production + Railway),
+  no scheduler cron, `/monitoring*` routes 404.
+- **Backups:** Railway has no volume snapshot and no backup schedule (the
+  CLI token can't create snapshots). Approved method = read-only
+  `pg_dump --format=custom` via `railway run`, verified with
+  `pg_restore --list` + row counts + SHA-256, stored mode 600 under
+  `~/private-backups/geoviz-db/` (outside git/cloud sync). Latest:
+  `geoviz-prod-pre-pr46-20261002T135634Z.dump` (sha256 `45811f00…`).
+  Take a fresh one before every production migration; never delete one
+  without the operator's approval.
 - **Stale previews** built against production were deleted (54); only
   current previews remain.
 - Local `.env` historically points at production — use
