@@ -212,6 +212,39 @@ The report's "Questions Customers Ask AI" section (buyer-intent
 questions per business — generated, not yet sent to models) and the
 "Evidence AI Can Cite" concept become monitored features here.
 
+**Subscription-monitoring architecture (first slice, `src/lib/monitoring/`,
+behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
+- **Plans** (`plans.ts`): catalog keys → Stripe recurring price via env
+  (`STRIPE_MONITORING_MONTHLY_PRICE_ID`, cadence 30 days). Amounts are
+  read from Stripe at render time — never hardcoded.
+- **Checkout** (`POST /api/checkout/monitoring`, `checkout.ts`): Stripe
+  `mode: "subscription"`; metadata (`geoviz_product: "monitoring"`,
+  plan, site, email) on the session AND `subscription_data`.
+- **Webhook** (`webhook.ts`, branch at the top of
+  `/api/stripe/webhook`): claims subscription-mode checkouts and
+  `customer.subscription.*` BEFORE the one-time path. Idempotent via the
+  `StripeWebhookEvent` ledger + re-reading the subscription from Stripe
+  on every event (`subscription-sync.ts`), so order doesn't matter;
+  failures return 500 so Stripe retries. One-time `$97`/`$59` checkout
+  handling is unchanged.
+- **Access** (`access.ts`): derived from Stripe status — `active` /
+  `trialing` schedule audits; cancel-at-period-end schedules only inside
+  the paid period; everything else pauses. Status page + past reports
+  stay available in every state.
+- **Scheduling** (`scheduler.ts`, `npm run monitoring:scheduler` on a
+  Railway cron): due subscriptions get an ordinary queued `AuditOrder`
+  (`orderType "MONITORING_RECHECK"`, amount 0, `monitoringSubscriptionId`,
+  `previousAuditOrderId` chained) — the existing worker, review queue,
+  report pages, verification page, and customer emails handle it.
+  Deterministic `stripeSessionId` per (subscription, due date) makes
+  scheduling idempotent; in-flight audits block pile-ups; max 3/tick.
+- **Customer surface**: `/monitoring` (plans), `/monitoring/success`,
+  `/monitoring/<token>` (status, next audit, latest/previous score and
+  change from **reviewed** audits only, report links, Stripe billing
+  portal via `POST /api/monitoring/portal`). No login.
+- **Not in this slice:** organic prompt panel, change detection, alerts,
+  competitor intelligence.
+
 **What this is NOT.** The AI Visibility Layer is **not** an attempt
 to rebuild customer websites. We are not a CMS. We are not a site
 builder. We're a thin, focused, machine-readable context layer that
@@ -685,7 +718,32 @@ non-production. Enforced in code:
   `geo-worker` (Railway runs `geo-worker:dev`),
   `daily-market-study-automation`, `recover-missing-checkout-order`,
   `verify-system`, `intelligence:*`, `diagnose:*`, `benchmark:*`,
-  `score:validate`, `score:premigration-check`.
+  `score:validate`, `score:premigration-check`, `monitoring:scheduler`
+  (Railway cron, production runtime).
+
+## Infrastructure State (as of 2026-09-30)
+
+- **Environments.** Production: Vercel `geoviz` (Production scope) +
+  Railway project `refreshing-love` (`geoviz` worker + Postgres,
+  `swi***.proxy.rlwy.net`). Staging: Railway project
+  `clever-motivation` (Postgres only, public TCP proxy
+  `iri***.proxy.rlwy.net`) used by **Vercel Preview** —
+  `DATABASE_URL`, `GEOVIZ_NONPROD_DB_HOSTS`, `GEOVIZ_APPROVED_DB_HOSTS`
+  are Preview-scoped; Production's `DATABASE_URL` is Production-only.
+  Preview builds can never migrate or read production.
+- **Merged:** #42 (pre-monitoring snapshot), #43 (Monitoring Stage 0
+  integrity fixes), #44 (fail-closed DB guard). Production healthy after
+  each; the build guard allows only `VERCEL_ENV=production` builds to
+  migrate production (`autoExposeSystemEnvs` is on).
+- **Stale previews** built against production were deleted (54); only
+  current previews remain.
+- Local `.env` historically points at production — use
+  `npm run test:no-db`, or a non-prod `DATABASE_URL` +
+  `GEOVIZ_NONPROD_DB_HOSTS`, for anything that writes.
+- **Deferred launch checks (not blockers; see docs/LAUNCH_CHECKLIST.md):**
+  (1) authenticated Stripe test webhook returns 200; (2) one real
+  production audit completes end-to-end. Never satisfy either by
+  inserting rows directly into the production database.
 
 ## Operational Verification (post-deploy)
 

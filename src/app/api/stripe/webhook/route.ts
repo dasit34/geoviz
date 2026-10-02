@@ -5,6 +5,14 @@ import { prisma } from "@/lib/db";
 import { getResend } from "@/lib/resend";
 import { resolveAppBaseUrl, buildAdminReviewUrl } from "@/lib/app-url";
 import { createAuditOrderFromCheckoutSession } from "@/lib/audit-orders/create-from-checkout-session";
+import {
+  handleMonitoringStripeEvent,
+  isMonitoringStripeEvent,
+  type MonitoringStripeEvent,
+} from "@/lib/monitoring/webhook";
+import { prismaMonitoringStore, resolveMonitoringBusiness } from "@/lib/monitoring/prisma-store";
+import { stripeSubscriptionGateway } from "@/lib/monitoring/stripe-gateway";
+import { sendMonitoringWelcomeEmail } from "@/lib/monitoring/emails";
 
 /**
  * Webhook-specific FROM fallback. We deliberately do NOT inherit
@@ -66,6 +74,28 @@ export async function POST(req: Request) {
     const message = err instanceof Error ? err.message : "unknown error";
     console.error(`[stripe-webhook] verification failed — ${message}`);
     return new Response(`Invalid signature: ${message}`, { status: 400 });
+  }
+
+  // Subscription monitoring (src/lib/monitoring/webhook.ts). Handled
+  // BEFORE the one-time path so a subscription-mode checkout can never
+  // create a $97 AuditOrder. Unlike the one-time path, a failure here
+  // returns 500 so Stripe retries: the handler is idempotent (event
+  // ledger + re-read-from-Stripe sync), so a retry is always safe.
+  if (isMonitoringStripeEvent(event as unknown as MonitoringStripeEvent)) {
+    try {
+      const result = await handleMonitoringStripeEvent(event as unknown as MonitoringStripeEvent, {
+        store: prismaMonitoringStore,
+        stripe: stripeSubscriptionGateway(),
+        now: () => new Date(),
+        resolveBusiness: resolveMonitoringBusiness,
+        sendWelcomeEmail: (sub) => sendMonitoringWelcomeEmail(resolveAppBaseUrl(req), sub),
+      });
+      console.log(`[stripe-webhook] monitoring event=${event.id} type=${event.type} outcome=${result.outcome}`);
+      return new Response("OK", { status: 200 });
+    } catch (err) {
+      console.error(`[stripe-webhook] monitoring event=${event.id} failed — Stripe will retry:`, err);
+      return new Response("Monitoring sync failed", { status: 500 });
+    }
   }
 
   // From here on, ALWAYS return 200 so Stripe marks the delivery successful.

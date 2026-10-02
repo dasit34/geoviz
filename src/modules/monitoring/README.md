@@ -1,3 +1,13 @@
+> **Status (2026-09-30):** the first customer-facing monitoring slice is
+> implemented in `src/lib/monitoring/` (Stripe subscription checkout,
+> idempotent subscription webhooks, scheduled re-audits through the
+> existing audit pipeline, tokenized status page, Stripe billing portal),
+> behind `GEO_MODULE_MONITORING_ENABLED`. The real Prisma model is
+> `MonitoringSubscription` in `prisma/schema.prisma` (keyed on the Stripe
+> subscription + `businessId`, not hostname) — the proposed model in
+> `contracts.ts` is superseded. Evidence sampling, change detection,
+> alerts, and competitor intelligence are still NOT built.
+
 # Module: Monitoring
 
 Status: SCAFFOLD ONLY. Nothing in this directory is wired into the running app. See `docs/prd/monitoring.md` and `docs/monitoring/MONITORING_SPEC.md`.

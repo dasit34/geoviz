@@ -193,11 +193,21 @@ model AuditOrder {
   // generates no SQL.
   marketStudyEntries MarketStudyEntry[]
 
+  // Subscription-monitoring linkage — set only on the scheduled
+  // re-audit orders the monitoring scheduler creates
+  // (orderType = "MONITORING_RECHECK"; see src/lib/monitoring/).
+  // Null on every one-time audit and manual re-audit. `onDelete:
+  // SetNull` for the same reason as `businessId`: an AuditOrder is a
+  // financial/customer record and must survive its subscription row.
+  monitoringSubscriptionId String?
+  monitoringSubscription   MonitoringSubscription? @relation(fields: [monitoringSubscriptionId], references: [id], onDelete: SetNull)
+
   @@index([email])
   @@index([createdAt])
   @@index([businessId])
   @@index([previousAuditOrderId])
   @@index([orderType])
+  @@index([monitoringSubscriptionId])
 }
 
 model Business {
@@ -216,12 +226,14 @@ model Business {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  auditOrders         AuditOrder[]
-  queryLibraryEntries QueryLibraryEntry[]
-  observations        Observation[]
+  auditOrders             AuditOrder[]
+  queryLibraryEntries     QueryLibraryEntry[]
+  observations            Observation[]
   // Inverse side of Lead.businessId — set once a discovered lead is
   // matched to (or converts into) a canonical Business identity.
-  leads               Lead[]
+  leads                   Lead[]
+  // Inverse side of MonitoringSubscription.businessId.
+  monitoringSubscriptions MonitoringSubscription[]
 
   @@index([createdAt])
 }
@@ -1262,4 +1274,90 @@ model MarketStudyAutomationRun {
   updatedAt          DateTime  @updatedAt
 
   @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Subscription monitoring (GEO_MODULE_MONITORING_ENABLED)
+//
+// Recurring AI-visibility monitoring billed through Stripe
+// subscriptions. Stripe is the source of truth for billing state —
+// every webhook re-reads the subscription from Stripe and syncs these
+// columns, so event order never matters. Scheduled re-audits reuse the
+// existing audit pipeline: the scheduler inserts ordinary queued
+// AuditOrder rows (orderType "MONITORING_RECHECK") that the worker,
+// review queue, report pages, and customer emails already handle.
+// See src/lib/monitoring/.
+// ─────────────────────────────────────────────────────────────────
+
+/// One row per Stripe subscription for the GeoViz monitoring product.
+model MonitoringSubscription {
+  id String @id @default(cuid())
+
+  /// Customer status-page capability token (/monitoring/<token>) —
+  /// random, unguessable, never derived from any other identifier.
+  accessToken String @unique
+
+  /// Plan catalog key (src/lib/monitoring/plans.ts) + the Stripe price
+  /// actually billed. Prices live in Stripe, never in code.
+  planKey       String
+  stripePriceId String?
+
+  stripeSubscriptionId    String  @unique
+  stripeCustomerId        String?
+  /// Set from checkout.session.completed; null until that event lands.
+  stripeCheckoutSessionId String? @unique
+
+  /// Stripe subscription status, verbatim ("active" | "trialing" |
+  /// "past_due" | "canceled" | "unpaid" | "incomplete" |
+  /// "incomplete_expired" | "paused"). Access is derived from it in
+  /// src/lib/monitoring/access.ts — never stored separately.
+  status            String
+  cancelAtPeriodEnd Boolean   @default(false)
+  currentPeriodEnd  DateTime?
+  canceledAt        DateTime?
+  endedAt           DateTime?
+  lastSyncedAt      DateTime  @default(now())
+
+  // What is monitored (from checkout metadata, validated at checkout).
+  websiteUrl           String
+  businessName         String?
+  email                String
+  businessId           String?
+  business             Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  /// Most recent completed audit for this business when the
+  /// subscription started (plain id, not a relation) — the "before"
+  /// the first monitoring re-audit is compared against.
+  baselineAuditOrderId String?
+
+  // Scheduling.
+  cadenceDays       Int
+  nextAuditAt       DateTime?
+  lastAuditQueuedAt DateTime?
+
+  welcomeEmailSentAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  auditOrders AuditOrder[]
+
+  @@index([status, nextAuditAt])
+  @@index([businessId])
+  @@index([email])
+}
+
+/// Idempotency ledger for Stripe events handled by the monitoring
+/// webhook branch. Row id is the Stripe event id. A redelivered event
+/// whose row has processedAt set is acknowledged without reprocessing;
+/// a row without processedAt (previous attempt failed) is retried.
+/// The one-time-audit webhook path does not use this table — it keeps
+/// its existing stripeSessionId-based idempotency.
+model StripeWebhookEvent {
+  id          String    @id
+  type        String
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  attempts    Int       @default(0)
+  lastError   String?
+
+  @@index([receivedAt])
 }
