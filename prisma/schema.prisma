@@ -1340,6 +1340,11 @@ model MonitoringSubscription {
 
   auditOrders AuditOrder[]
 
+  // Visibility tracking v1 (src/lib/monitoring/tracking/).
+  trackedPrompts     TrackedPrompt[]
+  trackedCompetitors TrackedCompetitor[]
+  monitoringCycles   MonitoringCycle[]
+
   @@index([status, nextAuditAt])
   @@index([businessId])
   @@index([email])
@@ -1360,4 +1365,166 @@ model StripeWebhookEvent {
   lastError   String?
 
   @@index([receivedAt])
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Visibility tracking v1 — prompt tracking, competitor comparison,
+// citation intelligence (src/lib/monitoring/tracking/). Behind
+// GEO_MODULE_MONITORING_ENABLED. Additive only.
+//
+// Deliberately NOT stored in `Observation`: that table requires an
+// auditOrderId on every row, and tracked-prompt runs belong to a
+// monitoring cycle, not an audit order. Making Observation.auditOrderId
+// optional would alter an existing load-bearing column.
+// ─────────────────────────────────────────────────────────────────
+
+/// A customer-intent question tracked for one monitored business.
+/// Text is immutable once created (edits = deactivate + add), so every
+/// historical result stays attached to exactly the prompt that ran.
+model TrackedPrompt {
+  id             String                 @id @default(cuid())
+  subscriptionId String
+  subscription   MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  text           String
+  /// Lowercased / whitespace-collapsed — the dedup key.
+  normalizedText String
+  /// "suggested" | "custom"
+  source         String
+  isActive       Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  deactivatedAt  DateTime?
+
+  results PromptRunResult[]
+
+  @@unique([subscriptionId, normalizedText])
+  @@index([subscriptionId, isActive])
+}
+
+/// A competitor the customer tracks — entered by the customer or
+/// promoted from businesses AI answers named.
+model TrackedCompetitor {
+  id             String                 @id @default(cuid())
+  subscriptionId String
+  subscription   MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  name           String
+  normalizedName String
+  websiteUrl     String?
+  /// normalizeDomain(websiteUrl) — matched against cited domains.
+  domain         String?
+  /// "customer" | "detected"
+  source         String
+  isActive       Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  deactivatedAt  DateTime?
+
+  @@unique([subscriptionId, normalizedName])
+  @@index([subscriptionId, isActive])
+}
+
+/// One prompt-tracking run for a subscription. `cycleKey` is the
+/// scheduled due date (or "manual:<iso>") — unique per subscription, so
+/// a retried or concurrent trigger resumes the same cycle instead of
+/// starting a second one.
+model MonitoringCycle {
+  id               String                 @id @default(cuid())
+  subscriptionId   String
+  subscription     MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  cycleKey         String
+  /// "scheduler" | "manual"
+  trigger          String
+  /// "running" | "completed" | "partial" | "failed" | "needs_review"
+  status           String
+  /// Snapshot of what this cycle covered (for honest comparisons).
+  promptIds        Json
+  providers        Json
+  /// Tracked competitors at run time: Array<{id, name, normalizedName, domain}>.
+  competitors      Json
+  /// Metrics computed when the cycle finished (versioned, see metrics.ts).
+  summary          Json?
+  metricsVersion   String?
+  /// Samples per (question, AI system) this cycle was planned with.
+  samplesPerPrompt Int                    @default(1)
+  /// Samples whose provider outcome is unknown (possibly billed) — operator review.
+  unknownOutcomes  Int                    @default(0)
+  /// Sum of per-sample cost (provider-reported where available, else estimated).
+  estimatedCostUsd Decimal?               @db.Decimal(10, 6)
+  startedAt        DateTime               @default(now())
+  completedAt      DateTime?
+  lastError        String?
+
+  results PromptRunResult[]
+
+  @@unique([subscriptionId, cycleKey])
+  @@index([subscriptionId, startedAt])
+}
+
+/// One SAMPLE of one provider's answer to one tracked prompt in one cycle.
+/// The (cycle, prompt, provider, sample) row is claimed and moved to
+/// `in_flight` BEFORE the paid request is sent — see
+/// src/lib/monitoring/tracking/cycle.ts for the call-state machine and the
+/// at-most-once automatic-request guarantee. Rows are never rewritten once
+/// final — history is real, not overwritten.
+model PromptRunResult {
+  id                     String          @id @default(cuid())
+  cycleId                String
+  cycle                  MonitoringCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  trackedPromptId        String
+  trackedPrompt          TrackedPrompt   @relation(fields: [trackedPromptId], references: [id], onDelete: Cascade)
+  subscriptionId         String
+  provider               String
+  /// 0-based sample number within (cycle, prompt, provider).
+  sampleIndex            Int             @default(0)
+  model                  String?
+  /// "pending" | "measured" | "not_measured"
+  status                 String
+  /// Provider call: "pending" | "in_flight" | "completed" | "failed" | "unknown"
+  /// (unknown = a request may have been processed and billed; never auto-retried).
+  callState              String          @default("completed")
+  /// Provider-side id for retrieving the result after a crash (OpenAI background mode).
+  providerRequestId      String?
+  requestStartedAt       DateTime?
+  promptVersion          String?
+  extractorVersion       String?
+  /// Exact search/grounding configuration used for this sample.
+  searchSettings         Json?
+  /// promptVersion|provider|model|search|extractor|detector — samples compare only within one fingerprint.
+  configFingerprint      String?
+  /// "ranked" | "not_in_list" | "no_ordered_list" | "not_measured"
+  positionStatus         String?
+  /// Provider response captured BEFORE normalization (text, native citations, search queries, usage, ids). Size-capped.
+  rawResponse            Json?
+  inputTokens            Int?
+  outputTokens           Int?
+  searchCalls            Int?
+  costUsd                Decimal?        @db.Decimal(10, 6)
+  /// "provider_reported" | "estimated"
+  costSource             String?
+  /// Why not measured: "provider_error" | "timeout" | "unavailable" | "parse_error" | "stale_claim".
+  errorCode              String?
+  errorMessage           String?
+  /// "web_search" | "none" — how the answer was produced.
+  groundingMode          String?
+  /// null when not measured — never false-by-default.
+  mentioned              Boolean?
+  /// 1-based order among businesses the answer named; null when unmeasurable.
+  position               Int?
+  citedUrls              Json
+  citedDomains           Json
+  /// Businesses the answer named, in order (verbatim).
+  namedBusinesses        Json
+  /// TrackedCompetitor ids mentioned in this answer.
+  competitorIdsMentioned Json
+  /// Deterministic detector evidence: what matched and where.
+  matchEvidence          Json?
+  detectorVersion        String?
+  /// Verbatim provider answer — the verification record.
+  answerText             String?
+  claimedAt              DateTime        @default(now())
+  completedAt            DateTime?
+  latencyMs              Int?
+
+  @@unique([cycleId, trackedPromptId, provider, sampleIndex])
+  @@index([callState])
+  @@index([subscriptionId, provider])
+  @@index([trackedPromptId])
 }

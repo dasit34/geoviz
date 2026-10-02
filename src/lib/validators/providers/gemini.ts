@@ -58,7 +58,7 @@ const REQUIRED_ENV_VARS = ["GEMINI_API_KEY"] as const;
 // Model + parameters isolated in this file so future swaps are
 // one-line changes. gemini-2.5-flash selected for cost + latency
 // (validator is checking interpretation, not generating reports).
-const GEMINI_MODEL = "gemini-2.5-flash";
+export const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const GEMINI_TIMEOUT_MS = 15_000;
 const GEMINI_TEMPERATURE = 0.1;
