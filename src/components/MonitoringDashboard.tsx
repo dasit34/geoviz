@@ -18,6 +18,7 @@ export const MONITORING_TABS = [
   { key: "website", label: "Website Changes" },
   { key: "reports", label: "Reports" },
   { key: "actions", label: "Recommended Actions" },
+  { key: "improvements", label: "Improvements" },
 ] as const;
 export type MonitoringTabKey = (typeof MONITORING_TABS)[number]["key"];
 
@@ -495,7 +496,18 @@ export function ReportsSection({ view }: { view: MonitoringStatusView }) {
   );
 }
 
-export function ActionsSection({ recommendations }: { recommendations: Recommendation[] }) {
+export function ActionsSection({
+  recommendations,
+  token,
+  canEdit = false,
+  taskByRecommendation = {},
+}: {
+  recommendations: Recommendation[];
+  token?: string;
+  canEdit?: boolean;
+  /** recommendation id → open improvement task id */
+  taskByRecommendation?: Record<string, string>;
+}) {
   if (recommendations.length === 0) return <p className="muted mt-8 text-sm">Recommendations appear once your first audit is reviewed and your questions have run.</p>;
   return (
     <ol className="mt-8 space-y-3">
@@ -508,6 +520,16 @@ export function ActionsSection({ recommendations }: { recommendations: Recommend
           <p className="mt-1 text-sm text-white/75">{r.action}</p>
           <p className="mt-2 text-xs text-white/50">Why: {r.evidence}</p>
           {r.url ? <p className="mono-data mt-1 break-all text-xs text-white/40">Source: {r.url}</p> : null}
+          {token && taskByRecommendation[r.id] ? (
+            <a href={`/monitoring/${token}?tab=improvements#task-${taskByRecommendation[r.id]}`} className="mt-3 inline-block text-xs text-accent underline">Task created — view it</a>
+          ) : token && canEdit ? (
+            <form action="/api/monitoring/improvements" method="POST" className="mt-3">
+              <input type="hidden" name="token" value={token} />
+              <input type="hidden" name="action" value="create_from_recommendation" />
+              <input type="hidden" name="recommendationId" value={r.id} />
+              <button className="btn-ghost px-3 py-1 text-xs" type="submit">Create improvement task</button>
+            </form>
+          ) : null}
         </li>
       ))}
     </ol>

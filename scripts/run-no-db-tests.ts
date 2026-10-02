@@ -76,6 +76,11 @@ const NO_DB_TESTS = [
   "test-website-scan",
   "test-website-diff",
   "test-website-jobs",
+  // supervised improvement workflows v1
+  "test-improvements-workflow",
+  "test-improvements-drafts",
+  "test-improvements-verify",
+  "test-improvements-impact-access",
 ];
 
 // `--only <substring>` narrows the run (e.g. `npm run test:monitoring`).

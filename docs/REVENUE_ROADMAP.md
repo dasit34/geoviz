@@ -21,7 +21,8 @@ Standalone $0→$100M reference. Full stage-by-stage business narrative lives in
 - **Scope note:** competitor tracking in AI answers measures presence in answers only; website change tracking (below) covers competitors' websites only when their website is confirmed. Alerts are not built.
 - **Remaining before launch:** recurring Stripe price, webhook subscription events, Stripe Customer Portal, scheduler cron, Stripe test-mode end-to-end, two deferred production smoke checks, then enable the flag.
 - **In review (branch `feat/website-change-tracking-v1`, not merged):** website snapshots + change detection v1 — bounded (12 pages/site), robots-respecting, SSRF-safe scans of the customer's site and up to 3 confirmed competitor sites; immutable snapshots; diffs for pages added/confirmed removed, title/description/headings, structured data, services/locations, business identity, and material content; "Website Changes" dashboard tab with a timeline next to AI tracking runs (coincidence, never causation); evidence-backed website findings in Recommended Actions. Separate retryable scan jobs (`monitoring:website-scans` cron); no paid APIs (cost recorded as $0 + requests/bytes/duration).
-- **Next:** alerts, then supervised improvement/fix workflows (operator-reviewed fix packages, measured by the next monitoring cycle).
+- **In review (stacked PR on #48):** supervised improvement workflows v1 — tasks from findings, fact-bound drafts, scanner verification, before/after measurement (no causation claims).
+- **Next:** alerts, then deeper supervised improvement/fix workflows (operator-reviewed fix packages, measured by the next monitoring cycle).
 
 ## Which modules unlock which revenue line
 

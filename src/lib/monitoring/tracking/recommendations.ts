@@ -129,7 +129,7 @@ export function buildRecommendations(input: {
         title: "AI answers mention you but don't cite your website",
         action:
           "Add clear, quotable pages for each core service and location (with FAQs) so AI systems have a page of yours worth citing.",
-        evidence: `You were named in ${m.customerMentions} answers, but your website was cited in none of them.`,
+        evidence: `You were named in ${m.customerMentions} answer${m.customerMentions === 1 ? "" : "s"}, but your website was cited in none of them.`,
         source: "tracking",
       });
     }

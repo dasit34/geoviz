@@ -373,6 +373,21 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
     [--confirm-competitor "Name=domain"]` (strictly guarded).
   - **Limits:** raw HTML only (no JS rendering — client-rendered or
     one-page sites capture little); services/locations are heuristic.
+- **Supervised improvement workflows v1** (`src/lib/monitoring/improvements/`,
+  same flag; branch `feat/supervised-improvements-v1`, stacked on PR #48,
+  NOT merged): findings → `ImprovementTask` (one open task per finding via
+  `openKey`; recurrences add evidence) with statuses Suggested → Approved →
+  In Progress → Implemented (customer/operator claim) → Verified
+  (independent check only) | Dismissed. Drafts are deterministic templates
+  (`drafts.ts`) using ONLY confirmed `BusinessFactSheet` facts (immutable
+  versions); missing facts are `[MISSING: …]`, never invented. Website
+  content is untrusted (`sanitize.ts`) and never copied into JSON-LD.
+  Scanner verification (`verify.ts`, robots + SSRF-safe fetch) → verified /
+  "Change not found yet" / "Could not verify"; operators may verify only
+  citation/general tasks with an evidence URL. Before/after AI metrics use
+  compatible cycles only, with a no-causation disclaimer. Improvements tab +
+  `/admin/improvements`; checks run in `monitoring:website-scans`. No site
+  edits, publishing, emails, or Stripe changes.
 - **Next layer: supervised improvement / fix workflows** — turn
   recommendations into operator-reviewed fix packages (schema, llms.txt,
   content/FAQ drafts) delivered through the Foundation Fix process, with

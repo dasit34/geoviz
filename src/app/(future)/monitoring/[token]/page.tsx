@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { ImprovementsSection } from "@/components/ImprovementsSection";
 import { WebsiteChangesSection } from "@/components/WebsiteChangesSection";
 import {
   ActionsSection,
@@ -16,6 +17,7 @@ import {
   ScoreHistorySection,
   type MonitoringTabKey,
 } from "@/components/MonitoringDashboard";
+import { loadImprovementsDashboard } from "@/lib/monitoring/improvements/service";
 import { findPlan, isMonitoringEnabled } from "@/lib/monitoring/plans";
 import { findSubscriptionByToken, loadStatusAuditRows } from "@/lib/monitoring/prisma-store";
 import { buildMonitoringStatusView } from "@/lib/monitoring/status-view";
@@ -61,6 +63,10 @@ export default async function MonitoringStatusPage({
   const website = await loadWebsiteDashboard(sub);
   const [rows, tracking] = await Promise.all([loadStatusAuditRows(sub), loadTrackingDashboard(sub, { websiteFindings: website.findings })]);
   const view = buildMonitoringStatusView(sub, rows, new Date());
+  const improvements =
+    tab === "improvements" || tab === "actions"
+      ? await loadImprovementsDashboard(sub, tracking.recommendations)
+      : null;
   const planName = findPlan(view.planKey)?.name ?? "AI Visibility Monitoring";
   const notice = typeof searchParams?.notice === "string" ? searchParams.notice.slice(0, 200) : null;
 
@@ -111,7 +117,15 @@ export default async function MonitoringStatusPage({
           />
         ) : null}
         {tab === "reports" ? <ReportsSection view={view} /> : null}
-        {tab === "actions" ? <ActionsSection recommendations={tracking.recommendations} /> : null}
+        {tab === "actions" ? (
+          <ActionsSection
+            recommendations={tracking.recommendations}
+            token={params.token}
+            canEdit={tracking.canEdit}
+            taskByRecommendation={improvements?.taskByRecommendation ?? {}}
+          />
+        ) : null}
+        {tab === "improvements" && improvements ? <ImprovementsSection token={params.token} d={improvements} /> : null}
 
         {view.canManageBilling ? (
           <form action="/api/monitoring/portal" method="POST" className="mt-14">
