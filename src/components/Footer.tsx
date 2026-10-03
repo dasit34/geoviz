@@ -12,6 +12,7 @@ import { GeoVizMark } from "@/components/brand/GeoVizMark";
 
 const PRODUCT = [
   { href: "/#how-it-works", label: "How it works" },
+  { href: "/#monitor", label: "Monitoring" },
   { href: "/sample-report", label: "Sample report" },
   { href: "/#pricing", label: "Pricing" },
   { href: "/#faq", label: "FAQ" },

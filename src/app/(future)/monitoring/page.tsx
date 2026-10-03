@@ -51,7 +51,7 @@ export default async function MonitoringPage() {
             <ul className="mt-8 space-y-3 text-sm text-white/75">
               <li>• Scheduled re-audits using the same GeoViz audit and scoring</li>
               <li>• Latest score, previous score, and score change</li>
-              <li>• Every completed report, available from one private page</li>
+              <li>• Every completed report, in your signed-in monitoring dashboard</li>
               <li>• Manage or cancel billing any time through Stripe</li>
             </ul>
           </div>

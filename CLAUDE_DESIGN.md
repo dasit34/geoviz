@@ -34,6 +34,15 @@ positioning.
 - **Intelligence-grade presentation**. Information density should
   feel deliberate, not dashboard-bloated.
 
+## Motion principles (homepage, `framer-motion`)
+
+- One provider: `MotionRoot` (LazyMotion, features loaded async, `MotionConfig reducedMotion="user"`). Components use `m.*` only.
+- Motion explains the product, never decorates: the hero readout assembles (score ring + count-up → category bars → four AI-system cards → derived readiness), the loop rail tracks scroll, previews gain depth as they arrive. Each runs once; nothing loops except the existing pulse.
+- The LCP element (H1 + hero copy) is server-rendered and never starts invisible.
+- Under prefers-reduced-motion every final value renders immediately.
+- Budget: homepage First Load JS ≤ +25 KB gzipped over the pre-relaunch baseline (101 kB → 124 kB).
+- Every product demonstration built from `src/lib/home/example-data.ts` carries the `ExampleDataBadge`.
+
 ## Avoid
 
 These are the recurring failure modes for AI / SaaS frontends; any

@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // ESLint runs as its own explicit step (`npm run lint:home`) scoped to the
+  // files a change touches. The repo has pre-existing lint findings, so it
+  // must not gate `next build` — this keeps build behavior unchanged.
+  eslint: { ignoreDuringBuilds: true },
   // Keep @sparticuz/chromium out of the server bundle. Webpack/Vercel
   // tracing relocates the package and shatters the relative path
   // chromium uses to find its bundled binary at runtime
