@@ -4,6 +4,8 @@
 // relation to the frozen v1 rubric, never persisted to
 // `AuditIntelligence`. See `runFreeCheck.ts` for the orchestrator.
 
+import type { BusinessType } from "./classifyBusinessType";
+
 export type CheckId =
   | "business_identity"
   | "location_clarity"
@@ -12,7 +14,10 @@ export type CheckId =
   | "structured_data"
   | "ai_recommendation_readiness";
 
-export type CheckStatus = "strong" | "needs_improvement" | "missing";
+/** `not_applicable`: the check doesn't apply to this business type and is left out of the overall score. */
+export type CheckStatus = "strong" | "needs_improvement" | "missing" | "not_applicable";
+
+export type { BusinessType };
 
 export type CheckResult = {
   id: CheckId;
@@ -37,7 +42,15 @@ export type FreeCheckResult = {
   strengths: string[];
   problems: string[];
   fixes: string[];
+  /** Which scoring profile was applied (scoring v1.1+). */
+  businessType: BusinessType;
+  /** Why the site was scored as an online business (empty when local). */
+  businessTypeReasons: string[];
+  scoringVersion: typeof FREE_CHECK_SCORING_VERSION;
 };
+
+/** v1.1: classify local vs. online first; online sites aren't scored on storefront location or opening hours. */
+export const FREE_CHECK_SCORING_VERSION = "free-check-v1.1" as const;
 
 export type FreeCheckFailure = {
   ok: false;

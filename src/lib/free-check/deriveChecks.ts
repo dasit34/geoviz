@@ -20,12 +20,14 @@ import type {
   ReadableContentResult,
   SchemaValidationResult,
 } from "@/lib/intelligence/preflight/types";
-import type {
-  CheckId,
-  CheckResult,
-  CheckStatus,
-  FreeCheckInput,
-  FreeCheckResult,
+import { classifyBusinessType } from "./classifyBusinessType";
+import {
+  FREE_CHECK_SCORING_VERSION,
+  type CheckId,
+  type CheckResult,
+  type CheckStatus,
+  type FreeCheckInput,
+  type FreeCheckResult,
 } from "./types";
 
 export type DeriveChecksInput = {
@@ -165,12 +167,34 @@ function scoreContactConsistency(args: DeriveChecksInput): {
   return { score, explanation };
 }
 
-function scoreStructuredData(args: DeriveChecksInput): {
+// Scoring v1.1 — online businesses: structured data is scored only on the
+// non-storefront business fields (no address / geo / openingHours).
+const ONLINE_SCHEMA_FIELDS = ["name", "url", "telephone"];
+
+function onlineSchemaScore(schema: SchemaValidationResult | null): number {
+  if (!schema) return 0;
+  const present = ONLINE_SCHEMA_FIELDS.filter((f) => schema.presentFields.includes(f)).length;
+  return Math.round((present / ONLINE_SCHEMA_FIELDS.length) * 100);
+}
+
+function scoreStructuredData(
+  args: DeriveChecksInput,
+  online = false,
+): {
   score: number;
   explanation: string;
 } {
   const score = args.schema?.score ?? 0;
   const status = scoreToStatus(score);
+  if (online) {
+    const explanation =
+      status === "strong"
+        ? "Your site includes business structured data with the key fields AI systems use to identify you (name, website, contact)."
+        : status === "needs_improvement"
+          ? "Your site has some business structured data, but it's missing key fields AI systems use to identify you."
+          : "Your site has little or no business structured data, so AI systems have no machine-readable way to confirm who you are.";
+    return { score, explanation };
+  }
   const explanation =
     status === "strong"
       ? "Your site includes LocalBusiness-style structured data with the key fields AI systems look for."
@@ -235,25 +259,52 @@ const CHECK_ORDER: CheckId[] = [
 ];
 
 export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
+  // Scoring v1.1: classify first. Local (the default) is scored exactly as
+  // in v1.0. Online businesses aren't scored on storefront location or
+  // opening hours.
+  const classification = classifyBusinessType({
+    category: args.input.category,
+    plainText: args.plainText,
+    schema: args.schema,
+    entityConsistency: args.entityConsistency,
+  });
+  const online = classification.type === "online";
+  const effective: DeriveChecksInput =
+    online && args.schema
+      ? { ...args, schema: { ...args.schema, score: onlineSchemaScore(args.schema) } }
+      : args;
+
   const scored: Record<CheckId, { score: number; explanation: string }> = {
     business_identity: scoreBusinessIdentity(args),
-    location_clarity: scoreLocationClarity(args),
+    location_clarity: online
+      ? {
+          score: 0,
+          explanation:
+            "This looks like an online business, so a storefront address and service area aren't scored.",
+        }
+      : scoreLocationClarity(args),
     service_clarity: scoreServiceClarity(args),
     contact_consistency: scoreContactConsistency(args),
-    structured_data: scoreStructuredData(args),
-    ai_recommendation_readiness: scoreAiRecommendationReadiness(args),
+    structured_data: scoreStructuredData(effective, online),
+    ai_recommendation_readiness: scoreAiRecommendationReadiness(effective),
   };
+  const applicable = (id: CheckId) => !(online && id === "location_clarity");
 
   const checks: CheckResult[] = CHECK_ORDER.map((id) => ({
     id,
     label: CHECK_LABELS[id],
-    status: scoreToStatus(scored[id].score),
+    status: applicable(id) ? scoreToStatus(scored[id].score) : "not_applicable",
     explanation: scored[id].explanation,
   }));
 
+  // Weights of the checks that apply; 100 for local, so v1.0 math is unchanged.
+  const applicableWeight = CHECK_ORDER.filter(applicable).reduce(
+    (sum, id) => sum + WEIGHTS[id],
+    0,
+  );
   const overallScore = Math.round(
-    CHECK_ORDER.reduce(
-      (sum, id) => sum + (scored[id].score * WEIGHTS[id]) / 100,
+    CHECK_ORDER.filter(applicable).reduce(
+      (sum, id) => sum + (scored[id].score * WEIGHTS[id]) / applicableWeight,
       0,
     ),
   );
@@ -263,6 +314,7 @@ export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
     missing: 0,
     needs_improvement: 1,
     strong: 2,
+    not_applicable: 3,
   };
 
   const strengths = checks
@@ -271,7 +323,7 @@ export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
     .map((c) => c.label);
 
   const problemChecks = [...checks]
-    .filter((c) => c.status !== "strong")
+    .filter((c) => c.status !== "strong" && c.status !== "not_applicable")
     .sort((a, b) => severityRank[a.status] - severityRank[b.status]);
 
   const problems = problemChecks.slice(0, 3).map((c) => c.label);
@@ -284,5 +336,8 @@ export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
     strengths,
     problems,
     fixes,
+    businessType: classification.type,
+    businessTypeReasons: classification.reasons,
+    scoringVersion: FREE_CHECK_SCORING_VERSION,
   };
 }

@@ -20,6 +20,9 @@ import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { deriveChecks } from "../src/lib/free-check/deriveChecks";
 import type { DeriveChecksInput } from "../src/lib/free-check/deriveChecks";
+import { classifyBusinessType } from "../src/lib/free-check/classifyBusinessType";
+import * as F from "./lib/free-check-fixtures";
+import BASELINE from "./lib/free-check-v1-0-baseline.json";
 
 let passed = 0;
 let failed = 0;
@@ -166,6 +169,97 @@ check("null analyzer results degrade to missing, never throw", () => {
   const result = deriveChecks(nulled);
   assert.equal(result.overallScore, 0);
   assert.ok(result.checks.every((c) => c.status === "missing"));
+});
+
+// ── Scoring v1.1: local vs. online ─────────────────────────────────────
+
+const ADDR_ONLY = F.fixture(F.NO_SIGNALS, {
+  plainText: `${F.NO_SIGNALS.plainText} pricing sign up log in free trial`,
+  entityConsistency: {
+    ...F.NO_SIGNALS.entityConsistency!,
+    extractedEntities: { ...F.NO_SIGNALS.entityConsistency!.extractedEntities, address: { schema: null, homepage: "22 Elm St, Austin, TX", footer: null } },
+  },
+});
+
+const v10 = (r: ReturnType<typeof deriveChecks>) => ({ ok: r.ok, overallScore: r.overallScore, checks: r.checks, strengths: r.strengths, problems: r.problems, fixes: r.fixes });
+
+for (const [name, fx] of [
+  ["ROOFER_NO_ADDRESS_OR_HOURS", F.ROOFER_NO_ADDRESS_OR_HOURS],
+  ["NO_SIGNALS", F.NO_SIGNALS],
+  ["ROOFER_WITH_ONLINE_CUES", F.ROOFER_WITH_ONLINE_CUES],
+  ["ADDR_ONLY", ADDR_ONLY],
+] as const) {
+  check(`local business unchanged from v1.0: ${name}`, () => {
+    const r = deriveChecks(fx);
+    assert.equal(r.businessType, "local");
+    assert.equal(r.scoringVersion, "free-check-v1.1");
+    assert.deepEqual(v10(r), (BASELINE as Record<string, unknown>)[name]);
+  });
+}
+
+check("strong and weak local fixtures stay local", () => {
+  assert.equal(deriveChecks(STRONG_FIXTURE).businessType, "local");
+  assert.equal(deriveChecks(WEAK_FIXTURE).businessType, "local");
+});
+
+check("local roofer missing address and hours still loses location + schema points", () => {
+  const r = deriveChecks(F.ROOFER_NO_ADDRESS_OR_HOURS);
+  const loc = r.checks.find((c) => c.id === "location_clarity")!;
+  const sd = r.checks.find((c) => c.id === "structured_data")!;
+  assert.equal(loc.status, "needs_improvement");
+  assert.equal(sd.status, "needs_improvement");
+  assert.ok(r.fixes.includes("Strengthen your location signals."));
+});
+
+check("online SaaS: location not applicable, schema scored without address/geo/hours", () => {
+  const r = deriveChecks(F.SAAS);
+  assert.equal(r.businessType, "online");
+  assert.deepEqual(r.businessTypeReasons[0], "SoftwareApplication structured data");
+  const byId = Object.fromEntries(r.checks.map((c) => [c.id, c]));
+  assert.equal(byId.location_clarity!.status, "not_applicable");
+  assert.match(byId.location_clarity!.explanation, /online business/);
+  assert.equal(byId.structured_data!.status, "strong");
+  assert.ok(!r.problems.includes("Location clarity"));
+  assert.ok(!r.fixes.includes("Strengthen your location signals."));
+  assert.ok(!r.strengths.includes("Location clarity"));
+});
+
+check("online overall score = weighted average over the five applicable checks", () => {
+  const r = deriveChecks(F.SAAS);
+  // Sub-scores: identity 100 (name found + >50 words), service 40 (no category; 420 words → depth 100 × 0.4),
+  // contact 100, structured 100 (name/url/telephone), readiness round(0.3·100 + 0.25·100 + 0.2·100 + 0.25·100) = 100.
+  const expected = Math.round((100 * 20 + 40 * 15 + 100 * 15 + 100 * 20 + 100 * 15) / 85);
+  assert.equal(r.overallScore, expected);
+  assert.ok(r.overallScore > (BASELINE as { SAAS_AS_LOCAL: { overallScore: number } }).SAAS_AS_LOCAL.overallScore, "online scoring no longer penalizes the SaaS site");
+});
+
+check("online by category alone (no local signals)", () => {
+  const fx = F.fixture(F.NO_SIGNALS, { input: { category: "SaaS" } });
+  const c = classifyBusinessType({ category: fx.input.category, plainText: fx.plainText, schema: fx.schema, entityConsistency: fx.entityConsistency });
+  assert.deepEqual(c, { type: "online", reasons: ["an online business category"] });
+});
+
+check("online text cues: 3 cues → online, 2 cues → stays local", () => {
+  const base = { category: "", schema: F.NO_SIGNALS.schema, entityConsistency: F.NO_SIGNALS.entityConsistency };
+  assert.equal(classifyBusinessType({ ...base, plainText: "see pricing and sign up or log in" }).type, "online");
+  assert.equal(classifyBusinessType({ ...base, plainText: "see pricing and sign up today" }).type, "local");
+});
+
+check("cues still match when the page text runs elements together, but not inside other words", () => {
+  const base = { category: "", schema: F.NO_SIGNALS.schema, entityConsistency: F.NO_SIGNALS.entityConsistency };
+  // Real shape of the free check's plain text: "06pricingstart", "$99per month".
+  assert.equal(classifyBusinessType({ ...base, plainText: "06pricingstart with the audit $99per month sign in to monitoring" }).type, "online");
+  // "design in", "catalog in", "rapid" must not count as cues.
+  assert.equal(classifyBusinessType({ ...base, plainText: "custom design in our catalog in a rapid turnaround" }).type, "local");
+});
+
+check("any local signal beats online signals (type, field, or street address)", () => {
+  const online = { category: "software", plainText: "free trial pricing sign up log in", entityConsistency: null };
+  const schema = F.SAAS.schema!;
+  assert.equal(classifyBusinessType({ ...online, schema: { ...schema, detectedTypes: ["SoftwareApplication", "LocalBusiness"] } }).type, "local");
+  assert.equal(classifyBusinessType({ ...online, schema: { ...schema, presentFields: [...schema.presentFields, "openingHours"] } }).type, "local");
+  assert.equal(classifyBusinessType({ ...online, schema, entityConsistency: ADDR_ONLY.entityConsistency }).type, "local");
+  assert.equal(classifyBusinessType({ ...online, schema }).type, "online");
 });
 
 if (failed > 0) {

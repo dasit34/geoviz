@@ -51,7 +51,7 @@ export type CheckBusinessVisibilityInput = z.infer<typeof inputSchema>;
 const findingSchema = z.object({
   id: z.string(),
   label: z.string(),
-  status: z.enum(["strong", "needs_improvement", "missing"]),
+  status: z.enum(["strong", "needs_improvement", "missing", "not_applicable"]),
   explanation: z.string(),
 });
 export const outputShape = {
@@ -62,6 +62,7 @@ export const outputShape = {
     city: z.string().nullable(),
     state: z.string().nullable(),
   }),
+  businessType: z.enum(["local", "online"]),
   websiteChecked: z.string(),
   score: z.number().int().min(0).max(100),
   scoreLabel: z.literal(SCORE_LABEL),
@@ -168,12 +169,13 @@ export async function checkBusinessVisibility(rawInput: unknown, deps: CheckDeps
       city: input.city || null,
       state: input.state || null,
     },
+    businessType: result.businessType,
     websiteChecked: finalUrl,
     score: result.overallScore,
     scoreLabel: SCORE_LABEL,
     findings: result.checks.map((c: CheckResult) => ({ id: c.id, label: c.label, status: c.status, explanation: c.explanation })),
     priorityImprovements: result.fixes.slice(0, 3),
-    evidence: buildEvidence(signals, nameProvided),
+    evidence: [businessTypeEvidence(result.businessType, result.businessTypeReasons), ...buildEvidence(signals, nameProvided)],
     checkedAt: (deps.now ?? (() => new Date()))().toISOString(),
     links: {
       freeCheck: `${siteUrl}/check`,
@@ -235,6 +237,12 @@ function homepageFailure(kind: string | undefined): ToolResult {
   }
 }
 
+function businessTypeEvidence(type: "local" | "online", reasons: string[]): string {
+  return type === "online"
+    ? `Scored as an online business, so storefront location and opening hours aren't scored. Reason: ${reasons.join("; ")}.`
+    : "Scored as a local business: location, address, and opening-hours signals are included.";
+}
+
 const SAFE_TYPE = /^[A-Za-z][A-Za-z0-9]{0,40}$/;
 
 /** Factual lines read straight from analyzer outputs — no inference. */
@@ -285,7 +293,7 @@ export function buildEvidence(signals: FreeCheckSignals, nameProvided: boolean):
 }
 
 function summarize(o: CheckBusinessVisibilityOutput): string {
-  const findings = o.findings.map((f) => `- ${f.label}: ${f.status.replace("_", " ")}`).join("\n");
+  const findings = o.findings.map((f) => `- ${f.label}: ${f.status.replaceAll("_", " ")}`).join("\n");
   const fixes = o.priorityImprovements.map((f, i) => `${i + 1}. ${f}`).join("\n");
   return [
     `${SCORE_LABEL} for ${o.business.name} (${o.websiteChecked}): ${o.score}/100, checked ${o.checkedAt}.`,

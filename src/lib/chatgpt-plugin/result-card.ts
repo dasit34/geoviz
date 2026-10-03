@@ -22,7 +22,7 @@ export const CARD_HTML = `<!doctype html>
 .label{font-size:11px;color:var(--muted);text-align:right}
 h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px;font-weight:600}
 ul{list-style:none;margin:0;padding:0}.row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--line)}
-.st{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}.strong{color:var(--ok)}.needs_improvement{color:var(--warn)}.missing{color:var(--bad)}
+.st{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}.strong{color:var(--ok)}.needs_improvement{color:var(--warn)}.missing{color:var(--bad)}.not_applicable{color:var(--muted)}
 ol{margin:0;padding-left:18px}ol li{padding:3px 0}
 .note{margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:12px}
 .foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--muted)}
@@ -43,7 +43,7 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 </div>
 <script>
 (function(){
-  var STATUS={strong:"Strong",needs_improvement:"Needs work",missing:"Missing"};
+  var STATUS={strong:"Strong",needs_improvement:"Needs work",missing:"Missing",not_applicable:"Not applicable"};
   var nextId=1, pending={};
   function el(id){return document.getElementById(id)}
   function text(id,v){el(id).textContent=v==null?"":String(v)}

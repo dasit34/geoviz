@@ -1,8 +1,12 @@
 # GeoViz ChatGPT plugin (v1, Preview only)
 
-Status: built on `feat/geoviz-chatgpt-plugin`, deployed only to a Vercel Preview,
-tested privately in ChatGPT developer mode. **Not merged, not in Production, not
-submitted.**
+Status: built on `feat/geoviz-chatgpt-plugin`, deployed only to a Vercel Preview.
+**Not merged, not in Production, not submitted.**
+
+**Validation:** the MCP Preview (`geoviz-gycc07baz-agentboard.vercel.app/mcp`,
+commit `83a1386`) was validated in ChatGPT developer mode on 2026-10-03 — the
+operator ran the private test prompts (real site, metadata IP, invalid URL,
+"does ChatGPT recommend this business?") and reported all passed.
 
 ## What it is
 One read-only MCP tool, `check_business_visibility`, served at `/mcp`
@@ -22,8 +26,22 @@ the disclaimer that no AI system was asked about the business.
 | Result card (MCP Apps `text/html;profile=mcp-app`) | `src/lib/chatgpt-plugin/result-card.ts` |
 | Tests (DB-free) | `scripts/test-chatgpt-plugin.ts` (`npm run test:chatgpt-plugin`) |
 
-The `/api/free-check` route is unchanged: the fetcher seam added to
-`runFreeCheck` / `auditCrawlability` defaults to the original `fetchRawHtml`.
+`/api/free-check` keeps its original fetch path: the fetcher seam added to
+`runFreeCheck` / `auditCrawlability` defaults to `fetchRawHtml`. Its scoring is
+shared with the plugin, so scoring v1.1 (below) applies to both.
+
+## Free-check scoring v1.1 (local vs. online)
+`deriveChecks` first runs `classifyBusinessType` (`src/lib/free-check/classifyBusinessType.ts`).
+Local is the default and any local signal wins (LocalBusiness-family `@type`,
+address/geo/openingHours in schema, or a street address on the page). Otherwise
+the site is **online** when it has a `SoftwareApplication` / `WebApplication` /
+`MobileApplication` / `OnlineBusiness` / `OnlineStore` type, an online category,
+or 3+ online product cues in the homepage text. For online sites:
+`location_clarity` is `not_applicable` and excluded from the overall score
+(weights renormalized over the other five), and structured data is scored on
+name/url/telephone only. Local scoring is byte-for-byte v1.0 (pinned in
+`scripts/lib/free-check-v1-0-baseline.json`). Results carry `businessType`,
+`businessTypeReasons`, and `scoringVersion: "free-check-v1.1"`.
 
 ## Safety
 - http/https on 80/443 only, no URL credentials; every DNS answer and connect-time
@@ -45,4 +63,7 @@ The `/api/free-check` route is unchanged: the fetcher seam added to
   screenshots of the card; justification for each annotation.
 - `_meta.ui.domain` for the card, if review requires a dedicated widget origin.
 - Durable shared rate limit (DB or KV) instead of per-instance memory.
-- Separate follow-up: move `/api/free-check` onto the SSRF-safe fetcher.
+- Separate follow-up: move `/api/free-check` onto the SSRF-safe fetcher. Note:
+  `/check`'s plain fetcher (UA `GeoVizPreflightProbe`) receives a much smaller
+  page from some sites than the plugin's fetcher does (e.g.
+  ricksaffordableheating.com: 5 vs. 60), so the two surfaces can disagree today.

@@ -175,6 +175,29 @@ async function main() {
     assert.ok(r.output.evidence.includes("No valid sitemap.xml found."));
   });
 
+  await check("online business end to end: businessType online, location not applicable, reason in evidence", async () => {
+    const saas = `<!doctype html><html><head><title>Ledgerly — invoicing software</title>
+<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "SoftwareApplication", name: "Ledgerly", url: "https://ledgerly.example/", applicationCategory: "BusinessApplication" })}</script></head>
+<body><main><h1>Ledgerly invoicing software</h1>${"<p>Ledgerly is invoicing software for freelancers. Send invoices, track payments, and reconcile expenses in one place.</p>".repeat(8)}
+<p>Start your free trial. See pricing. Log in.</p></main></body></html>`;
+    const net = siteNet("ledgerly.example", { "https://ledgerly.example/": { status: 200, body: saas } });
+    const r = await checkBusinessVisibility({ websiteUrl: "ledgerly.example", businessName: "Ledgerly" }, { clientKey: freshKey(), ...net });
+    assert.ok(r.ok, r.ok ? "" : r.message);
+    assert.equal(r.output.businessType, "online");
+    const loc = r.output.findings.find((f) => f.id === "location_clarity")!;
+    assert.equal(loc.status, "not_applicable");
+    assert.ok(!r.output.priorityImprovements.includes("Strengthen your location signals."));
+    assert.match(r.output.evidence[0]!, /^Scored as an online business, so storefront location and opening hours aren't scored\. Reason: SoftwareApplication structured data/);
+    assert.match(r.text, /Location clarity: not applicable/);
+  });
+
+  await check("local business reports businessType local", async () => {
+    const r = await checkBusinessVisibility({ websiteUrl: "localbiz.example", businessName: "Summit Roofing", city: "Denver", state: "CO" }, { clientKey: freshKey(), ...siteNet("localbiz.example") });
+    assert.ok(r.ok);
+    assert.equal(r.output.businessType, "local");
+    assert.match(r.output.evidence[0]!, /^Scored as a local business/);
+  });
+
   // ── Invalid URLs ──
   for (const bad of ["ftp://example.com/", "not a url", "https://user:pass@example.com/", "https://example.com:8080/", "javascript:alert(1)", "x", "https://intranet/"]) {
     await check(`invalid URL rejected without any request: ${JSON.stringify(bad)}`, async () => {
