@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { HeroReadout } from "@/components/HeroReadout";
+import { HeroSignalField } from "@/components/HeroSignalField";
 import { AUDIT_PRICE, AUDIT_REGULAR_PRICE } from "@/lib/home/offers";
 
 /**
@@ -44,7 +45,10 @@ export function HomeHero() {
             report reviewed by a person before it’s sent
           </p>
         </div>
-        <HeroReadout />
+        <div className="relative">
+          <HeroSignalField />
+          <HeroReadout />
+        </div>
       </div>
     </section>
   );

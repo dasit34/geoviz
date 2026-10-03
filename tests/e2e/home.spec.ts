@@ -86,6 +86,25 @@ test.describe("homepage — content and behavior", () => {
     await page.goto("/");
     await expect(page.getByRole("figure", { name: /score 60 of 100/ })).toBeVisible();
     await expect(page.locator('[aria-hidden="true"]', { hasText: /^60$/ }).first()).toBeVisible();
+    // Graphics render in their final state without motion.
+    await expect(page.locator('ol[aria-label="How GeoViz works, step by step"] svg')).toHaveCount(5);
+    const prove = page.locator("#prove");
+    await prove.scrollIntoViewIfNeeded();
+    await expect(prove.getByText("Verified · newly observed")).toBeVisible();
+    await expect(prove.getByText("No LocalBusiness structured data found")).toBeVisible();
+    const compare = page.locator("#compare");
+    await compare.scrollIntoViewIfNeeded();
+    await expect(compare.getByText("points since")).toBeVisible();
+    await expect(compare.locator('ol[aria-label="Example score history"] li')).toHaveText(["Starting audit: 52", "Month 1: 55", "Month 2: 60"]);
+  });
+
+  test("graphics are labelled as example data and the hero field names only the four queried systems", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#compare").getByText("Example data")).toHaveCount(2);
+    await expect(page.locator("#prove").getByText("Example data")).toHaveCount(1);
+    const field = page.locator("section").first().locator('[aria-hidden="true"].pointer-events-none');
+    const text = await field.innerText().catch(() => "");
+    expect(text).not.toMatch(/Overview/i);
   });
 
   test("accessibility: no serious or critical axe violations", async ({ page }) => {

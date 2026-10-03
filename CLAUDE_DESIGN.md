@@ -109,3 +109,8 @@ Today this is intentionally a stub. Expand it when:
 - A specific frontend regression keeps recurring — add the rule
   here so it becomes a checklist item rather than a re-litigated
   judgment call.
+
+**Homepage graphics v2 (hero field, loop glyphs, Compare + Prove):**
+- `HeroSignalField` is server-rendered SVG animated with CSS only (`motion-safe:animate-radarSweep`, `animate-signalDash`, `animate-pulseSoft`), desktop only, `aria-hidden`. It names only the four API-queried systems — never AI Overviews.
+- `LoopGlyph` strokes draw from the existing loop scroll progress; `CompareCharts` (line chart with a labelled 40–70 axis, presence bars) and `ProveSnapshot` (before/after snapshot, scan line, "Verified · newly observed") animate once on view.
+- Under reduced motion every graphic renders in its final state. Every graphic built from example data carries the Example data badge; chart values also exist as accessible text.

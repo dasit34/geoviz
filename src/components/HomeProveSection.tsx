@@ -1,4 +1,5 @@
 import { HomeSection } from "@/components/HomeSection";
+import { ProveSnapshot } from "@/components/ProveSnapshot";
 
 const STATES = [
   {
@@ -38,7 +39,9 @@ export function HomeProveSection() {
         </p>
       }
     >
-      <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <ProveSnapshot />
+      <p className="mt-10 font-mono text-[11px] uppercase tracking-[0.16em] text-white/50">Every check ends in one of four outcomes</p>
+      <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {STATES.map((s) => (
           <li key={s.label} className="rounded-lg border border-white/10 bg-ink-900/60 p-5 transition hover:border-white/20">
             <span className={`inline-block rounded border px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider ${s.tone}`}>{s.label}</span>

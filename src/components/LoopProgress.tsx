@@ -3,7 +3,9 @@
 import { m, useMotionValue, useReducedMotion, useScroll, useTransform, type MotionValue } from "framer-motion";
 import { useRef } from "react";
 
-export type LoopStep = { key: string; label: string; line: string; href: string };
+import { LoopGlyph, type LoopGlyphKind } from "@/components/LoopGlyph";
+
+export type LoopStep = { key: LoopGlyphKind; label: string; line: string; href: string };
 
 function StepRow({ step, index, total, progress }: { step: LoopStep; index: number; total: number; progress: MotionValue<number> }) {
   const at = index / total;
@@ -18,11 +20,14 @@ function StepRow({ step, index, total, progress }: { step: LoopStep; index: numb
       >
         {index + 1}
       </m.span>
-      <div>
-        <a href={step.href} className="font-display text-2xl font-semibold text-white transition hover:text-accent-glow">
-          {step.label}
-        </a>
-        <p className="mt-1 max-w-md text-[15px] leading-relaxed text-white/65">{step.line}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <a href={step.href} className="font-display text-2xl font-semibold text-white transition hover:text-accent-glow">
+            {step.label}
+          </a>
+          <p className="mt-1 max-w-md text-[15px] leading-relaxed text-white/65">{step.line}</p>
+        </div>
+        <LoopGlyph kind={step.key} progress={progress} at={at} />
       </div>
     </m.li>
   );
