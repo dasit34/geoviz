@@ -8,6 +8,7 @@ import { findOrCreateBusinessForUrl } from "@/lib/business/find-or-create-busine
 import { prisma } from "@/lib/db";
 
 import {
+  DuplicateBusinessRecordError,
   DuplicateSubscriptionError,
   MONITORING_ORDER_TYPE,
   type MonitoringStore,
@@ -21,15 +22,94 @@ function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
 }
 
+/** True when a P2002 came from the (email, siteKey) business-identity index. */
+function isBusinessKeyViolation(err: unknown): boolean {
+  if (!isUniqueViolation(err)) return false;
+  const target = (err as Prisma.PrismaClientKnownRequestError).meta?.target;
+  const text = Array.isArray(target) ? target.join(",") : String(target ?? "");
+  return text.includes("siteKey");
+}
+
 export const prismaMonitoringStore: MonitoringStore = {
   async findBySubscriptionId(stripeSubscriptionId) {
     return prisma.monitoringSubscription.findUnique({ where: { stripeSubscriptionId } });
+  },
+
+  async findByPriorSubscriptionId(stripeSubscriptionId) {
+    return prisma.monitoringSubscription.findFirst({ where: { priorStripeSubscriptionIds: { has: stripeSubscriptionId } } });
+  },
+
+  async findById(id) {
+    return prisma.monitoringSubscription.findUnique({ where: { id } });
+  },
+
+  async findByEmail(email) {
+    return prisma.monitoringSubscription.findMany({ where: { email }, orderBy: { createdAt: "desc" }, take: 50 });
+  },
+
+  async findBySiteKey(email, siteKey) {
+    return prisma.monitoringSubscription.findUnique({ where: { email_siteKey: { email, siteKey } } });
+  },
+
+  async claimSiteKey(id, siteKey) {
+    try {
+      const { count } = await prisma.monitoringSubscription.updateMany({ where: { id, siteKey: null }, data: { siteKey } });
+      return count === 1;
+    } catch (err) {
+      if (isBusinessKeyViolation(err)) return false;
+      throw err;
+    }
+  },
+
+  async recordDuplicateSubscription({ stripeSubscriptionId, monitoringSubscriptionId, stripeCustomerId, status, now }) {
+    const write = () =>
+      prisma.monitoringDuplicateSubscription.upsert({
+        where: { stripeSubscriptionId },
+        create: { stripeSubscriptionId, monitoringSubscriptionId, stripeCustomerId, status, detectedAt: now, lastEventAt: now },
+        update: { status, lastEventAt: now },
+      });
+    try {
+      await write();
+    } catch (err) {
+      // Two events for the same duplicate raced on the insert; the retry updates.
+      if (!isUniqueViolation(err)) throw err;
+      await write();
+    }
+  },
+
+  async findDuplicateSubscription(stripeSubscriptionId) {
+    return prisma.monitoringDuplicateSubscription.findUnique({
+      where: { stripeSubscriptionId },
+      select: { monitoringSubscriptionId: true },
+    });
+  },
+
+  async reattach(id, fromStripeSubscriptionId, toStripeSubscriptionId, patch) {
+    // Conditional on the record still pointing at the old subscription, so
+    // exactly one concurrent event performs the reattach.
+    try {
+      const { count } = await prisma.monitoringSubscription.updateMany({
+        where: { id, stripeSubscriptionId: fromStripeSubscriptionId },
+        data: {
+          ...patch,
+          stripeSubscriptionId: toStripeSubscriptionId,
+          priorStripeSubscriptionIds: { push: fromStripeSubscriptionId },
+        },
+      });
+      if (count !== 1) return null;
+    } catch (err) {
+      // The new id already exists on some record — the race was lost.
+      if (isUniqueViolation(err)) return null;
+      throw err;
+    }
+    return prisma.monitoringSubscription.findUnique({ where: { id } });
   },
 
   async create(data) {
     try {
       return await prisma.monitoringSubscription.create({ data });
     } catch (err) {
+      if (isBusinessKeyViolation(err)) throw new DuplicateBusinessRecordError(data.siteKey ?? data.websiteUrl);
       if (isUniqueViolation(err)) throw new DuplicateSubscriptionError(data.stripeSubscriptionId);
       throw err;
     }

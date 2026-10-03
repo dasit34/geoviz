@@ -5,7 +5,11 @@ import {
   buildMonitoringCheckoutSessionParams,
   monitoringCheckoutInputSchema,
 } from "@/lib/monitoring/checkout";
+import { createCheckoutUnderLease } from "@/lib/monitoring/checkout-lease";
+import { prismaCheckoutLeaseStore } from "@/lib/monitoring/checkout-lease-store";
 import { isMonitoringEnabled, resolvePlan } from "@/lib/monitoring/plans";
+import { prismaMonitoringStore } from "@/lib/monitoring/prisma-store";
+import { checkNewPurchase } from "@/lib/monitoring/purchase-guard";
 import { applyApiRateLimit } from "@/lib/rate-limit";
 import { getStripe } from "@/lib/stripe";
 
@@ -17,6 +21,11 @@ export const runtime = "nodejs";
  * checks, error mapping). Off unless GEO_MODULE_MONITORING_ENABLED is
  * "true"; the plan's price comes from its STRIPE_MONITORING_*_PRICE_ID
  * env var (src/lib/monitoring/plans.ts) — never from the client.
+ *
+ * Double-billing prevention: refused when this email already has a
+ * monitoring record for the business (manage / reactivate from the
+ * signed-in dashboard instead), and created under the checkout lease so
+ * concurrent requests share ONE Checkout session (idempotency-keyed).
  */
 export async function POST(req: Request) {
   if (!isMonitoringEnabled()) {
@@ -55,19 +64,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "That monitoring plan is not available." }, { status: 400 });
   }
 
-  const params = buildMonitoringCheckoutSessionParams({
-    plan,
-    input: parsed.data,
-    siteUrl: resolveAppBaseUrl(req),
-  });
-
   try {
-    const session = await getStripe().checkout.sessions.create(params);
-    if (!session.url) {
-      return NextResponse.json({ error: "Stripe did not return a checkout URL." }, { status: 502 });
+    const decision = await checkNewPurchase(parsed.data.email, parsed.data.websiteUrl, prismaMonitoringStore);
+    if (!decision.allowed) {
+      return NextResponse.json({ error: decision.message, signIn: "/monitoring/sign-in", reason: decision.reason }, { status: 409 });
     }
-    console.log(`[checkout-monitoring] session created id=${session.id} plan=${plan.key}`);
-    return NextResponse.json({ url: session.url });
+    const result = await createCheckoutUnderLease({
+      email: parsed.data.email,
+      siteKey: decision.siteKey,
+      kind: "new",
+      monitoringSubscriptionId: null,
+      buildParams: () => buildMonitoringCheckoutSessionParams({ plan, input: parsed.data, siteUrl: resolveAppBaseUrl(req) }),
+      createSession: async (params, idempotencyKey) => {
+        const s = await getStripe().checkout.sessions.create(params, { idempotencyKey });
+        return { id: s.id, url: s.url };
+      },
+      store: prismaCheckoutLeaseStore,
+      now: () => new Date(),
+    });
+    if (result.status === "in_progress") {
+      return NextResponse.json({ error: "A checkout for this website is already being prepared. Please try again in a moment." }, { status: 409 });
+    }
+    console.log(`[checkout-monitoring] checkout ${result.status} plan=${plan.key}`);
+    return NextResponse.json({ url: result.url });
   } catch (err) {
     console.error("[checkout-monitoring] Stripe session error", err);
     const e = err as { code?: unknown; message?: unknown };

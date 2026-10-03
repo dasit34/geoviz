@@ -42,12 +42,32 @@ export function isMonitoringStripeEvent(event: MonitoringStripeEvent): boolean {
 
 export type WebhookDeps = SyncDeps & {
   stripe: StripeSubscriptionGateway;
+  /**
+   * Monitoring-only customer login: create or connect the buyer's account
+   * (by email) and link this record to it. Idempotent; returns the record
+   * with `customerId` set.
+   */
+  linkCustomer: (sub: MonitoringSubscriptionRecord) => Promise<MonitoringSubscriptionRecord>;
+  /** Welcome email with a single-use 24-hour sign-in link. */
   sendWelcomeEmail: (sub: MonitoringSubscriptionRecord) => Promise<void>;
+  /** Close the checkout lease for a completed Checkout session (prevention layer). */
+  completeCheckoutLease: (checkoutSessionId: string) => Promise<void>;
+  /**
+   * Cancel + fully refund a duplicate paid subscription and notify, exactly
+   * once (duplicate-compensation.ts). Throws on failure → 500 → Stripe retries.
+   */
+  compensateDuplicate: (stripeSubscriptionId: string) => Promise<unknown>;
 };
 
 export type MonitoringWebhookResult =
   | { outcome: "duplicate" }
   | { outcome: "ignored"; reason: string }
+  /**
+   * A paid subscription that lost to the record already attached to this
+   * business (e.g. two reactivations paid at once). No record or account
+   * link is created; it is canceled + refunded automatically (once).
+   */
+  | { outcome: "duplicate_subscription"; monitoringSubscriptionId: string }
   | { outcome: "synced"; sync: SyncResult; welcomeEmailSent: boolean };
 
 function idOf(value: unknown): string | null {
@@ -82,11 +102,21 @@ async function process(event: MonitoringStripeEvent, deps: WebhookDeps): Promise
   const subscriptionId = isCheckout ? idOf(obj.subscription) : idOf(obj.id);
   if (!subscriptionId) return { outcome: "ignored", reason: "event has no subscription id" };
 
+  if (isCheckout && typeof obj.id === "string") await deps.completeCheckoutLease(obj.id);
+
   const snapshot = await deps.stripe.retrieveSubscription(subscriptionId);
   const sync = await syncSubscription(snapshot, deps);
   if (sync.outcome === "ignored") return { outcome: "ignored", reason: sync.reason };
+  if (sync.outcome === "duplicate") {
+    console.warn(
+      `[monitoring-webhook] duplicate paid subscription ${subscriptionId} for record ${sync.monitoringSubscriptionId} — compensating (cancel + refund + notify)`,
+    );
+    await deps.compensateDuplicate(subscriptionId);
+    return { outcome: "duplicate_subscription", monitoringSubscriptionId: sync.monitoringSubscriptionId };
+  }
 
   let sub = sync.subscription;
+  if (!sub.customerId) sub = await deps.linkCustomer(sub);
   if (isCheckout && typeof obj.id === "string" && sub.stripeCheckoutSessionId !== obj.id) {
     await deps.store.setCheckoutSessionId(sub.id, obj.id);
     sub = { ...sub, stripeCheckoutSessionId: obj.id };

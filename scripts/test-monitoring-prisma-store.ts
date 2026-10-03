@@ -42,6 +42,9 @@ const now = new Date();
       endedAt: null,
       lastSyncedAt: now,
       websiteUrl: `https://monitoring-test-${tag}.invalid`,
+      // Legacy-style row (no business key) so this test isolates the
+      // Stripe-subscription-id uniqueness check.
+      siteKey: null,
       businessName: "[TEST] monitoring store",
       email: "monitoring-test@example.invalid",
       businessId: null,

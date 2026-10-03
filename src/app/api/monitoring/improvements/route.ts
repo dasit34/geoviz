@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { resolveAppBaseUrl } from "@/lib/app-url";
+import { forbiddenOriginResponse, isSameOriginRequest, signedOutResponse } from "@/lib/monitoring/auth/http";
+import { requireOwnedSubscription } from "@/lib/monitoring/auth/session";
 import {
   addTaskNote,
   createTaskFromRecommendation,
@@ -9,28 +11,30 @@ import {
   transitionTask,
 } from "@/lib/monitoring/improvements/service";
 import { isMonitoringEnabled } from "@/lib/monitoring/plans";
-import { findSubscriptionByToken } from "@/lib/monitoring/prisma-store";
 import type { MutationResult } from "@/lib/monitoring/tracking/service";
 import { applyApiRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 /**
- * Customer actions on improvement tasks, posted from the status page. The
- * status-page token is the only credential; every rule (subscription
+ * Customer actions on improvement tasks, posted from the signed-in dashboard.
+ * Requires the customer's session and ownership of the subscription; every rule (subscription
  * active, task belongs to this subscription, allowed status change) is
  * enforced server-side in improvements/service.ts. Customers can never mark
  * a task Verified.
  */
 export async function POST(req: Request) {
   if (!isMonitoringEnabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
+  if (!isSameOriginRequest(req)) return forbiddenOriginResponse();
   const limited = applyApiRateLimit({ req, routeKey: "api:monitoring:improvements", limit: 40, windowMs: 10 * 60_000 });
   if (limited) return limited;
 
   const form = await req.formData().catch(() => null);
   const field = (k: string) => (typeof form?.get(k) === "string" ? String(form?.get(k)).trim() : "");
-  const sub = await findSubscriptionByToken(field("token"));
-  if (!sub) return NextResponse.json({ error: "Not found." }, { status: 404 });
+  const owned = await requireOwnedSubscription(field("subscriptionId"));
+  if (owned.status === "signed_out") return signedOutResponse(req);
+  if (owned.status === "not_found") return NextResponse.json({ error: "Not found." }, { status: 404 });
+  const { sub } = owned;
 
   const taskId = field("taskId");
   let result: MutationResult;
@@ -73,7 +77,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   }
 
-  const url = new URL(`/monitoring/${sub.accessToken}`, resolveAppBaseUrl(req));
+  const url = new URL(`/monitoring/account/${sub.id}`, resolveAppBaseUrl(req));
   url.searchParams.set("tab", "improvements");
   if (!result.ok) url.searchParams.set("notice", result.message);
   if (taskId) url.hash = `task-${taskId}`;

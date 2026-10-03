@@ -184,7 +184,7 @@ const deps = (routes: Record<string, Record<string, FakeRoute>>) => (scan: Claim
   await h.check("scheduler: website enqueue failure never blocks the re-audit or question tracking", async () => {
     const mstore = createFakeStore();
     mstore.subs.set("sub_x", {
-      id: "sub_x", accessToken: "t", planKey: "monitoring_monthly", stripePriceId: null, stripeSubscriptionId: "stripe_x", stripeCustomerId: null, stripeCheckoutSessionId: null,
+      id: "sub_x", accessToken: "t", planKey: "monitoring_monthly", stripePriceId: null, stripeSubscriptionId: "stripe_x", priorStripeSubscriptionIds: [], customerId: null, siteKey: null, stripeCustomerId: null, stripeCheckoutSessionId: null,
       status: "active", cancelAtPeriodEnd: false, currentPeriodEnd: new Date(T0.getTime() + 30 * 86400000), canceledAt: null, endedAt: null, lastSyncedAt: T0,
       websiteUrl: "https://a.example", businessName: "A", email: "a@a.example", businessId: null, baselineAuditOrderId: null, cadenceDays: 30, nextAuditAt: T0, lastAuditQueuedAt: null, welcomeEmailSentAt: null, createdAt: T0,
     } as never);
@@ -228,12 +228,14 @@ const deps = (routes: Record<string, Record<string, FakeRoute>>) => (scan: Claim
     assert.deepEqual(WT, { enabled: true, maxPagesPerSite: 12, maxSitemapUrlsRead: 200, maxCompetitorSites: 3 });
   });
 
-  await h.check("routes: website edits go through the token-gated, flag-gated, rate-limited tracking route; the page loads website data only behind the token", () => {
+  await h.check("routes: website edits go through the signed-in, owner-checked, flag-gated tracking route; the page loads website data only after the ownership check", () => {
     const route = readFileSync("src/app/api/monitoring/tracking/route.ts", "utf8");
     assert.match(route, /case "set_competitor_website"/);
-    assert.ok(route.indexOf("findSubscriptionByToken(") < route.indexOf("setCompetitorWebsite("));
-    const page = readFileSync("src/app/(future)/monitoring/[token]/page.tsx", "utf8");
-    assert.ok(page.indexOf("findSubscriptionByToken(") < page.indexOf("loadWebsiteDashboard(sub)"));
+    assert.ok(route.indexOf("requireOwnedSubscription(") > 0);
+    assert.ok(route.indexOf("requireOwnedSubscription(") < route.indexOf("setCompetitorWebsite("));
+    const page = readFileSync("src/app/(future)/monitoring/account/[subscriptionId]/page.tsx", "utf8");
+    assert.ok(page.indexOf("requireOwnedSubscription(") > 0);
+    assert.ok(page.indexOf("requireOwnedSubscription(") < page.indexOf("loadWebsiteDashboard(sub)"));
     const svc = readFileSync("src/lib/monitoring/website/service.ts", "utf8");
     assert.match(svc, /setCompetitorWebsite[\s\S]*?canEditTracking\(sub\)/, "edits require an active subscription");
   });

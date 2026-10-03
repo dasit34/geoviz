@@ -68,16 +68,16 @@ const cyc = (id: string, at: string, results: ResultForMetrics[]) => ({ id, star
     assert.doesNotMatch(ui.replace(IMPACT_DISCLAIMER, ""), /because of (your|this) (change|fix)|led to|improved your ranking|guarantee/i);
   });
 
-  await h.check("customer routes: flag gate, rate limit, token lookup before any action", () => {
+  await h.check("customer routes: flag gate, rate limit, session + ownership check before any action", () => {
     for (const f of ["src/app/api/monitoring/improvements/route.ts", "src/app/api/monitoring/improvements/draft/route.ts"]) {
       const src = readFileSync(f, "utf8");
       assert.match(src, /isMonitoringEnabled\(\)/, f);
       assert.match(src, /applyApiRateLimit/, f);
-      const tokenAt = src.indexOf("findSubscriptionByToken(");
+      const tokenAt = src.indexOf("requireOwnedSubscription(");
       assert.ok(tokenAt > 0, f);
       for (const call of ["createTaskFromRecommendation(", "transitionTask(", "draftForDownload(", "saveFacts("]) {
         const at = src.indexOf(call, src.indexOf("export async function"));
-        if (at > 0) assert.ok(at > tokenAt, `${f}: ${call} after token check`);
+        if (at > 0) assert.ok(at > tokenAt, `${f}: ${call} after ownership check`);
       }
     }
     const route = readFileSync("src/app/api/monitoring/improvements/route.ts", "utf8");

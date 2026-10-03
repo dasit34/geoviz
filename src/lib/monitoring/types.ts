@@ -53,8 +53,12 @@ export type MonitoringSubscriptionRecord = {
   planKey: string;
   stripePriceId: string | null;
   stripeSubscriptionId: string;
+  /** Earlier Stripe subscriptions reattached to this record (reactivations). */
+  priorStripeSubscriptionIds: string[];
   stripeCustomerId: string | null;
   stripeCheckoutSessionId: string | null;
+  /** Owning MonitoringCustomer (monitoring-only login); null until linked by email. */
+  customerId: string | null;
   status: string;
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd: Date | null;
@@ -62,6 +66,8 @@ export type MonitoringSubscriptionRecord = {
   endedAt: Date | null;
   lastSyncedAt: Date;
   websiteUrl: string;
+  /** normalizeDomain(websiteUrl); unique together with `email` (null only on legacy rows). */
+  siteKey: string | null;
   businessName: string | null;
   email: string;
   businessId: string | null;
@@ -75,8 +81,14 @@ export type MonitoringSubscriptionRecord = {
 
 export type NewMonitoringSubscription = Omit<
   MonitoringSubscriptionRecord,
-  "id" | "createdAt" | "welcomeEmailSentAt" | "lastAuditQueuedAt" | "stripeCheckoutSessionId"
-> & { stripeCheckoutSessionId?: string | null };
+  | "id"
+  | "createdAt"
+  | "welcomeEmailSentAt"
+  | "lastAuditQueuedAt"
+  | "stripeCheckoutSessionId"
+  | "priorStripeSubscriptionIds"
+  | "customerId"
+> & { stripeCheckoutSessionId?: string | null; customerId?: string | null };
 
 export type SubscriptionBillingPatch = Pick<
   MonitoringSubscriptionRecord,
@@ -94,9 +106,49 @@ export type CreateOrderResult =
   | { outcome: "created"; orderId: string }
   | { outcome: "already_exists" };
 
+/**
+ * Metadata key on a REACTIVATION checkout (and its subscription): the
+ * existing MonitoringSubscription the new Stripe subscription reattaches to.
+ */
+export const REACTIVATES_METADATA_KEY = "reactivatesMonitoringSubscriptionId";
+
 /** Persistence seam — Prisma in production, in-memory in tests. */
 export interface MonitoringStore {
   findBySubscriptionId(stripeSubscriptionId: string): Promise<MonitoringSubscriptionRecord | null>;
+  /** The record that previously used this Stripe subscription id (reactivated since), if any. */
+  findByPriorSubscriptionId(stripeSubscriptionId: string): Promise<MonitoringSubscriptionRecord | null>;
+  findById(id: string): Promise<MonitoringSubscriptionRecord | null>;
+  /** All records bought with this (lowercased) email (legacy siteKey fallback). */
+  findByEmail(email: string): Promise<MonitoringSubscriptionRecord[]>;
+  /** The ONE record for (email, siteKey) — database-unique. */
+  findBySiteKey(email: string, siteKey: string): Promise<MonitoringSubscriptionRecord | null>;
+  /**
+   * Give a legacy row (siteKey null) its siteKey. False when the row already
+   * has one or another row holds (email, siteKey) — never throws on that.
+   */
+  claimSiteKey(id: string, siteKey: string): Promise<boolean>;
+  /** Paid subscription that lost to an existing record — upserted per Stripe subscription. */
+  recordDuplicateSubscription(args: {
+    stripeSubscriptionId: string;
+    monitoringSubscriptionId: string;
+    stripeCustomerId: string | null;
+    status: string;
+    now: Date;
+  }): Promise<void>;
+  /** The record a known duplicate Stripe subscription lost to, or null. */
+  findDuplicateSubscription(stripeSubscriptionId: string): Promise<{ monitoringSubscriptionId: string } | null>;
+  /**
+   * Atomically move `id` from `fromStripeSubscriptionId` to a new Stripe
+   * subscription (old id appended to priorStripeSubscriptionIds) and apply
+   * the billing patch. Returns null when the record no longer points at
+   * `fromStripeSubscriptionId` (a concurrent event reattached it first).
+   */
+  reattach(
+    id: string,
+    fromStripeSubscriptionId: string,
+    toStripeSubscriptionId: string,
+    patch: SubscriptionBillingPatch & { stripeCheckoutSessionId?: null },
+  ): Promise<MonitoringSubscriptionRecord | null>;
   /** Throws `DuplicateSubscriptionError` when the Stripe subscription id already exists. */
   create(data: NewMonitoringSubscription): Promise<MonitoringSubscriptionRecord>;
   updateBilling(id: string, patch: SubscriptionBillingPatch): Promise<MonitoringSubscriptionRecord>;
@@ -119,6 +171,14 @@ export interface MonitoringStore {
     queuedAt: Date;
   }): Promise<CreateOrderResult>;
   advanceSchedule(id: string, nextAuditAt: Date, queuedAt: Date): Promise<void>;
+}
+
+/** `create` hit the (email, siteKey) unique index — another record owns this business. */
+export class DuplicateBusinessRecordError extends Error {
+  constructor(siteKey: string) {
+    super(`monitoring record already exists for ${siteKey} under this email`);
+    this.name = "DuplicateBusinessRecordError";
+  }
 }
 
 export class DuplicateSubscriptionError extends Error {

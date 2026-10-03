@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { resolveAppBaseUrl } from "@/lib/app-url";
+import { forbiddenOriginResponse, isSameOriginRequest, signedOutResponse } from "@/lib/monitoring/auth/http";
+import { requireOwnedSubscription } from "@/lib/monitoring/auth/session";
 import { isMonitoringEnabled } from "@/lib/monitoring/plans";
-import { findSubscriptionByToken } from "@/lib/monitoring/prisma-store";
 import {
   addTrackedCompetitor,
   addTrackedPrompt,
@@ -17,18 +18,22 @@ export const runtime = "nodejs";
 
 /**
  * Customer edits to tracked questions / competitors, posted from the
- * status page. The status-page token is the only credential; every limit
+ * signed-in dashboard. Requires the customer's session and ownership of
+ * the subscription (src/lib/monitoring/auth/session.ts); every limit
  * and access rule is enforced server-side (tracking/service.ts).
  */
 export async function POST(req: Request) {
   if (!isMonitoringEnabled()) return NextResponse.json({ error: "Not found." }, { status: 404 });
+  if (!isSameOriginRequest(req)) return forbiddenOriginResponse();
   const limited = applyApiRateLimit({ req, routeKey: "api:monitoring:tracking", limit: 30, windowMs: 10 * 60_000 });
   if (limited) return limited;
 
   const form = await req.formData().catch(() => null);
   const field = (k: string) => (typeof form?.get(k) === "string" ? String(form?.get(k)).trim() : "");
-  const sub = await findSubscriptionByToken(field("token"));
-  if (!sub) return NextResponse.json({ error: "Not found." }, { status: 404 });
+  const owned = await requireOwnedSubscription(field("subscriptionId"));
+  if (owned.status === "signed_out") return signedOutResponse(req);
+  if (owned.status === "not_found") return NextResponse.json({ error: "Not found." }, { status: 404 });
+  const { sub } = owned;
 
   const action = field("action");
   let tab = "prompts";
@@ -63,7 +68,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   }
 
-  const url = new URL(`/monitoring/${sub.accessToken}`, resolveAppBaseUrl(req));
+  const url = new URL(`/monitoring/account/${sub.id}`, resolveAppBaseUrl(req));
   url.searchParams.set("tab", tab);
   if (!result.ok) url.searchParams.set("notice", result.message);
   return NextResponse.redirect(url, 303);
