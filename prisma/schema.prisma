@@ -1379,9 +1379,11 @@ model MonitoringSubscription {
 /// A paid monitoring Stripe subscription that lost the race to an existing
 /// record for the same (email, business) — e.g. two reactivation checkouts
 /// paid at once, or a second purchase while monitoring is already active.
-/// It is never turned into a second monitoring record; it is recorded here
-/// (one row per Stripe subscription, upserted on every event) for operator
-/// review — refund / cancel in Stripe. GeoViz never changes it automatically.
+/// It is never turned into a second monitoring record. GeoViz compensates
+/// automatically and exactly once (src/lib/monitoring/duplicate-compensation.ts):
+/// cancel the duplicate Stripe subscription, fully refund every payment it
+/// collected, notify customer + admin. The canonical subscription (the one
+/// attached to the record) is never touched.
 model MonitoringDuplicateSubscription {
   id                       String                 @id @default(cuid())
   stripeSubscriptionId     String                 @unique
@@ -1392,10 +1394,52 @@ model MonitoringDuplicateSubscription {
   status                   String
   detectedAt               DateTime               @default(now())
   lastEventAt              DateTime               @default(now())
-  /// Set by an operator once refunded / canceled in Stripe.
+  /// Set by an operator after reviewing (compensation is automatic).
   resolvedAt               DateTime?
 
+  // Automatic compensation (all nullable / defaulted — additive).
+  /// Short-lived claim so concurrent webhook deliveries compensate serially.
+  compensationClaimedAt  DateTime?
+  /// Set once the duplicate is confirmed canceled in Stripe.
+  canceledInStripeAt     DateTime?
+  /// "pending" | "refunded" | "nothing_to_refund" | "failed"
+  refundStatus           String    @default("pending")
+  refundedAmount         Int       @default(0)
+  refundCurrency         String?
+  stripeRefundIds        String[]  @default([])
+  compensatedAt          DateTime?
+  lastError              String?
+  customerNotifiedAt     DateTime?
+  adminNotifiedAt        DateTime?
+  /// Append-only audit trail: [{ at, action, detail }].
+  history                Json      @default("[]")
+
   @@index([monitoringSubscriptionId])
+  @@index([compensatedAt])
+}
+
+/// Checkout lease: at most ONE open Stripe Checkout session per
+/// (buyer email, business) at a time, for new purchases and reactivations.
+/// `leaseKey` = sha256(email|siteKey) is the primary key, so two concurrent
+/// requests cannot both acquire it; the loser reuses the winner's session
+/// URL (or is asked to retry). The Stripe session expires when the lease
+/// does (30 min), so an expired lease can never coexist with a payable
+/// session. Stripe idempotency keys are derived from (leaseKey, attempt).
+model MonitoringCheckoutLease {
+  leaseKey                 String    @id
+  email                    String
+  siteKey                  String
+  /// "new" | "reactivation"
+  kind                     String
+  monitoringSubscriptionId String?
+  /// "open" | "completed" | "released"
+  status                   String
+  attempt                  Int       @default(1)
+  stripeCheckoutSessionId  String?   @unique
+  checkoutUrl              String?
+  expiresAt                DateTime
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 }
 
 /// Monitoring customer account — the ONLY customer login in GeoViz

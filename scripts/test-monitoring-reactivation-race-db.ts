@@ -21,9 +21,13 @@ import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 
-import { createFakeStripe, harness, monitoringSnapshot } from "./lib/monitoring-fakes";
+import { createFakeBilling, createFakeStripe, harness, monitoringSnapshot } from "./lib/monitoring-fakes";
 import { prisma } from "../src/lib/db";
 import { prismaMonitoringAuthStore } from "../src/lib/monitoring/auth/prisma-auth-store";
+import { createCheckoutUnderLease, leaseKeyFor } from "../src/lib/monitoring/checkout-lease";
+import { prismaCheckoutLeaseStore } from "../src/lib/monitoring/checkout-lease-store";
+import { compensateDuplicate, type CompensationNotice } from "../src/lib/monitoring/duplicate-compensation";
+import { prismaDuplicateLedgerStore } from "../src/lib/monitoring/duplicate-compensation-prisma";
 import { prismaMonitoringStore } from "../src/lib/monitoring/prisma-store";
 import { REACTIVATES_METADATA_KEY } from "../src/lib/monitoring/types";
 import { handleMonitoringStripeEvent, type WebhookDeps } from "../src/lib/monitoring/webhook";
@@ -43,8 +47,25 @@ function shuffle<T>(xs: T[]): T[] {
   return a;
 }
 
-function deps(stripe: ReturnType<typeof createFakeStripe>, welcome: string[]): WebhookDeps {
+function deps(
+  stripe: ReturnType<typeof createFakeStripe>,
+  welcome: string[],
+  billing = createFakeBilling(),
+  notices: CompensationNotice[] = [],
+): WebhookDeps {
   return {
+    // Real Prisma ledger + lease store; Stripe billing faked (cancel/refund).
+    completeCheckoutLease: (sessionId) => prismaCheckoutLeaseStore.completeBySession(sessionId),
+    compensateDuplicate: (sid) =>
+      compensateDuplicate(sid, {
+        ledger: prismaDuplicateLedgerStore,
+        billing: billing.gateway,
+        adminEmail: "admin@example.test",
+        now: () => new Date(),
+        notify: async (n) => {
+          notices.push(n);
+        },
+      }),
     store: prismaMonitoringStore,
     stripe: stripe.gateway,
     now: () => new Date(),
@@ -79,7 +100,9 @@ const chk = (id: string, sub: string, cs: string) => ({
         const meta = { ...monitoringSnapshot().metadata, email, websiteUrl: site, businessName: tag };
         const stripe = createFakeStripe();
         const welcome: string[] = [];
-        const d = deps(stripe, welcome);
+        const billing = createFakeBilling();
+        const notices: CompensationNotice[] = [];
+        const d = deps(stripe, welcome, billing, notices);
         const old = `sub_${tag}_old`;
 
         // Original purchase, some history, then the subscription ends.
@@ -144,8 +167,44 @@ const chk = (id: string, sub: string, cs: string) => ({
         assert.equal(ledger.length, events.length + 2, "each event id once in the ledger");
         assert.ok(ledger.every((l) => l.processedAt !== null), "every event processed");
         assert.equal(welcome.length, 1, "welcome email only for the original purchase");
+
+        // Compensation: duplicate canceled once, refunded exactly once, canonical untouched.
+        assert.deepEqual(billing.cancels, [loser], "only the duplicate is canceled, once");
+        assert.equal(billing.refunds.length, 1, "exactly one refund");
+        assert.equal(billing.refunds[0]!.paymentIntentId, `pi_${loser}`);
+        assert.equal(billing.refunds[0]!.amount, 9900, "full refund");
+        assert.ok(!billing.cancels.includes(rec.stripeSubscriptionId) && !billing.refunds.some((x) => x.paymentIntentId === `pi_${rec.stripeSubscriptionId}`), "canonical never canceled or refunded");
+        const row = await prisma.monitoringDuplicateSubscription.findUniqueOrThrow({ where: { stripeSubscriptionId: loser } });
+        assert.ok(row.compensatedAt && row.canceledInStripeAt && row.customerNotifiedAt && row.adminNotifiedAt);
+        assert.equal(row.refundStatus, "refunded");
+        assert.equal(row.refundedAmount, 9900);
+        assert.equal(row.stripeRefundIds.length, 1);
+        assert.deepEqual(notices.map((n) => n.to).sort(), ["admin", "customer"], "one customer + one admin notice");
       });
     }
+
+    await h.check("checkout lease on PostgreSQL: 20 concurrent checkout requests → ONE Stripe session, same URL for all", async () => {
+      const email = `race-test-${run}-lease@example.com`;
+      const siteKey = `race-test-${run}-lease.example`;
+      let created = 0;
+      const results = await Promise.all(
+        Array.from({ length: 20 }, () =>
+          createCheckoutUnderLease({
+            email, siteKey, kind: "new", monitoringSubscriptionId: null,
+            buildParams: () => ({ mode: "subscription" }),
+            createSession: async () => {
+              created += 1;
+              await new Promise((r) => setTimeout(r, 150));
+              return { id: `cs_${run}_lease`, url: `https://checkout.stripe.test/${run}` };
+            },
+            store: prismaCheckoutLeaseStore, now: () => new Date(), waitMs: 5000,
+          }),
+        ),
+      );
+      assert.equal(created, 1);
+      assert.ok(results.every((r) => r.status !== "in_progress" && r.url === `https://checkout.stripe.test/${run}`));
+      await prisma.monitoringCheckoutLease.delete({ where: { leaseKey: leaseKeyFor(email, siteKey) } });
+    });
 
     await h.check("concurrent FIRST purchases for the same email + website → one record + one duplicate", async () => {
       const tag = `race-test-${run}-first`;
@@ -154,7 +213,8 @@ const chk = (id: string, sub: string, cs: string) => ({
       const meta = { ...monitoringSnapshot().metadata, email, websiteUrl: `https://${tag}.example`, businessName: tag };
       const stripe = createFakeStripe();
       const welcome: string[] = [];
-      const d = deps(stripe, welcome);
+      const billing = createFakeBilling();
+      const d = deps(stripe, welcome, billing);
       const a = `sub_${tag}_a`;
       const b = `sub_${tag}_b`;
       for (const n of [a, b]) stripe.set(monitoringSnapshot({ id: n, metadata: meta }));
@@ -166,6 +226,8 @@ const chk = (id: string, sub: string, cs: string) => ({
       assert.equal(await prisma.monitoringCustomer.count({ where: { email } }), 1);
       assert.equal(await prisma.monitoringDuplicateSubscription.count({ where: { stripeSubscriptionId: { in: [a, b] } } }), 1);
       assert.equal(welcome.length, 1);
+      assert.equal(billing.cancels.length, 1);
+      assert.equal(billing.refunds.length, 1);
     });
     console.log(`[monitoring-reactivation-race-db] deliveries that would have returned 500 (Stripe retries): ${rejections.length}`);
     for (const r of [...new Set(rejections)]) console.log(`    · ${r.slice(0, 160)}`);

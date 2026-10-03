@@ -38,11 +38,12 @@ export default async function MonitoringCustomersAdminPage({
     },
   });
   const duplicates = await prisma.monitoringDuplicateSubscription.findMany({
-    where: { resolvedAt: null },
     orderBy: { detectedAt: "desc" },
     take: 100,
     select: {
       id: true, stripeSubscriptionId: true, stripeCustomerId: true, status: true, detectedAt: true, lastEventAt: true,
+      resolvedAt: true, compensatedAt: true, refundStatus: true, refundedAmount: true, refundCurrency: true,
+      stripeRefundIds: true, customerNotifiedAt: true, adminNotifiedAt: true, lastError: true, history: true,
       monitoringSubscription: { select: { id: true, businessName: true, websiteUrl: true, stripeSubscriptionId: true } },
     },
   });
@@ -58,32 +59,63 @@ export default async function MonitoringCustomersAdminPage({
       </p>
       {notice ? <p role="status" className="mt-4 text-sm text-severity-info">{notice}</p> : null}
       {duplicates.length > 0 ? (
-        <section className="card mt-8 border-severity-warning/40 p-5">
-          <h2 className="h3 text-severity-warning">Duplicate paid subscriptions — needs review</h2>
+        <section className="card mt-8 p-5">
+          <h2 className="h3">Duplicate paid subscriptions</h2>
           <p className="muted mt-2 text-xs">
-            A second monitoring subscription was paid for a business that already has an attached subscription (e.g. two
-            reactivations at once). GeoViz kept ONE monitoring record and did not change these in Stripe. Refund / cancel the
-            duplicate in the Stripe Dashboard, then mark it resolved.
+            A second monitoring subscription was paid for a business that already had one. GeoViz kept ONE monitoring record,
+            left the original subscription untouched, and automatically canceled + fully refunded the duplicate and emailed the
+            customer and admin. Rows needing attention (failed or manual refund) are highlighted.
           </p>
-          <ul className="mt-4 space-y-2 text-sm">
-            {duplicates.map((d) => (
-              <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-2">
-                <span>
-                  <span className="text-white">{d.monitoringSubscription.businessName || d.monitoringSubscription.websiteUrl}</span>{" "}
-                  <span className="mono-data text-xs text-white/55">
-                    duplicate {d.stripeSubscriptionId} ({d.status}) · attached {d.monitoringSubscription.stripeSubscriptionId} ·
-                    customer {d.stripeCustomerId ?? "—"} · detected {fmt(d.detectedAt)}
-                  </span>
-                </span>
-                <form action="/api/admin/monitoring-customers" method="POST">
-                  <input type="hidden" name="key" value={key} />
-                  <input type="hidden" name="subscriptionId" value={d.monitoringSubscription.id} />
-                  <input type="hidden" name="duplicateId" value={d.id} />
-                  <input type="hidden" name="action" value="resolve_duplicate" />
-                  <button type="submit" className="btn-ghost px-2 py-1 text-xs">Mark resolved</button>
-                </form>
-              </li>
-            ))}
+          <ul className="mt-4 space-y-3 text-sm">
+            {duplicates.map((d) => {
+              const attention = !d.resolvedAt && (!d.compensatedAt || d.refundStatus === "needs_manual_refund");
+              const history = Array.isArray(d.history) ? (d.history as Array<{ at?: string; action?: string; detail?: string }>) : [];
+              return (
+                <li key={d.id} className={`border-t border-white/10 pt-3 ${attention ? "text-severity-warning" : ""}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span>
+                      <span className="text-white">{d.monitoringSubscription.businessName || d.monitoringSubscription.websiteUrl}</span>{" "}
+                      <span className="mono-data text-xs text-white/55">
+                        duplicate {d.stripeSubscriptionId} ({d.status}) · original {d.monitoringSubscription.stripeSubscriptionId} (untouched)
+                      </span>
+                    </span>
+                    <span className="flex gap-1">
+                      {!d.compensatedAt && !d.resolvedAt ? (
+                        <form action="/api/admin/monitoring-customers" method="POST">
+                          <input type="hidden" name="key" value={key} />
+                          <input type="hidden" name="subscriptionId" value={d.monitoringSubscription.id} />
+                          <input type="hidden" name="duplicateId" value={d.id} />
+                          <input type="hidden" name="action" value="retry_compensation" />
+                          <button type="submit" className="btn-ghost px-2 py-1 text-xs">Retry compensation</button>
+                        </form>
+                      ) : null}
+                      {!d.resolvedAt ? (
+                        <form action="/api/admin/monitoring-customers" method="POST">
+                          <input type="hidden" name="key" value={key} />
+                          <input type="hidden" name="subscriptionId" value={d.monitoringSubscription.id} />
+                          <input type="hidden" name="duplicateId" value={d.id} />
+                          <input type="hidden" name="action" value="resolve_duplicate" />
+                          <button type="submit" className="btn-ghost px-2 py-1 text-xs">Mark reviewed</button>
+                        </form>
+                      ) : null}
+                    </span>
+                  </div>
+                  <p className="mono-data mt-1 text-xs text-white/60">
+                    refund: {d.refundStatus} {(d.refundedAmount / 100).toFixed(2)} {(d.refundCurrency ?? "usd").toUpperCase()}
+                    {d.stripeRefundIds.length ? ` (${d.stripeRefundIds.join(", ")})` : ""} · compensated {fmt(d.compensatedAt)} · customer notified{" "}
+                    {fmt(d.customerNotifiedAt)} · admin notified {fmt(d.adminNotifiedAt)} · reviewed {fmt(d.resolvedAt)}
+                    {d.lastError ? ` · last error: ${d.lastError}` : ""}
+                  </p>
+                  {history.length ? (
+                    <ol className="mono-data mt-1 text-[11px] text-white/45">
+                      {history.map((h, i) => (
+                        <li key={i}>{`${h.at ?? ""} ${h.action ?? ""}${h.detail ? ` — ${h.detail}` : ""}`}</li>
+                      ))}
+                    </ol>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}

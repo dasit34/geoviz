@@ -11,10 +11,12 @@ import { getStripe } from "@/lib/stripe";
 
 import { monitoringAccess } from "./access";
 import { buildMonitoringReactivationSessionParams } from "./checkout";
+import { createCheckoutUnderLease } from "./checkout-lease";
+import { prismaCheckoutLeaseStore } from "./checkout-lease-store";
 import { resolvePlan } from "./plans";
 import { prismaMonitoringStore, resolveMonitoringBusiness } from "./prisma-store";
 import { toSubscriptionSnapshot } from "./stripe-gateway";
-import { syncSubscription } from "./subscription-sync";
+import { siteKeyFor, syncSubscription } from "./subscription-sync";
 import type { MonitoringSubscriptionRecord } from "./types";
 
 const ENDED = new Set(["canceled", "incomplete_expired"]);
@@ -55,12 +57,28 @@ export async function setCancelAtPeriodEnd(sub: MonitoringSubscriptionRecord, ca
   await resync(updated);
 }
 
-/** Stripe Checkout URL that reactivates this ended record. */
-export async function createReactivationCheckoutUrl(sub: MonitoringSubscriptionRecord, siteUrl: string): Promise<string | null> {
+export type ReactivationCheckout = { status: "ready"; url: string } | { status: "in_progress" } | { status: "unavailable" };
+
+/**
+ * Stripe Checkout URL that reactivates this ENDED record — only reachable
+ * from the signed-in dashboard. Created under the checkout lease, so
+ * repeated or concurrent clicks share ONE Checkout session (idempotency-keyed).
+ */
+export async function createReactivationCheckoutUrl(sub: MonitoringSubscriptionRecord, siteUrl: string): Promise<ReactivationCheckout> {
   const plan = resolvePlan(sub.planKey);
-  if (!plan) return null;
-  const session = await getStripe().checkout.sessions.create(
-    buildMonitoringReactivationSessionParams({ plan, sub, siteUrl }),
-  );
-  return session.url;
+  if (!plan) return { status: "unavailable" };
+  const result = await createCheckoutUnderLease({
+    email: sub.email,
+    siteKey: sub.siteKey ?? siteKeyFor(sub.websiteUrl),
+    kind: "reactivation",
+    monitoringSubscriptionId: sub.id,
+    buildParams: () => buildMonitoringReactivationSessionParams({ plan, sub, siteUrl }),
+    createSession: async (params, idempotencyKey) => {
+      const s = await getStripe().checkout.sessions.create(params, { idempotencyKey });
+      return { id: s.id, url: s.url };
+    },
+    store: prismaCheckoutLeaseStore,
+    now: () => new Date(),
+  });
+  return result.status === "in_progress" ? { status: "in_progress" } : { status: "ready", url: result.url };
 }

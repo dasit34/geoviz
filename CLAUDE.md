@@ -301,6 +301,30 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
     Stripe. Legacy rows: `scripts/backfill-monitoring-site-keys.ts`
     (idempotent) or lazy claim on sync. Regression:
     `scripts/test-monitoring-reactivation-race-db.ts` (non-prod DB).
+  - **No double billing (defense in depth;** migration
+    `20261006100000_monitoring_duplicate_billing_guard`**):**
+    - *Prevention*: `POST /api/checkout/monitoring` refuses (409) when the
+      email already has a record for the business — live/canceling/payment
+      issue → "sign in to manage", ended → "sign in to reactivate";
+      reactivation exists only on the signed-in dashboard. Every monitoring
+      Checkout session (new + reactivation) is created under
+      `MonitoringCheckoutLease` (PK = sha256(email|siteKey); conditional
+      takeover on (leaseKey, attempt)) with a Stripe idempotency key
+      `geoviz-monitoring-checkout-<kind>-<lease>-<attempt>`; concurrent or
+      repeated requests get the SAME session URL. Sessions expire after
+      31 min, the lease 1 min later; `checkout.session.completed` closes it.
+    - *Compensation* (`duplicate-compensation.ts`): any paid subscription
+      that still loses to the canonical one is, exactly once, canceled
+      immediately in Stripe and fully refunded (only its OWN paid invoices'
+      PaymentIntents; amount = paid − already refunded per Stripe; per-invoice
+      idempotency key), then the customer and admin
+      (`AUDIT_NOTIFICATION_EMAIL`) get one plain-text notice each. A DB claim
+      serializes concurrent deliveries; failures return 500 so Stripe
+      retries; re-runs can't double-cancel/refund. The canonical
+      (current or prior) subscription is never touched — compensation aborts.
+      Paid invoices without a PaymentIntent are never guessed:
+      `needs_manual_refund`. Ledger fields + JSONB `history` show at
+      `/admin/monitoring-customers` (Retry compensation, Mark reviewed).
   - **Admin**: `/admin/monitoring-customers` — "Send sign-in link"
     (emails the account owner; the operator never sees the link) and
     "Sign out everywhere".
@@ -1023,8 +1047,8 @@ non-production. Enforced in code:
   supervised improvements v1 (migration `20261003100000`) were later
   merged to `main` (`44f8924`, `7f3807c`).
   **Open, not merged:** `feat/monitoring-customer-login` (monitoring-only
-  passwordless login, migrations `20261004100000` + `20261005100000`) —
-  applied to staging only.
+  passwordless login, migrations `20261004100000` + `20261005100000` +
+  `20261006100000`) — applied to staging only. PR #50.
   Production healthy after each merge; the build
   guard allows only `VERCEL_ENV=production` builds to migrate production
   (`autoExposeSystemEnvs` is on).

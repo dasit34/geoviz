@@ -65,6 +65,7 @@ const NO_DB_TESTS = [
   "test-monitoring-auth",
   "test-monitoring-reactivation",
   "test-monitoring-session-authz",
+  "test-monitoring-duplicate-billing",
   // visibility tracking v1
   "test-tracking-prompts-competitors",
   "test-tracking-normalize",

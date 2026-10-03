@@ -7,6 +7,8 @@ import { prisma } from "@/lib/db";
 import { monitoringAuthDeps } from "@/lib/monitoring/auth/http";
 import { prismaMonitoringAuthStore } from "@/lib/monitoring/auth/prisma-auth-store";
 import { issueLoginLink } from "@/lib/monitoring/auth/service";
+import { compensateDuplicate } from "@/lib/monitoring/duplicate-compensation";
+import { compensationDeps } from "@/lib/monitoring/duplicate-compensation-prisma";
 
 export const runtime = "nodejs";
 
@@ -16,8 +18,9 @@ export const runtime = "nodejs";
  *  - send_sign_in_link: emails the account owner a single-use 24-hour link
  *    (always to the account's own email — the operator never sees the link).
  *  - revoke_sessions: signs the customer out everywhere.
- *  - resolve_duplicate: marks a duplicate paid subscription reviewed (after
- *    the operator refunded / canceled it in Stripe — GeoViz never does).
+ *  - retry_compensation: re-runs the automatic duplicate compensation
+ *    (idempotent — never cancels/refunds twice, never touches the original).
+ *  - resolve_duplicate: marks a duplicate reviewed by an operator.
  */
 export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
@@ -38,12 +41,24 @@ export async function POST(req: Request) {
     return NextResponse.redirect(url, 303);
   };
 
+  if (field("action") === "retry_compensation") {
+    const dup = await prisma.monitoringDuplicateSubscription.findFirst({ where: { id: field("duplicateId"), monitoringSubscriptionId: sub.id } });
+    if (!dup) return back("Duplicate not found.");
+    try {
+      const r = await compensateDuplicate(dup.stripeSubscriptionId, compensationDeps(resolveAppBaseUrl(req)));
+      return back(`Compensation: ${r.outcome}${"reason" in r ? ` (${r.reason})` : ""}.`);
+    } catch (err) {
+      console.error("[admin-monitoring-customers] compensation retry failed:", err instanceof Error ? err.message : err);
+      return back("Compensation retry failed — see the row's last error.");
+    }
+  }
+
   if (field("action") === "resolve_duplicate") {
     const { count } = await prisma.monitoringDuplicateSubscription.updateMany({
       where: { id: field("duplicateId"), monitoringSubscriptionId: sub.id, resolvedAt: null },
       data: { resolvedAt: new Date() },
     });
-    return back(count === 1 ? "Duplicate marked resolved." : "Nothing to resolve.");
+    return back(count === 1 ? "Duplicate marked reviewed." : "Nothing to mark.");
   }
 
   const customer = sub.customerId

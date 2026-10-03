@@ -54,9 +54,10 @@ export async function POST(req: Request) {
         return back("Monitoring will continue — your cancellation was removed.");
       case "reactivate": {
         if (!actions.canReactivate) return back("This subscription is still active.");
-        const url = await createReactivationCheckoutUrl(sub, resolveAppBaseUrl(req));
-        if (!url) return back("Reactivation is temporarily unavailable. Please contact support@geoviz.ai.");
-        return NextResponse.redirect(url, 303);
+        const checkout = await createReactivationCheckoutUrl(sub, resolveAppBaseUrl(req));
+        if (checkout.status === "unavailable") return back("Reactivation is temporarily unavailable. Please contact support@geoviz.ai.");
+        if (checkout.status === "in_progress") return back("Your reactivation checkout is being prepared — please try again in a moment.");
+        return NextResponse.redirect(checkout.url, 303);
       }
       default:
         return NextResponse.json({ error: "Unknown action." }, { status: 400 });

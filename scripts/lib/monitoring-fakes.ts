@@ -12,6 +12,13 @@ import {
   type StripeSubscriptionGateway,
   type SubscriptionSnapshot,
 } from "../../src/lib/monitoring/types";
+import {
+  compensateDuplicate,
+  type CompensationNotice,
+  type DuplicateBillingGateway,
+  type DuplicateLedgerStore,
+  type HistoryEntry,
+} from "../../src/lib/monitoring/duplicate-compensation";
 import type { WebhookDeps } from "../../src/lib/monitoring/webhook";
 
 export type FakeOrder = {
@@ -22,7 +29,25 @@ export type FakeOrder = {
   queuedAt: Date;
 };
 
-export type FakeDuplicate = { stripeSubscriptionId: string; monitoringSubscriptionId: string; status: string; events: number };
+export type FakeDuplicate = {
+  id: string;
+  stripeSubscriptionId: string;
+  monitoringSubscriptionId: string;
+  stripeCustomerId: string | null;
+  status: string;
+  events: number;
+  resolvedAt: Date | null;
+  claimedAt: Date | null;
+  canceledInStripeAt: Date | null;
+  compensatedAt: Date | null;
+  refundStatus: string;
+  refundedAmount: number;
+  refundIds: string[];
+  customerNotifiedAt: Date | null;
+  adminNotifiedAt: Date | null;
+  lastError: string | null;
+  history: HistoryEntry[];
+};
 
 export type FakeStore = MonitoringStore & {
   subs: Map<string, MonitoringSubscriptionRecord>;
@@ -62,12 +87,17 @@ export function createFakeStore(): FakeStore {
       subs.set(id, { ...s, siteKey });
       return true;
     },
-    async recordDuplicateSubscription({ stripeSubscriptionId, monitoringSubscriptionId, status }) {
+    async recordDuplicateSubscription({ stripeSubscriptionId, monitoringSubscriptionId, stripeCustomerId, status }) {
       const d = duplicates.get(stripeSubscriptionId);
       if (d) {
         d.status = status;
         d.events += 1;
-      } else duplicates.set(stripeSubscriptionId, { stripeSubscriptionId, monitoringSubscriptionId, status, events: 1 });
+      } else
+        duplicates.set(stripeSubscriptionId, {
+          id: `dup_${duplicates.size + 1}`, stripeSubscriptionId, monitoringSubscriptionId, stripeCustomerId, status, events: 1,
+          resolvedAt: null, claimedAt: null, canceledInStripeAt: null, compensatedAt: null, refundStatus: "pending",
+          refundedAmount: 0, refundIds: [], customerNotifiedAt: null, adminNotifiedAt: null, lastError: null, history: [],
+        });
     },
     async findDuplicateSubscription(stripeSubscriptionId) {
       const d = duplicates.get(stripeSubscriptionId);
@@ -163,6 +193,111 @@ export function createFakeStore(): FakeStore {
   };
 }
 
+/** In-memory DuplicateLedgerStore over a FakeStore (same atomic claims as the Prisma store). */
+export function createFakeLedger(store: FakeStore, staleMs = 120_000): DuplicateLedgerStore {
+  const byId = (id: string) => [...store.duplicates.values()].find((d) => d.id === id)!;
+  return {
+    async claim(sid, now) {
+      const d = store.duplicates.get(sid);
+      if (!d || d.compensatedAt || d.resolvedAt) return null;
+      if (d.claimedAt && now.getTime() - d.claimedAt.getTime() < staleMs) return null;
+      d.claimedAt = now;
+      return { id: d.id, stripeSubscriptionId: sid, monitoringSubscriptionId: d.monitoringSubscriptionId, stripeCustomerId: d.stripeCustomerId, compensatedAt: d.compensatedAt, canceledInStripeAt: d.canceledInStripeAt, refundStatus: d.refundStatus };
+    },
+    async release(id, error) {
+      const d = byId(id);
+      d.claimedAt = null;
+      d.lastError = error;
+    },
+    async canonical(recordId) {
+      const r = store.subs.get(recordId);
+      return r ? { ...r } : null;
+    },
+    async markCanceled(id, now) {
+      const d = byId(id);
+      d.canceledInStripeAt ??= now;
+    },
+    async recordRefunds(id, r) {
+      const d = byId(id);
+      d.refundStatus = r.status;
+      d.refundedAmount = r.amount;
+      d.refundIds.push(...r.refundIds);
+    },
+    async claimNotification(id, kind, now) {
+      const d = byId(id);
+      const k = kind === "customer" ? "customerNotifiedAt" : "adminNotifiedAt";
+      if (d[k]) return false;
+      d[k] = now;
+      return true;
+    },
+    async unclaimNotification(id, kind) {
+      byId(id)[kind === "customer" ? "customerNotifiedAt" : "adminNotifiedAt"] = null;
+    },
+    async markCompensated(id, now) {
+      const d = byId(id);
+      d.compensatedAt = now;
+      d.claimedAt = null;
+    },
+    async appendHistory(id, entry) {
+      byId(id).history.push(entry);
+    },
+  };
+}
+
+/**
+ * Fake Stripe billing for compensation: every subscription has one paid
+ * invoice (9900 usd) unless overridden. Idempotency keys behave like
+ * Stripe's: a repeated key returns the first result without a new effect.
+ */
+export function createFakeBilling() {
+  const status = new Map<string, string>();
+  const invoices = new Map<string, Array<{ invoiceId: string; paymentIntentId: string | null; amountPaid: number; currency: string }>>();
+  const refunds: Array<{ id: string; paymentIntentId: string; amount: number; key: string }> = [];
+  const cancels: string[] = [];
+  const keyed = new Map<string, unknown>();
+  let failNextRefund = false;
+  const gateway: DuplicateBillingGateway = {
+    async subscriptionStatus(id) {
+      return status.get(id) ?? "active";
+    },
+    async cancelSubscription(id, key) {
+      if (keyed.has(key)) return;
+      keyed.set(key, true);
+      if ((status.get(id) ?? "active") === "canceled") throw new Error("already canceled");
+      status.set(id, "canceled");
+      cancels.push(id);
+    },
+    async collectedPayments(id) {
+      return invoices.get(id) ?? [{ invoiceId: `in_${id}`, paymentIntentId: `pi_${id}`, amountPaid: 9900, currency: "usd" }];
+    },
+    async refundedAmount(pi) {
+      return refunds.filter((r) => r.paymentIntentId === pi).reduce((a, r) => a + r.amount, 0);
+    },
+    async refund({ paymentIntentId, amount, idempotencyKey }) {
+      if (failNextRefund) {
+        failNextRefund = false;
+        throw new Error("stripe: temporary failure");
+      }
+      const prior = keyed.get(idempotencyKey) as { id: string; amount: number } | undefined;
+      if (prior) return prior;
+      const r = { id: `re_${refunds.length + 1}`, paymentIntentId, amount, key: idempotencyKey };
+      refunds.push(r);
+      keyed.set(idempotencyKey, { id: r.id, amount });
+      return { id: r.id, amount };
+    },
+  };
+  return {
+    gateway,
+    status,
+    invoices,
+    refunds,
+    cancels,
+    failRefundOnce() {
+      failNextRefund = true;
+    },
+  };
+}
+
 /** Fake Stripe: `set()` changes what Stripe currently says about a subscription. */
 export function createFakeStripe() {
   const current = new Map<string, SubscriptionSnapshot>();
@@ -213,6 +348,10 @@ export function monitoringSnapshot(overrides: Partial<SubscriptionSnapshot> = {}
 export function webhookDeps(store: FakeStore, stripe: StripeSubscriptionGateway, clock: { now: Date }) {
   const sentWelcome: string[] = [];
   const linkedCustomers: string[] = [];
+  const completedLeases: string[] = [];
+  const notices: CompensationNotice[] = [];
+  const billing = createFakeBilling();
+  const ledger = createFakeLedger(store);
   const deps: WebhookDeps = {
     store,
     stripe,
@@ -228,8 +367,21 @@ export function webhookDeps(store: FakeStore, stripe: StripeSubscriptionGateway,
     sendWelcomeEmail: async (sub) => {
       sentWelcome.push(sub.id);
     },
+    completeCheckoutLease: async (sessionId) => {
+      completedLeases.push(sessionId);
+    },
+    compensateDuplicate: (sid) =>
+      compensateDuplicate(sid, {
+        ledger,
+        billing: billing.gateway,
+        adminEmail: "admin@example.test",
+        now: () => clock.now,
+        notify: async (n) => {
+          notices.push(n);
+        },
+      }),
   };
-  return { deps, sentWelcome, linkedCustomers };
+  return { deps, sentWelcome, linkedCustomers, completedLeases, notices, billing, ledger };
 }
 
 export function subscriptionEvent(id: string, type: string, subscriptionId = "sub_123") {
@@ -266,4 +418,40 @@ export function harness(name: string) {
       }
     },
   };
+}
+
+/** In-memory CheckoutLeaseStore (same atomic semantics: unique insert, conditional takeover). */
+export function createFakeLeaseStore() {
+  const rows = new Map<string, import("../../src/lib/monitoring/checkout-lease").CheckoutLeaseRow>();
+  const store: import("../../src/lib/monitoring/checkout-lease").CheckoutLeaseStore = {
+    async get(k) {
+      const r = rows.get(k);
+      return r ? { ...r } : null;
+    },
+    async insert(row) {
+      if (rows.has(row.leaseKey)) return false;
+      rows.set(row.leaseKey, { ...row });
+      return true;
+    },
+    async takeover(k, expected, now, next) {
+      const r = rows.get(k);
+      if (!r || r.attempt !== expected) return null;
+      if (r.status === "open" && r.expiresAt.getTime() > now.getTime()) return null;
+      const n = { ...r, ...next };
+      rows.set(k, n);
+      return { ...n };
+    },
+    async attachSession(k, attempt, sessionId, url) {
+      const r = rows.get(k);
+      if (r && r.attempt === attempt && r.status === "open") rows.set(k, { ...r, stripeCheckoutSessionId: sessionId, checkoutUrl: url });
+    },
+    async completeBySession(sessionId) {
+      for (const [k, r] of rows) if (r.stripeCheckoutSessionId === sessionId) rows.set(k, { ...r, status: "completed" });
+    },
+    async release(k, attempt) {
+      const r = rows.get(k);
+      if (r && r.attempt === attempt && r.status === "open") rows.set(k, { ...r, status: "released" });
+    },
+  };
+  return { store, rows };
 }

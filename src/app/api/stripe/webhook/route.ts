@@ -15,6 +15,9 @@ import { stripeSubscriptionGateway } from "@/lib/monitoring/stripe-gateway";
 import { monitoringAuthDeps } from "@/lib/monitoring/auth/http";
 import { prismaMonitoringAuthStore } from "@/lib/monitoring/auth/prisma-auth-store";
 import { sendWelcomeLink } from "@/lib/monitoring/auth/service";
+import { prismaCheckoutLeaseStore } from "@/lib/monitoring/checkout-lease-store";
+import { compensateDuplicate } from "@/lib/monitoring/duplicate-compensation";
+import { compensationDeps } from "@/lib/monitoring/duplicate-compensation-prisma";
 
 /**
  * Webhook-specific FROM fallback. We deliberately do NOT inherit
@@ -96,6 +99,11 @@ export async function POST(req: Request) {
         },
         sendWelcomeEmail: async (sub) => {
           await sendWelcomeLink(sub, monitoringAuthDeps(req));
+        },
+        completeCheckoutLease: (sessionId) => prismaCheckoutLeaseStore.completeBySession(sessionId),
+        compensateDuplicate: async (stripeSubscriptionId) => {
+          const r = await compensateDuplicate(stripeSubscriptionId, compensationDeps(resolveAppBaseUrl(req)));
+          console.log(`[monitoring-duplicate] ${stripeSubscriptionId} compensation=${r.outcome}`);
         },
       });
       console.log(`[stripe-webhook] monitoring event=${event.id} type=${event.type} outcome=${result.outcome}`);
