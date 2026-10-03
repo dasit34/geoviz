@@ -106,7 +106,9 @@
     "diagnose:providers": "tsx scripts/diagnose-provider-env.ts",
     "geo-worker": "tsx scripts/geo-worker.ts",
     "geo-worker:dev": "tsx scripts/geo-worker.ts --loop",
-    "geo-worker:start": "tsx scripts/geo-worker.ts --loop"
+    "geo-worker:start": "tsx scripts/geo-worker.ts --loop",
+    "lint:home": "eslint --max-warnings=0 src/app/page.tsx src/lib/home src/components/Home*.tsx src/components/HeroReadout.tsx src/components/LoopProgress.tsx src/components/DashboardPreview.tsx src/components/MotionRoot.tsx src/components/ExampleDataBadge.tsx src/components/ModelResultCard.tsx src/components/Header.tsx src/components/MobileNav.tsx src/components/Footer.tsx",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
@@ -127,13 +129,15 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^20.17.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
-    "eslint-config-next": "14.2.35",
+    "eslint-config-next": "^14.2.35",
     "postcss": "^8.4.49",
     "prisma": "^5.22.0",
     "schema-dts": "^2.0.0",

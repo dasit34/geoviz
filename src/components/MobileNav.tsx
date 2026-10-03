@@ -6,17 +6,23 @@ import { useEffect, useState } from "react";
 const MOBILE_NAV_ITEMS: { label: string; href: string; badge?: string }[] = [
   { label: "Free AI Visibility Check", href: "/check", badge: "Free" },
   { label: "How it works", href: "/#how-it-works" },
+  { label: "Monitoring", href: "/#monitor" },
   { label: "Sample report", href: "/sample-report" },
   { label: "Pricing", href: "/#pricing" },
   { label: "FAQ", href: "/#faq" },
 ];
+
+const SIGN_IN_ITEM = { label: "Monitoring sign in", href: "/monitoring/sign-in" };
 
 /**
  * Mobile-only header nav: hamburger + free-check CTA + slide-down panel.
  * Split out from Header.tsx (a server component) since this needs client
  * state — mirrors the RevealOnView client-island pattern used elsewhere.
  */
-export function MobileNav() {
+export function MobileNav({ monitoringOpen = false }: { monitoringOpen?: boolean }) {
+  const items: { label: string; href: string; badge?: string }[] = monitoringOpen
+    ? [...MOBILE_NAV_ITEMS, SIGN_IN_ITEM]
+    : MOBILE_NAV_ITEMS;
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -83,7 +89,7 @@ export function MobileNav() {
             className="fixed inset-x-0 top-20 z-30 max-h-[calc(100vh-5rem)] overflow-y-auto border-b border-white/10 bg-ink-950 shadow-card"
           >
             <nav className="container-page flex flex-col gap-1 py-4">
-              {MOBILE_NAV_ITEMS.map((item) => (
+              {items.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

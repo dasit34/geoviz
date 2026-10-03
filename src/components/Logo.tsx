@@ -23,7 +23,7 @@ export function Logo({ className = "" }: { className?: string }) {
         <span className="font-display text-[20px] font-semibold leading-none tracking-[-0.01em] sm:text-[30px]">
           GeoViz<span className="text-[color:var(--gv-signal)]">.ai</span>
         </span>
-        <span className="mono-data mt-1.5 hidden text-[10px] font-semibold uppercase tracking-[0.3em] text-white/45 sm:block">
+        <span className="mono-data mt-1.5 hidden text-[10px] font-semibold uppercase tracking-[0.3em] text-white/55 sm:block">
           AI Visibility Intelligence
         </span>
       </span>
