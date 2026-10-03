@@ -107,7 +107,7 @@
     "geo-worker": "tsx scripts/geo-worker.ts",
     "geo-worker:dev": "tsx scripts/geo-worker.ts --loop",
     "geo-worker:start": "tsx scripts/geo-worker.ts --loop",
-    "lint:home": "eslint --max-warnings=0 src/app/page.tsx src/lib/home src/components/Home*.tsx src/components/HeroReadout.tsx src/components/LoopProgress.tsx src/components/DashboardPreview.tsx src/components/MotionRoot.tsx src/components/ExampleDataBadge.tsx src/components/ModelResultCard.tsx src/components/Header.tsx src/components/MobileNav.tsx src/components/Footer.tsx",
+    "lint:home": "eslint --max-warnings=0 src/app/page.tsx src/lib/home src/components/Home*.tsx src/components/HeroReadout.tsx src/components/HeroSignalField.tsx src/components/LoopProgress.tsx src/components/LoopGlyph.tsx src/components/CompareCharts.tsx src/components/ProveSnapshot.tsx src/components/DashboardPreview.tsx src/components/MotionRoot.tsx src/components/ExampleDataBadge.tsx src/components/ModelResultCard.tsx src/components/Header.tsx src/components/MobileNav.tsx src/components/Footer.tsx",
     "test:e2e": "playwright test"
   },
   "dependencies": {
