@@ -1029,7 +1029,7 @@ non-production. Enforced in code:
   `scripts/monitoring-improvements-staging.ts`, and
   `seed:monitoring-staging` ARE strictly guarded (staging only).
 
-## Infrastructure State (as of 2026-10-02)
+## Infrastructure State (as of 2026-10-03)
 
 - **Environments.** Production: Vercel `geoviz` (Production scope) +
   Railway project `refreshing-love` (`geoviz` worker + Postgres,
@@ -1046,25 +1046,34 @@ non-production. Enforced in code:
   #48 website change tracking v1 (migration `20261002200000`) and #49
   supervised improvements v1 (migration `20261003100000`) were later
   merged to `main` (`44f8924`, `7f3807c`).
-  **Open, not merged:** `feat/monitoring-customer-login` (monitoring-only
-  passwordless login, migrations `20261004100000` + `20261005100000` +
-  `20261006100000`) — applied to staging only. PR #50.
+  #50 monitoring-only passwordless login (migrations `20261004100000` +
+  `20261005100000` + `20261006100000`, merge `fcfa7c6`) and #51 homepage
+  relaunch (no migrations, merge `f7f55e1`) are merged and live.
   Production healthy after each merge; the build
   guard allows only `VERCEL_ENV=production` builds to migrate production
   (`autoExposeSystemEnvs` is on).
-- **Production schema:** 37 migrations. Monitoring tables
-  (`MonitoringSubscription`, `StripeWebhookEvent`) and tracking tables
-  (`TrackedPrompt`, `TrackedCompetitor`, `MonitoringCycle`,
-  `PromptRunResult`) exist and are **empty**. **Monitoring is OFF in
-  Production**: `GEO_MODULE_MONITORING_ENABLED` and
-  `STRIPE_MONITORING_MONTHLY_PRICE_ID` unset (Vercel Production + Railway),
-  no scheduler cron, `/monitoring*` routes 404.
+- **Production schema:** 42 migrations. Monitoring tables exist and hold
+  no subscriptions yet.
+- **Monitoring is ON in Production (soft launch, 2026-10-03):**
+  `GEO_MODULE_MONITORING_ENABLED=true` in Vercel Production and on the
+  Railway cron services `monitoring-scheduler` (`0 * * * *`) and
+  `monitoring-website-scans` (`*/30 * * * *`), both `restartPolicyType
+  NEVER`, building from `main` and referencing the `geoviz` service's
+  variables (the `geoviz` worker's own copy of the flag is unused).
+  Live Stripe: price `price_1UMHLGLXmpVFvuMtqxHxstSK` ($99/month), portal
+  config `bpc_1UMHLQLXmpVFvuMtjCAEGr0q` (cancel at period end, default),
+  webhook `we_1U0mCQLXmpVFvuMtMzdR0aFl` with `customer.subscription.*`.
+  Verified: homepage tests on Production, enabled cron runs, sandbox
+  end-to-end, no-charge Live checks (see docs/LAUNCH_CHECKLIST.md).
+  **NOT verified: a completed Live payment and its downstream flow** — the
+  operator deferred the controlled Live $99 purchase. Never fabricate a
+  payment or mark a subscription paid to close this.
 - **Backups:** Railway has no volume snapshot and no backup schedule (the
   CLI token can't create snapshots). Approved method = read-only
   `pg_dump --format=custom` via `railway run`, verified with
   `pg_restore --list` + row counts + SHA-256, stored mode 600 under
   `~/private-backups/geoviz-db/` (outside git/cloud sync). Latest:
-  `geoviz-prod-pre-pr46-20261002T135634Z.dump` (sha256 `45811f00…`).
+  `geoviz-prod-pre-pr50-20261003T004634Z.dump` (sha256 `e7628ba2…`).
   Take a fresh one before every production migration; never delete one
   without the operator's approval.
 - **Stale previews** built against production were deleted (54); only

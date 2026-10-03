@@ -35,15 +35,20 @@ After merging #42–#44 every read-only post-deploy check passed (Production Rea
 - [ ] **Authenticated Stripe test webhook returns 200.** Stripe Dashboard → Developers → Webhooks → production endpoint → "Send test webhook" (or a real order) and confirm the delivery shows HTTP 200. The only local Stripe key is test-mode and the live key is a Vercel sensitive var, so this was not verifiable from the CLI.
 - [ ] **One real production audit completes end-to-end.** Queue one audit through the product (a real order, or `/admin/calibration` with the production `ADMIN_SECRET` — the local `.env` value does not match production) and confirm `queued → running → generated`, then review + delivery. Do not insert orders directly into the production database.
 
-## Subscription monitoring (before enabling `GEO_MODULE_MONITORING_ENABLED` in Production)
+## Subscription monitoring — soft-launched 2026-10-03
 
-- [ ] Create a **recurring** monthly Stripe price for monitoring (amount per the documented $29–79/mo Stage 2 range — decided in Stripe, not code) and set `STRIPE_MONITORING_MONTHLY_PRICE_ID`.
-- [ ] Add `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` to the production webhook endpoint's events (alongside `checkout.session.completed`).
-- [ ] Configure the **Stripe Customer Portal** (cancellation + payment-method update allowed) — `/api/monitoring/portal` depends on it.
-- [ ] Approve and apply migration `20260930170000_add_subscription_monitoring` to Production (runs automatically in the Vercel production build when the PR merges).
-- [ ] Create a Railway **cron service** running `npm run monitoring:scheduler` every 15 minutes with the worker's env (same pattern as `market-study:daily-cron`).
-- [ ] End-to-end on Preview/staging with Stripe test mode: subscribe → status page → first audit queued → approve → score shown → portal cancel → no further audits.
-- [ ] Only then set `GEO_MODULE_MONITORING_ENABLED="true"` in Vercel Production AND on the scheduler cron service.
+Status: `GEO_MODULE_MONITORING_ENABLED=true` in Vercel Production and on both Railway crons
+(`monitoring-scheduler` hourly, `monitoring-website-scans` every 30 min). The $97 audit and $59 re-audit are unchanged.
+
+- [x] Live recurring price `price_1UMHLGLXmpVFvuMtqxHxstSK` ($99/month, no trial) set as `STRIPE_MONITORING_MONTHLY_PRICE_ID`.
+- [x] Production webhook `we_1U0mCQLXmpVFvuMtMzdR0aFl` sends `checkout.session.completed`, `charge.refunded`, `customer.subscription.created/updated/deleted`.
+- [x] Customer Portal `bpc_1UMHLQLXmpVFvuMtjCAEGr0q` (default): cancel **at period end**, payment-method update, invoice history.
+- [x] Monitoring migrations applied in Production (PR #45–#50); homepage relaunch merged (PR #51, `f7f55e1`).
+- [x] Railway cron services created with `restartPolicyType: NEVER`; ran with the flag off (`{"outcome":"disabled"}`), then with it on (scheduler `{"outcome":"ran","examined":0}`, website scans `outcomes:[]`, no errors).
+- [x] Stripe **test-mode** end-to-end on Preview/staging: checkout → webhook → record → sign-in → dashboard → portal → cancellation, plus reactivation and duplicate-billing compensation.
+- [x] Production homepage tests pass against www.geoviz.ai with monitoring open (20/20, desktop + mobile, axe clean).
+- [x] No-charge Production checks: the unpaid Live checkout page shows GEOVIZ (not Sandbox) and $99.00/month; concurrent duplicate requests share one session (checkout lease); unsigned webhook → 400; signed-in pages redirect to sign-in without a session; admin pages 404 without the key; sign-in requests are generic for unknown emails and 403 cross-origin; Resend `mail.geoviz.ai` verified, click/open tracking off.
+- [ ] **UNVERIFIED — a completed Live payment and its downstream flow.** The controlled Live $99 purchase was deferred by the operator (no charge authorized). Still to confirm on the first real or controlled Live subscription: webhook processed exactly once, `MonitoringSubscription` + `MonitoringCustomer` created, welcome sign-in email delivered, sign-in and dashboard, tracked questions/competitors saved, billing portal, scheduler queues a `MONITORING_RECHECK` audit (amount 0) that reaches the review queue, website scan completes. Never satisfy this by inserting rows or marking anything paid.
 
 ## Audit Engine
 
