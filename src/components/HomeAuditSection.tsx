@@ -13,9 +13,9 @@ const CATEGORIES = [
 ];
 
 const PROVIDERS = [
-  { key: "claude", label: "Anthropic Claude" },
-  { key: "openai", label: "OpenAI GPT" },
-  { key: "gemini", label: "Google Gemini" },
+  { key: "openai", label: "ChatGPT" },
+  { key: "claude", label: "Claude" },
+  { key: "gemini", label: "Gemini" },
   { key: "perplexity", label: "Perplexity" },
 ];
 
@@ -38,7 +38,7 @@ export function HomeAuditSection() {
       title="One reviewed audit. Four AI systems. A brief you can act on."
       lede={
         <p>
-          We score six areas of AI readability, then ask Claude, OpenAI, Gemini, and Perplexity — through their APIs —
+          We score six areas of AI readability, then ask ChatGPT, Claude, Gemini, and Perplexity — through their APIs —
           how they read your business. A person reviews every report before it’s sent.
         </p>
       }

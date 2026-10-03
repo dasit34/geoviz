@@ -5,8 +5,8 @@ import { ProviderMark } from "@/components/report/BrandMarks";
 import { EXAMPLE_BUSINESS, EXAMPLE_TRACKED_QUESTIONS, type ExampleModelResult } from "@/lib/home/example-data";
 
 const PROVIDERS: { key: ExampleModelResult["provider"]; label: string }[] = [
+  { key: "openai", label: "ChatGPT" },
   { key: "claude", label: "Claude" },
-  { key: "openai", label: "OpenAI" },
   { key: "gemini", label: "Gemini" },
   { key: "perplexity", label: "Perplexity" },
 ];
@@ -46,7 +46,7 @@ export function HomeMonitorSection({ open }: { open: boolean }) {
     <HomeSection
       id="monitor"
       index="02"
-      eyebrow={open ? "Monitor" : "Monitor · launching soon"}
+      eyebrow={open ? "Monitor" : "Monitor · opening soon"}
       title="Find out whether AI recommends you this month — not just once."
       lede={
         <>

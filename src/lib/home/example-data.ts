@@ -40,9 +40,9 @@ export type ExampleModelResult = {
 
 /** How each AI system (queried via its API) read the example business. */
 export const EXAMPLE_MODEL_RESULTS: ExampleModelResult[] = [
-  { provider: "claude", label: "Anthropic Claude", verdict: "Clear", note: "Identifies the business and its roofing services; service area stated." },
-  { provider: "openai", label: "OpenAI GPT", verdict: "Partial", note: "Understands the services; can't confirm the service area from the site." },
-  { provider: "gemini", label: "Google Gemini", verdict: "Partial", note: "Finds the business; reviews and credentials are hard to verify." },
+  { provider: "openai", label: "ChatGPT", verdict: "Partial", note: "Understands the services; can't confirm the service area from the site." },
+  { provider: "claude", label: "Claude", verdict: "Clear", note: "Identifies the business and its roofing services; service area stated." },
+  { provider: "gemini", label: "Gemini", verdict: "Partial", note: "Finds the business; reviews and credentials are hard to verify." },
   { provider: "perplexity", label: "Perplexity", verdict: "Unclear", note: "Cites a directory listing instead of the business's own site." },
 ];
 

@@ -37,7 +37,8 @@ test.describe("homepage — content and behavior", () => {
     expect(text).not.toMatch(/ChatGPT (says|will say)/i);
     expect(text).not.toMatch(/supercharge|unlock|10x|dominate/i);
     // Google AI Overviews must never appear among the API-queried systems.
-    const apiList = page.locator("#how-it-works li").filter({ hasText: /Claude|OpenAI|Gemini|Perplexity/ });
+    const apiList = page.locator("#how-it-works li").filter({ hasText: /^(ChatGPT|Claude|Gemini|Perplexity)$/ });
+    await expect(apiList).toHaveText(["ChatGPT", "Claude", "Gemini", "Perplexity"]);
     for (const item of await apiList.all()) expect(await item.innerText()).not.toMatch(/Overview/i);
     await expect(page.locator("#how-it-works")).toContainText("derived from your website’s signals");
   });
@@ -63,10 +64,12 @@ test.describe("homepage — content and behavior", () => {
     if (MONITORING_OPEN) {
       await expect(pricing.getByRole("link", { name: "Start monitoring" })).toHaveAttribute("href", "/monitoring");
       await expect(page.locator('a[href="/monitoring/sign-in"]').first()).toBeAttached();
-      await expect(pricing).not.toContainText("Launching soon");
+      await expect(pricing).not.toContainText("Opening soon");
     } else {
-      await expect(pricing).toContainText("Launching soon");
-      await expect(pricing).toContainText("Not available to purchase yet");
+      await expect(pricing).toContainText("Opening soon");
+      await expect(pricing).toContainText("$99");
+      await expect(pricing.getByRole("button", { name: "Start monitoring" })).toBeDisabled();
+      await expect(pricing).toContainText("Purchasing opens at launch.");
       await expect(page.locator('main a[href="/monitoring"]')).toHaveCount(0);
       await expect(page.locator('a[href="/monitoring/sign-in"]')).toHaveCount(0);
     }

@@ -53,7 +53,7 @@ export function HomePricing({ monitoring }: { monitoring: MonitoringOffer }) {
             </p>
             <ul className="mt-5 space-y-2.5">
               <Bullet>Score across six areas of AI readability</Bullet>
-              <Bullet>How Claude, OpenAI, Gemini, and Perplexity read your business (via their APIs)</Bullet>
+              <Bullet>How ChatGPT, Claude, Gemini, and Perplexity read your business (via their APIs)</Bullet>
               <Bullet>Issues in plain English, and what to fix first</Bullet>
               <Bullet>Reviewed by a person · PDF brief by email</Bullet>
             </ul>
@@ -87,7 +87,7 @@ export function HomePricing({ monitoring }: { monitoring: MonitoringOffer }) {
             </p>
             {!open ? (
               <p className="mt-2 inline-flex w-fit rounded border border-graphite-400/40 px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-graphite-700">
-                Launching soon
+                Opening soon
               </p>
             ) : null}
             <ul className="mt-5 space-y-2.5">
@@ -105,9 +105,20 @@ export function HomePricing({ monitoring }: { monitoring: MonitoringOffer }) {
                   Start monitoring
                 </Link>
               ) : (
-                <p className="rounded-md border border-dashed border-graphite-400/50 px-4 py-3 text-center text-[14px] text-graphite-500">
-                  Not available to purchase yet
-                </p>
+                <>
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    aria-describedby="monitoring-opening-note"
+                    className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-md border border-graphite-400/40 bg-graphite-400/10 px-4 py-3 text-[15px] font-medium text-graphite-700"
+                  >
+                    Start monitoring
+                  </button>
+                  <p id="monitoring-opening-note" className="mt-2 text-center text-[12.5px] text-graphite-700">
+                    Purchasing opens at launch.
+                  </p>
+                </>
               )}
             </div>
           </article>

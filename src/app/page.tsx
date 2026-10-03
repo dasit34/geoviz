@@ -22,7 +22,7 @@ import { getMonitoringOffer } from "@/lib/home/offers";
  * Every section maps to functionality that exists today. Product
  * demonstrations use src/lib/home/example-data.ts and are always badged
  * "Example data". Monitoring is sold only when GEO_MODULE_MONITORING_ENABLED
- * is "true"; otherwise it is shown as launching soon with no purchase path.
+ * is "true"; otherwise it is shown as "Opening soon" with purchasing disabled.
  *
  * Binding copy contracts (scripts/test-report-copy-defensibility.ts reads
  * this file): the Foundation Fix copy below must keep "underlying technical,
@@ -60,7 +60,7 @@ function faqs(monitoringOpen: boolean): FaqItem[] {
     },
     {
       q: "Which AI systems do you check?",
-      a: "The audit asks Anthropic Claude, OpenAI GPT, Google Gemini, and Perplexity through their APIs. API answers can differ from what the consumer apps show. Google AI Overviews has no public way to test, so the report includes a readiness estimate derived from your website’s signals instead — it is not a test of Google’s results.",
+      a: "The audit asks ChatGPT (OpenAI), Claude (Anthropic), Gemini (Google), and Perplexity — through each provider’s API, not the consumer apps. API answers can differ from what the consumer apps show. Google AI Overviews has no public way to test, so the report includes a readiness estimate derived from your website’s signals instead — it is not a test of Google’s results.",
     },
     {
       q: "What’s the difference between the free check and the audit?",
@@ -70,7 +70,7 @@ function faqs(monitoringOpen: boolean): FaqItem[] {
       q: "What does monitoring add?",
       a: monitoringOpen
         ? "A reviewed re-audit every month, up to 10 customer questions asked to four AI systems twice each, up to 3 competitors tracked in the same questions, website change tracking, and improvement tasks with independent verification. Your first monitoring audit is queued when your subscription starts. Cancel any time; access continues to the end of your paid month."
-        : "Monitoring is launching soon. It will add a reviewed re-audit every month, tracked customer questions across four AI systems, competitor presence in the same questions, website change tracking, and verified improvement tasks.",
+        : "Monitoring is opening soon. It will add a reviewed re-audit every month, tracked customer questions across four AI systems, competitor presence in the same questions, website change tracking, and verified improvement tasks.",
     },
     {
       q: "Is this just an SEO score?",
