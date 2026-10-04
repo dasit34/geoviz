@@ -21,12 +21,15 @@ const STATUS_LABEL: Record<CheckStatus, string> = {
   strong: "Strong",
   needs_improvement: "Needs Improvement",
   missing: "Missing",
+  not_applicable: "Not applicable",
 };
 
 const STATUS_DOT: Record<CheckStatus, string> = {
   strong: "severity-dot--info",
   needs_improvement: "severity-dot--warning",
   missing: "severity-dot--critical",
+  // Neutral: the check doesn't apply to this business type.
+  not_applicable: "bg-white/30",
 };
 
 export function FreeCheckResults({

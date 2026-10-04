@@ -1,0 +1,282 @@
+{
+ "_comment": "free-check scoring v1.0 outputs captured before v1.1 (2026-10-03). Local businesses must still match exactly.",
+ "ROOFER_NO_ADDRESS_OR_HOURS": {
+  "ok": true,
+  "overallScore": 70,
+  "checks": [
+   {
+    "id": "business_identity",
+    "label": "Business identity clarity",
+    "status": "strong",
+    "explanation": "Your business name appears clearly in your homepage content, so AI systems can confidently identify who you are."
+   },
+   {
+    "id": "location_clarity",
+    "label": "Location clarity",
+    "status": "needs_improvement",
+    "explanation": "Your service area is only partially stated \u2014 add your city, state, and address more clearly."
+   },
+   {
+    "id": "service_clarity",
+    "label": "Service clarity",
+    "status": "strong",
+    "explanation": "Your homepage describes your services in enough plain-language detail for AI systems to understand what you offer."
+   },
+   {
+    "id": "contact_consistency",
+    "label": "Contact information consistency",
+    "status": "needs_improvement",
+    "explanation": "Some contact details differ between your homepage, footer, and structured data \u2014 small mismatches reduce AI trust."
+   },
+   {
+    "id": "structured_data",
+    "label": "Structured data / LocalBusiness schema",
+    "status": "needs_improvement",
+    "explanation": "Your site has some structured data, but it's missing key fields AI systems use to verify your business."
+   },
+   {
+    "id": "ai_recommendation_readiness",
+    "label": "AI recommendation readiness",
+    "status": "needs_improvement",
+    "explanation": "AI systems can partially understand your business, but gaps in crawlability, structure, or content reduce confidence in recommending you."
+   }
+  ],
+  "strengths": [
+   "Business identity clarity",
+   "Service clarity"
+  ],
+  "problems": [
+   "Location clarity",
+   "Contact information consistency",
+   "Structured data / LocalBusiness schema"
+  ],
+  "fixes": [
+   "Strengthen your location signals.",
+   "Improve business identity consistency.",
+   "Increase AI-readable website signals."
+  ]
+ },
+ "NO_SIGNALS": {
+  "ok": true,
+  "overallScore": 45,
+  "checks": [
+   {
+    "id": "business_identity",
+    "label": "Business identity clarity",
+    "status": "strong",
+    "explanation": "Your business name appears clearly in your homepage content, so AI systems can confidently identify who you are."
+   },
+   {
+    "id": "location_clarity",
+    "label": "Location clarity",
+    "status": "missing",
+    "explanation": "Your website doesn't clearly state where you're located, so AI systems can't confidently match you to local queries."
+   },
+   {
+    "id": "service_clarity",
+    "label": "Service clarity",
+    "status": "missing",
+    "explanation": "Your homepage doesn't describe your services in enough readable detail for AI systems to understand what you offer."
+   },
+   {
+    "id": "contact_consistency",
+    "label": "Contact information consistency",
+    "status": "needs_improvement",
+    "explanation": "Some contact details differ between your homepage, footer, and structured data \u2014 small mismatches reduce AI trust."
+   },
+   {
+    "id": "structured_data",
+    "label": "Structured data / LocalBusiness schema",
+    "status": "missing",
+    "explanation": "Your site has little or no LocalBusiness structured data, so AI systems have no machine-readable way to confirm your details."
+   },
+   {
+    "id": "ai_recommendation_readiness",
+    "label": "AI recommendation readiness",
+    "status": "needs_improvement",
+    "explanation": "AI systems can partially understand your business, but gaps in crawlability, structure, or content reduce confidence in recommending you."
+   }
+  ],
+  "strengths": [
+   "Business identity clarity"
+  ],
+  "problems": [
+   "Location clarity",
+   "Service clarity",
+   "Structured data / LocalBusiness schema"
+  ],
+  "fixes": [
+   "Strengthen your location signals.",
+   "Improve service and offering clarity.",
+   "Increase AI-readable website signals."
+  ]
+ },
+ "ROOFER_WITH_ONLINE_CUES": {
+  "ok": true,
+  "overallScore": 70,
+  "checks": [
+   {
+    "id": "business_identity",
+    "label": "Business identity clarity",
+    "status": "strong",
+    "explanation": "Your business name appears clearly in your homepage content, so AI systems can confidently identify who you are."
+   },
+   {
+    "id": "location_clarity",
+    "label": "Location clarity",
+    "status": "needs_improvement",
+    "explanation": "Your service area is only partially stated \u2014 add your city, state, and address more clearly."
+   },
+   {
+    "id": "service_clarity",
+    "label": "Service clarity",
+    "status": "strong",
+    "explanation": "Your homepage describes your services in enough plain-language detail for AI systems to understand what you offer."
+   },
+   {
+    "id": "contact_consistency",
+    "label": "Contact information consistency",
+    "status": "needs_improvement",
+    "explanation": "Some contact details differ between your homepage, footer, and structured data \u2014 small mismatches reduce AI trust."
+   },
+   {
+    "id": "structured_data",
+    "label": "Structured data / LocalBusiness schema",
+    "status": "needs_improvement",
+    "explanation": "Your site has some structured data, but it's missing key fields AI systems use to verify your business."
+   },
+   {
+    "id": "ai_recommendation_readiness",
+    "label": "AI recommendation readiness",
+    "status": "needs_improvement",
+    "explanation": "AI systems can partially understand your business, but gaps in crawlability, structure, or content reduce confidence in recommending you."
+   }
+  ],
+  "strengths": [
+   "Business identity clarity",
+   "Service clarity"
+  ],
+  "problems": [
+   "Location clarity",
+   "Contact information consistency",
+   "Structured data / LocalBusiness schema"
+  ],
+  "fixes": [
+   "Strengthen your location signals.",
+   "Improve business identity consistency.",
+   "Increase AI-readable website signals."
+  ]
+ },
+ "ADDR_ONLY": {
+  "ok": true,
+  "overallScore": 51,
+  "checks": [
+   {
+    "id": "business_identity",
+    "label": "Business identity clarity",
+    "status": "strong",
+    "explanation": "Your business name appears clearly in your homepage content, so AI systems can confidently identify who you are."
+   },
+   {
+    "id": "location_clarity",
+    "label": "Location clarity",
+    "status": "needs_improvement",
+    "explanation": "Your service area is only partially stated \u2014 add your city, state, and address more clearly."
+   },
+   {
+    "id": "service_clarity",
+    "label": "Service clarity",
+    "status": "missing",
+    "explanation": "Your homepage doesn't describe your services in enough readable detail for AI systems to understand what you offer."
+   },
+   {
+    "id": "contact_consistency",
+    "label": "Contact information consistency",
+    "status": "needs_improvement",
+    "explanation": "Some contact details differ between your homepage, footer, and structured data \u2014 small mismatches reduce AI trust."
+   },
+   {
+    "id": "structured_data",
+    "label": "Structured data / LocalBusiness schema",
+    "status": "missing",
+    "explanation": "Your site has little or no LocalBusiness structured data, so AI systems have no machine-readable way to confirm your details."
+   },
+   {
+    "id": "ai_recommendation_readiness",
+    "label": "AI recommendation readiness",
+    "status": "needs_improvement",
+    "explanation": "AI systems can partially understand your business, but gaps in crawlability, structure, or content reduce confidence in recommending you."
+   }
+  ],
+  "strengths": [
+   "Business identity clarity"
+  ],
+  "problems": [
+   "Service clarity",
+   "Structured data / LocalBusiness schema",
+   "Location clarity"
+  ],
+  "fixes": [
+   "Improve service and offering clarity.",
+   "Increase AI-readable website signals.",
+   "Strengthen your location signals."
+  ]
+ },
+ "SAAS_AS_LOCAL": {
+  "ok": true,
+  "overallScore": 64,
+  "checks": [
+   {
+    "id": "business_identity",
+    "label": "Business identity clarity",
+    "status": "strong",
+    "explanation": "Your business name appears clearly in your homepage content, so AI systems can confidently identify who you are."
+   },
+   {
+    "id": "location_clarity",
+    "label": "Location clarity",
+    "status": "missing",
+    "explanation": "Your website doesn't clearly state where you're located, so AI systems can't confidently match you to local queries."
+   },
+   {
+    "id": "service_clarity",
+    "label": "Service clarity",
+    "status": "needs_improvement",
+    "explanation": "Your services are only partially described in text \u2014 AI systems may not fully understand what you offer."
+   },
+   {
+    "id": "contact_consistency",
+    "label": "Contact information consistency",
+    "status": "strong",
+    "explanation": "Your business name, phone, and address are consistent across your site, which builds AI trust in your identity."
+   },
+   {
+    "id": "structured_data",
+    "label": "Structured data / LocalBusiness schema",
+    "status": "needs_improvement",
+    "explanation": "Your site has some structured data, but it's missing key fields AI systems use to verify your business."
+   },
+   {
+    "id": "ai_recommendation_readiness",
+    "label": "AI recommendation readiness",
+    "status": "strong",
+    "explanation": "Combined, your crawlability, structured data, and content depth give AI systems enough to work with when considering a recommendation."
+   }
+  ],
+  "strengths": [
+   "Business identity clarity",
+   "Contact information consistency",
+   "AI recommendation readiness"
+  ],
+  "problems": [
+   "Location clarity",
+   "Service clarity",
+   "Structured data / LocalBusiness schema"
+  ],
+  "fixes": [
+   "Strengthen your location signals.",
+   "Improve service and offering clarity.",
+   "Increase AI-readable website signals."
+  ]
+ }
+}

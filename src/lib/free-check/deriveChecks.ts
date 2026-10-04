@@ -20,12 +20,15 @@ import type {
   ReadableContentResult,
   SchemaValidationResult,
 } from "@/lib/intelligence/preflight/types";
-import type {
-  CheckId,
-  CheckResult,
-  CheckStatus,
-  FreeCheckInput,
-  FreeCheckResult,
+import { classifyBusinessType, type BusinessType } from "./classifyBusinessType";
+import type { OnlineSchemaSignals } from "./onlineSchema";
+import {
+  FREE_CHECK_SCORING_VERSION,
+  type CheckId,
+  type CheckResult,
+  type CheckStatus,
+  type FreeCheckInput,
+  type FreeCheckResult,
 } from "./types";
 
 export type DeriveChecksInput = {
@@ -35,6 +38,8 @@ export type DeriveChecksInput = {
   schema: SchemaValidationResult | null;
   crawlability: CrawlabilityResult | null;
   entityConsistency: EntityConsistencyResult | null;
+  /** Online-business schema checklist (scoring v1.2). Absent → treated as no online schema. */
+  onlineSchema?: OnlineSchemaSignals | null;
 };
 
 // Sub-score → status thresholds, shared across all six checks so the
@@ -165,12 +170,24 @@ function scoreContactConsistency(args: DeriveChecksInput): {
   return { score, explanation };
 }
 
-function scoreStructuredData(args: DeriveChecksInput): {
+function scoreStructuredData(
+  args: DeriveChecksInput,
+  online = false,
+): {
   score: number;
   explanation: string;
 } {
   const score = args.schema?.score ?? 0;
   const status = scoreToStatus(score);
+  if (online) {
+    const explanation =
+      status === "strong"
+        ? "Your site includes Organization, WebSite, and product structured data, so AI systems can confirm who you are and what you offer."
+        : status === "needs_improvement"
+          ? "Your site has some Organization, WebSite, or product (e.g. SoftwareApplication) structured data, but key pieces are missing."
+          : "Your site has little or no Organization, WebSite, or product structured data, so AI systems have no machine-readable way to confirm who you are and what you offer.";
+    return { score, explanation };
+  }
   const explanation =
     status === "strong"
       ? "Your site includes LocalBusiness-style structured data with the key fields AI systems look for."
@@ -206,24 +223,72 @@ function scoreAiRecommendationReadiness(args: DeriveChecksInput): {
   return { score, explanation };
 }
 
-const CHECK_LABELS: Record<CheckId, string> = {
-  business_identity: "Business identity clarity",
-  location_clarity: "Location clarity",
-  service_clarity: "Service clarity",
-  contact_consistency: "Contact information consistency",
-  structured_data: "Structured data / LocalBusiness schema",
-  ai_recommendation_readiness: "AI recommendation readiness",
+const CHECK_LABELS: Record<BusinessType, Record<CheckId, string>> = {
+  local: {
+    business_identity: "Business identity clarity",
+    location_clarity: "Location clarity",
+    service_clarity: "Service clarity",
+    contact_consistency: "Contact information consistency",
+    structured_data: "Structured data / LocalBusiness schema",
+    ai_recommendation_readiness: "AI recommendation readiness",
+  },
+  online: {
+    business_identity: "Business identity clarity",
+    location_clarity: "Location clarity",
+    service_clarity: "Service clarity",
+    contact_consistency: "Contact information consistency",
+    structured_data: "Structured data / Organization & product schema",
+    ai_recommendation_readiness: "AI recommendation readiness",
+  },
 };
 
-const CHECK_PRIORITIES: Record<CheckId, string> = {
-  business_identity: "Strengthen your business identity clarity.",
-  location_clarity: "Strengthen your location signals.",
-  service_clarity: "Improve service and offering clarity.",
-  contact_consistency: "Improve business identity consistency.",
-  structured_data: "Increase AI-readable website signals.",
-  ai_recommendation_readiness:
-    "Strengthen your overall AI recommendation readiness.",
+const READINESS_FIX_PREFIX = "Improve these AI recommendation inputs together:";
+
+// Scoring v1.2: each fix names only what its own check measures, so a fix
+// never restates a check that reads Strong (e.g. the old contact fix said
+// "business identity" while "Business identity clarity" could be Strong).
+const CHECK_PRIORITIES: Record<BusinessType, Record<CheckId, string>> = {
+  local: {
+    business_identity: "State your business name clearly in your homepage text.",
+    location_clarity: "State your city, state, and street address on your homepage.",
+    service_clarity: "Describe your services in more plain-language detail on your homepage.",
+    contact_consistency: "Make your name, phone, and address consistent across your site.",
+    structured_data: "Add LocalBusiness structured data with your address, phone, and opening hours.",
+    ai_recommendation_readiness: READINESS_FIX_PREFIX,
+  },
+  online: {
+    business_identity: "State your business name clearly in your homepage text.",
+    location_clarity: "State your city, state, and street address on your homepage.",
+    service_clarity: "Describe your product and what it does in more plain-language detail on your homepage.",
+    contact_consistency: "Make your business name and contact details consistent across your site.",
+    structured_data: "Add Organization, WebSite, and SoftwareApplication (or Product) structured data.",
+    ai_recommendation_readiness: READINESS_FIX_PREFIX,
+  },
 };
+
+/**
+ * The readiness fix names only the readiness inputs that are actually weak
+ * (< STRONG_THRESHOLD), so it can't contradict a Strong structured-data or
+ * contact check that shares an input.
+ */
+function readinessFix(args: DeriveChecksInput): string {
+  const parts: string[] = [];
+  if ((args.crawlability?.score ?? 0) < STRONG_THRESHOLD) parts.push("crawl access");
+  if ((args.schema?.score ?? 0) < STRONG_THRESHOLD) parts.push("structured data");
+  if ((args.entityConsistency?.score ?? 0) < STRONG_THRESHOLD) parts.push("contact consistency");
+  if (Math.min(100, Math.round(((args.readability?.wordCount ?? 0) / 300) * 100)) < STRONG_THRESHOLD) parts.push("content depth");
+  return parts.length > 0 ? `${READINESS_FIX_PREFIX} ${parts.join(", ")}.` : `${READINESS_FIX_PREFIX} crawl access and content depth.`;
+}
+
+/** Which check a fix came from — exported for consistency tests. */
+export function checkIdForFix(fix: string): CheckId | null {
+  if (fix.startsWith(READINESS_FIX_PREFIX)) return "ai_recommendation_readiness";
+  for (const table of Object.values(CHECK_PRIORITIES)) {
+    const hit = (Object.keys(table) as CheckId[]).find((id) => table[id] === fix);
+    if (hit) return hit;
+  }
+  return null;
+}
 
 const CHECK_ORDER: CheckId[] = [
   "business_identity",
@@ -235,25 +300,52 @@ const CHECK_ORDER: CheckId[] = [
 ];
 
 export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
+  // Scoring v1.1: classify first. Local (the default) is scored exactly as
+  // in v1.0. Online businesses aren't scored on storefront location or
+  // opening hours.
+  const classification = classifyBusinessType({
+    category: args.input.category,
+    plainText: args.plainText,
+    schema: args.schema,
+    entityConsistency: args.entityConsistency,
+  });
+  const online = classification.type === "online";
+  const effective: DeriveChecksInput =
+    online && args.schema
+      ? { ...args, schema: { ...args.schema, score: args.onlineSchema?.score ?? 0 } }
+      : args;
+
   const scored: Record<CheckId, { score: number; explanation: string }> = {
     business_identity: scoreBusinessIdentity(args),
-    location_clarity: scoreLocationClarity(args),
+    location_clarity: online
+      ? {
+          score: 0,
+          explanation:
+            "This looks like an online business, so a storefront address and service area aren't scored.",
+        }
+      : scoreLocationClarity(args),
     service_clarity: scoreServiceClarity(args),
     contact_consistency: scoreContactConsistency(args),
-    structured_data: scoreStructuredData(args),
-    ai_recommendation_readiness: scoreAiRecommendationReadiness(args),
+    structured_data: scoreStructuredData(effective, online),
+    ai_recommendation_readiness: scoreAiRecommendationReadiness(effective),
   };
+  const applicable = (id: CheckId) => !(online && id === "location_clarity");
 
   const checks: CheckResult[] = CHECK_ORDER.map((id) => ({
     id,
-    label: CHECK_LABELS[id],
-    status: scoreToStatus(scored[id].score),
+    label: CHECK_LABELS[classification.type][id],
+    status: applicable(id) ? scoreToStatus(scored[id].score) : "not_applicable",
     explanation: scored[id].explanation,
   }));
 
+  // Weights of the checks that apply; 100 for local, so v1.0 math is unchanged.
+  const applicableWeight = CHECK_ORDER.filter(applicable).reduce(
+    (sum, id) => sum + WEIGHTS[id],
+    0,
+  );
   const overallScore = Math.round(
-    CHECK_ORDER.reduce(
-      (sum, id) => sum + (scored[id].score * WEIGHTS[id]) / 100,
+    CHECK_ORDER.filter(applicable).reduce(
+      (sum, id) => sum + (scored[id].score * WEIGHTS[id]) / applicableWeight,
       0,
     ),
   );
@@ -263,6 +355,7 @@ export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
     missing: 0,
     needs_improvement: 1,
     strong: 2,
+    not_applicable: 3,
   };
 
   const strengths = checks
@@ -271,11 +364,17 @@ export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
     .map((c) => c.label);
 
   const problemChecks = [...checks]
-    .filter((c) => c.status !== "strong")
+    .filter((c) => c.status !== "strong" && c.status !== "not_applicable")
     .sort((a, b) => severityRank[a.status] - severityRank[b.status]);
 
   const problems = problemChecks.slice(0, 3).map((c) => c.label);
-  const fixes = problemChecks.slice(0, 3).map((c) => CHECK_PRIORITIES[c.id]);
+  const fixes = problemChecks
+    .slice(0, 3)
+    .map((c) =>
+      c.id === "ai_recommendation_readiness"
+        ? readinessFix(effective)
+        : CHECK_PRIORITIES[classification.type][c.id],
+    );
 
   return {
     ok: true,
@@ -284,5 +383,8 @@ export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
     strengths,
     problems,
     fixes,
+    businessType: classification.type,
+    businessTypeReasons: classification.reasons,
+    scoringVersion: FREE_CHECK_SCORING_VERSION,
   };
 }

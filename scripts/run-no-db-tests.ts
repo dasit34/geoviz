@@ -86,6 +86,9 @@ const NO_DB_TESTS = [
   "test-improvements-drafts",
   "test-improvements-verify",
   "test-improvements-impact-access",
+  "test-chatgpt-plugin",
+  "test-free-check-scoring",
+  "test-free-check-safe-fetch",
 ];
 
 // `--only <substring>` narrows the run (e.g. `npm run test:monitoring`).

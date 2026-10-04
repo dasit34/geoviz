@@ -12,13 +12,20 @@
 // surface to the customer without a 500.
 
 import { JSDOM } from "jsdom";
-import { fetchRawHtml } from "@/lib/intelligence/preflight/fetchRawHtml";
+import { fetchRawHtml, type HtmlFetcher } from "@/lib/intelligence/preflight/fetchRawHtml";
 import { extractReadableContent } from "@/lib/intelligence/preflight/extractReadableContent";
 import { validateSchema } from "@/lib/intelligence/preflight/schemaValidation";
 import { auditCrawlability } from "@/lib/intelligence/preflight/crawlabilityAudit";
 import { checkEntityConsistency } from "@/lib/intelligence/preflight/entityConsistency";
 import { deriveChecks } from "./deriveChecks";
+import { analyzeOnlineSchema, type OnlineSchemaSignals } from "./onlineSchema";
 import type { FreeCheckFailure, FreeCheckInput, FreeCheckResult } from "./types";
+import type {
+  CrawlabilityResult,
+  EntityConsistencyResult,
+  ReadableContentResult,
+  SchemaValidationResult,
+} from "@/lib/intelligence/preflight/types";
 
 const PLAIN_TEXT_CAP = 20_000;
 
@@ -45,24 +52,65 @@ function extractPlainText(html: string, url: string): string {
   }
 }
 
+export type RunFreeCheckOptions = {
+  /** Defaults to `fetchRawHtml` (the /check behavior). */
+  fetcher?: HtmlFetcher;
+};
+
+/** Raw analyzer outputs behind a free-check result (null = analyzer failed). */
+export type FreeCheckSignals = {
+  readability: ReadableContentResult | null;
+  schema: SchemaValidationResult | null;
+  crawlability: CrawlabilityResult | null;
+  entityConsistency: EntityConsistencyResult | null;
+  /** Organization / WebSite / product schema checklist (scoring v1.2, online businesses). */
+  onlineSchema: OnlineSchemaSignals | null;
+};
+
+export type FreeCheckDetailed =
+  | { result: FreeCheckResult; signals: FreeCheckSignals; finalUrl: string }
+  | { result: FreeCheckFailure; signals: null; finalUrl: null };
+
 export async function runFreeCheck(
   input: FreeCheckInput,
+  opts: RunFreeCheckOptions = {},
 ): Promise<FreeCheckResult | FreeCheckFailure> {
-  const fetchRes = await fetchRawHtml(input.websiteUrl, { timeoutMs: 10_000 });
+  return (await runFreeCheckDetailed(input, opts)).result;
+}
+
+/**
+ * Same check as `runFreeCheck`, also returning the analyzer signals the
+ * result was derived from (for evidence lines). Scoring is unchanged:
+ * `deriveChecks` is the only score author.
+ */
+export async function runFreeCheckDetailed(
+  input: FreeCheckInput,
+  opts: RunFreeCheckOptions = {},
+): Promise<FreeCheckDetailed> {
+  const fetchHtml = opts.fetcher ?? fetchRawHtml;
+  const fetchRes = await fetchHtml(input.websiteUrl, { timeoutMs: 10_000 });
   if (!fetchRes.ok) {
     if (fetchRes.timedOut) {
       return {
-        ok: false,
-        error:
-          "This site took too long to respond. It may be temporarily down — try again in a moment.",
-        status: 504,
+        result: {
+          ok: false,
+          error:
+            "This site took too long to respond. It may be temporarily down — try again in a moment.",
+          status: 504,
+        },
+        signals: null,
+        finalUrl: null,
       };
     }
     return {
-      ok: false,
-      error:
-        "We couldn't reach this website. Double-check the URL and try again.",
-      status: 502,
+      result: {
+        ok: false,
+        error:
+          "We couldn't reach this website. Double-check the URL and try again.",
+        status: 502,
+      },
+      signals: null,
+      finalUrl: null,
     };
   }
 
@@ -72,20 +120,29 @@ export async function runFreeCheck(
     await Promise.all([
       safe(() => extractReadableContent(html, finalUrl)),
       safe(() => validateSchema(html, finalUrl)),
-      safe(() => auditCrawlability({ url: finalUrl, homepageHtml: html })),
+      safe(() =>
+        auditCrawlability({ url: finalUrl, homepageHtml: html, fetcher: opts.fetcher }),
+      ),
       safe(() => checkEntityConsistency({ url: finalUrl, html })),
     ]);
+  const onlineSchema = await safe(() => analyzeOnlineSchema(html));
 
   const plainText = extractPlainText(html, finalUrl);
 
-  return deriveChecks({
+  const result = deriveChecks({
     input,
     plainText,
     readability,
     schema,
     crawlability,
     entityConsistency,
+    onlineSchema,
   });
+  return {
+    result,
+    signals: { readability, schema, crawlability, entityConsistency, onlineSchema },
+    finalUrl,
+  };
 }
 
 async function safe<T>(fn: () => T | Promise<T>): Promise<T | null> {

@@ -29,6 +29,13 @@ export type FetchRawHtmlOptions = {
   timeoutMs?: number;
 };
 
+/**
+ * Injectable fetcher signature. Analyzers default to `fetchRawHtml`; callers
+ * that need stricter network rules (e.g. the ChatGPT plugin's SSRF-safe
+ * fetcher) pass their own implementation with the same contract.
+ */
+export type HtmlFetcher = (url: string, opts?: FetchRawHtmlOptions) => Promise<FetchRawHtmlResult>;
+
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 const USER_AGENT =

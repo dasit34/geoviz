@@ -70,6 +70,8 @@
     "test:score-explainer": "tsx scripts/test-score-explainer.ts",
     "test:format-score": "tsx scripts/test-format-score.ts",
     "test:free-check-scoring": "tsx scripts/test-free-check-scoring.ts",
+    "test:chatgpt-plugin": "tsx scripts/test-chatgpt-plugin.ts",
+    "test:free-check-safe-fetch": "tsx scripts/test-free-check-safe-fetch.ts",
     "test:category-label-wrap": "tsx scripts/test-category-label-wrap.ts",
     "test:report-redesign": "tsx scripts/test-report-redesign.ts",
     "test:report-model": "tsx scripts/test-report-model.ts",
@@ -112,6 +114,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
+    "@modelcontextprotocol/sdk": "1.32.0",
     "@mozilla/readability": "^0.6.0",
     "@prisma/client": "^5.22.0",
     "@sparticuz/chromium": "^148.0.0",

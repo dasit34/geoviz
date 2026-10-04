@@ -16,13 +16,16 @@
 // this with per-bot User-Agent specific checks.
 
 import { JSDOM } from "jsdom";
-import { fetchRawHtml } from "./fetchRawHtml";
+import { fetchRawHtml, type HtmlFetcher } from "./fetchRawHtml";
 import type { CrawlabilityResult } from "./types";
 
 export async function auditCrawlability(args: {
   url: string;
   homepageHtml: string;
+  /** Defaults to `fetchRawHtml`. */
+  fetcher?: HtmlFetcher;
 }): Promise<CrawlabilityResult> {
+  const fetchHtml = args.fetcher ?? fetchRawHtml;
   const findings: string[] = [];
   const warnings: string[] = [];
   const passedChecks: string[] = [];
@@ -77,7 +80,7 @@ export async function auditCrawlability(args: {
 
   // Check 3 — robots.txt exists and doesn't block-all.
   if (origin) {
-    const robotsRes = await fetchRawHtml(`${origin}/robots.txt`, { timeoutMs: 5_000 });
+    const robotsRes = await fetchHtml(`${origin}/robots.txt`, { timeoutMs: 5_000 });
     if (robotsRes.ok && robotsRes.status >= 200 && robotsRes.status < 300) {
       passedChecks.push("robots_txt_exists");
       if (blocksAllCrawlers(robotsRes.html)) {
@@ -98,7 +101,7 @@ export async function auditCrawlability(args: {
 
   // Check 4 — sitemap.xml exists and is parseable XML.
   if (origin) {
-    const sitemapRes = await fetchRawHtml(`${origin}/sitemap.xml`, { timeoutMs: 5_000 });
+    const sitemapRes = await fetchHtml(`${origin}/sitemap.xml`, { timeoutMs: 5_000 });
     if (sitemapRes.ok && sitemapRes.status >= 200 && sitemapRes.status < 300) {
       const looksXml = /<\?xml|<urlset|<sitemapindex/i.test(sitemapRes.html);
       if (looksXml) {
