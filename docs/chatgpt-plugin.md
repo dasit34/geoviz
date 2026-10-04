@@ -8,7 +8,11 @@ commit `83a1386`) was validated in ChatGPT developer mode on 2026-10-03 — the
 operator ran the private test prompts (real site, metadata IP, invalid URL,
 "does ChatGPT recommend this business?") and reported all passed. Scoring v1.1 on
 Preview `geoviz-nbxw3blb7` (commit `5eb2b0e`) also passed the operator's ChatGPT
-smoke test (geoviz.ai 58/100, online, location "Not applicable").
+smoke test (geoviz.ai 58/100, online, location "Not applicable"). Scoring v1.2 on
+Preview `geoviz-djb1m8xsx` (commit `f1b4c0d`) passed the operator's final ChatGPT
+test: geoviz.ai 53/100, classified online, location "Not applicable",
+structured data shown as "Organization & product schema", recommendations
+consistent with the findings, and the result card rendered in ChatGPT.
 
 ## What it is
 One read-only MCP tool, `check_business_visibility`, served at `/mcp`
