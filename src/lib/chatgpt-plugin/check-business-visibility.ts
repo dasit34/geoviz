@@ -21,7 +21,7 @@ import type { CheckResult } from "@/lib/free-check/types";
 import { checkUrlShape, type Resolver, type Transport } from "@/lib/monitoring/website/safe-fetch";
 import { checkRateLimit } from "@/lib/rate-limit";
 
-import { createSafeHtmlFetcher } from "./safe-html-fetcher";
+import { createSafeHtmlFetcher } from "@/lib/free-check/safe-html-fetcher";
 
 export const TOOL_NAME = "check_business_visibility";
 export const CHECK_TYPE = "website_ai_readiness";

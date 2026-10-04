@@ -3,6 +3,7 @@ import { prisma, isDatabaseConfigured } from "@/lib/db";
 import { freeCheckInputSchema } from "@/lib/validation";
 import { applyApiRateLimit } from "@/lib/rate-limit";
 import { runFreeCheck } from "@/lib/free-check/runFreeCheck";
+import { CHECK_ROUTE_FETCH_OPTIONS, createSafeHtmlFetcher } from "@/lib/free-check/safe-html-fetcher";
 import type { CheckResult } from "@/lib/free-check/types";
 
 export const runtime = "nodejs";
@@ -77,7 +78,13 @@ export async function POST(req: Request) {
   // page — the frontend can't parse that and shows a blank generic
   // failure. Always resolve to a categorized JSON error instead.
   try {
-    const result = await runFreeCheck({ websiteUrl, businessName, city, state, category });
+    // SSRF-safe retrieval: public addresses only (checked at DNS and connect
+    // time), every redirect hop re-validated, size and time capped.
+    const { fetcher } = createSafeHtmlFetcher(websiteUrl, CHECK_ROUTE_FETCH_OPTIONS);
+    const result = await runFreeCheck(
+      { websiteUrl, businessName, city, state, category },
+      { fetcher },
+    );
 
     if (!result.ok) {
       console.log(`[free-check] failed url=${websiteUrl} reason=${result.error}`);

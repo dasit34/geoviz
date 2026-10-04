@@ -28,13 +28,21 @@ the disclaimer that no AI system was asked about the business.
 | Route | `src/app/mcp/route.ts` (POST only, 64 KB body cap, GET/DELETE 405) |
 | Server + tool + card registration | `src/lib/chatgpt-plugin/server.ts` |
 | Tool logic (validation, limits, output) | `src/lib/chatgpt-plugin/check-business-visibility.ts` |
-| SSRF-safe fetcher (wraps monitoring `safeFetch`) | `src/lib/chatgpt-plugin/safe-html-fetcher.ts` |
+| SSRF-safe fetcher (wraps monitoring `safeFetch`; shared with `/check`) | `src/lib/free-check/safe-html-fetcher.ts` |
 | Result card (MCP Apps `text/html;profile=mcp-app`) | `src/lib/chatgpt-plugin/result-card.ts` |
 | Tests (DB-free) | `scripts/test-chatgpt-plugin.ts` (`npm run test:chatgpt-plugin`) |
 
-`/api/free-check` keeps its original fetch path: the fetcher seam added to
-`runFreeCheck` / `auditCrawlability` defaults to `fetchRawHtml`. Its scoring is
-shared with the plugin, so scoring v1.1 (below) applies to both.
+`/api/free-check` now retrieves websites through the same SSRF-safe fetcher
+(`CHECK_ROUTE_FETCH_OPTIONS`: 10 s / 5 MB homepage, cross-site redirects
+followed with every hop re-validated; the ChatGPT tool stays same-site only,
+8 s / 1.5 MB). Scoring is shared, so v1.1/v1.2 (below) apply to both. Tests:
+`scripts/test-free-check-safe-fetch.ts`.
+
+**Rick's 5-vs-60 discrepancy (resolved).** Node's built-in `fetch` always sends
+`sec-fetch-mode: cors` and `accept-language: *`; ricksaffordableheating.com
+answers those with its client-side app shell (5.9 KB, no JSON-LD) instead of
+the prerendered page (39 KB, 2 JSON-LD blocks). `safeFetch`'s node:https
+transport sends neither, so `/check` now scores the real page (5 → 60).
 
 ## Free-check scoring v1.1 (local vs. online)
 `deriveChecks` first runs `classifyBusinessType` (`src/lib/free-check/classifyBusinessType.ts`).
@@ -79,7 +87,6 @@ no top improvement restates a Strong finding (enforced by a consistency test).
   screenshots of the card; justification for each annotation.
 - `_meta.ui.domain` for the card, if review requires a dedicated widget origin.
 - Durable shared rate limit (DB or KV) instead of per-instance memory.
-- Separate follow-up: move `/api/free-check` onto the SSRF-safe fetcher. Note:
-  `/check`'s plain fetcher (UA `GeoVizPreflightProbe`) receives a much smaller
-  page from some sites than the plugin's fetcher does (e.g.
-  ricksaffordableheating.com: 5 vs. 60), so the two surfaces can disagree today.
+- `/check` behavior change to review: a homepage that answers with a non-2xx
+  status, a non-HTML content type, or more than 5 MB is now reported as
+  unreachable instead of being scored.
