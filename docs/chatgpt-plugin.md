@@ -6,7 +6,9 @@ Status: built on `feat/geoviz-chatgpt-plugin`, deployed only to a Vercel Preview
 **Validation:** the MCP Preview (`geoviz-gycc07baz-agentboard.vercel.app/mcp`,
 commit `83a1386`) was validated in ChatGPT developer mode on 2026-10-03 — the
 operator ran the private test prompts (real site, metadata IP, invalid URL,
-"does ChatGPT recommend this business?") and reported all passed.
+"does ChatGPT recommend this business?") and reported all passed. Scoring v1.1 on
+Preview `geoviz-nbxw3blb7` (commit `5eb2b0e`) also passed the operator's ChatGPT
+smoke test (geoviz.ai 58/100, online, location "Not applicable").
 
 ## What it is
 One read-only MCP tool, `check_business_visibility`, served at `/mcp`
@@ -41,7 +43,17 @@ or 3+ online product cues in the homepage text. For online sites:
 (weights renormalized over the other five), and structured data is scored on
 name/url/telephone only. Local scoring is byte-for-byte v1.0 (pinned in
 `scripts/lib/free-check-v1-0-baseline.json`). Results carry `businessType`,
-`businessTypeReasons`, and `scoringVersion: "free-check-v1.1"`.
+`businessTypeReasons`, and `scoringVersion`.
+
+**v1.2** (`free-check-v1.2`): online structured data is scored on a 6-item
+checklist (`src/lib/free-check/onlineSchema.ts`): Organization name, url, and
+logo/sameAs; a WebSite node; a product node (`SoftwareApplication`,
+`WebApplication`, `MobileApplication`, `Product`, `Service`) with a name and
+with applicationCategory/offers/description. The check is labeled
+"Structured data / Organization & product schema" for online sites and keeps
+"Structured data / LocalBusiness schema" for local ones. Fix wording names only
+what its own check measures, and the readiness fix lists only its weak inputs, so
+no top improvement restates a Strong finding (enforced by a consistency test).
 
 ## Safety
 - http/https on 80/443 only, no URL credentials; every DNS answer and connect-time

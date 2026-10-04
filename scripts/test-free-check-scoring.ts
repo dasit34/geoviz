@@ -18,7 +18,8 @@
 
 import "./lib/require-nonprod-db";
 import assert from "node:assert/strict";
-import { deriveChecks } from "../src/lib/free-check/deriveChecks";
+import { checkIdForFix, deriveChecks } from "../src/lib/free-check/deriveChecks";
+import { analyzeOnlineSchema } from "../src/lib/free-check/onlineSchema";
 import type { DeriveChecksInput } from "../src/lib/free-check/deriveChecks";
 import { classifyBusinessType } from "../src/lib/free-check/classifyBusinessType";
 import * as F from "./lib/free-check-fixtures";
@@ -181,7 +182,20 @@ const ADDR_ONLY = F.fixture(F.NO_SIGNALS, {
   },
 });
 
-const v10 = (r: ReturnType<typeof deriveChecks>) => ({ ok: r.ok, overallScore: r.overallScore, checks: r.checks, strengths: r.strengths, problems: r.problems, fixes: r.fixes });
+// v1.0 fix text → check id (wording changed in v1.2; the checks they point at must not).
+const V10_FIX_TO_CHECK: Record<string, string> = {
+  "Strengthen your business identity clarity.": "business_identity",
+  "Strengthen your location signals.": "location_clarity",
+  "Improve service and offering clarity.": "service_clarity",
+  "Improve business identity consistency.": "contact_consistency",
+  "Increase AI-readable website signals.": "structured_data",
+  "Strengthen your overall AI recommendation readiness.": "ai_recommendation_readiness",
+};
+const v10 = (r: ReturnType<typeof deriveChecks>) => ({ ok: r.ok, overallScore: r.overallScore, checks: r.checks, strengths: r.strengths, problems: r.problems, fixes: r.fixes.map(checkIdForFix) });
+const baselineOf = (name: string) => {
+  const b = (BASELINE as unknown as Record<string, ReturnType<typeof deriveChecks>>)[name]!;
+  return { ...b, fixes: b.fixes.map((f) => V10_FIX_TO_CHECK[f]) };
+};
 
 for (const [name, fx] of [
   ["ROOFER_NO_ADDRESS_OR_HOURS", F.ROOFER_NO_ADDRESS_OR_HOURS],
@@ -192,8 +206,9 @@ for (const [name, fx] of [
   check(`local business unchanged from v1.0: ${name}`, () => {
     const r = deriveChecks(fx);
     assert.equal(r.businessType, "local");
-    assert.equal(r.scoringVersion, "free-check-v1.1");
-    assert.deepEqual(v10(r), (BASELINE as Record<string, unknown>)[name]);
+    assert.equal(r.scoringVersion, "free-check-v1.2");
+    // Score, statuses, labels, explanations, strengths, problems: exactly v1.0. Fixes: same checks, same order.
+    assert.deepEqual(v10(r), baselineOf(name));
   });
 }
 
@@ -208,7 +223,9 @@ check("local roofer missing address and hours still loses location + schema poin
   const sd = r.checks.find((c) => c.id === "structured_data")!;
   assert.equal(loc.status, "needs_improvement");
   assert.equal(sd.status, "needs_improvement");
-  assert.ok(r.fixes.includes("Strengthen your location signals."));
+  assert.ok(r.fixes.includes("State your city, state, and street address on your homepage."));
+  assert.equal(sd.label, "Structured data / LocalBusiness schema");
+  assert.ok(r.fixes.includes("Add LocalBusiness structured data with your address, phone, and opening hours."));
 });
 
 check("online SaaS: location not applicable, schema scored without address/geo/hours", () => {
@@ -220,17 +237,92 @@ check("online SaaS: location not applicable, schema scored without address/geo/h
   assert.match(byId.location_clarity!.explanation, /online business/);
   assert.equal(byId.structured_data!.status, "strong");
   assert.ok(!r.problems.includes("Location clarity"));
-  assert.ok(!r.fixes.includes("Strengthen your location signals."));
+  assert.ok(!r.fixes.some((f) => checkIdForFix(f) === "location_clarity"));
+  assert.equal(byId.structured_data!.label, "Structured data / Organization & product schema");
+  assert.ok(!/LocalBusiness|opening hours|street address/i.test(JSON.stringify(r)), "no LocalBusiness wording for an online business");
   assert.ok(!r.strengths.includes("Location clarity"));
 });
 
 check("online overall score = weighted average over the five applicable checks", () => {
   const r = deriveChecks(F.SAAS);
   // Sub-scores: identity 100 (name found + >50 words), service 40 (no category; 420 words → depth 100 × 0.4),
-  // contact 100, structured 100 (name/url/telephone), readiness round(0.3·100 + 0.25·100 + 0.2·100 + 0.25·100) = 100.
-  const expected = Math.round((100 * 20 + 40 * 15 + 100 * 15 + 100 * 20 + 100 * 15) / 85);
+  // contact 100, structured 83 (5 of 6 online-schema items), readiness round(0.3·100 + 0.25·83 + 0.2·100 + 0.25·100) = 96.
+  const expected = Math.round((100 * 20 + 40 * 15 + 100 * 15 + 83 * 20 + 96 * 15) / 85);
   assert.equal(r.overallScore, expected);
   assert.ok(r.overallScore > (BASELINE as { SAAS_AS_LOCAL: { overallScore: number } }).SAAS_AS_LOCAL.overallScore, "online scoring no longer penalizes the SaaS site");
+});
+
+check("online structured data follows the Organization / WebSite / product checklist", () => {
+  const status = (present: Parameters<typeof F.onlineSchema>[0]) => {
+    const r = deriveChecks(F.fixture(F.SAAS, { onlineSchema: F.onlineSchema(present) }));
+    return { check: r.checks.find((c) => c.id === "structured_data")!, fixes: r.fixes };
+  };
+  const full = status({ organization_name: true, organization_url: true, organization_logo_or_sameas: true, website: true, product_name: true, product_details: true });
+  assert.equal(full.check.status, "strong");
+  assert.ok(!full.fixes.some((f) => checkIdForFix(f) === "structured_data"));
+  const half = status({ organization_name: true, organization_url: true, website: true });
+  assert.equal(F.onlineSchema({ organization_name: true, organization_url: true, website: true }).score, 50);
+  assert.equal(half.check.status, "needs_improvement");
+  assert.ok(half.fixes.includes("Add Organization, WebSite, and SoftwareApplication (or Product) structured data."));
+  const none = deriveChecks(F.fixture(F.SAAS, { onlineSchema: null })).checks.find((c) => c.id === "structured_data")!;
+  assert.equal(none.status, "missing");
+});
+
+check("local structured data still uses the LocalBusiness validator score", () => {
+  const r = deriveChecks(F.fixture(F.ROOFER_NO_ADDRESS_OR_HOURS, { onlineSchema: F.onlineSchema({ organization_name: true, organization_url: true, website: true, product_name: true, product_details: true, organization_logo_or_sameas: true }) }));
+  const sd = r.checks.find((c) => c.id === "structured_data")!;
+  assert.equal(r.businessType, "local");
+  assert.equal(sd.status, "needs_improvement", "online schema never lifts a local business");
+  assert.equal(sd.label, "Structured data / LocalBusiness schema");
+});
+
+check("no top improvement contradicts a Strong (or not-applicable) finding", () => {
+  const fixtures = [STRONG_FIXTURE, WEAK_FIXTURE, F.ROOFER_NO_ADDRESS_OR_HOURS, F.NO_SIGNALS, F.ROOFER_WITH_ONLINE_CUES, ADDR_ONLY, F.SAAS,
+    F.fixture(F.SAAS, { onlineSchema: null }), F.fixture(F.SAAS, { entityConsistency: { ...F.SAAS.entityConsistency!, score: 40 } }),
+    // Structured data Strong but readiness weak (thin content, poor crawl): the readiness fix must not mention structured data.
+    F.fixture(F.SAAS, { readability: { ...F.SAAS.readability!, wordCount: 30 }, crawlability: { ...F.SAAS.crawlability!, score: 25 }, entityConsistency: { ...F.SAAS.entityConsistency!, score: 0 } })];
+  const KEYWORDS: Record<string, RegExp> = {
+    business_identity: /identity/i,
+    location_clarity: /location|city|street address/i,
+    service_clarity: /services|product and what it does/i,
+    contact_consistency: /consistent|contact/i,
+    structured_data: /structured data/i,
+    ai_recommendation_readiness: /AI recommendation/i,
+  };
+  for (const fx of fixtures) {
+    const r = deriveChecks(fx);
+    const done = r.checks.filter((c) => c.status === "strong" || c.status === "not_applicable").map((c) => c.id);
+    for (const fix of r.fixes) {
+      const id = checkIdForFix(fix);
+      assert.ok(id, `fix maps to a check: ${fix}`);
+      assert.ok(!done.includes(id!), `"${fix}" comes from ${id}, which is ${r.checks.find((c) => c.id === id)!.status}`);
+      for (const strongId of done) {
+        if (strongId === id) continue;
+        assert.ok(!KEYWORDS[strongId]?.test(fix), `"${fix}" restates ${strongId}, which is ${r.checks.find((c) => c.id === strongId)!.status}`);
+      }
+    }
+  }
+});
+
+check("readiness fix lists only its weak inputs", () => {
+  const r = deriveChecks(F.fixture(F.SAAS, { readability: { ...F.SAAS.readability!, wordCount: 30 }, crawlability: { ...F.SAAS.crawlability!, score: 25 }, entityConsistency: { ...F.SAAS.entityConsistency!, score: 0 } }));
+  assert.equal(r.checks.find((c) => c.id === "structured_data")!.status, "strong");
+  const fix = r.fixes.find((f) => checkIdForFix(f) === "ai_recommendation_readiness");
+  assert.equal(fix, "Improve these AI recommendation inputs together: crawl access, contact consistency, content depth.");
+});
+
+check("analyzeOnlineSchema: @graph, array @type, empty strings, malformed blocks", () => {
+  const html = (...blocks: string[]) => `<html><head>${blocks.map((b) => `<script type="application/ld+json">${b}</script>`).join("")}</head><body></body></html>`;
+  const graph = analyzeOnlineSchema(html(JSON.stringify({ "@context": "https://schema.org", "@graph": [
+    { "@type": ["Organization", "Brand"], name: "Ledgerly", url: "https://ledgerly.app", sameAs: ["https://x.com/ledgerly"] },
+    { "@type": "WebSite", url: "https://ledgerly.app" },
+    { "@type": "SoftwareApplication", name: "Ledgerly", applicationCategory: "BusinessApplication" },
+  ] })));
+  assert.equal(graph.score, 100);
+  assert.equal(graph.productType, "SoftwareApplication");
+  const empty = analyzeOnlineSchema(html('{"@type":"Organization","name":"  ","url":""}', "{not json", JSON.stringify({ "@type": "WebSite", name: "" })));
+  assert.equal(empty.score, 0);
+  assert.equal(analyzeOnlineSchema("").score, 0);
 });
 
 check("online by category alone (no local signals)", () => {

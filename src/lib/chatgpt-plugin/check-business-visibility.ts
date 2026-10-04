@@ -175,7 +175,7 @@ export async function checkBusinessVisibility(rawInput: unknown, deps: CheckDeps
     scoreLabel: SCORE_LABEL,
     findings: result.checks.map((c: CheckResult) => ({ id: c.id, label: c.label, status: c.status, explanation: c.explanation })),
     priorityImprovements: result.fixes.slice(0, 3),
-    evidence: [businessTypeEvidence(result.businessType, result.businessTypeReasons), ...buildEvidence(signals, nameProvided)],
+    evidence: [businessTypeEvidence(result.businessType, result.businessTypeReasons), ...buildEvidence(signals, nameProvided, result.businessType)],
     checkedAt: (deps.now ?? (() => new Date()))().toISOString(),
     links: {
       freeCheck: `${siteUrl}/check`,
@@ -246,7 +246,7 @@ function businessTypeEvidence(type: "local" | "online", reasons: string[]): stri
 const SAFE_TYPE = /^[A-Za-z][A-Za-z0-9]{0,40}$/;
 
 /** Factual lines read straight from analyzer outputs — no inference. */
-export function buildEvidence(signals: FreeCheckSignals, nameProvided: boolean): string[] {
+export function buildEvidence(signals: FreeCheckSignals, nameProvided: boolean, businessType: "local" | "online" = "local"): string[] {
   const lines: string[] = [];
   const { schema, crawlability, readability, entityConsistency } = signals;
 
@@ -257,9 +257,18 @@ export function buildEvidence(signals: FreeCheckSignals, nameProvided: boolean):
         ? "No JSON-LD structured data found on the homepage."
         : `Structured data: ${schema.rawJsonLdCount} JSON-LD block${schema.rawJsonLdCount === 1 ? "" : "s"}${types.length ? ` (types: ${types.join(", ")})` : ""}.`,
     );
-    const fields = (xs: string[]) => xs.filter((f) => SAFE_TYPE.test(f)).slice(0, 8).join(", ");
-    if (schema.presentFields.length) lines.push(`Business fields present in structured data: ${fields(schema.presentFields)}.`);
-    if (schema.missingFields.length) lines.push(`Business fields missing from structured data: ${fields(schema.missingFields)}.`);
+    if (businessType === "online") {
+      // Online businesses are scored on Organization / WebSite / product schema, not LocalBusiness fields.
+      const items = signals.onlineSchema?.items ?? [];
+      const present = items.filter((i) => i.present).map((i) => i.label);
+      const missing = items.filter((i) => !i.present).map((i) => i.label);
+      if (present.length) lines.push(`Online business schema present: ${present.join("; ")}.`);
+      if (missing.length) lines.push(`Online business schema missing: ${missing.join("; ")}.`);
+    } else {
+      const fields = (xs: string[]) => xs.filter((f) => SAFE_TYPE.test(f)).slice(0, 8).join(", ");
+      if (schema.presentFields.length) lines.push(`Business fields present in structured data: ${fields(schema.presentFields)}.`);
+      if (schema.missingFields.length) lines.push(`Business fields missing from structured data: ${fields(schema.missingFields)}.`);
+    }
   } else {
     lines.push("Structured data could not be analyzed.");
   }

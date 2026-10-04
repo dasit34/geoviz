@@ -189,6 +189,13 @@ async function main() {
     assert.ok(!r.output.priorityImprovements.includes("Strengthen your location signals."));
     assert.match(r.output.evidence[0]!, /^Scored as an online business, so storefront location and opening hours aren't scored\. Reason: SoftwareApplication structured data/);
     assert.match(r.text, /Location clarity: not applicable/);
+    // v1.2: structured data judged on Organization / WebSite / product schema, not LocalBusiness.
+    const sd = r.output.findings.find((f) => f.id === "structured_data")!;
+    assert.equal(sd.label, "Structured data / Organization & product schema");
+    assert.ok(r.output.evidence.some((e) => e.startsWith("Online business schema present:") && e.includes("Product / SoftwareApplication name")), r.output.evidence.join(" | "));
+    assert.ok(r.output.evidence.some((e) => e.startsWith("Online business schema missing:") && e.includes("WebSite")));
+    assert.ok(!r.output.evidence.some((e) => /Business fields (present|missing)/.test(e)), "no LocalBusiness field lines");
+    assert.ok(!/LocalBusiness|opening hours|street address/i.test(JSON.stringify(r.output.findings) + r.output.priorityImprovements.join(" ")));
   });
 
   await check("local business reports businessType local", async () => {
@@ -196,6 +203,8 @@ async function main() {
     assert.ok(r.ok);
     assert.equal(r.output.businessType, "local");
     assert.match(r.output.evidence[0]!, /^Scored as a local business/);
+    assert.equal(r.output.findings.find((f) => f.id === "structured_data")!.label, "Structured data / LocalBusiness schema");
+    assert.ok(r.output.evidence.some((e) => e.startsWith("Business fields present in structured data:")));
   });
 
   // ── Invalid URLs ──

@@ -18,6 +18,7 @@ import { validateSchema } from "@/lib/intelligence/preflight/schemaValidation";
 import { auditCrawlability } from "@/lib/intelligence/preflight/crawlabilityAudit";
 import { checkEntityConsistency } from "@/lib/intelligence/preflight/entityConsistency";
 import { deriveChecks } from "./deriveChecks";
+import { analyzeOnlineSchema, type OnlineSchemaSignals } from "./onlineSchema";
 import type { FreeCheckFailure, FreeCheckInput, FreeCheckResult } from "./types";
 import type {
   CrawlabilityResult,
@@ -62,6 +63,8 @@ export type FreeCheckSignals = {
   schema: SchemaValidationResult | null;
   crawlability: CrawlabilityResult | null;
   entityConsistency: EntityConsistencyResult | null;
+  /** Organization / WebSite / product schema checklist (scoring v1.2, online businesses). */
+  onlineSchema: OnlineSchemaSignals | null;
 };
 
 export type FreeCheckDetailed =
@@ -122,6 +125,7 @@ export async function runFreeCheckDetailed(
       ),
       safe(() => checkEntityConsistency({ url: finalUrl, html })),
     ]);
+  const onlineSchema = await safe(() => analyzeOnlineSchema(html));
 
   const plainText = extractPlainText(html, finalUrl);
 
@@ -132,10 +136,11 @@ export async function runFreeCheckDetailed(
     schema,
     crawlability,
     entityConsistency,
+    onlineSchema,
   });
   return {
     result,
-    signals: { readability, schema, crawlability, entityConsistency },
+    signals: { readability, schema, crawlability, entityConsistency, onlineSchema },
     finalUrl,
   };
 }

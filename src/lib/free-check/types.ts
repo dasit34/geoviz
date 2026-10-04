@@ -49,8 +49,11 @@ export type FreeCheckResult = {
   scoringVersion: typeof FREE_CHECK_SCORING_VERSION;
 };
 
-/** v1.1: classify local vs. online first; online sites aren't scored on storefront location or opening hours. */
-export const FREE_CHECK_SCORING_VERSION = "free-check-v1.1" as const;
+/**
+ * v1.1: classify local vs. online first; online sites aren't scored on storefront location or opening hours.
+ * v1.2: online structured data scored on Organization / WebSite / product schema; fixes never restate a Strong check.
+ */
+export const FREE_CHECK_SCORING_VERSION = "free-check-v1.2" as const;
 
 export type FreeCheckFailure = {
   ok: false;

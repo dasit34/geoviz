@@ -4,6 +4,15 @@
  * src/lib/intelligence/preflight actually produces.
  */
 import type { DeriveChecksInput } from "../../src/lib/free-check/deriveChecks";
+import type { OnlineSchemaItemKey, OnlineSchemaSignals } from "../../src/lib/free-check/onlineSchema";
+
+const ONLINE_KEYS: OnlineSchemaItemKey[] = ["organization_name", "organization_url", "organization_logo_or_sameas", "website", "product_name", "product_details"];
+
+/** Online-schema checklist signals with the given items present. */
+export function onlineSchema(present: Partial<Record<OnlineSchemaItemKey, boolean>>): OnlineSchemaSignals {
+  const items = ONLINE_KEYS.map((key) => ({ key, label: key, present: Boolean(present[key]) }));
+  return { items, score: Math.round((items.filter((i) => i.present).length / items.length) * 100), productType: present.product_name ? "SoftwareApplication" : null };
+}
 
 type Overrides = Partial<Omit<DeriveChecksInput, "input">> & { input?: Partial<DeriveChecksInput["input"]> };
 
@@ -60,6 +69,7 @@ export const SAAS: DeriveChecksInput = {
   plainText: "ledgerly is invoicing software for freelancers send invoices track payments and reconcile expenses start your free trial today see pricing log in",
   readability: { textLength: 1600, parsedByReadability: true, fallbackUsed: false, articleTitle: "Ledgerly — invoicing software", wordCount: 420, preview: "Ledgerly is invoicing software…" },
   schema: { score: 50, presentFields: ["name", "telephone", "url"], missingFields: ["address", "geo", "openingHours"], malformedFields: [], detectedTypes: ["SoftwareApplication", "Organization"], rawJsonLdCount: 2, notes: [] },
+  onlineSchema: onlineSchema({ organization_name: true, organization_url: true, website: true, product_name: true, product_details: true }),
   crawlability: { score: 100, findings: [], warnings: [], passedChecks: ["homepage_not_noindex", "canonical_present", "robots_txt_exists", "robots_txt_not_blocking_all", "sitemap_xml_present"], failedChecks: [] },
   entityConsistency: {
     score: 100,
