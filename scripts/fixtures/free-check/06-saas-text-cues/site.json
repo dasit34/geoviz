@@ -1,0 +1,9 @@
+{
+  "domain": "taskloop.example",
+  "input": {
+    "businessName": "Taskloop",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

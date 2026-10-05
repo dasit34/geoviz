@@ -1,0 +1,18 @@
+{
+  "type": "online",
+  "scored": true,
+  "score": 42,
+  "statuses": {
+    "business_identity": "strong",
+    "location_clarity": "not_applicable",
+    "service_clarity": "missing",
+    "contact_consistency": "missing",
+    "structured_data": "missing",
+    "ai_recommendation_readiness": "needs_improvement"
+  },
+  "fixes": [
+    "Describe your product and what it does in more plain-language detail on your homepage.",
+    "Make your business name and contact details consistent across your site.",
+    "Add Organization, WebSite, and SoftwareApplication (or Product) structured data."
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "type": "local",
+  "scored": true,
+  "score": 94,
+  "statuses": {
+    "business_identity": "strong",
+    "location_clarity": "strong",
+    "service_clarity": "strong",
+    "contact_consistency": "strong",
+    "structured_data": "strong",
+    "ai_recommendation_readiness": "strong"
+  },
+  "fixes": []
+}

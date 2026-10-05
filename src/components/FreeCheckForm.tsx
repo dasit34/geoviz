@@ -13,7 +13,10 @@ type FieldErrors = Partial<
 
 type ApiResult = {
   ok: true;
-  overallScore: number;
+  /** Null for sites outside the supported scoring scope (scoring v1.3). */
+  overallScore: number | null;
+  scored?: boolean;
+  scopeNote?: string | null;
   checks: CheckResult[];
   strengths: string[];
   problems: string[];

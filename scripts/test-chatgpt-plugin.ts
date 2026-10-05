@@ -122,7 +122,9 @@ async function main() {
     assert.equal(o.scoreLabel, "Website AI-readiness (free check)");
     assert.deepEqual(o.business, { name: "Summit Roofing", nameProvided: true, city: "Denver", state: "CO" });
     assert.equal(o.websiteChecked, "https://summitroofing.example/");
-    assert.ok(o.score >= 0 && o.score <= 100);
+    assert.ok(o.score !== null && o.score >= 0 && o.score <= 100);
+    assert.equal(o.businessType, "local");
+    assert.equal(o.scopeNote, null);
     assert.equal(o.findings.length, 6);
     assert.ok(o.priorityImprovements.length <= 3);
     assert.ok(o.evidence.some((e) => e.includes("RoofingContractor")), o.evidence.join(" | "));
@@ -206,6 +208,43 @@ async function main() {
     assert.match(r.output.evidence[0]!, /^Scored as a local business/);
     assert.equal(r.output.findings.find((f) => f.id === "structured_data")!.label, "Structured data / LocalBusiness schema");
     assert.ok(r.output.evidence.some((e) => e.startsWith("Business fields present in structured data:")));
+  });
+
+  await check("v1.3 publisher site: recognized, not scored, no fixes, no storefront wording; card shows the scope note", async () => {
+    const page = `<!doctype html><html><head><title>Daily Ledger News</title>
+<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@graph": [
+      { "@type": "NewsMediaOrganization", name: "Daily Ledger", url: "https://dailyledger.example/", logo: "https://dailyledger.example/logo.png", address: { "@type": "PostalAddress", streetAddress: "1 Press St", addressLocality: "Springfield" } },
+      { "@type": "WebSite", name: "Daily Ledger", url: "https://dailyledger.example/" },
+    ] })}</script></head><body><main><h1>Top stories</h1>${"<p>Latest news and headlines from around the region, updated all day by our newsroom.</p>".repeat(12)}</main><footer>Daily Ledger · 1 Press St, Springfield</footer></body></html>`;
+    const net = siteNet("dailyledger.example", { "https://dailyledger.example/": { status: 200, body: page } });
+    const r = await checkBusinessVisibility({ websiteUrl: "dailyledger.example", businessName: "Daily Ledger" }, { clientKey: freshKey(), ...net });
+    assert.ok(r.ok, r.ok ? "" : r.message);
+    const o = r.output;
+    assert.equal(o.businessType, "publisher");
+    assert.equal(o.score, null);
+    assert.equal(o.scoreLabel, "Not scored: outside GeoViz's supported business types");
+    assert.match(o.scopeNote ?? "", /publisher or media site/);
+    assert.deepEqual(o.priorityImprovements, []);
+    assert.match(o.evidence[0]!, /^Recognized as a publisher or media site.*Reason: NewsMediaOrganization structured data/);
+    const all = JSON.stringify(o.findings) + o.priorityImprovements.join(" ") + o.evidence.join(" ");
+    assert.ok(!/LocalBusiness|opening hours|openingHours|street address|storefront/i.test(all.replace("storefront location and opening hours", "")), "no storefront wording");
+    assert.match(r.text, /Not scored: outside GeoViz's supported business types/);
+    assert.match(r.text, /No improvements are suggested/);
+    assert.match(CARD_HTML, /id="scope"/);
+    assert.match(CARD_HTML, /d\.score===null/);
+  });
+
+  await check("v1.3 category input classifies an otherwise ambiguous site (and is optional)", async () => {
+    const bare = "<!doctype html><html><head><title>Northside Co</title></head><body><main><h1>Northside Co</h1>" + "<p>Northside Co helps people with their projects. Contact us to learn more about what we do.</p>".repeat(8) + "</main></body></html>";
+    const without = await checkBusinessVisibility({ websiteUrl: "northside.example", businessName: "Northside Co" }, { clientKey: freshKey(), ...siteNet("northside.example", { "https://northside.example/": { status: 200, body: bare } }) });
+    const withCat = await checkBusinessVisibility({ websiteUrl: "northside2.example", businessName: "Northside Co", category: "plumbing contractor" }, { clientKey: freshKey(), ...siteNet("northside2.example", { "https://northside2.example/": { status: 200, body: bare } }) });
+    assert.ok(without.ok && withCat.ok);
+    if (without.ok && withCat.ok) {
+      assert.equal(without.output.businessType, "uncertain");
+      assert.ok(without.output.score !== null);
+      assert.match(without.output.scopeNote ?? "", /check again with your city and state/);
+      assert.equal(withCat.output.businessType, "local");
+    }
   });
 
   // ── Invalid URLs ──
@@ -447,6 +486,8 @@ async function main() {
     assert.equal(t.name, TOOL_NAME);
     assert.deepEqual(t.annotations, { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true });
     assert.deepEqual(t.inputSchema.required, ["websiteUrl"]);
+    assert.ok(t.inputSchema.properties.category, "optional category input");
+    assert.deepEqual(t.outputSchema.properties.businessType.enum, ["local", "online", "uncertain", "publisher", "ecommerce"]);
     assert.ok(t.outputSchema.properties.disclaimer);
     assert.equal(t._meta.ui.resourceUri, CARD_URI);
     assert.equal(t._meta["openai/outputTemplate"], CARD_URI);

@@ -128,6 +128,7 @@ export async function runFreeCheckDetailed(
   const onlineSchema = await safe(() => analyzeOnlineSchema(html));
 
   const plainText = extractPlainText(html, finalUrl);
+  const cueText = extractCueText(html, finalUrl);
 
   const result = deriveChecks({
     input,
@@ -137,12 +138,33 @@ export async function runFreeCheckDetailed(
     crawlability,
     entityConsistency,
     onlineSchema,
+    cueText,
   });
   return {
     result,
     signals: { readability, schema, crawlability, entityConsistency, onlineSchema },
     finalUrl,
   };
+}
+
+/**
+ * Scoring v1.3: text for business-type cue matching only. Unlike
+ * `extractPlainText` (kept byte-for-byte for the scoring checks), adjacent
+ * elements are separated by a space, so "Top Headlines" + "Shop now" can't
+ * merge into "headlinesshop now" and hide a cue.
+ */
+function extractCueText(html: string, url: string): string {
+  try {
+    const dom = new JSDOM(html, { url });
+    const doc = dom.window.document;
+    doc.querySelectorAll("script, style, noscript").forEach((n) => n.remove());
+    const walker = doc.createTreeWalker(doc.body ?? doc.documentElement, dom.window.NodeFilter.SHOW_TEXT);
+    const parts: string[] = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) parts.push(n.textContent ?? "");
+    return parts.join(" ").replace(/\s+/g, " ").trim().toLowerCase().slice(0, PLAIN_TEXT_CAP);
+  } catch {
+    return "";
+  }
 }
 
 async function safe<T>(fn: () => T | Promise<T>): Promise<T | null> {

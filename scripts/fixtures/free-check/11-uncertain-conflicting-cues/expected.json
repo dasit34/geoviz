@@ -1,0 +1,18 @@
+{
+  "type": "uncertain",
+  "scored": true,
+  "score": 30,
+  "statuses": {
+    "business_identity": "strong",
+    "location_clarity": "not_applicable",
+    "service_clarity": "missing",
+    "contact_consistency": "missing",
+    "structured_data": "missing",
+    "ai_recommendation_readiness": "missing"
+  },
+  "fixes": [
+    "Describe what you offer in more plain-language detail on your homepage.",
+    "Make your business name and contact details consistent across your site.",
+    "Add structured data that identifies your business (name, website, logo, and contact details)."
+  ]
+}

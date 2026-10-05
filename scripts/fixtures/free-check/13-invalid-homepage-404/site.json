@@ -1,0 +1,9 @@
+{
+  "domain": "gone.example",
+  "input": {
+    "businessName": "Gone Co",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

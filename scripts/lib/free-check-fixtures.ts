@@ -11,7 +11,7 @@ const ONLINE_KEYS: OnlineSchemaItemKey[] = ["organization_name", "organization_u
 /** Online-schema checklist signals with the given items present. */
 export function onlineSchema(present: Partial<Record<OnlineSchemaItemKey, boolean>>): OnlineSchemaSignals {
   const items = ONLINE_KEYS.map((key) => ({ key, label: key, present: Boolean(present[key]) }));
-  return { items, score: Math.round((items.filter((i) => i.present).length / items.length) * 100), productType: present.product_name ? "SoftwareApplication" : null };
+  return { items, score: Math.round((items.filter((i) => i.present).length / items.length) * 100), productType: present.product_name ? "SoftwareApplication" : null, productWithOffer: false, articleNodes: 0 };
 }
 
 type Overrides = Partial<Omit<DeriveChecksInput, "input">> & { input?: Partial<DeriveChecksInput["input"]> };

@@ -1,0 +1,9 @@
+{
+  "domain": "daily-ledger.example",
+  "input": {
+    "businessName": "The Daily Ledger",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

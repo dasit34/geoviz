@@ -27,6 +27,11 @@
           "type": "string",
           "maxLength": 100,
           "description": "State or region the business serves"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "What kind of business it is, e.g. roofing contractor, dental clinic, or invoicing software (improves classification)"
         }
       },
       "required": [
@@ -93,20 +98,39 @@
           "type": "string",
           "enum": [
             "local",
-            "online"
+            "online",
+            "uncertain",
+            "publisher",
+            "ecommerce"
           ]
         },
         "websiteChecked": {
           "type": "string"
         },
         "score": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 100
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "scoreLabel": {
           "type": "string",
-          "const": "Website AI-readiness (free check)"
+          "enum": [
+            "Website AI-readiness (free check)",
+            "Not scored: outside GeoViz's supported business types"
+          ]
+        },
+        "scopeNote": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "findings": {
           "type": "array",
@@ -192,6 +216,7 @@
         "websiteChecked",
         "score",
         "scoreLabel",
+        "scopeNote",
         "findings",
         "priorityImprovements",
         "evidence",

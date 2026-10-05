@@ -37,7 +37,15 @@ export type FreeCheckInput = {
 
 export type FreeCheckResult = {
   ok: true;
-  overallScore: number;
+  /**
+   * 0–100, or null when the site is outside the supported scoring scope
+   * (scoring v1.3: publisher / media and ecommerce sites are not scored).
+   */
+  overallScore: number | null;
+  /** False for publisher / ecommerce sites (see `scopeNote`). */
+  scored: boolean;
+  /** Customer-safe note shown with uncertain and unscored results; null otherwise. */
+  scopeNote: string | null;
   checks: CheckResult[];
   strengths: string[];
   problems: string[];
@@ -52,8 +60,11 @@ export type FreeCheckResult = {
 /**
  * v1.1: classify local vs. online first; online sites aren't scored on storefront location or opening hours.
  * v1.2: online structured data scored on Organization / WebSite / product schema; fixes never restate a Strong check.
+ * v1.3: five classifications (local, online, uncertain, publisher, ecommerce); no silent default to local;
+ *       uncertain sites scored on general checks only; publisher / ecommerce sites are outside the
+ *       supported scope (no overall score, no fixes). Local and online scoring are unchanged.
  */
-export const FREE_CHECK_SCORING_VERSION = "free-check-v1.2" as const;
+export const FREE_CHECK_SCORING_VERSION = "free-check-v1.3" as const;
 
 export type FreeCheckFailure = {
   ok: false;

@@ -3,7 +3,10 @@ import { ScoreGauge } from "./ScoreGauge";
 import type { CheckResult, CheckStatus } from "@/lib/free-check/types";
 
 type ApiResult = {
-  overallScore: number;
+  /** Null when the site is outside the supported scoring scope (scoring v1.3). */
+  overallScore: number | null;
+  scored?: boolean;
+  scopeNote?: string | null;
   checks: CheckResult[];
   strengths: string[];
   problems: string[];
@@ -43,17 +46,34 @@ export function FreeCheckResults({
     websiteUrl: input.websiteUrl,
     email: input.email,
   });
+  const score = result.overallScore;
 
   return (
     <div className="space-y-10">
       <div className="card flex flex-col items-center gap-4 py-10 text-center">
         <p className="pill">Your Free AI Visibility Snapshot</p>
-        <ScoreGauge
-          score={result.overallScore}
-          status={bandLabel(result.overallScore)}
-          size="lg"
-          sampleLabel={false}
-        />
+        {score === null ? (
+          <div className="max-w-md">
+            <p className="mono-data text-4xl text-white/60">Not scored</p>
+            <p className="mt-3 text-sm leading-relaxed text-white/70">
+              {result.scopeNote}
+            </p>
+          </div>
+        ) : (
+          <>
+            <ScoreGauge
+              score={score}
+              status={bandLabel(score)}
+              size="lg"
+              sampleLabel={false}
+            />
+            {result.scopeNote ? (
+              <p className="max-w-md text-sm leading-relaxed text-white/70">
+                {result.scopeNote}
+              </p>
+            ) : null}
+          </>
+        )}
         <p className="max-w-md text-xs leading-relaxed text-white/45">
           This preview estimates how clearly AI systems may understand and
           recommend your business based on publicly available website
@@ -86,6 +106,7 @@ export function FreeCheckResults({
         </div>
       </div>
 
+      {score === null ? null : (
       <div className="grid gap-6 sm:grid-cols-2">
         <div className="card">
           <h3 className="h3 text-base">Top strengths</h3>
@@ -116,6 +137,7 @@ export function FreeCheckResults({
           )}
         </div>
       </div>
+      )}
 
       {result.fixes.length > 0 ? (
         <div className="card">
@@ -143,6 +165,8 @@ export function FreeCheckResults({
         </div>
       ) : null}
 
+      {/* The paid audit is built for the same business types the score supports. */}
+      {score === null ? null : (
       <div className="card border-accent/30 bg-gradient-to-b from-accent/[0.06] to-transparent text-center">
         <p className="pill border-accent/30 bg-accent/10 text-accent">
           This is only the surface-level check
@@ -175,6 +199,7 @@ export function FreeCheckResults({
           Get the Full GeoViz Audit — $97
         </Link>
       </div>
+      )}
     </div>
   );
 }

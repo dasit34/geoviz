@@ -1,0 +1,9 @@
+{
+  "domain": "mixedsignals.example",
+  "input": {
+    "businessName": "Mixed Signals",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

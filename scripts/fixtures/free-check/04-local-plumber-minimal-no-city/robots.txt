@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://riverside-plumbing-2.example/sitemap.xml

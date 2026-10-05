@@ -17,7 +17,7 @@ import { z } from "zod";
 
 import { normalizeDomain } from "@/lib/business/normalize-domain";
 import { runFreeCheckDetailed, type FreeCheckSignals } from "@/lib/free-check/runFreeCheck";
-import type { CheckResult } from "@/lib/free-check/types";
+import type { BusinessType, CheckResult } from "@/lib/free-check/types";
 import { checkUrlShape, type Resolver, type Transport } from "@/lib/monitoring/website/safe-fetch";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -28,6 +28,7 @@ import { isCached, withFetchCache } from "./fetch-cache";
 export const TOOL_NAME = "check_business_visibility";
 export const CHECK_TYPE = "website_ai_readiness";
 export const SCORE_LABEL = "Website AI-readiness (free check)";
+export const UNSCORED_LABEL = "Not scored: outside GeoViz's supported business types";
 export const DISCLAIMER =
   "This is a website AI-readiness check of public pages. GeoViz did not ask ChatGPT, Claude, Gemini, or Perplexity about this business; it does not show whether any AI system recommends it.";
 const TOOL_DEADLINE_MS = 20_000;
@@ -45,6 +46,7 @@ export const inputShape = {
   businessName: z.string().trim().min(2).max(200).optional().describe("Business name as customers know it (improves the identity check)"),
   city: z.string().trim().max(100).optional().describe("City the business serves"),
   state: z.string().trim().max(100).optional().describe("State or region the business serves"),
+  category: z.string().trim().max(100).optional().describe("What kind of business it is, e.g. roofing contractor, dental clinic, or invoicing software (improves classification)"),
 };
 const inputSchema = z.object(inputShape);
 export type CheckBusinessVisibilityInput = z.infer<typeof inputSchema>;
@@ -64,10 +66,12 @@ export const outputShape = {
     city: z.string().nullable(),
     state: z.string().nullable(),
   }),
-  businessType: z.enum(["local", "online"]),
+  // Scoring v1.3: publisher and ecommerce sites are recognized but not scored (score null).
+  businessType: z.enum(["local", "online", "uncertain", "publisher", "ecommerce"]),
   websiteChecked: z.string(),
-  score: z.number().int().min(0).max(100),
-  scoreLabel: z.literal(SCORE_LABEL),
+  score: z.number().int().min(0).max(100).nullable(),
+  scoreLabel: z.enum([SCORE_LABEL, UNSCORED_LABEL]),
+  scopeNote: z.string().nullable(),
   findings: z.array(findingSchema),
   priorityImprovements: z.array(z.string()).max(3),
   evidence: z.array(z.string()),
@@ -146,7 +150,7 @@ export async function checkBusinessVisibility(rawInput: unknown, deps: CheckDeps
   try {
     detailed = await Promise.race([
       runFreeCheckDetailed(
-        { websiteUrl: url, businessName, city: input.city ?? "", state: input.state ?? "", category: "" },
+        { websiteUrl: url, businessName, city: input.city ?? "", state: input.state ?? "", category: input.category ?? "" },
         { fetcher: withFetchCache(net.fetcher) },
       ),
       deadline,
@@ -177,7 +181,8 @@ export async function checkBusinessVisibility(rawInput: unknown, deps: CheckDeps
     businessType: result.businessType,
     websiteChecked: finalUrl,
     score: result.overallScore,
-    scoreLabel: SCORE_LABEL,
+    scoreLabel: result.scored ? SCORE_LABEL : UNSCORED_LABEL,
+    scopeNote: result.scopeNote,
     findings: result.checks.map((c: CheckResult) => ({ id: c.id, label: c.label, status: c.status, explanation: c.explanation })),
     priorityImprovements: result.fixes.slice(0, 3),
     evidence: [businessTypeEvidence(result.businessType, result.businessTypeReasons), ...buildEvidence(signals, nameProvided, result.businessType)],
@@ -246,16 +251,26 @@ function homepageFailure(kind: string | undefined): ToolResult {
   }
 }
 
-function businessTypeEvidence(type: "local" | "online", reasons: string[]): string {
-  return type === "online"
-    ? `Scored as an online business, so storefront location and opening hours aren't scored. Reason: ${reasons.join("; ")}.`
-    : "Scored as a local business: location, address, and opening-hours signals are included.";
+function businessTypeEvidence(type: BusinessType, reasons: string[]): string {
+  const why = reasons.length ? ` Reason: ${reasons.join("; ")}.` : "";
+  switch (type) {
+    case "online":
+      return `Scored as an online business, so storefront location and opening hours aren't scored.${why}`;
+    case "uncertain":
+      return `Business type unclear, so only checks that apply to any business were scored.${why}`;
+    case "publisher":
+      return `Recognized as a publisher or media site, which is outside GeoViz's supported scoring scope, so it isn't scored.${why}`;
+    case "ecommerce":
+      return `Recognized as an online store, which is outside GeoViz's supported scoring scope, so it isn't scored.${why}`;
+    default:
+      return `Scored as a local business: location, address, and opening-hours signals are included.${why}`;
+  }
 }
 
 const SAFE_TYPE = /^[A-Za-z][A-Za-z0-9]{0,40}$/;
 
 /** Factual lines read straight from analyzer outputs — no inference. */
-export function buildEvidence(signals: FreeCheckSignals, nameProvided: boolean, businessType: "local" | "online" = "local"): string[] {
+export function buildEvidence(signals: FreeCheckSignals, nameProvided: boolean, businessType: BusinessType = "local"): string[] {
   const lines: string[] = [];
   const { schema, crawlability, readability, entityConsistency } = signals;
 
@@ -266,9 +281,10 @@ export function buildEvidence(signals: FreeCheckSignals, nameProvided: boolean, 
         ? "No JSON-LD structured data found on the homepage."
         : `Structured data: ${schema.rawJsonLdCount} JSON-LD block${schema.rawJsonLdCount === 1 ? "" : "s"}${types.length ? ` (types: ${types.join(", ")})` : ""}.`,
     );
-    if (businessType === "online") {
-      // Online businesses are scored on Organization / WebSite / product schema, not LocalBusiness fields.
-      const items = signals.onlineSchema?.items ?? [];
+    if (businessType !== "local") {
+      // Non-local sites are judged on Organization / WebSite (and, for software, product) schema — never LocalBusiness fields.
+      const productKeys = ["product_name", "product_details"];
+      const items = (signals.onlineSchema?.items ?? []).filter((i) => businessType === "online" || !productKeys.includes(i.key));
       const present = items.filter((i) => i.present).map((i) => i.label);
       const missing = items.filter((i) => !i.present).map((i) => i.label);
       if (present.length) lines.push(`Online business schema present: ${present.join("; ")}.`);
@@ -313,13 +329,18 @@ export function buildEvidence(signals: FreeCheckSignals, nameProvided: boolean, 
 function summarize(o: CheckBusinessVisibilityOutput): string {
   const findings = o.findings.map((f) => `- ${f.label}: ${f.status.replaceAll("_", " ")}`).join("\n");
   const fixes = o.priorityImprovements.map((f, i) => `${i + 1}. ${f}`).join("\n");
+  const headline =
+    o.score === null
+      ? `${UNSCORED_LABEL} — ${o.business.name} (${o.websiteChecked}), checked ${o.checkedAt}.`
+      : `${SCORE_LABEL} for ${o.business.name} (${o.websiteChecked}): ${o.score}/100, checked ${o.checkedAt}.`;
   return [
-    `${SCORE_LABEL} for ${o.business.name} (${o.websiteChecked}): ${o.score}/100, checked ${o.checkedAt}.`,
+    headline,
+    ...(o.scopeNote ? ["", o.scopeNote] : []),
     "",
     "Findings:",
     findings,
     "",
-    fixes ? `Top improvements:\n${fixes}` : "No priority improvements were flagged.",
+    fixes ? `Top improvements:\n${fixes}` : o.score === null ? "No improvements are suggested for sites outside GeoViz's supported scope." : "No priority improvements were flagged.",
     "",
     `Evidence:\n${o.evidence.map((e) => `- ${e}`).join("\n")}`,
     "",

@@ -23,10 +23,16 @@ export type OnlineSchemaSignals = {
   score: number;
   /** The product @type found, if any (e.g. "SoftwareApplication"). */
   productType: string | null;
+  /** Scoring v1.3 classification signals (see classifyBusinessType.ts). */
+  /** A Product node with an `offers` value — the shape of a store listing. */
+  productWithOffer: boolean;
+  /** Article / NewsArticle / BlogPosting / ReportageNewsArticle nodes. */
+  articleNodes: number;
 };
 
 const ORGANIZATION_TYPES = new Set(["Organization", "Corporation", "OnlineBusiness", "OnlineStore"]);
 const PRODUCT_TYPES = new Set(["SoftwareApplication", "WebApplication", "MobileApplication", "Product", "Service"]);
+const ARTICLE_TYPES = new Set(["Article", "NewsArticle", "BlogPosting", "ReportageNewsArticle", "AnalysisNewsArticle", "LiveBlogPosting"]);
 
 const LABELS: Record<OnlineSchemaItemKey, string> = {
   organization_name: "Organization name",
@@ -69,7 +75,9 @@ export function analyzeOnlineSchema(html: string): OnlineSchemaSignals {
   const items = (Object.keys(LABELS) as OnlineSchemaItemKey[]).map((key) => ({ key, label: LABELS[key], present: present[key] }));
   const score = Math.round((items.filter((i) => i.present).length / items.length) * 100);
   const productType = product ? typesOf(product).find((t) => PRODUCT_TYPES.has(t)) ?? null : null;
-  return { items, score, productType };
+  const productWithOffer = nodes.some((n) => hasType(n, new Set(["Product"])) && filled(n.offers));
+  const articleNodes = nodes.filter((n) => hasType(n, ARTICLE_TYPES)).length;
+  return { items, score, productType, productWithOffer, articleNodes };
 }
 
 function collect(node: unknown, out: Node[]): void {

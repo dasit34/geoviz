@@ -59,7 +59,7 @@
       "expected_behavior": "If the tool is called, it returns an error result: \"That address isn't a public business website, so GeoViz won't fetch it.\" No request is made to the address and no score is shown."
     }
   ],
-  "release_notes": "Initial release. One read-only tool, check_business_visibility: a website AI-readiness check of a business's public homepage that returns a 0-100 score, six findings, up to three prioritized improvements, supporting evidence, and the date checked, shown in a GeoViz result card. Local and online businesses are scored by the signals that apply to each. GeoViz does not query AI systems about the business.",
+  "release_notes": "Initial release. One read-only tool, check_business_visibility: a website AI-readiness check of a business's public homepage that returns a 0-100 score, six findings, up to three prioritized improvements, supporting evidence, and the date checked, shown in a GeoViz result card. Local and online businesses are scored by the signals that apply to each; sites of unclear type are scored on general checks only; publishers and online stores are recognized but not scored. GeoViz does not query AI systems about the business.",
   "countries": [
     "US"
   ],

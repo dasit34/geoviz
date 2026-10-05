@@ -1,0 +1,18 @@
+{
+  "type": "local",
+  "scored": true,
+  "score": 33,
+  "statuses": {
+    "business_identity": "strong",
+    "location_clarity": "needs_improvement",
+    "service_clarity": "missing",
+    "contact_consistency": "missing",
+    "structured_data": "missing",
+    "ai_recommendation_readiness": "missing"
+  },
+  "fixes": [
+    "Describe your services in more plain-language detail on your homepage.",
+    "Make your name, phone, and address consistent across your site.",
+    "Add LocalBusiness structured data with your address, phone, and opening hours."
+  ]
+}

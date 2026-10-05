@@ -1,0 +1,18 @@
+{
+  "type": "uncertain",
+  "scored": true,
+  "score": 64,
+  "statuses": {
+    "business_identity": "strong",
+    "location_clarity": "not_applicable",
+    "service_clarity": "missing",
+    "contact_consistency": "strong",
+    "structured_data": "missing",
+    "ai_recommendation_readiness": "needs_improvement"
+  },
+  "fixes": [
+    "Describe what you offer in more plain-language detail on your homepage.",
+    "Add structured data that identifies your business (name, website, logo, and contact details).",
+    "Improve these AI recommendation inputs together: structured data, content depth."
+  ]
+}

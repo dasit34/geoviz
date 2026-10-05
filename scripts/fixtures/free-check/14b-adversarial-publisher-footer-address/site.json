@@ -1,0 +1,9 @@
+{
+  "domain": "metro-dispatch.example",
+  "input": {
+    "businessName": "Metro Dispatch",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

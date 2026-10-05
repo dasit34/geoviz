@@ -1,0 +1,9 @@
+{
+  "domain": "harbor-collective.example",
+  "input": {
+    "businessName": "Harbor Collective",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

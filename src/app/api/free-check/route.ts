@@ -105,7 +105,7 @@ export async function POST(req: Request) {
     }
 
     console.log(
-      `[free-check] completed url=${websiteUrl} score=${result.overallScore}`,
+      `[free-check] completed url=${websiteUrl} score=${result.overallScore ?? "unscored"} type=${result.businessType}`,
     );
 
     await persistSubmission({
@@ -152,7 +152,7 @@ async function persistSubmission(args: {
   email: string;
   status: "completed" | "failed";
   failureReason?: string;
-  overallScore?: number;
+  overallScore?: number | null;
   checks?: CheckResult[];
   strengths?: string[];
   problems?: string[];

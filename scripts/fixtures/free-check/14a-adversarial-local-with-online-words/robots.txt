@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://valley-plumbing.example/sitemap.xml

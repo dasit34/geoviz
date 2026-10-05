@@ -67,6 +67,35 @@ with applicationCategory/offers/description. The check is labeled
 what its own check measures, and the readiness fix lists only its weak inputs, so
 no top improvement restates a Strong finding (enforced by a consistency test).
 
+## Free-check scoring v1.3 (business-type scope)
+`classifyBusinessType` returns five types. The order of evidence is:
+1. declared schema types;
+2. local evidence;
+3. category;
+4. text cues;
+5. otherwise uncertain.
+
+There is no silent default to local any more.
+
+| Type | Scored | Profile |
+|---|---|---|
+| local | yes | v1.0 local rubric, unchanged |
+| online | yes | v1.2 online rubric, unchanged |
+| uncertain | yes | general checks only; location not applicable; prompts the user for a city and state |
+| publisher | **no** (`overallScore: null`) | outside the supported scope; informational findings, no fixes |
+| ecommerce | **no** (`overallScore: null`) | outside the supported scope; informational findings, no fixes |
+
+- **Strong local evidence:** a LocalBusiness-family type, or a city, state or category the user provides.
+- **Weak local evidence:** a schema address, a page address, or a "City, ST 12345" pattern. Weak evidence becomes uncertain when the homepage also has 3 or more store or news cues, because stores and publishers list head-office addresses too.
+- **Cue text:** cues are matched on element-separated text, so adjacent nav items can't merge into one word and hide a cue.
+- **Benchmark:** 16 synthetic fixture sites in `scripts/fixtures/free-check/`, run by `npm run test:free-check-benchmark`. It pins type, score, statuses and fixes, and checks invariants:
+  - no fixes for unscored sites;
+  - fixes never come from Strong or N/A checks;
+  - no storefront wording for non-local types;
+  - no popularity or ranking claims.
+
+  The local and online fixtures score identically to v1.2.
+
 ## Submission-readiness changes (branch `feat/chatgpt-plugin-submission`)
 - **Links:** tool results link only to non-transactional pages: `links.freeCheck` (`/check`) and `links.exampleReport` (`/sample-report`). The card reads "See an example GeoViz report". There is no `/order` or checkout link, per OpenAI's plugin commerce rules.
 - **Cache:** fetched public pages are cached in memory for 10 minutes per URL (`src/lib/chatgpt-plugin/fetch-cache.ts`). Repeat checks re-score the cached pages without a new request and don't count toward the per-site or global limits.

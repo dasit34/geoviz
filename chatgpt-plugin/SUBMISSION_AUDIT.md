@@ -23,6 +23,8 @@ The 4 remaining items need your action in the OpenAI dashboard or a recording; t
 | `review/tools-list.json` | `tools/list` from this branch's MCP server (what Production will expose after deploy) |
 | `review/sample-output-geoviz.json` | Tool output for geoviz.ai from this branch's code (used for the screenshot) |
 
+**Scoring v1.3 (branch `feat/free-check-v1-3`):** `plugin.json` (longDescription), the release notes and `review/tools-list.json` are updated for v1.3. The committed ZIP is still the v1.2 build. Rebuild it only after v1.3 is approved and deployed to Production.
+
 Rebuild: `npm run chatgpt-plugin:package`. It validates the listing limits and re-renders the assets and the ZIP.
 
 ## Audit results
