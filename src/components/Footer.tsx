@@ -22,6 +22,7 @@ const COMPANY = [
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
   { href: "/refund-policy", label: "Refund policy" },
+  { href: "/support", label: "Support" },
   { href: "mailto:support@geoviz.ai", label: "Contact" },
 ];
 

@@ -60,7 +60,6 @@ export type HomepageOutcome = { kind: "ok" } | { kind: FetchFailure };
 export function createSafeHtmlFetcher(siteUrl: string, opts: SafeHtmlFetcherOptions = {}) {
   let site = normalizeDomain(siteUrl);
   let homepage: HomepageOutcome | null = null;
-  let calls = 0;
   const homepageTimeoutMs = opts.homepageTimeoutMs ?? 8_000;
   const homepageMaxBytes = opts.homepageMaxBytes ?? HOMEPAGE_MAX_BYTES;
   const auxTimeoutMs = opts.auxTimeoutMs ?? 5_000;
@@ -94,8 +93,10 @@ export function createSafeHtmlFetcher(siteUrl: string, opts: SafeHtmlFetcherOpti
   };
 
   const fetcher: HtmlFetcher = async (url: string, fetchOpts?: FetchRawHtmlOptions): Promise<FetchRawHtmlResult> => {
-    const isHomepage = calls === 0;
-    calls += 1;
+    // The homepage is the URL this fetcher was created for (identified by URL,
+    // not call order, so a caching wrapper can skip it without confusing the
+    // robots.txt / sitemap.xml requests that follow).
+    const isHomepage = url === siteUrl && homepage === null;
     if (!site) {
       if (isHomepage) homepage = { kind: "blocked_unsafe" };
       return { ok: false, error: "fetch blocked", timedOut: false };

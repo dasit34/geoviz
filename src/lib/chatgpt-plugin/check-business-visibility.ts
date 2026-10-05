@@ -23,6 +23,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 
 import { createSafeHtmlFetcher } from "@/lib/free-check/safe-html-fetcher";
 
+import { isCached, withFetchCache } from "./fetch-cache";
+
 export const TOOL_NAME = "check_business_visibility";
 export const CHECK_TYPE = "website_ai_readiness";
 export const SCORE_LABEL = "Website AI-readiness (free check)";
@@ -70,7 +72,8 @@ export const outputShape = {
   priorityImprovements: z.array(z.string()).max(3),
   evidence: z.array(z.string()),
   checkedAt: z.string(),
-  links: z.object({ freeCheck: z.string(), fullAudit: z.string() }),
+  // Non-transactional pages only (OpenAI plugin guidelines: no links to checkout).
+  links: z.object({ freeCheck: z.string(), exampleReport: z.string() }),
   aiSystemsQueried: z.array(z.string()).max(0),
   disclaimer: z.literal(DISCLAIMER),
 };
@@ -125,7 +128,9 @@ export async function checkBusinessVisibility(rawInput: unknown, deps: CheckDeps
     );
   }
 
-  const limited = applyLimits(deps.clientKey, domain);
+  // A fresh cached copy means no new request to the website, so only the
+  // per-client limit applies (repeat checks don't hit "try again later").
+  const limited = applyLimits(deps.clientKey, domain, !isCached(url));
   if (limited) return finish(deps, domain, started, limited);
 
   const net = createSafeHtmlFetcher(url, { resolver: deps.resolver, transport: deps.transport });
@@ -142,7 +147,7 @@ export async function checkBusinessVisibility(rawInput: unknown, deps: CheckDeps
     detailed = await Promise.race([
       runFreeCheckDetailed(
         { websiteUrl: url, businessName, city: input.city ?? "", state: input.state ?? "", category: "" },
-        { fetcher: net.fetcher },
+        { fetcher: withFetchCache(net.fetcher) },
       ),
       deadline,
     ]);
@@ -179,7 +184,7 @@ export async function checkBusinessVisibility(rawInput: unknown, deps: CheckDeps
     checkedAt: (deps.now ?? (() => new Date()))().toISOString(),
     links: {
       freeCheck: `${siteUrl}/check`,
-      fullAudit: `${siteUrl}/order?websiteUrl=${encodeURIComponent(finalUrl)}`,
+      exampleReport: `${siteUrl}/sample-report`,
     },
     aiSystemsQueried: [],
     disclaimer: DISCLAIMER,
@@ -206,11 +211,15 @@ function domainLabel(domain: string): string {
   return root.charAt(0).toUpperCase() + root.slice(1);
 }
 
-function applyLimits(clientKey: string, domain: string): ToolResult | null {
+function applyLimits(clientKey: string, domain: string, fetchesWebsite: boolean): ToolResult | null {
   const checks = [
     checkRateLimit(`mcp:check:client:${clientKey}`, LIMITS.perClient, WINDOW_MS),
-    checkRateLimit(`mcp:check:domain:${domain}`, LIMITS.perDomain, WINDOW_MS),
-    checkRateLimit("mcp:check:global", LIMITS.global, WINDOW_MS),
+    ...(fetchesWebsite
+      ? [
+          checkRateLimit(`mcp:check:domain:${domain}`, LIMITS.perDomain, WINDOW_MS),
+          checkRateLimit("mcp:check:global", LIMITS.global, WINDOW_MS),
+        ]
+      : []),
   ];
   const blocked = checks.find((r) => !r.allowed);
   if (!blocked) return null;
@@ -315,7 +324,7 @@ function summarize(o: CheckBusinessVisibilityOutput): string {
     `Evidence:\n${o.evidence.map((e) => `- ${e}`).join("\n")}`,
     "",
     o.disclaimer,
-    `Run the free check: ${o.links.freeCheck} · Full AI Visibility Audit: ${o.links.fullAudit}`,
+    `Free website check: ${o.links.freeCheck} · Example GeoViz report: ${o.links.exampleReport}`,
   ].join("\n");
 }
 

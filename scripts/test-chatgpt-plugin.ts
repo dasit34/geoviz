@@ -17,6 +17,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 import { checkBusinessVisibility, DISCLAIMER, LIMITS, TOOL_NAME } from "../src/lib/chatgpt-plugin/check-business-visibility";
+import { CACHE_TTL_MS, clearFetchCache } from "../src/lib/chatgpt-plugin/fetch-cache";
 import { handleMcpRequest } from "../src/lib/chatgpt-plugin/server";
 import { CARD_HTML, CARD_MIME_TYPE, CARD_URI } from "../src/lib/chatgpt-plugin/result-card";
 import { runFreeCheck } from "../src/lib/free-check/runFreeCheck";
@@ -129,7 +130,7 @@ async function main() {
     assert.ok(o.evidence.includes("sitemap.xml found."));
     assert.equal(o.checkedAt, "2026-10-03T12:00:00.000Z");
     assert.equal(o.links.freeCheck, "https://www.geoviz.ai/check");
-    assert.equal(o.links.fullAudit, "https://www.geoviz.ai/order?websiteUrl=https%3A%2F%2Fsummitroofing.example%2F");
+    assert.equal(o.links.exampleReport, "https://www.geoviz.ai/sample-report");
     assert.deepEqual(o.aiSystemsQueried, []);
     assert.equal(o.disclaimer, DISCLAIMER);
   });
@@ -293,10 +294,11 @@ async function main() {
   });
 
   // ── Rate limits ──
-  await check(`per-domain limit (${LIMITS.perDomain}/10 min) returns a retry message`, async () => {
+  await check(`per-domain limit (${LIMITS.perDomain}/10 min) applies to fresh fetches and returns a retry message`, async () => {
     const results = [];
     for (let i = 0; i < LIMITS.perDomain + 1; i += 1) {
-      results.push(await checkBusinessVisibility({ websiteUrl: "popular.example", businessName: "Pop" }, { clientKey: freshKey(), ...siteNet("popular.example") }));
+      clearFetchCache(); // simulate the 10-minute cache expiring between checks
+      results.push(await checkBusinessVisibility({ websiteUrl: "popular.example", businessName: "Pop Co" }, { clientKey: freshKey(), ...siteNet("popular.example") }));
     }
     assert.ok(results.slice(0, LIMITS.perDomain).every((r) => r.ok));
     const last = results[LIMITS.perDomain]!;
@@ -305,6 +307,49 @@ async function main() {
       assert.equal(last.kind, "rate_limited");
       assert.match(last.message, /try again in about \d+ minutes?/);
     }
+  });
+
+  await check("repeat checks of the same site within 10 minutes are served from cache: no new fetch, no rate-limit refusal", async () => {
+    const net = siteNet("reviewed.example");
+    const runs = [];
+    for (let i = 0; i < LIMITS.perDomain + 3; i += 1) {
+      runs.push(await checkBusinessVisibility({ websiteUrl: "reviewed.example", businessName: "Summit Roofing" }, { clientKey: freshKey(), ...net }));
+    }
+    assert.ok(runs.every((r) => r.ok), "every repeat check succeeds");
+    assert.deepEqual(net.calls, ["https://reviewed.example/", "https://reviewed.example/robots.txt", "https://reviewed.example/sitemap.xml"], "the website was fetched once");
+    const scores = runs.map((r) => (r.ok ? r.output.score : -1));
+    assert.ok(scores.every((x) => x === scores[0]), "same input, same result");
+    assert.equal(CACHE_TTL_MS, 10 * 60_000);
+  });
+
+  await check("cached pages are re-scored per caller (business name / city are not shared between callers)", async () => {
+    const net = siteNet("shared.example");
+    const a = await checkBusinessVisibility({ websiteUrl: "shared.example", businessName: "Summit Roofing", city: "Denver" }, { clientKey: freshKey(), ...net });
+    const b = await checkBusinessVisibility({ websiteUrl: "shared.example", businessName: "Other Name LLC", city: "Boise" }, { clientKey: freshKey(), ...net });
+    assert.ok(a.ok && b.ok);
+    if (a.ok && b.ok) {
+      assert.equal(b.output.business.name, "Other Name LLC");
+      assert.equal(b.output.business.city, "Boise");
+      assert.notEqual(a.output.findings.find((f) => f.id === "business_identity")!.status, b.output.findings.find((f) => f.id === "business_identity")!.status);
+    }
+    assert.equal(net.calls.length, 3, "second caller used the cached pages");
+  });
+
+  await check("failed fetches are never cached", async () => {
+    const net = fakeNet({ "flaky.example": PUBLIC_IP }, { "https://flaky.example/": "timeout" });
+    await checkBusinessVisibility({ websiteUrl: "flaky.example" }, { clientKey: freshKey(), ...net });
+    await checkBusinessVisibility({ websiteUrl: "flaky.example" }, { clientKey: freshKey(), ...net });
+    assert.equal(net.calls.length, 2, "each attempt fetched again");
+  });
+
+  await check("no tool output, text summary, or card links to /order or any checkout page", async () => {
+    const r = await checkBusinessVisibility({ websiteUrl: "nolinks.example", businessName: "Summit Roofing" }, { clientKey: freshKey(), ...siteNet("nolinks.example") });
+    assert.ok(r.ok);
+    const all = `${JSON.stringify(r.ok ? r.output : r)}\n${r.ok ? r.text : ""}\n${CARD_HTML}`;
+    assert.ok(!/\/order|checkout|stripe|\$97|full GeoViz audit/i.test(all), "transactional link or wording found");
+    if (r.ok) assert.deepEqual(Object.keys(r.output.links).sort(), ["exampleReport", "freeCheck"]);
+    assert.match(CARD_HTML, /d\.links\.exampleReport/);
+    assert.match(CARD_HTML, /See an example GeoViz report/);
   });
 
   await check(`per-client limit (${LIMITS.perClient}/10 min) applies across domains`, async () => {
@@ -339,6 +384,35 @@ async function main() {
         assert.ok(!/openai|anthropic|gemini|google|perplexity|prisma|stripe|resend|monitoring\/(auth|tracking|webhook)/i.test(line.replace("@/lib/monitoring/website/safe-fetch", "")), `${path.basename(f)}: ${line}`);
       }
     }
+  });
+
+  // ── Submission requirements (OpenAI plugin directory) ──
+  await check("public /support page exists with the support email and ChatGPT guidance", () => {
+    const src = readFileSync(path.join(__dirname, "../src/app/support/page.tsx"), "utf8");
+    assert.match(src, /support@geoviz\.ai/);
+    assert.match(src, /GeoViz in ChatGPT/);
+    assert.match(src, /does\s+not\s+show\s+whether\s+any\s+AI\s+system\s+recommends\s+it/);
+    assert.ok(!/guarantee|rank higher|\$97|\/order/i.test(src));
+  });
+
+  await check("privacy policy covers the ChatGPT plugin: data, purpose, retention, deletion, sharing, contact", () => {
+    const src = readFileSync(path.join(__dirname, "../src/app/privacy/page.tsx"), "utf8");
+    const section = src.slice(src.indexOf('id="chatgpt"'), src.indexOf('title="5. Cookies'));
+    assert.ok(section.length > 500, "ChatGPT section present (#chatgpt)");
+    for (const needle of [/What we receive/, /website address/, /business\s+name, city, and state/, /How we use it/, /not saved\s+to our database/, /up to 10 minutes/, /no longer than 30 days/, /Sharing/, /do not\s+sell/, /Deletion/, /\/support/, /support@geoviz\.ai/]) {
+      assert.match(section, needle);
+    }
+    assert.match(src, /const LAST_UPDATED = "October 4, 2026"/);
+  });
+
+  await check("listing URLs in plugin.json point at routes that exist in this app", () => {
+    const plugin = JSON.parse(readFileSync(path.join(__dirname, "../chatgpt-plugin/plugin.json"), "utf8"));
+    const ui = plugin.extensions["com.openai"].interface;
+    for (const key of ["supportURL", "privacyPolicyURL", "termsOfServiceURL"]) {
+      const route = new URL(ui[key]).pathname.replace(/^\//, "");
+      assert.ok(readdirSync(path.join(__dirname, "../src/app", route)).includes("page.tsx"), `${key} → src/app/${route}/page.tsx`);
+    }
+    assert.equal(JSON.parse(readFileSync(path.join(__dirname, "../chatgpt-plugin/mcp.json"), "utf8")).mcpServers.geoviz.url, "https://www.geoviz.ai/mcp");
   });
 
   // ── Safe errors / logs ──
