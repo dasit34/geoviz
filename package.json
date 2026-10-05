@@ -71,6 +71,7 @@
     "test:format-score": "tsx scripts/test-format-score.ts",
     "test:free-check-scoring": "tsx scripts/test-free-check-scoring.ts",
     "test:chatgpt-plugin": "tsx scripts/test-chatgpt-plugin.ts",
+    "chatgpt-plugin:package": "tsx scripts/build-chatgpt-plugin-package.ts",
     "test:free-check-safe-fetch": "tsx scripts/test-free-check-safe-fetch.ts",
     "test:category-label-wrap": "tsx scripts/test-category-label-wrap.ts",
     "test:report-redesign": "tsx scripts/test-report-redesign.ts",

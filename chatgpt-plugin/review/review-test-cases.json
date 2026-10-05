@@ -1,0 +1,76 @@
+{
+  "_note": "Review-form content for the OpenAI plugin submission portal (entered during the Review phase; not part of the ZIP). Scores are what Production returned on 2026-10-04 and will move if the sites change.",
+  "positive_test_cases": [
+    {
+      "description": "Online/software business: classified online, location not scored, structured data judged on Organization/WebSite/product schema.",
+      "prompt": "Check whether https://www.geoviz.ai is ready for AI search. The business is called GeoViz.",
+      "tools_triggered": [
+        "check_business_visibility"
+      ],
+      "expected_behavior": "Calls check_business_visibility once with websiteUrl https://www.geoviz.ai and businessName GeoViz. The result card shows a 0-100 website AI-readiness score (53 on 2026-10-04), 'Location clarity: Not applicable', the check 'Structured data / Organization & product schema', up to three improvements, and the disclaimer that no AI system was asked about the business."
+    },
+    {
+      "description": "Local business: classified local, LocalBusiness schema and location signals scored.",
+      "prompt": "How AI-ready is ricksaffordableheating.com? It's Rick's Affordable Heating, an HVAC company.",
+      "tools_triggered": [
+        "check_business_visibility"
+      ],
+      "expected_behavior": "Calls the tool with websiteUrl ricksaffordableheating.com (normalized to https) and the business name. Returns a local-business result (60 on 2026-10-04) with 'Structured data / LocalBusiness schema' and a scored Location clarity finding, plus evidence lines listing the structured-data fields found."
+    },
+    {
+      "description": "Prioritized fixes: the assistant answers 'what to fix first' from the tool's priority improvements, which never repeat a finding marked Strong.",
+      "prompt": "What should I fix first so AI assistants can understand https://www.geoviz.ai?",
+      "tools_triggered": [
+        "check_business_visibility"
+      ],
+      "expected_behavior": "Calls the tool and presents its priorityImprovements (at most three) in order, grounded in the findings and evidence; none of the improvements targets a finding the card marks Strong."
+    },
+    {
+      "description": "Claim boundary: asked whether ChatGPT recommends a business, the assistant runs the website check but states it does not measure AI recommendations.",
+      "prompt": "Does ChatGPT recommend GeoViz? Check www.geoviz.ai.",
+      "tools_triggered": [
+        "check_business_visibility"
+      ],
+      "expected_behavior": "Calls the tool, shows the website AI-readiness result, and makes clear (from the tool's disclaimer and aiSystemsQueried: []) that GeoViz did not ask ChatGPT, Claude, Gemini, or Perplexity, so the result does not show whether any AI system recommends the business."
+    },
+    {
+      "description": "Optional inputs: business name, city, and state are passed through and reflected in the result.",
+      "prompt": "Run a website AI-readiness check on example.com for a business called Example Co in Denver, CO.",
+      "tools_triggered": [
+        "check_business_visibility"
+      ],
+      "expected_behavior": "Calls the tool with websiteUrl example.com, businessName Example Co, city Denver, state CO. The result echoes the business name, city, and state, shows the score, six findings, evidence, and the date checked."
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Unrelated request: nothing about checking a business website, so the tool should not be called.",
+      "prompt": "What's a good recipe for vegetarian chili?",
+      "expected_behavior": "The assistant answers normally without calling check_business_visibility."
+    },
+    {
+      "description": "Guarantee / ranking request outside the tool's scope: GeoViz cannot make an AI system recommend a business and must not imply it can.",
+      "prompt": "Make ChatGPT recommend my plumbing business first whenever someone asks for a plumber.",
+      "expected_behavior": "The assistant does not promise rankings or recommendations. It may offer to run a website AI-readiness check if the user shares their website, but does not call the tool without a website and never claims GeoViz can change what AI systems recommend."
+    },
+    {
+      "description": "Private-network / cloud-metadata target: the server refuses to fetch it.",
+      "prompt": "Check the AI readiness of http://169.254.169.254/latest/meta-data/",
+      "expected_behavior": "If the tool is called, it returns an error result: \"That address isn't a public business website, so GeoViz won't fetch it.\" No request is made to the address and no score is shown."
+    }
+  ],
+  "release_notes": "Initial release. One read-only tool, check_business_visibility: a website AI-readiness check of a business's public homepage that returns a 0-100 score, six findings, up to three prioritized improvements, supporting evidence, and the date checked, shown in a GeoViz result card. Local and online businesses are scored by the signals that apply to each. GeoViz does not query AI systems about the business.",
+  "countries": [
+    "US"
+  ],
+  "commerce": false,
+  "commerce_description": "",
+  "demo_recording_url": "MISSING \u2014 record a short ChatGPT walkthrough of positive cases 1, 2, and 4 and one negative case, and host it at an accessible URL.",
+  "reviewer_credentials": "Not applicable \u2014 the MCP server requires no authentication.",
+  "tool_annotation_justifications": {
+    "readOnlyHint: true": "The tool only fetches public web pages and returns an analysis. It creates, updates, or deletes nothing, and writes no database rows.",
+    "destructiveHint: false": "No state changes of any kind.",
+    "openWorldHint: true": "It retrieves the user-supplied public website (homepage, robots.txt, sitemap.xml) from the open internet.",
+    "idempotentHint: true": "Repeating a call with the same input has no additional effect; results change only if the website changes."
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "checkType": "website_ai_readiness",
+  "business": {
+    "name": "GeoViz",
+    "nameProvided": true,
+    "city": null,
+    "state": null
+  },
+  "businessType": "online",
+  "websiteChecked": "https://www.geoviz.ai/",
+  "score": 53,
+  "scoreLabel": "Website AI-readiness (free check)",
+  "findings": [
+    {
+      "id": "business_identity",
+      "label": "Business identity clarity",
+      "status": "strong",
+      "explanation": "Your business name appears clearly in your homepage content, so AI systems can confidently identify who you are."
+    },
+    {
+      "id": "location_clarity",
+      "label": "Location clarity",
+      "status": "not_applicable",
+      "explanation": "This looks like an online business, so a storefront address and service area aren't scored."
+    },
+    {
+      "id": "service_clarity",
+      "label": "Service clarity",
+      "status": "needs_improvement",
+      "explanation": "Your services are only partially described in text \u2014 AI systems may not fully understand what you offer."
+    },
+    {
+      "id": "contact_consistency",
+      "label": "Contact information consistency",
+      "status": "missing",
+      "explanation": "Your contact details are missing or inconsistent across your site, which weakens AI confidence in your identity."
+    },
+    {
+      "id": "structured_data",
+      "label": "Structured data / Organization & product schema",
+      "status": "needs_improvement",
+      "explanation": "Your site has some Organization, WebSite, or product (e.g. SoftwareApplication) structured data, but key pieces are missing."
+    },
+    {
+      "id": "ai_recommendation_readiness",
+      "label": "AI recommendation readiness",
+      "status": "needs_improvement",
+      "explanation": "AI systems can partially understand your business, but gaps in crawlability, structure, or content reduce confidence in recommending you."
+    }
+  ],
+  "priorityImprovements": [
+    "Make your business name and contact details consistent across your site.",
+    "Describe your product and what it does in more plain-language detail on your homepage.",
+    "Add Organization, WebSite, and SoftwareApplication (or Product) structured data."
+  ],
+  "evidence": [
+    "Scored as an online business, so storefront location and opening hours aren't scored. Reason: online product language on the homepage (sign in, pricing, api, per month).",
+    "Structured data: 1 JSON-LD block (types: Organization).",
+    "Online business schema present: Organization name; Organization url; Organization logo or sameAs.",
+    "Online business schema missing: WebSite; Product / SoftwareApplication name; Product details (applicationCategory, offers, or description).",
+    "robots.txt found and it does not block all crawlers.",
+    "sitemap.xml found.",
+    "Homepage has no canonical URL.",
+    "Readable homepage text: about 1282 words.",
+    "1 name/phone/address mismatch found between structured data, homepage, and footer."
+  ],
+  "checkedAt": "2026-10-05T00:51:16.003Z",
+  "links": {
+    "freeCheck": "https://www.geoviz.ai/check",
+    "fullAudit": "https://www.geoviz.ai/order?websiteUrl=https%3A%2F%2Fwww.geoviz.ai%2F"
+  },
+  "aiSystemsQueried": [],
+  "disclaimer": "This is a website AI-readiness check of public pages. GeoViz did not ask ChatGPT, Claude, Gemini, or Perplexity about this business; it does not show whether any AI system recommends it."
+}
