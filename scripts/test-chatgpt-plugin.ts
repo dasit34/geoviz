@@ -222,16 +222,33 @@ async function main() {
     const o = r.output;
     assert.equal(o.businessType, "publisher");
     assert.equal(o.score, null);
-    assert.equal(o.scoreLabel, "Not scored: outside GeoViz's supported business types");
+    assert.equal(o.scoreLabel, "Not scored — outside GeoViz's supported business types");
     assert.match(o.scopeNote ?? "", /publisher or media site/);
     assert.deepEqual(o.priorityImprovements, []);
     assert.match(o.evidence[0]!, /^Recognized as a publisher or media site.*Reason: NewsMediaOrganization structured data/);
     const all = JSON.stringify(o.findings) + o.priorityImprovements.join(" ") + o.evidence.join(" ");
     assert.ok(!/LocalBusiness|opening hours|openingHours|street address|storefront/i.test(all.replace("storefront location and opening hours", "")), "no storefront wording");
-    assert.match(r.text, /Not scored: outside GeoViz's supported business types/);
-    assert.match(r.text, /No improvements are suggested/);
+    assert.match(r.text, /^Not scored — outside GeoViz's supported business types: Daily Ledger/);
+    assert.match(r.text, /No improvements are suggested because this site wasn't scored/);
+    assert.ok(!/\/100/.test(r.text), "no score shown for an unscored result");
     assert.match(CARD_HTML, /id="scope"/);
     assert.match(CARD_HTML, /d\.score===null/);
+  });
+
+  await check("v1.3 insufficient content (JavaScript shell) is not scored and has no fixes; card renders no score", async () => {
+    const shell = '<!doctype html><html><head><title>App</title><script src="/app.js"></script></head><body><div id="root"></div></body></html>';
+    const r = await checkBusinessVisibility({ websiteUrl: "jsshell.example", businessName: "Shell Co" }, { clientKey: freshKey(), ...siteNet("jsshell.example", { "https://jsshell.example/": { status: 200, body: shell } }) });
+    assert.ok(r.ok);
+    if (r.ok) {
+      assert.equal(r.output.businessType, "insufficient_evidence");
+      assert.equal(r.output.score, null);
+      assert.equal(r.output.scoreLabel, "Not scored — website type could not be determined reliably");
+      assert.deepEqual(r.output.priorityImprovements, []);
+      assert.match(r.output.scopeNote ?? "", /too little readable content/);
+    }
+    // The card shows "—" (never a number) and hides the improvements block when there are none.
+    assert.match(CARD_HTML, /unscored\?"—":d\.score/);
+    assert.match(CARD_HTML, /el\("fixesBlock"\)\.hidden=fx\.length===0/);
   });
 
   await check("v1.3 category input classifies an otherwise ambiguous site (and is optional)", async () => {
@@ -241,9 +258,12 @@ async function main() {
     assert.ok(without.ok && withCat.ok);
     if (without.ok && withCat.ok) {
       assert.equal(without.output.businessType, "uncertain");
-      assert.ok(without.output.score !== null);
-      assert.match(without.output.scopeNote ?? "", /check again with your city and state/);
+      assert.equal(without.output.score, null, "uncertain is not scored");
+      assert.equal(without.output.scoreLabel, "Not scored — website type could not be determined reliably");
+      assert.deepEqual(without.output.priorityImprovements, []);
+      assert.match(without.output.scopeNote ?? "", /city and state or its business category/);
       assert.equal(withCat.output.businessType, "local");
+      assert.ok(withCat.output.score !== null, "local is scored");
     }
   });
 
@@ -487,7 +507,8 @@ async function main() {
     assert.deepEqual(t.annotations, { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true });
     assert.deepEqual(t.inputSchema.required, ["websiteUrl"]);
     assert.ok(t.inputSchema.properties.category, "optional category input");
-    assert.deepEqual(t.outputSchema.properties.businessType.enum, ["local", "online", "uncertain", "publisher", "ecommerce"]);
+    assert.deepEqual(t.outputSchema.properties.businessType.enum, ["local", "online", "uncertain", "insufficient_evidence", "publisher", "ecommerce"]);
+    assert.deepEqual(t.outputSchema.properties.scoreLabel.enum, ["Website AI-readiness (free check)", "Not scored — outside GeoViz's supported business types", "Not scored — website type could not be determined reliably"]);
     assert.ok(t.outputSchema.properties.disclaimer);
     assert.equal(t._meta.ui.resourceUri, CARD_URI);
     assert.equal(t._meta["openai/outputTemplate"], CARD_URI);

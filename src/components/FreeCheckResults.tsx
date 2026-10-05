@@ -56,7 +56,7 @@ export function FreeCheckResults({
           <div className="max-w-md">
             <p className="mono-data text-4xl text-white/60">Not scored</p>
             <p className="mt-3 text-sm leading-relaxed text-white/70">
-              {result.scopeNote}
+              {(result.scopeNote ?? "").replace(/^Not scored — /, "")}
             </p>
           </div>
         ) : (

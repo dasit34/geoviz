@@ -55,7 +55,7 @@ async function check(label: string, fn: () => Promise<void> | void): Promise<voi
   }
 }
 
-function fixtureNet(caseDir: string, domain: string) {
+function fixtureNet(caseDir: string, domain: string, homepageStatus = 200) {
   const file = (name: string) => (existsSync(path.join(caseDir, name)) ? readFileSync(path.join(caseDir, name), "utf8") : null);
   const routes: Record<string, { body: string; type: string } | null> = {
     [`https://${domain}/`]: file("index.html") === null ? null : { body: file("index.html")!, type: "text/html; charset=utf-8" },
@@ -65,8 +65,9 @@ function fixtureNet(caseDir: string, domain: string) {
   const resolver: Resolver = async () => [{ address: "93.184.216.34", family: 4 }];
   const transport: Transport = async (url) => {
     const r = routes[url.toString()];
+    const status = url.pathname === "/" ? homepageStatus : 200;
     return r
-      ? { status: 200, headers: { "content-type": r.type }, body: Buffer.from(r.body), truncated: false }
+      ? { status, headers: { "content-type": r.type }, body: Buffer.from(r.body), truncated: false }
       : { status: 404, headers: { "content-type": "text/html" }, body: Buffer.from("not found"), truncated: false };
   };
   return { resolver, transport };
@@ -74,9 +75,9 @@ function fixtureNet(caseDir: string, domain: string) {
 
 async function runCase(name: string): Promise<FreeCheckResult | FreeCheckFailure> {
   const caseDir = path.join(DIR, name);
-  const site = JSON.parse(readFileSync(path.join(caseDir, "site.json"), "utf8")) as { domain: string; input: { businessName: string; city: string; state: string; category: string } };
+  const site = JSON.parse(readFileSync(path.join(caseDir, "site.json"), "utf8")) as { domain: string; homepageStatus?: number; input: { businessName: string; city: string; state: string; category: string } };
   const url = `https://${site.domain}/`;
-  const { fetcher } = createSafeHtmlFetcher(url, { ...CHECK_ROUTE_FETCH_OPTIONS, ...fixtureNet(caseDir, site.domain) });
+  const { fetcher } = createSafeHtmlFetcher(url, { ...CHECK_ROUTE_FETCH_OPTIONS, ...fixtureNet(caseDir, site.domain, site.homepageStatus) });
   return (await runFreeCheckDetailed({ websiteUrl: url, ...site.input }, { fetcher })).result;
 }
 
@@ -118,11 +119,18 @@ async function main() {
       assert.equal(result.scoringVersion, "free-check-v1.3");
       assert.ok(result.businessTypeReasons.length > 0, "classification has a reason");
       // Score is null exactly when the site is outside the supported scope.
-      if (result.scored) assert.ok(typeof result.overallScore === "number" && result.overallScore >= 0 && result.overallScore <= 100);
+      // Only local and online businesses are scored.
+      assert.equal(result.scored, result.businessType === "local" || result.businessType === "online", "scored iff local or online");
+      if (result.scored) {
+        assert.ok(typeof result.overallScore === "number" && result.overallScore >= 0 && result.overallScore <= 100);
+        assert.equal(result.unscoredReason, null);
+      }
       else {
         assert.equal(result.overallScore, null);
         assert.deepEqual(result.fixes, [], "no fixes for unscored sites");
-        assert.ok(result.scopeNote, "unscored sites carry a scope note");
+        assert.ok(result.scopeNote?.startsWith("Not scored —"), "unscored sites carry a 'Not scored —' note");
+        assert.ok(result.unscoredReason, "unscored sites say why");
+        assert.equal(result.strengths.length + result.problems.length >= 0, true);
       }
       // Fixes come only from applicable, non-Strong checks.
       const done = new Set(result.checks.filter((c) => c.status === "strong" || c.status === "not_applicable").map((c) => c.id));
@@ -140,6 +148,31 @@ async function main() {
   }
 
   if (PRINT) return;
+
+  // /check results UI: an unscored result never shows a number, priorities, or the paid-audit offer.
+  await check("/check UI: unscored results show 'Not scored' with no score, no priorities, no audit offer", async () => {
+    const React = await import("react");
+    (globalThis as { React?: unknown }).React = React; // tsx compiles JSX to React.createElement
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { FreeCheckResults } = await import("../src/components/FreeCheckResults");
+    const input = { websiteUrl: "https://a.example", businessName: "A", email: "a@b.example" };
+    for (const name of ["07-publisher-newsmedia-schema", "12-uncertain-brochure", "17-insufficient-js-shell"]) {
+      const r = await runCase(name);
+      assert.ok(r.ok && !r.scored, name);
+      if (!r.ok) continue;
+      const html = renderToStaticMarkup(React.createElement(FreeCheckResults, { result: r, input }));
+      assert.ok(html.includes("Not scored"), `${name}: 'Not scored'`);
+      assert.ok(!/\/100|\$97|Recommended priorities|Top problems|Priority 1/.test(html), `${name}: shows a score, priorities, or the audit offer`);
+      assert.ok(!html.includes("Not scored — Not scored"), `${name}: duplicated label`);
+    }
+    const scored = await runCase("05-saas-software-schema");
+    assert.ok(scored.ok && scored.scored);
+    if (scored.ok) {
+      const html = renderToStaticMarkup(React.createElement(FreeCheckResults, { result: scored, input }));
+      assert.ok(html.includes("Recommended priorities") && html.includes("$97") && !html.includes("Not scored"), "scored result keeps the normal UI");
+    }
+  });
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed > 0) {
     console.log(failures.join("\n"));

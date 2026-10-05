@@ -22,8 +22,10 @@ import type {
 } from "@/lib/intelligence/preflight/types";
 import { classifyBusinessType, type BusinessType } from "./classifyBusinessType";
 import type { OnlineSchemaSignals } from "./onlineSchema";
+import type { PageSignals } from "./pageSignals";
 import {
   FREE_CHECK_SCORING_VERSION,
+  type UnscoredReason,
   type CheckId,
   type CheckResult,
   type CheckStatus,
@@ -42,6 +44,8 @@ export type DeriveChecksInput = {
   onlineSchema?: OnlineSchemaSignals | null;
   /** Element-separated homepage text for classification cues (v1.3). Defaults to `plainText`. */
   cueText?: string;
+  /** Page-structure evidence for classification (v1.3). */
+  pageSignals?: PageSignals | null;
 };
 
 // Sub-score → status thresholds, shared across all six checks so the
@@ -328,6 +332,8 @@ const CHECK_PRIORITIES: Record<CopyKind, Record<CheckId, string>> = {
 // information, but there is no overall score and no fixes.
 type Profile = {
   scored: boolean;
+  /** Why an unscored result wasn't scored. */
+  unscoredReason: UnscoredReason | null;
   schema: "local" | "online" | "general";
   copy: CopyKind;
   notApplicable: CheckId[];
@@ -336,39 +342,59 @@ type Profile = {
 
 const UNSCORED_NA: CheckId[] = ["location_clarity", "service_clarity", "ai_recommendation_readiness"];
 
+const UNDETERMINED = "Not scored — website type could not be determined reliably.";
+const OUT_OF_SCOPE = "Not scored — outside GeoViz's supported business types.";
+
 const PROFILES: Record<BusinessType, Profile> = {
-  local: { scored: true, schema: "local", copy: "local", notApplicable: [], scopeNote: null },
-  online: { scored: true, schema: "online", copy: "online", notApplicable: ["location_clarity"], scopeNote: null },
+  local: { scored: true, unscoredReason: null, schema: "local", copy: "local", notApplicable: [], scopeNote: null },
+  online: { scored: true, unscoredReason: null, schema: "online", copy: "online", notApplicable: ["location_clarity"], scopeNote: null },
   uncertain: {
-    scored: true,
+    scored: false,
+    unscoredReason: "type_undetermined",
     schema: "general",
     copy: "general",
-    notApplicable: ["location_clarity"],
-    scopeNote:
-      "GeoViz couldn't tell what kind of business this is, so it scored only the checks that apply to any business. If you serve customers in a specific area, check again with your city and state for a local-business score.",
+    notApplicable: UNSCORED_NA,
+    scopeNote: `${UNDETERMINED} GeoViz scores local service businesses and online/software businesses, and this homepage didn't show clear enough evidence of either. If this is a local business, check again with its city and state or its business category; for software, add a category such as "software". The findings below are for information only.`,
+  },
+  insufficient_evidence: {
+    scored: false,
+    unscoredReason: "insufficient_evidence",
+    schema: "general",
+    copy: "general",
+    notApplicable: UNSCORED_NA,
+    scopeNote: `${UNDETERMINED} The homepage returned too little readable content to evaluate — it may load its content with JavaScript, or the page may be incomplete. The findings below are for information only.`,
   },
   publisher: {
     scored: false,
+    unscoredReason: "out_of_scope",
     schema: "general",
     copy: "general",
     notApplicable: UNSCORED_NA,
-    scopeNote:
-      "This looks like a publisher or media site. GeoViz's score is built for local service businesses and online/software businesses, so this site isn't scored. The findings below are for information only.",
+    scopeNote: `${OUT_OF_SCOPE} This looks like a publisher or media site; GeoViz's score is built for local service businesses and online/software businesses. The findings below are for information only.`,
   },
   ecommerce: {
     scored: false,
+    unscoredReason: "out_of_scope",
     schema: "general",
     copy: "general",
     notApplicable: UNSCORED_NA,
-    scopeNote:
-      "This looks like an online store. GeoViz's score is built for local service businesses and online/software businesses, so this site isn't scored. The findings below are for information only.",
+    scopeNote: `${OUT_OF_SCOPE} This looks like an online store; GeoViz's score is built for local service businesses and online/software businesses. The findings below are for information only.`,
   },
 };
 
 const NOT_APPLICABLE_EXPLANATION: Record<BusinessType, Partial<Record<CheckId, string>>> = {
   local: {},
   online: { location_clarity: "This looks like an online business, so a storefront address and service area aren't scored." },
-  uncertain: { location_clarity: "Location isn't scored because the business type is unclear. If you serve a specific area, check again with your city and state." },
+  uncertain: {
+    location_clarity: "Not scored: the website type could not be determined.",
+    service_clarity: "Not scored: the website type could not be determined.",
+    ai_recommendation_readiness: "Not scored: the website type could not be determined.",
+  },
+  insufficient_evidence: {
+    location_clarity: "Not scored: too little readable content.",
+    service_clarity: "Not scored: too little readable content.",
+    ai_recommendation_readiness: "Not scored: too little readable content.",
+  },
   publisher: {
     location_clarity: "Not scored for publisher or media sites.",
     service_clarity: "Not scored for publisher or media sites.",
@@ -432,6 +458,8 @@ export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
     schema: args.schema,
     entityConsistency: args.entityConsistency,
     onlineSchema: args.onlineSchema,
+    pageSignals: args.pageSignals,
+    readableWords: args.readability?.wordCount,
     city: args.input.city,
     state: args.input.state,
   });
@@ -513,6 +541,7 @@ export function deriveChecks(args: DeriveChecksInput): FreeCheckResult {
     ok: true,
     overallScore,
     scored: profile.scored,
+    unscoredReason: profile.unscoredReason,
     scopeNote: profile.scopeNote,
     checks,
     strengths,

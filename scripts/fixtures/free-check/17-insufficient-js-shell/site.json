@@ -1,0 +1,9 @@
+{
+  "domain": "appshell.example",
+  "input": {
+    "businessName": "Appshell",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

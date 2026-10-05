@@ -1,13 +1,13 @@
 {
-  "type": "publisher",
+  "type": "insufficient_evidence",
   "scored": false,
   "score": null,
   "statuses": {
-    "business_identity": "strong",
+    "business_identity": "missing",
     "location_clarity": "not_applicable",
     "service_clarity": "not_applicable",
     "contact_consistency": "missing",
-    "structured_data": "needs_improvement",
+    "structured_data": "missing",
     "ai_recommendation_readiness": "not_applicable"
   },
   "fixes": []

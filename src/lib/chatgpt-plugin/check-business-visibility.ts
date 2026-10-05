@@ -28,7 +28,8 @@ import { isCached, withFetchCache } from "./fetch-cache";
 export const TOOL_NAME = "check_business_visibility";
 export const CHECK_TYPE = "website_ai_readiness";
 export const SCORE_LABEL = "Website AI-readiness (free check)";
-export const UNSCORED_LABEL = "Not scored: outside GeoViz's supported business types";
+export const UNSCORED_LABEL = "Not scored — outside GeoViz's supported business types";
+export const UNDETERMINED_LABEL = "Not scored — website type could not be determined reliably";
 export const DISCLAIMER =
   "This is a website AI-readiness check of public pages. GeoViz did not ask ChatGPT, Claude, Gemini, or Perplexity about this business; it does not show whether any AI system recommends it.";
 const TOOL_DEADLINE_MS = 20_000;
@@ -66,11 +67,11 @@ export const outputShape = {
     city: z.string().nullable(),
     state: z.string().nullable(),
   }),
-  // Scoring v1.3: publisher and ecommerce sites are recognized but not scored (score null).
-  businessType: z.enum(["local", "online", "uncertain", "publisher", "ecommerce"]),
+  // Scoring v1.3: only local and online businesses are scored; every other type has score null.
+  businessType: z.enum(["local", "online", "uncertain", "insufficient_evidence", "publisher", "ecommerce"]),
   websiteChecked: z.string(),
   score: z.number().int().min(0).max(100).nullable(),
-  scoreLabel: z.enum([SCORE_LABEL, UNSCORED_LABEL]),
+  scoreLabel: z.enum([SCORE_LABEL, UNSCORED_LABEL, UNDETERMINED_LABEL]),
   scopeNote: z.string().nullable(),
   findings: z.array(findingSchema),
   priorityImprovements: z.array(z.string()).max(3),
@@ -181,7 +182,7 @@ export async function checkBusinessVisibility(rawInput: unknown, deps: CheckDeps
     businessType: result.businessType,
     websiteChecked: finalUrl,
     score: result.overallScore,
-    scoreLabel: result.scored ? SCORE_LABEL : UNSCORED_LABEL,
+    scoreLabel: result.scored ? SCORE_LABEL : result.unscoredReason === "out_of_scope" ? UNSCORED_LABEL : UNDETERMINED_LABEL,
     scopeNote: result.scopeNote,
     findings: result.checks.map((c: CheckResult) => ({ id: c.id, label: c.label, status: c.status, explanation: c.explanation })),
     priorityImprovements: result.fixes.slice(0, 3),
@@ -257,7 +258,9 @@ function businessTypeEvidence(type: BusinessType, reasons: string[]): string {
     case "online":
       return `Scored as an online business, so storefront location and opening hours aren't scored.${why}`;
     case "uncertain":
-      return `Business type unclear, so only checks that apply to any business were scored.${why}`;
+      return `Website type could not be determined reliably, so it isn't scored.${why}`;
+    case "insufficient_evidence":
+      return `Too little readable content to determine the website type, so it isn't scored.${why}`;
     case "publisher":
       return `Recognized as a publisher or media site, which is outside GeoViz's supported scoring scope, so it isn't scored.${why}`;
     case "ecommerce":
@@ -331,7 +334,7 @@ function summarize(o: CheckBusinessVisibilityOutput): string {
   const fixes = o.priorityImprovements.map((f, i) => `${i + 1}. ${f}`).join("\n");
   const headline =
     o.score === null
-      ? `${UNSCORED_LABEL} — ${o.business.name} (${o.websiteChecked}), checked ${o.checkedAt}.`
+      ? `${o.scoreLabel}: ${o.business.name} (${o.websiteChecked}), checked ${o.checkedAt}.`
       : `${SCORE_LABEL} for ${o.business.name} (${o.websiteChecked}): ${o.score}/100, checked ${o.checkedAt}.`;
   return [
     headline,
@@ -340,7 +343,7 @@ function summarize(o: CheckBusinessVisibilityOutput): string {
     "Findings:",
     findings,
     "",
-    fixes ? `Top improvements:\n${fixes}` : o.score === null ? "No improvements are suggested for sites outside GeoViz's supported scope." : "No priority improvements were flagged.",
+    fixes ? `Top improvements:\n${fixes}` : o.score === null ? "No improvements are suggested because this site wasn't scored." : "No priority improvements were flagged.",
     "",
     `Evidence:\n${o.evidence.map((e) => `- ${e}`).join("\n")}`,
     "",

@@ -1,0 +1,9 @@
+{
+  "domain": "harbor-gazette.example",
+  "input": {
+    "businessName": "Harbor Gazette",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

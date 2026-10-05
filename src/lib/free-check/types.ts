@@ -42,8 +42,10 @@ export type FreeCheckResult = {
    * (scoring v1.3: publisher / media and ecommerce sites are not scored).
    */
   overallScore: number | null;
-  /** False for publisher / ecommerce sites (see `scopeNote`). */
+  /** True only for local and online businesses (see `scopeNote` otherwise). */
   scored: boolean;
+  /** Why the site wasn't scored; null when scored. */
+  unscoredReason: UnscoredReason | null;
   /** Customer-safe note shown with uncertain and unscored results; null otherwise. */
   scopeNote: string | null;
   checks: CheckResult[];
@@ -64,6 +66,12 @@ export type FreeCheckResult = {
  *       uncertain sites scored on general checks only; publisher / ecommerce sites are outside the
  *       supported scope (no overall score, no fixes). Local and online scoring are unchanged.
  */
+/**
+ * out_of_scope: publisher / media or ecommerce. type_undetermined: conflicting
+ * or too-weak evidence. insufficient_evidence: too little readable content.
+ */
+export type UnscoredReason = "out_of_scope" | "type_undetermined" | "insufficient_evidence";
+
 export const FREE_CHECK_SCORING_VERSION = "free-check-v1.3" as const;
 
 export type FreeCheckFailure = {

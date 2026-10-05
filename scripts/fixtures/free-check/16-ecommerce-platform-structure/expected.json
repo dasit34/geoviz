@@ -1,12 +1,12 @@
 {
-  "type": "uncertain",
+  "type": "ecommerce",
   "scored": false,
   "score": null,
   "statuses": {
-    "business_identity": "strong",
+    "business_identity": "missing",
     "location_clarity": "not_applicable",
     "service_clarity": "not_applicable",
-    "contact_consistency": "strong",
+    "contact_consistency": "missing",
     "structured_data": "missing",
     "ai_recommendation_readiness": "not_applicable"
   },

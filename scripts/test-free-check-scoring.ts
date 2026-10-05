@@ -361,19 +361,29 @@ check("v1.3 order: a LocalBusiness type wins; declared software beats schema add
   assert.equal(classifyBusinessType({ ...online, schema: plain }).type, "online");
 });
 
-check("NO_SIGNALS is re-pinned as uncertain: location not applicable, general schema, same weights over the rest", () => {
+check("NO_SIGNALS is re-pinned as uncertain and NOT scored (v1.0–v1.2 scored it as local by default)", () => {
   const r = deriveChecks(F.NO_SIGNALS);
   const v10 = (BASELINE as unknown as Record<string, ReturnType<typeof deriveChecks>>).NO_SIGNALS!;
+  assert.equal(v10.checks.find((c) => c.id === "location_clarity")!.status, "missing", "v1.0 penalized missing location");
   assert.equal(r.businessType, "uncertain");
-  assert.equal(r.scored, true);
-  assert.match(r.scopeNote ?? "", /couldn't tell what kind of business/);
+  assert.equal(r.scored, false);
+  assert.equal(r.overallScore, null);
+  assert.equal(r.unscoredReason, "type_undetermined");
+  assert.match(r.scopeNote ?? "", /^Not scored — website type could not be determined reliably\./);
+  assert.match(r.scopeNote ?? "", /city and state or its business category/);
+  assert.deepEqual(r.fixes, [], "no normal fixes for an unscored result");
   const byId = Object.fromEntries(r.checks.map((c) => [c.id, c]));
-  assert.equal(byId.location_clarity!.status, "not_applicable");
+  for (const id of ["location_clarity", "service_clarity", "ai_recommendation_readiness"]) assert.equal(byId[id]!.status, "not_applicable");
   assert.equal(byId.structured_data!.label, "Structured data / business schema");
-  // v1.0 penalized it for missing location (scored local by default); v1.3 does not.
-  assert.equal(v10.checks.find((c) => c.id === "location_clarity")!.status, "missing");
-  assert.ok(r.overallScore! > v10.overallScore!, `${r.overallScore} vs v1.0 ${v10.overallScore}`);
-  assert.ok(!r.fixes.some((f) => /street address|opening hours|LocalBusiness|services/i.test(f)), r.fixes.join(" | "));
+});
+
+check("only local and online results are ever scored", () => {
+  for (const fx of [STRONG_FIXTURE, WEAK_FIXTURE, F.ROOFER_NO_ADDRESS_OR_HOURS, F.NO_SIGNALS, F.ROOFER_WITH_ONLINE_CUES, ADDR_ONLY, F.SAAS]) {
+    const r = deriveChecks(fx);
+    assert.equal(r.scored, r.businessType === "local" || r.businessType === "online", r.businessType);
+    assert.equal(r.overallScore === null, !r.scored);
+    if (!r.scored) assert.deepEqual(r.fixes, []);
+  }
 });
 
 if (failed > 0) {

@@ -1,39 +1,45 @@
 // Business-type classification for the /check free score (scoring v1.3).
 //
-// GeoViz scores two business types with full rubrics — LOCAL (storefront /
-// service-area) and ONLINE (software / SaaS / app) — and scores UNCERTAIN
-// sites on the checks that apply to any business. PUBLISHER (news / media)
-// and ECOMMERCE (online stores) are recognized but deliberately outside the
-// supported scoring scope: they get no overall score and no storefront advice.
+// GeoViz scores two business types: LOCAL (storefront / service-area) and
+// ONLINE (software / SaaS / app). Everything else is recognized but NOT
+// scored: PUBLISHER (news / media), ECOMMERCE (online stores), UNCERTAIN
+// (conflicting or too-weak evidence) and INSUFFICIENT_EVIDENCE (too little
+// readable content, e.g. a JavaScript-only page).
 //
-// Deterministic and evidence-ordered; no brand or domain lists. Every
-// outcome carries plain-language reasons that trace to a computed signal.
+// Deterministic; no brand or domain lists. Every outcome carries reasons that
+// trace to a computed signal.
 //
-//   1. Declared schema types, strongest first: LocalBusiness family → local;
+//   1. Decisive evidence: a LocalBusiness-family schema type → local;
 //      NewsMediaOrganization / Periodical → publisher; SoftwareApplication /
-//      WebApplication / MobileApplication → online; Product with an Offer /
-//      OnlineStore → ecommerce; NewsArticle or 3+ Article/BlogPosting nodes
-//      → publisher.
-//   2. Local evidence. A city / state the user provided is decisive. Address /
-//      geo / openingHours in the business schema, a street address on the
-//      page, or a "City, ST 12345" pattern is WEAK evidence (online stores and
-//      publishers list a head-office address too): with 3+ store or news cues
-//      on the homepage it becomes uncertain instead of local.
-//   3. The user's category (the /check form; the MCP tool's optional input).
-//   4. Text cues: 3+ distinct cues of one kind (software / store / publisher);
-//      the kind with the most cues wins, a tie is uncertain.
-//   5. Otherwise uncertain — never a silent default to local.
+//      WebApplication / MobileApplication → online; a city / state the user
+//      provided → local; a business category the user provided.
+//   2. Evidence points from general page structure (pageSignals.ts) and text:
+//        publisher — article schema, og:article meta, headline links,
+//                    bylines, date stamps, news/section navigation, feeds,
+//                    news phrases
+//        ecommerce — Product/Offer/ItemList schema, product/collection links,
+//                    one-time prices, cart/checkout navigation, commerce-
+//                    platform metadata, store phrases
+//        online    — software phrases
+//        local     — address/geo/hours in schema, a street address, or a
+//                    "City, ST 12345" pattern (weak: stores and publishers
+//                    list head-office addresses too)
+//   3. The strongest of publisher / ecommerce / online with ≥ 3 points wins
+//      (an exact tie is uncertain). Publisher and store evidence override weak
+//      local evidence; software phrases alone don't.
+//   4. Too little readable content → insufficient_evidence; else uncertain.
 
 import type {
   EntityConsistencyResult,
   SchemaValidationResult,
 } from "@/lib/intelligence/preflight/types";
 import type { OnlineSchemaSignals } from "./onlineSchema";
+import type { PageSignals } from "./pageSignals";
 
-export type BusinessType = "local" | "online" | "publisher" | "ecommerce" | "uncertain";
+export type BusinessType = "local" | "online" | "publisher" | "ecommerce" | "uncertain" | "insufficient_evidence";
 
-/** Types GeoViz scores. Publisher and ecommerce are recognized but not scored. */
-export const SCORED_BUSINESS_TYPES: readonly BusinessType[] = ["local", "online", "uncertain"];
+/** Types GeoViz scores. Every other type gets no overall score and no fixes. */
+export const SCORED_BUSINESS_TYPES: readonly BusinessType[] = ["local", "online"];
 
 export type BusinessTypeClassification = {
   type: BusinessType;
@@ -66,9 +72,8 @@ const LOCAL_TYPES = new Set([
 const LOCAL_FIELDS = ["address", "geo", "openingHours"];
 const PUBLISHER_IDENTITY_TYPES = new Set(["NewsMediaOrganization", "Periodical"]);
 const SOFTWARE_TYPES = new Set(["SoftwareApplication", "WebApplication", "MobileApplication"]);
-const ARTICLE_NODES_MIN = 3;
 
-const CATEGORY: Array<[Exclude<BusinessType, "local" | "uncertain">, RegExp]> = [
+const CATEGORY: Array<[Exclude<BusinessType, "local" | "uncertain" | "insufficient_evidence">, RegExp]> = [
   ["ecommerce", /\b(e-?commerce|online (store|shop)|webshop)\b/i],
   ["online", /\b(software|saas|apps?|web ?app|platform|online)\b/i],
   ["publisher", /\b(news|media|publisher|publishing|magazine)\b/i],
@@ -80,6 +85,10 @@ const TEXT_CUES: Record<"online" | "ecommerce" | "publisher", string[]> = {
   publisher: ["breaking news", "latest news", "top headlines", "headlines", "top stories", "most read", "most popular", "editor's picks", "live updates", "opinion"],
 };
 const MIN_TEXT_CUES = 3;
+/** Points a kind needs to be chosen (local's page evidence is weak, so it needs less to stand alone). */
+const MIN_POINTS = 3;
+/** Fewer readable words than this, with no decisive evidence → insufficient evidence. */
+const MIN_READABLE_WORDS = 50;
 
 // The free check's plain text joins adjacent elements without spaces
 // ("06pricingstart", "$99per month"), so a cue only needs no LETTER right
@@ -95,11 +104,15 @@ const US_STATES = "al|ak|az|ar|ca|co|ct|de|fl|ga|hi|id|il|in|ia|ks|ky|la|me|md|m
 const CITY_STATE_ZIP = new RegExp(`[a-z]{3,},\\s*(?:${US_STATES})\\s+\\d{5}(?:-\\d{4})?(?!\\d)`);
 
 /** Distinct cues of each kind found in the text; a cue contained in a longer matched cue isn't counted twice. */
-function matchCues(text: string): Array<{ kind: keyof typeof TEXT_CUES; cues: string[] }> {
-  return (Object.keys(TEXT_CUES) as Array<keyof typeof TEXT_CUES>).map((kind) => {
-    const hits = TEXT_CUES[kind].filter((c) => cueRegex(c).test(text));
-    return { kind, cues: hits.filter((c) => !hits.some((o) => o !== c && o.includes(c))) };
-  });
+function matchCues(text: string, kind: keyof typeof TEXT_CUES): string[] {
+  const hits = TEXT_CUES[kind].filter((c) => cueRegex(c).test(text));
+  return hits.filter((c) => !hits.some((o) => o !== c && o.includes(c)));
+}
+
+type Evidence = { points: number; reasons: string[] };
+function add(e: Evidence, points: number, reason: string): void {
+  e.points += points;
+  e.reasons.push(reason);
 }
 
 export function classifyBusinessType(args: {
@@ -108,32 +121,60 @@ export function classifyBusinessType(args: {
   schema: SchemaValidationResult | null;
   entityConsistency: EntityConsistencyResult | null;
   onlineSchema?: OnlineSchemaSignals | null;
+  pageSignals?: PageSignals | null;
+  readableWords?: number;
   city?: string;
   state?: string;
 }): BusinessTypeClassification {
   const { category, plainText, schema, entityConsistency, onlineSchema } = args;
+  const page = args.pageSignals ?? null;
   const types = schema?.detectedTypes ?? [];
   const find = (set: Set<string>) => types.find((t) => set.has(t));
 
-  // 1. Declared schema types, strongest first.
+  // 1. Decisive evidence.
   const localType = find(LOCAL_TYPES);
   if (localType) return { type: "local", reasons: [`${localType} structured data`] };
   const publisherType = find(PUBLISHER_IDENTITY_TYPES);
   if (publisherType) return { type: "publisher", reasons: [`${publisherType} structured data`] };
   const softwareType = find(SOFTWARE_TYPES);
   if (softwareType) return { type: "online", reasons: [`${softwareType} structured data`] };
-  if (onlineSchema?.productWithOffer || types.includes("OnlineStore")) {
-    return { type: "ecommerce", reasons: [onlineSchema?.productWithOffer ? "Product structured data with an offer" : "OnlineStore structured data"] };
-  }
-  const articleNodes = onlineSchema?.articleNodes ?? 0;
-  if (types.includes("NewsArticle") || articleNodes >= ARTICLE_NODES_MIN) {
-    return { type: "publisher", reasons: [types.includes("NewsArticle") ? "NewsArticle structured data" : `${articleNodes} article entries in structured data`] };
+  if ((args.city ?? "").trim() || (args.state ?? "").trim()) return { type: "local", reasons: ["a city or state was provided for the business"] };
+  const cat = category.trim();
+  if (cat) {
+    const hit = CATEGORY.find(([, re]) => re.test(cat));
+    return { type: hit ? hit[0] : "local", reasons: [`the business category "${cat.slice(0, 60)}"`] };
   }
 
-  // 2. Local evidence: a user-provided city / state is decisive; page
-  //    evidence is weak and yields to strong store / news language.
-  if ((args.city ?? "").trim() || (args.state ?? "").trim()) return { type: "local", reasons: ["a city or state was provided for the business"] };
-  const cueMatches = matchCues(plainText);
+  // 2. Evidence points.
+  const publisher: Evidence = { points: 0, reasons: [] };
+  const articleNodes = onlineSchema?.articleNodes ?? 0;
+  if (types.includes("NewsArticle") || articleNodes >= 2) add(publisher, 3, types.includes("NewsArticle") ? "NewsArticle structured data" : `${articleNodes} article entries in structured data`);
+  else if (articleNodes === 1) add(publisher, 2, "article structured data");
+  if (page?.ogArticle) add(publisher, 2, "article metadata");
+  if ((page?.headlineLinks ?? 0) >= 8) add(publisher, 3, `${page!.headlineLinks} headline links`);
+  else if ((page?.headlineLinks ?? 0) >= 4) add(publisher, 2, `${page!.headlineLinks} headline links`);
+  if ((page?.bylines ?? 0) >= 3) add(publisher, 2, "author bylines");
+  if ((page?.dateStamps ?? 0) >= 3) add(publisher, 2, "publication timestamps");
+  if ((page?.newsNavItems.length ?? 0) >= 4) add(publisher, 2, `news section navigation (${page!.newsNavItems.slice(0, 4).join(", ")})`);
+  if ((page?.feedLinks ?? 0) > 0) add(publisher, 1, "an RSS / Atom feed");
+  const newsCues = matchCues(plainText, "publisher");
+  if (newsCues.length >= MIN_TEXT_CUES) add(publisher, 2, `news language (${newsCues.slice(0, 3).join(", ")})`);
+
+  const ecommerce: Evidence = { points: 0, reasons: [] };
+  if (onlineSchema?.productWithOffer || types.includes("OnlineStore")) add(ecommerce, 3, onlineSchema?.productWithOffer ? "Product structured data with an offer" : "OnlineStore structured data");
+  else if (types.includes("Product") || types.includes("ItemList")) add(ecommerce, 2, `${types.includes("Product") ? "Product" : "ItemList"} structured data`);
+  if (page?.commercePlatform) add(ecommerce, 3, `${page.commercePlatform} store metadata`);
+  if ((page?.productLinks ?? 0) >= 6) add(ecommerce, 3, `${page!.productLinks} product or collection links`);
+  else if ((page?.productLinks ?? 0) >= 3) add(ecommerce, 2, `${page!.productLinks} product or collection links`);
+  if ((page?.prices ?? 0) >= 6) add(ecommerce, 2, `${page!.prices} product prices`);
+  if ((page?.cartNav ?? 0) > 0) add(ecommerce, 2, "cart or checkout navigation");
+  const storeCues = matchCues(plainText, "ecommerce");
+  if (storeCues.length >= MIN_TEXT_CUES) add(ecommerce, 2, `store language (${storeCues.slice(0, 3).join(", ")})`);
+
+  const online: Evidence = { points: 0, reasons: [] };
+  const softwareCues = matchCues(plainText, "online");
+  if (softwareCues.length >= MIN_TEXT_CUES) add(online, 3, `online product language on the homepage (${softwareCues.slice(0, 4).join(", ")})`);
+
   const localField = schema?.presentFields.find((f) => LOCAL_FIELDS.includes(f));
   const address = entityConsistency?.extractedEntities.address;
   const weakLocal = localField
@@ -143,35 +184,28 @@ export function classifyBusinessType(args: {
       : CITY_STATE_ZIP.test(plainText)
         ? "a city, state, and ZIP code on the homepage"
         : null;
-  if (weakLocal) {
-    const conflict = cueMatches.find((c) => (c.kind === "ecommerce" || c.kind === "publisher") && c.cues.length >= MIN_TEXT_CUES);
-    if (conflict) {
-      const label = conflict.kind === "ecommerce" ? "online store" : "news / publishing";
-      return { type: "uncertain", reasons: [`mixed signals: ${weakLocal}, but also ${label} language (${conflict.cues.slice(0, 4).join(", ")})`] };
+
+  // 3. Decide. The strongest of publisher / ecommerce / online with at least
+  //    3 points wins; an exact tie is uncertain. A page address (weak local)
+  //    beats software phrases alone — local service sites have "pricing" and
+  //    "sign in" too — but not publisher or store evidence.
+  const ranked = ([["publisher", publisher], ["ecommerce", ecommerce], ["online", online]] as const)
+    .slice()
+    .sort((a, b) => b[1].points - a[1].points);
+  const [top, next] = ranked;
+  if (top[1].points >= MIN_POINTS) {
+    if (top[1].points === next[1].points) {
+      return { type: "uncertain", reasons: [`mixed signals: ${top[0]} (${top[1].reasons.join("; ")}) and ${next[0]} (${next[1].reasons.join("; ")}) evidence are equally strong`] };
     }
-    return { type: "local", reasons: [weakLocal] };
+    if (top[0] === "online" && weakLocal) return { type: "local", reasons: [weakLocal] };
+    return { type: top[0], reasons: top[1].reasons };
   }
+  if (weakLocal) return { type: "local", reasons: [weakLocal] };
 
-  // 3. The user's category (a non-matching category, e.g. "Roofing", is local intent).
-  const cat = category.trim();
-  if (cat) {
-    const hit = CATEGORY.find(([, re]) => re.test(cat));
-    return { type: hit ? hit[0] : "local", reasons: [`the business category "${cat.slice(0, 60)}"`] };
+  // 4. Not enough evidence either way.
+  if ((args.readableWords ?? Infinity) < MIN_READABLE_WORDS) {
+    return { type: "insufficient_evidence", reasons: [`only ${args.readableWords} readable words on the homepage`] };
   }
-
-  // 4. Text cues — the kind with the most distinct cues (at least 3) wins.
-  const qualifying = cueMatches
-    .filter((c) => c.cues.length >= MIN_TEXT_CUES)
-    .sort((a, b) => b.cues.length - a.cues.length);
-  if (qualifying.length > 0 && (qualifying.length === 1 || qualifying[0]!.cues.length > qualifying[1]!.cues.length)) {
-    const top = qualifying[0]!;
-    const label = { online: "online product", ecommerce: "online store", publisher: "news / publishing" }[top.kind];
-    return { type: top.kind, reasons: [`${label} language on the homepage (${top.cues.slice(0, 4).join(", ")})`] };
-  }
-  if (qualifying.length > 1) {
-    return { type: "uncertain", reasons: [`mixed signals on the homepage (${qualifying.map((q) => q.kind).join(" and ")} language)`] };
-  }
-
-  // 5. Not enough evidence either way.
-  return { type: "uncertain", reasons: ["no clear local, online, store, or publisher signals"] };
+  const partial = [...publisher.reasons, ...ecommerce.reasons, ...online.reasons];
+  return { type: "uncertain", reasons: [partial.length ? `too little evidence to decide (${partial.join("; ")})` : "no clear local, online, store, or publisher signals"] };
 }

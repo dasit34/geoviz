@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://harbor-gazette.example/sitemap.xml

@@ -19,6 +19,7 @@ import { auditCrawlability } from "@/lib/intelligence/preflight/crawlabilityAudi
 import { checkEntityConsistency } from "@/lib/intelligence/preflight/entityConsistency";
 import { deriveChecks } from "./deriveChecks";
 import { analyzeOnlineSchema, type OnlineSchemaSignals } from "./onlineSchema";
+import { analyzePageSignals, type PageSignals } from "./pageSignals";
 import type { FreeCheckFailure, FreeCheckInput, FreeCheckResult } from "./types";
 import type {
   CrawlabilityResult,
@@ -65,6 +66,8 @@ export type FreeCheckSignals = {
   entityConsistency: EntityConsistencyResult | null;
   /** Organization / WebSite / product schema checklist (scoring v1.2, online businesses). */
   onlineSchema: OnlineSchemaSignals | null;
+  /** Page-structure evidence for business-type classification (scoring v1.3). */
+  pageSignals: PageSignals | null;
 };
 
 export type FreeCheckDetailed =
@@ -126,6 +129,7 @@ export async function runFreeCheckDetailed(
       safe(() => checkEntityConsistency({ url: finalUrl, html })),
     ]);
   const onlineSchema = await safe(() => analyzeOnlineSchema(html));
+  const pageSignals = await safe(() => analyzePageSignals(html, finalUrl));
 
   const plainText = extractPlainText(html, finalUrl);
   const cueText = extractCueText(html, finalUrl);
@@ -139,10 +143,11 @@ export async function runFreeCheckDetailed(
     entityConsistency,
     onlineSchema,
     cueText,
+    pageSignals,
   });
   return {
     result,
-    signals: { readability, schema, crawlability, entityConsistency, onlineSchema },
+    signals: { readability, schema, crawlability, entityConsistency, onlineSchema, pageSignals },
     finalUrl,
   };
 }
