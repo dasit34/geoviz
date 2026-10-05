@@ -20,7 +20,7 @@ const INSTRUCTIONS =
   "The result is a website AI-readiness check only: GeoViz does not query ChatGPT, Claude, Gemini, or Perplexity, so never present it as evidence that any AI system recommends or mentions the business.";
 
 const TOOL_DESCRIPTION =
-  "Run GeoViz's free website AI-readiness check on a business's public homepage. Returns a 0-100 readiness score, six category findings, up to three prioritized improvements, supporting evidence, and the check date. " +
+  "Run GeoViz's free website AI-readiness check on a business's public homepage. For local service businesses and online/software businesses it returns a 0-100 readiness score, six category findings, up to three prioritized improvements, supporting evidence, and the check date. Publishers, online stores, and sites whose type can't be determined reliably are recognized but not scored (score null, no improvements). " +
   "It analyzes the website only — it does not ask any AI system whether it recommends the business.";
 
 export type ServerDeps = Omit<CheckDeps, "clientKey">;

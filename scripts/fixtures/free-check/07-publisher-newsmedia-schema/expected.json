@@ -1,0 +1,14 @@
+{
+  "type": "publisher",
+  "scored": false,
+  "score": null,
+  "statuses": {
+    "business_identity": "strong",
+    "location_clarity": "not_applicable",
+    "service_clarity": "not_applicable",
+    "contact_consistency": "missing",
+    "structured_data": "missing",
+    "ai_recommendation_readiness": "not_applicable"
+  },
+  "fixes": []
+}

@@ -1,0 +1,9 @@
+{
+  "domain": "valley-plumbing.example",
+  "input": {
+    "businessName": "Valley Plumbing",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "domain": "formwise.example",
+  "input": {
+    "businessName": "Formwise",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

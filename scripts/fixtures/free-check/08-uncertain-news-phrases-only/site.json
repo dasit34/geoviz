@@ -1,0 +1,9 @@
+{
+  "domain": "scoreline-sports.example",
+  "input": {
+    "businessName": "Scoreline",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

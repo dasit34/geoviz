@@ -91,7 +91,7 @@ async function main() {
   console.log("\n/check — SSRF-safe website retrieval\n");
 
   // ── Valid public websites ──
-  await check("valid public website: v1.2 result, same score as the analyzers on the same bytes", async () => {
+  await check("valid public website: v1.3 result, same score as the analyzers on the same bytes", async () => {
     const page = PAGE("Acme Heating");
     const net = fakeNet({ "acmeheating.example": PUBLIC_IP }, {
       "https://acmeheating.example/": { status: 200, body: page },
@@ -100,7 +100,7 @@ async function main() {
     });
     const { result } = await checkVia(net, "https://acmeheating.example/");
     assert.ok(result.ok, JSON.stringify(result));
-    assert.equal(result.scoringVersion, "free-check-v1.2");
+    assert.equal(result.scoringVersion, "free-check-v1.3");
     assert.equal(result.businessType, "local");
     const plainBytes: Record<string, string> = { "https://acmeheating.example/": page, "https://acmeheating.example/robots.txt": "User-agent: *\nAllow: /\n", "https://acmeheating.example/sitemap.xml": "<?xml version=\"1.0\"?><urlset></urlset>" };
     const plain = async (u: string): Promise<FetchRawHtmlResult> => ({ ok: true, html: plainBytes[u] ?? "", finalUrl: u, status: plainBytes[u] ? 200 : 404, contentType: "text/html" });

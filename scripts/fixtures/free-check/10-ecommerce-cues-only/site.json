@@ -1,0 +1,9 @@
+{
+  "domain": "loomhouse.example",
+  "input": {
+    "businessName": "Loomhouse",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

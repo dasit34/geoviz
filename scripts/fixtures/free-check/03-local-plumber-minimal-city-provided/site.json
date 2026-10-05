@@ -1,0 +1,9 @@
+{
+  "domain": "riverside-plumbing.example",
+  "input": {
+    "businessName": "Riverside Plumbing",
+    "city": "Boise",
+    "state": "ID",
+    "category": ""
+  }
+}

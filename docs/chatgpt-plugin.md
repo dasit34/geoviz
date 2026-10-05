@@ -67,6 +67,62 @@ with applicationCategory/offers/description. The check is labeled
 what its own check measures, and the readiness fix lists only its weak inputs, so
 no top improvement restates a Strong finding (enforced by a consistency test).
 
+## Free-check scoring v1.3 (business-type scope)
+Only **local** and **online/software** businesses are scored. Every other outcome is recognized and explained, but gets `overallScore: null`, no fixes, and a scope note that starts with "Not scored —".
+
+| Type | Scored | Why it isn't scored | `unscoredReason` |
+|---|---|---|---|
+| local | yes (v1.0 rubric, unchanged) | — | — |
+| online | yes (v1.2 rubric, unchanged) | — | — |
+| publisher | no | outside the supported scope | `out_of_scope` |
+| ecommerce | no | outside the supported scope | `out_of_scope` |
+| uncertain | no | type couldn't be determined reliably (conflicting or too-weak evidence) | `type_undetermined` |
+| insufficient_evidence | no | too little readable content (e.g. a JavaScript-only page) | `insufficient_evidence` |
+
+**How a site is classified (`classifyBusinessType.ts`)**
+1. **Decisive evidence:**
+   - a LocalBusiness-family type → local;
+   - `NewsMediaOrganization` or `Periodical` → publisher;
+   - `SoftwareApplication`, `WebApplication` or `MobileApplication` → online;
+   - a city or state the user gave → local;
+   - a business category the user gave.
+2. **Evidence points** from general page structure (`pageSignals.ts`) and text, with no brand or domain lists:
+   - **Publisher:**
+     - article schema: `NewsArticle`, or 2+ Article/BlogPosting entries (3 points); 1 entry (2);
+     - Open Graph article metadata (2);
+     - headline links: 8 or more (3), 4 or more (2);
+     - bylines (2), publication timestamps (2), news/section navigation (2);
+     - an RSS or Atom feed (1);
+     - news phrases (2).
+   - **Ecommerce:**
+     - Product with an Offer, or OnlineStore (3); Product or ItemList (2);
+     - commerce-platform metadata, such as a Shopify, WooCommerce, BigCommerce or Magento generator or assets, or `og:type=product` (3);
+     - product or collection links at the site root: 6 or more (3), 3 or more (2);
+     - 6 or more one-time prices (2), excluding subscription prices like "$12/mo";
+     - cart or checkout navigation (2);
+     - store phrases (2).
+   - **Online:** 3 or more software phrases (3).
+   - **Weak local:** an address, geo or opening hours in the schema; a street address on the page; or a "City, ST 12345" pattern.
+3. **Deciding:** the strongest of publisher, ecommerce and online with at least 3 points wins; an exact tie is uncertain. Publisher and store evidence override weak local evidence; software phrases alone don't. Without that, weak local evidence means local.
+4. **Otherwise:** fewer than 50 readable words is insufficient_evidence; anything else is uncertain.
+
+Cues are matched on element-separated text (`extractCueText`). The scoring checks still use the original text, unchanged.
+
+**Benchmark:** 21 synthetic fixture sites in `scripts/fixtures/free-check/`, run through the real safe-fetch path (`npm run test:free-check-benchmark`). It covers:
+- confident local, online, publisher (by schema and by structure) and ecommerce (by schema, platform and structure);
+- adversarial address cases;
+- uncertain, insufficient (JavaScript shell) and blocked (403 and 404) pages.
+
+Each case pins type, score, statuses and fixes. The benchmark also checks these invariants:
+- scored only if local or online;
+- no fixes when unscored;
+- fixes never come from Strong or N/A checks;
+- no storefront wording for non-local types;
+- no popularity or ranking claims;
+- the `/check` UI never shows a number, priorities or the audit offer for an unscored result.
+
+The local and online fixtures score identically to v1.2.
+
 ## Submission-readiness changes (branch `feat/chatgpt-plugin-submission`)
 - **Links:** tool results link only to non-transactional pages: `links.freeCheck` (`/check`) and `links.exampleReport` (`/sample-report`). The card reads "See an example GeoViz report". There is no `/order` or checkout link, per OpenAI's plugin commerce rules.
 - **Cache:** fetched public pages are cached in memory for 10 minutes per URL (`src/lib/chatgpt-plugin/fetch-cache.ts`). Repeat checks re-score the cached pages without a new request and don't count toward the per-site or global limits.

@@ -1,0 +1,10 @@
+{
+  "domain": "private-portal.example",
+  "input": {
+    "businessName": "Private Portal",
+    "city": "",
+    "state": "",
+    "category": ""
+  },
+  "homepageStatus": 403
+}

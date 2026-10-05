@@ -1,0 +1,9 @@
+{
+  "domain": "northline-hvac.example",
+  "input": {
+    "businessName": "Northline Heating & Cooling",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

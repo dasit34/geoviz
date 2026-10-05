@@ -34,10 +34,11 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 <div class="card" id="card" hidden>
   <div class="top">
     <div><div class="eyebrow">GeoViz · Website AI-readiness check</div><div class="name" id="name"></div><div class="site" id="site"></div></div>
-    <div><div class="score"><span id="score"></span><small>/100</small></div><div class="label" id="scoreLabel"></div></div>
+    <div><div class="score"><span id="score"></span><small id="outOf">/100</small></div><div class="label" id="scoreLabel"></div></div>
   </div>
+  <div class="note" id="scope" hidden></div>
   <h3>Findings</h3><ul id="findings"></ul>
-  <h3>Top improvements</h3><ol id="fixes"></ol>
+  <div id="fixesBlock"><h3>Top improvements</h3><ol id="fixes"></ol></div>
   <div class="note" id="disclaimer"></div>
   <div class="foot"><span id="checked"></span><a id="link" href="#" target="_blank" rel="noopener noreferrer">See an example GeoViz report</a></div>
 </div>
@@ -51,13 +52,17 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
   function render(d){
     if(!d||d.checkType!=="website_ai_readiness")return;
     text("name",d.business&&d.business.name);text("site",d.websiteChecked);
-    text("score",d.score);text("scoreLabel",d.scoreLabel);text("disclaimer",d.disclaimer);
+    var unscored=d.score===null||d.score===undefined;
+    text("score",unscored?"—":d.score);text("outOf",unscored?"":"/100");
+    text("scoreLabel",d.scoreLabel);text("disclaimer",d.disclaimer);
+    var sc=el("scope");if(d.scopeNote){sc.textContent=String(d.scopeNote);sc.hidden=false}else{sc.hidden=true}
     text("checked","Checked "+String(d.checkedAt||"").slice(0,10));
     var f=el("findings");f.textContent="";(d.findings||[]).forEach(function(x){
       var li=document.createElement("li");li.className="row";var a=document.createElement("span");a.textContent=x.label;
       var b=document.createElement("span");b.className="st "+(STATUS[x.status]?x.status:"");b.textContent=STATUS[x.status]||"";
       li.appendChild(a);li.appendChild(b);f.appendChild(li)});
-    var o=el("fixes");o.textContent="";(d.priorityImprovements||[]).slice(0,3).forEach(function(x){var li=document.createElement("li");li.textContent=x;o.appendChild(li)});
+    var o=el("fixes");o.textContent="";var fx=(d.priorityImprovements||[]).slice(0,3);fx.forEach(function(x){var li=document.createElement("li");li.textContent=x;o.appendChild(li)});
+    el("fixesBlock").hidden=fx.length===0;
     var link=safeHttps(d.links&&d.links.exampleReport);var a=el("link");
     if(link){a.href=link;a.onclick=function(e){e.preventDefault();request("ui/open-link",{url:link}).catch(function(){window.open(link,"_blank","noopener")})}}else{a.hidden=true}
     el("empty").hidden=true;el("card").hidden=false;

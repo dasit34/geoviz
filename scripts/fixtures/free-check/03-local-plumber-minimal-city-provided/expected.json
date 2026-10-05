@@ -1,0 +1,18 @@
+{
+  "type": "local",
+  "scored": true,
+  "score": 29,
+  "statuses": {
+    "business_identity": "strong",
+    "location_clarity": "missing",
+    "service_clarity": "missing",
+    "contact_consistency": "missing",
+    "structured_data": "missing",
+    "ai_recommendation_readiness": "missing"
+  },
+  "fixes": [
+    "State your city, state, and street address on your homepage.",
+    "Describe your services in more plain-language detail on your homepage.",
+    "Make your name, phone, and address consistent across your site."
+  ]
+}

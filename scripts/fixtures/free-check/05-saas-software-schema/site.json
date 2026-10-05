@@ -1,0 +1,9 @@
+{
+  "domain": "ledgerly.example",
+  "input": {
+    "businessName": "Ledgerly",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

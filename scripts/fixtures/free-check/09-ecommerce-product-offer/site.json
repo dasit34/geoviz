@@ -1,0 +1,9 @@
+{
+  "domain": "trailhead-goods.example",
+  "input": {
+    "businessName": "Trailhead Goods",
+    "city": "",
+    "state": "",
+    "category": ""
+  }
+}

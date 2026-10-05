@@ -1,0 +1,9 @@
+{
+  "domain": "summit-roofing.example",
+  "input": {
+    "businessName": "Summit Roofing",
+    "city": "Denver",
+    "state": "CO",
+    "category": "Roofing"
+  }
+}
