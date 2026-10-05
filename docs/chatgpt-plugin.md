@@ -67,6 +67,12 @@ with applicationCategory/offers/description. The check is labeled
 what its own check measures, and the readiness fix lists only its weak inputs, so
 no top improvement restates a Strong finding (enforced by a consistency test).
 
+## Submission-readiness changes (branch `feat/chatgpt-plugin-submission`)
+- **Links:** tool results link only to non-transactional pages: `links.freeCheck` (`/check`) and `links.exampleReport` (`/sample-report`). The card reads "See an example GeoViz report". There is no `/order` or checkout link, per OpenAI's plugin commerce rules.
+- **Cache:** fetched public pages are cached in memory for 10 minutes per URL (`src/lib/chatgpt-plugin/fetch-cache.ts`). Repeat checks re-score the cached pages without a new request and don't count toward the per-site or global limits.
+- **Pages:** `/support` added. `/privacy#chatgpt` documents the plugin's data, purpose, retention, sharing and contact.
+- **Package:** the submission package and audit are in `chatgpt-plugin/`.
+
 ## Safety
 - http/https on 80/443 only, no URL credentials; every DNS answer and connect-time
   address must be public (private, loopback, link-local/metadata, CGNAT, ULA,

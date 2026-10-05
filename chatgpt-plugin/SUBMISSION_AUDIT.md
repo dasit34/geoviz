@@ -7,7 +7,9 @@ Prepared 2026-10-04 against the current OpenAI plugin docs:
 - [plugin guidelines](https://developers.openai.com/plugins/plugin-guidelines)
 - [security & privacy](https://developers.openai.com/plugins/guides/security-privacy)
 
-**Status: NOT submitted.** The package is ready for review. 3 blockers and 4 other missing items are listed below.
+**Status: NOT submitted.** The 3 blockers are **fixed on branch `feat/chatgpt-plugin-submission`**, but not deployed. They become effective only after you merge and deploy to Production; until then, the live site still has the old behavior.
+
+The 4 remaining items need your action in the OpenAI dashboard or a recording; they are listed below.
 
 ## Package (`chatgpt-plugin/`)
 | File | Purpose |
@@ -15,11 +17,11 @@ Prepared 2026-10-04 against the current OpenAI plugin docs:
 | `plugin.json` | Package identity + listing metadata (`extensions.com.openai.interface`) |
 | `mcp.json` | One MCP server: `geoviz`, `streamable-http`, `https://www.geoviz.ai/mcp` |
 | `assets/logo.png` | 512×512 square, rendered from the site mark `src/app/icon.svg` |
-| `assets/screenshot-1.png` | 706×545. The real result card filled with Production output for geoviz.ai (`review/sample-output-geoviz.json`). It's a card render, not a ChatGPT capture. |
+| `assets/screenshot-1.png` | 706×545. The real result card filled with this branch's output for geoviz.ai. It's a card render, not a ChatGPT capture. |
 | `dist/geoviz-chatgpt-plugin-1.0.0.zip` | `plugin.json` + `mcp.json` + `assets/` (100 KB, 5 entries) |
 | `review/review-test-cases.json` | Exactly 5 positive + 3 negative cases, release notes, countries, commerce flag, annotation justifications |
-| `review/tools-list.production.json` | Live `tools/list` from Production |
-| `review/privacy-policy-addendum.md` | Draft privacy-policy section for the plugin (not published) |
+| `review/tools-list.json` | `tools/list` from this branch's MCP server (what Production will expose after deploy) |
+| `review/sample-output-geoviz.json` | Tool output for geoviz.ai from this branch's code (used for the screenshot) |
 
 Rebuild: `npm run chatgpt-plugin:package`. It validates the listing limits and re-renders the assets and the ZIP.
 
@@ -30,8 +32,8 @@ Rebuild: `npm run chatgpt-plugin:package`. It validates the listing limits and r
 |---|---|---|
 | Production MCP endpoint | `https://www.geoviz.ai/mcp` | ✅ `initialize` 200; one tool; `GET` 405; card resource loads; blocks private/metadata targets |
 | Website URL | `https://www.geoviz.ai` | ✅ 200 |
-| Support URL | `https://www.geoviz.ai/support` | ❌ **404**. No HTTPS support page exists; support is `mailto:support@geoviz.ai` only, and the listing needs an HTTPS URL. |
-| Privacy-policy URL | `https://www.geoviz.ai/privacy` | ⚠️ Live, but **doesn't cover the plugin**, and retention isn't a timeline (see blockers) |
+| Support URL | `https://www.geoviz.ai/support` | ✅ on branch (`src/app/support/page.tsx`, also linked from the footer). It returns 404 in Production until deployed. |
+| Privacy-policy URL | `https://www.geoviz.ai/privacy` | ✅ on branch. New section "4. GeoViz in ChatGPT" (`/privacy#chatgpt`); last updated October 4, 2026. Live only after deploy. |
 | Terms-of-service URL | `https://www.geoviz.ai/terms` | ⚠️ Live; doesn't mention the ChatGPT plugin. Recommended, not required. |
 | Plugin name | `geoviz` / display "GeoViz" (6 characters) | ✅ |
 | Short description | "Website AI-readiness checks" (27 of 30 characters) | ✅ |
@@ -52,36 +54,39 @@ Rebuild: `npm run chatgpt-plugin:package`. It validates the listing limits and r
 | Domain verification | `https://www.geoviz.ai/.well-known/openai-apps-challenge` | ❌ **404**. The token is issued by the portal after upload, then must be served as plain text. |
 | Organization verification | — | ❌ **not confirmed**. Business verification as "GeoViz" in the OpenAI Platform dashboard (owner, or a member with Apps Management Write). |
 
-### Blockers (need a decision or a Production change, not made here)
-1. **The tool links to a paid checkout flow.**
-   - Every result returns `links.fullAudit` = `https://www.geoviz.ai/order?websiteUrl=…`. The card shows it as "Run the full GeoViz audit", and the text summary includes it.
-   - `/order` is the $97 audit order form that leads to Stripe checkout.
-   - The guidelines say plugins may conduct commerce only for physical goods and must not "link directly to a checkout or other transactional page".
-   - **Fix:** drop `fullAudit` from the tool output and the card, or point it at a non-transactional page such as `/sample-report` or `/check`. This is a code change plus a Production deploy. The screenshot would need re-rendering afterwards.
-2. **The privacy policy doesn't cover the plugin.**
-   - Requirement: data categories, purposes and **retention timelines**.
-   - The current policy (updated 2026-05-11) doesn't mention ChatGPT, the plugin or MCP. Its retention is "a reasonable period".
-   - What the tool actually processes:
-     - inputs: the website URL, plus optional business name, city and state;
-     - logs: the normalized domain, outcome, timing and a hashed client IP;
-     - nothing written to the database.
-   - The OpenAI conversation itself never reaches GeoViz.
-   - **Fix:** publish a plugin section, drafted in `review/privacy-policy-addendum.md`, with concrete log-retention periods that you confirm for Vercel.
-3. **There is no HTTPS support page.**
-   - **Fix:** publish `https://www.geoviz.ai/support`, a simple page with `support@geoviz.ai` and response expectations, or use another HTTPS support URL you control, and update `supportURL`.
+### Blockers: fixed on this branch (effective after merge and Production deploy)
+1. **Transactional link removed.**
+   - Tool results no longer contain `/order`. `links` is now `{ freeCheck: /check, exampleReport: /sample-report }`.
+   - The card link reads "See an example GeoViz report", and the text summary links the free check and the example report.
+   - Tests assert there's no `/order`, checkout, Stripe or price wording in output, text or card.
+   - `/sample-report` itself is a marketing page with its own order button. It isn't a checkout page.
+   - Note: the public sample reports were generated with an older version and may show outdated content. Consider regenerating them before submission.
+2. **Privacy policy covers the plugin**, in `/privacy#chatgpt`:
+   - **data received:** the website address, plus optional business name, city and state;
+   - **ignored:** ChatGPT request metadata;
+   - **purpose:** run the website check;
+   - **retention:** results are not stored; fetched pages stay in memory up to 10 minutes; logs are kept no longer than 30 days;
+   - **sharing:** Vercel hosting, the checked website and OpenAI; nothing sold;
+   - **deletion:** nothing to delete; logs expire;
+   - **contact:** `/support` and email.
+
+   ⚠️ Confirm that Vercel runtime-log retention, and any log drains, keep logs 30 days or less, so "no longer than 30 days" stays accurate.
+3. **Support page.** `/support` covers audits and orders, GeoViz in ChatGPT (what it does and doesn't do, what to include, how to disconnect), the free check, and privacy requests.
+
+### Rate-limit review risk: mitigated
+- Fetched public pages are cached in memory for 10 minutes per URL (bounded at 200 entries and 40 MB).
+- A repeat check within that window re-scores the cached pages with that caller's own inputs. It makes no new request to the website and doesn't count toward the per-site limit (3 per 10 minutes) or the global limit.
+- The per-client limit (10 per 10 minutes) still applies, and failures are never cached.
+- **Limit:** the cache lives in each server instance's memory, so a retry that lands on a different instance fetches again. That's fine at review volume.
 
 ### Other missing items
-4. Domain-verification token. Generate it in the portal, then serve it at `/.well-known/openai-apps-challenge` (plain text) through a Production deploy.
+4. Domain-verification token. Generate it in the portal, then serve it at `/.well-known/openai-apps-challenge` (plain text). This needs a small route or static file and a Production deploy; the token can only come from the portal.
 5. Organization verification under the publisher name "GeoViz".
 6. Demo recording: a short walkthrough of the review cases in ChatGPT, at an accessible URL.
 7. Policy attestations: confirmed in the portal at submission time.
 
-### Risks (not listed as blockers, but likely to affect review)
-- **The rate limit may trip review testing.**
-  - The limit is 3 checks per target domain per 10 minutes, per server instance, held in memory.
-  - Review cases 1, 3 and 4 all use geoviz.ai. A reviewer who retries, or ChatGPT calling the tool twice, can get "try again in N minutes".
-  - Options: cache each domain's result for about 10 minutes and return it instead of refusing, or raise the per-domain limit. A shared (database or KV) limit would also make the global cap real across instances.
-- **The screenshot isn't a ChatGPT capture.** It's the actual card markup with real Production data. If review wants in-product images, capture the card in ChatGPT at 706 px wide.
+### Remaining risks
+- **The screenshot isn't a ChatGPT capture.** It's the actual card markup with real output. If review wants in-product images, capture the card in ChatGPT at 706 px wide.
 - **The listing's first impression is a 53/100 score for GeoViz's own site.** It's accurate and on-message, but you may prefer to improve the site's WebSite and product schema first.
 - **Third-party site in review cases.** Positive case 2 uses ricksaffordableheating.com, a real business, and is seen only by reviewers. Swap it for a local site you own or have permission for, if you prefer.
 

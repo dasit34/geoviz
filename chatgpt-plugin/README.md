@@ -5,7 +5,7 @@ Submission package for the GeoViz ChatGPT plugin. It is **not submitted**. Start
 - `plugin.json` and `mcp.json`: package manifest and the single MCP server (`https://www.geoviz.ai/mcp`).
 - `assets/`: the logo and the starter-prompt screenshot.
 - `dist/geoviz-chatgpt-plugin-1.0.0.zip`: the archive to upload in the OpenAI plugin submission portal.
-- `review/`: review-form content (test cases, release notes, annotation justifications), the live tool schema, sample Production output, and a draft privacy-policy section.
+- `review/`: review-form content (test cases, release notes, annotation justifications), the tool schema, and the sample output used for the screenshot.
 
 Rebuild after any metadata or card change:
 

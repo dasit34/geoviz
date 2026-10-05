@@ -2,7 +2,7 @@
   {
     "name": "check_business_visibility",
     "title": "Check website AI-readiness",
-    "description": "Run GeoViz's free website AI-readiness check on a business's public homepage. Returns a 0-100 readiness score, six category findings, up to three prioritized improvements, supporting evidence, and the check date. It analyzes the website only \u2014 it does not ask any AI system whether it recommends the business.",
+    "description": "Run GeoViz's free website AI-readiness check on a business's public homepage. Returns a 0-100 readiness score, six category findings, up to three prioritized improvements, supporting evidence, and the check date. It analyzes the website only — it does not ask any AI system whether it recommends the business.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -49,7 +49,7 @@
         "resourceUri": "ui://geoviz/visibility-card-v1.html"
       },
       "openai/outputTemplate": "ui://geoviz/visibility-card-v1.html",
-      "openai/toolInvocation/invoking": "Checking website AI-readiness\u2026",
+      "openai/toolInvocation/invoking": "Checking website AI-readiness…",
       "openai/toolInvocation/invoked": "Website check complete"
     },
     "outputSchema": {
@@ -163,13 +163,13 @@
             "freeCheck": {
               "type": "string"
             },
-            "fullAudit": {
+            "exampleReport": {
               "type": "string"
             }
           },
           "required": [
             "freeCheck",
-            "fullAudit"
+            "exampleReport"
           ],
           "additionalProperties": false
         },

@@ -39,7 +39,7 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
   <h3>Findings</h3><ul id="findings"></ul>
   <h3>Top improvements</h3><ol id="fixes"></ol>
   <div class="note" id="disclaimer"></div>
-  <div class="foot"><span id="checked"></span><a id="link" href="#" target="_blank" rel="noopener noreferrer">Run the full GeoViz audit</a></div>
+  <div class="foot"><span id="checked"></span><a id="link" href="#" target="_blank" rel="noopener noreferrer">See an example GeoViz report</a></div>
 </div>
 <script>
 (function(){
@@ -58,7 +58,7 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
       var b=document.createElement("span");b.className="st "+(STATUS[x.status]?x.status:"");b.textContent=STATUS[x.status]||"";
       li.appendChild(a);li.appendChild(b);f.appendChild(li)});
     var o=el("fixes");o.textContent="";(d.priorityImprovements||[]).slice(0,3).forEach(function(x){var li=document.createElement("li");li.textContent=x;o.appendChild(li)});
-    var link=safeHttps(d.links&&d.links.fullAudit);var a=el("link");
+    var link=safeHttps(d.links&&d.links.exampleReport);var a=el("link");
     if(link){a.href=link;a.onclick=function(e){e.preventDefault();request("ui/open-link",{url:link}).catch(function(){window.open(link,"_blank","noopener")})}}else{a.hidden=true}
     el("empty").hidden=true;el("card").hidden=false;
   }

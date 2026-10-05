@@ -27,7 +27,7 @@
       "id": "service_clarity",
       "label": "Service clarity",
       "status": "needs_improvement",
-      "explanation": "Your services are only partially described in text \u2014 AI systems may not fully understand what you offer."
+      "explanation": "Your services are only partially described in text — AI systems may not fully understand what you offer."
     },
     {
       "id": "contact_consistency",
@@ -64,10 +64,10 @@
     "Readable homepage text: about 1282 words.",
     "1 name/phone/address mismatch found between structured data, homepage, and footer."
   ],
-  "checkedAt": "2026-10-05T00:51:16.003Z",
+  "checkedAt": "2026-10-05T01:08:55.608Z",
   "links": {
     "freeCheck": "https://www.geoviz.ai/check",
-    "fullAudit": "https://www.geoviz.ai/order?websiteUrl=https%3A%2F%2Fwww.geoviz.ai%2F"
+    "exampleReport": "https://www.geoviz.ai/sample-report"
   },
   "aiSystemsQueried": [],
   "disclaimer": "This is a website AI-readiness check of public pages. GeoViz did not ask ChatGPT, Claude, Gemini, or Perplexity about this business; it does not show whether any AI system recommends it."

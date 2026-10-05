@@ -5,10 +5,10 @@ import { Footer } from "@/components/Footer";
 export const metadata = {
   title: "Privacy Policy · GeoViz",
   description:
-    "How GeoViz collects, uses, and protects the information you share when ordering an AI Visibility Audit.",
+    "How GeoViz collects, uses, and protects the information you share when ordering an AI Visibility Audit or using GeoViz in ChatGPT.",
 };
 
-const LAST_UPDATED = "May 11, 2026";
+const LAST_UPDATED = "October 4, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -110,7 +110,78 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
-            <Section title="4. Cookies and tracking">
+            <Section id="chatgpt" title="4. GeoViz in ChatGPT">
+              <p>
+                GeoViz is available as a plugin in ChatGPT. It runs a
+                website AI-readiness check through our MCP server at{" "}
+                <span className="font-mono text-white/85">www.geoviz.ai/mcp</span>.
+                This section covers that integration.
+              </p>
+              <p>
+                <strong className="text-white">What we receive.</strong> When
+                you ask GeoViz to check a website, ChatGPT sends us the
+                website address and, only if you include them, the business
+                name, city, and state. We do not receive your ChatGPT
+                conversation, your name, your email address, or your OpenAI
+                account details, and GeoViz does not create an account for
+                you. ChatGPT may attach general request metadata (such as
+                locale or an approximate location); we do not use, log, or
+                store it.
+              </p>
+              <p>
+                <strong className="text-white">How we use it.</strong> We
+                fetch that website&rsquo;s public homepage,{" "}
+                <span className="font-mono">robots.txt</span>, and{" "}
+                <span className="font-mono">sitemap.xml</span>, analyze them,
+                and return the result to ChatGPT. GeoViz does not ask any AI
+                system about the business. We only fetch public websites;
+                private-network, local, and cloud-metadata addresses are
+                refused.
+              </p>
+              <p>
+                <strong className="text-white">What we keep, and for how long.</strong>{" "}
+                The check result and the details you entered are not saved
+                to our database. The fetched public pages are held in server
+                memory for up to 10 minutes so a repeat check of the same
+                website can be answered without fetching it again, then
+                discarded. Our application logs record only the website
+                domain that was checked, whether the check succeeded, how
+                long it took, and a one-way hash of the requesting IP
+                address (for rate limiting and abuse prevention). Our
+                hosting provider also keeps standard request metadata, which
+                can include the requesting IP address. These logs are kept
+                for no longer than 30 days and then deleted.
+              </p>
+              <p>
+                <strong className="text-white">Sharing.</strong> We do not
+                sell this information or use it for advertising. Vercel hosts
+                the MCP server and its logs. The website you ask about
+                receives an ordinary request from our scanner
+                (<span className="font-mono">GeoVizSiteScanner/1.0</span>).
+                The result we return is shown to you in ChatGPT, where
+                OpenAI&rsquo;s own privacy policy applies.
+              </p>
+              <p>
+                <strong className="text-white">Deletion and your choices.</strong>{" "}
+                Because nothing you enter is stored, there is no plugin data
+                to delete; logs expire automatically within 30 days. You can
+                stop using GeoViz at any time by removing or disconnecting it
+                in ChatGPT&rsquo;s settings. For questions or requests, see{" "}
+                <Link href="/support" className="text-accent hover:underline">
+                  Support
+                </Link>{" "}
+                or email{" "}
+                <a
+                  href="mailto:support@geoviz.ai"
+                  className="text-accent hover:underline"
+                >
+                  support@geoviz.ai
+                </a>
+                .
+              </p>
+            </Section>
+
+            <Section title="5. Cookies and tracking">
               <p>
                 GeoViz uses only essential cookies — the ones required
                 for checkout to work and for basic session state. We do
@@ -119,7 +190,7 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
-            <Section title="5. Data retention">
+            <Section title="6. Data retention">
               <p>
                 We retain orders and reports while your account is active
                 and for a reasonable period afterwards for tax, support,
@@ -136,7 +207,7 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
-            <Section title="6. Security">
+            <Section title="7. Security">
               <p>
                 We protect data in transit with TLS, gate administrative
                 surfaces with a high-entropy secret using a length-stable
@@ -147,7 +218,7 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
-            <Section title="7. Your rights">
+            <Section title="8. Your rights">
               <p>
                 You may ask us to access, correct, or delete the personal
                 data we hold about you. Email{" "}
@@ -162,14 +233,14 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
-            <Section title="8. Children">
+            <Section title="9. Children">
               <p>
                 GeoViz is not directed at children under 16 and we do
                 not knowingly collect personal data from them.
               </p>
             </Section>
 
-            <Section title="9. International transfers">
+            <Section title="10. International transfers">
               <p>
                 GeoViz operates from and stores data in the United States.
                 If you order from outside the US, your information will be
@@ -177,7 +248,7 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
-            <Section title="10. Changes">
+            <Section title="11. Changes">
               <p>
                 We may update this Privacy Policy from time to time. When
                 we make material changes, we will update the &ldquo;Last
@@ -186,9 +257,13 @@ export default function PrivacyPage() {
               </p>
             </Section>
 
-            <Section title="11. Contact">
+            <Section title="12. Contact">
               <p>
-                Questions about your data or this Policy? Email us at{" "}
+                Questions about your data or this Policy? Visit{" "}
+                <Link href="/support" className="text-accent hover:underline">
+                  Support
+                </Link>{" "}
+                or email us at{" "}
                 <a
                   href="mailto:support@geoviz.ai"
                   className="text-accent hover:underline"
@@ -221,14 +296,16 @@ export default function PrivacyPage() {
 }
 
 function Section({
+  id,
   title,
   children,
 }: {
+  id?: string;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-10">
+    <section id={id} className="mt-10 scroll-mt-24">
       <h2 className="h3 text-white">{title}</h2>
       <div className="mt-3 space-y-3 text-sm leading-relaxed text-white/75">
         {children}
