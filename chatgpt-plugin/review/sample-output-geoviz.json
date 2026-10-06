@@ -10,6 +10,7 @@
   "websiteChecked": "https://www.geoviz.ai/",
   "score": 53,
   "scoreLabel": "Website AI-readiness (free check)",
+  "scopeNote": null,
   "findings": [
     {
       "id": "business_identity",
@@ -27,13 +28,13 @@
       "id": "service_clarity",
       "label": "Service clarity",
       "status": "needs_improvement",
-      "explanation": "Your services are only partially described in text — AI systems may not fully understand what you offer."
+      "explanation": "What you offer is only partially described in text — AI systems may not fully understand it."
     },
     {
       "id": "contact_consistency",
       "label": "Contact information consistency",
       "status": "missing",
-      "explanation": "Your contact details are missing or inconsistent across your site, which weakens AI confidence in your identity."
+      "explanation": "Your business name and contact details are missing or inconsistent across your site, which weakens AI confidence in your identity."
     },
     {
       "id": "structured_data",
@@ -64,7 +65,7 @@
     "Readable homepage text: about 1282 words.",
     "1 name/phone/address mismatch found between structured data, homepage, and footer."
   ],
-  "checkedAt": "2026-10-05T01:08:55.608Z",
+  "checkedAt": "2026-10-06T15:51:47.499Z",
   "links": {
     "freeCheck": "https://www.geoviz.ai/check",
     "exampleReport": "https://www.geoviz.ai/sample-report"
