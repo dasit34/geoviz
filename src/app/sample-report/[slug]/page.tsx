@@ -6,6 +6,7 @@ import { type AuditReportContext } from "@/components/AuditReportContent";
 import { ReportSurface } from "@/components/report/ReportSurface";
 import {
   SAMPLE_REGISTRY,
+  sampleRobots,
   findAvailableSamples,
   findSampleAudit,
   findSampleEntryBySlug,
@@ -47,6 +48,8 @@ export async function generateMetadata({
   return {
     title: `Sample · ${entry.businessName} · GeoViz`,
     description: `A real GeoViz AI Visibility Report for ${entry.businessName} — same dashboard your audit will use.`,
+    // Unlisted samples stay reachable by URL but are kept out of search.
+    ...(sampleRobots(entry) ? { robots: sampleRobots(entry) } : {}),
   };
 }
 

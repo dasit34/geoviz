@@ -90,6 +90,7 @@ const NO_DB_TESTS = [
   "test-free-check-scoring",
   "test-free-check-safe-fetch",
   "test-free-check-benchmark",
+  "test-sample-audit",
 ];
 
 // `--only <substring>` narrows the run (e.g. `npm run test:monitoring`).
