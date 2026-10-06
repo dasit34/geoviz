@@ -3,6 +3,7 @@
  * scheduler, and the staging trigger. All rules live in the pure modules;
  * this file only loads/saves.
  */
+import { prismaQuestionSetStore } from "../proof/prisma-store";
 import { normalizeDomain } from "@/lib/business/normalize-domain";
 import { prisma } from "@/lib/db";
 
@@ -102,14 +103,20 @@ export async function runTrackingCycleForSubscription(
 ): Promise<RunCycleResult> {
   const ent = entitlementsForPlan(sub.planKey);
   if (ent.maxActivePrompts <= 0) return { outcome: "skipped", reason: "plan has no prompt tracking" };
-  const prompts = await prisma.trackedPrompt.findMany({
-    where: { subscriptionId: sub.id, isActive: true },
-    orderBy: { createdAt: "asc" },
-    take: ent.maxActivePrompts,
-    select: { id: true },
-  });
+  // Proof Engine: when a fixed question set is active, measure exactly its
+  // questions (in set order) and tag the cycle with that set version.
+  const activeSet = await prismaQuestionSetStore.activeSet(sub.id);
+  const setPromptIds = activeSet?.items.map((i) => i.trackedPromptId).filter((id): id is string => !!id) ?? [];
+  const prompts = activeSet && setPromptIds.length > 0
+    ? setPromptIds.slice(0, ent.maxActivePrompts).map((id) => ({ id }))
+    : await prisma.trackedPrompt.findMany({
+        where: { subscriptionId: sub.id, isActive: true },
+        orderBy: { createdAt: "asc" },
+        take: ent.maxActivePrompts,
+        select: { id: true },
+      });
   const competitors = ent.maxCompetitors > 0 ? (await activeCompetitorRefs(sub.id)).slice(0, ent.maxCompetitors) : [];
-  return runMonitoringCycle({
+  const result = await runMonitoringCycle({
     store: prismaTrackingStore,
     client: opts.client,
     samplesPerPrompt: ent.samplesPerPrompt,
@@ -121,7 +128,12 @@ export async function runTrackingCycleForSubscription(
     cycleKey: opts.cycleKey,
     trigger: opts.trigger,
     now: () => new Date(),
+    questionSet: activeSet && setPromptIds.length > 0 ? { id: activeSet.id, version: activeSet.version } : null,
   });
+  if (activeSet && setPromptIds.length > 0 && result.outcome === "ran" && result.metrics && result.metrics.measured > 0) {
+    await prismaQuestionSetStore.markFirstMeasured(sub.id, activeSet.id, new Date());
+  }
+  return result;
 }
 
 /** Everything the tracking tabs of the status page need. */

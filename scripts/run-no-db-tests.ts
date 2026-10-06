@@ -91,6 +91,13 @@ const NO_DB_TESTS = [
   "test-free-check-safe-fetch",
   "test-free-check-benchmark",
   "test-sample-audit",
+  // Proof Engine v1
+  "test-proof-question-set",
+  "test-proof-evidence",
+  "test-proof-compare",
+  "test-proof-experiment",
+  "test-proof-summary",
+  "test-proof-isolation",
 ];
 
 // `--only <substring>` narrows the run (e.g. `npm run test:monitoring`).

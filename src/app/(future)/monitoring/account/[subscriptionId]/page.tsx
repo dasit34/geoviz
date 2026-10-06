@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ImprovementsSection } from "@/components/ImprovementsSection";
+import { ProofSection } from "@/components/ProofSection";
 import { MonitoringSettingsSection } from "@/components/MonitoringSettingsSection";
 import { WebsiteChangesSection } from "@/components/WebsiteChangesSection";
 import {
@@ -22,6 +23,9 @@ import { prismaMonitoringAuthStore } from "@/lib/monitoring/auth/prisma-auth-sto
 import { listCustomerSubscriptions, requireOwnedSubscription } from "@/lib/monitoring/auth/session";
 import { billingActionsFor } from "@/lib/monitoring/billing-actions";
 import { loadImprovementsDashboard } from "@/lib/monitoring/improvements/service";
+import { isProofEngineEnabled } from "@/lib/monitoring/proof/flags";
+import { prismaProofStores } from "@/lib/monitoring/proof/prisma-store";
+import { loadProofDashboard } from "@/lib/monitoring/proof/service";
 import { findPlan, isMonitoringEnabled } from "@/lib/monitoring/plans";
 import { loadStatusAuditRows } from "@/lib/monitoring/prisma-store";
 import { buildMonitoringStatusView } from "@/lib/monitoring/status-view";
@@ -65,7 +69,11 @@ export default async function MonitoringAccountDashboardPage({
   if (owned.status === "not_found") notFound();
   const { sub, customerId } = owned;
 
-  const tab: MonitoringTabKey = MONITORING_TABS.some((t) => t.key === searchParams?.tab) ? (searchParams!.tab as MonitoringTabKey) : "overview";
+  const proofOn = isProofEngineEnabled();
+  const tab: MonitoringTabKey =
+    MONITORING_TABS.some((t) => t.key === searchParams?.tab) || (proofOn && searchParams?.tab === "proof")
+      ? (searchParams!.tab as MonitoringTabKey)
+      : "overview";
   const now = new Date();
   const website = await loadWebsiteDashboard(sub);
   const [rows, tracking, customer, all] = await Promise.all([
@@ -78,6 +86,11 @@ export default async function MonitoringAccountDashboardPage({
   const improvements =
     tab === "improvements" || tab === "actions"
       ? await loadImprovementsDashboard(sub, tracking.recommendations)
+      : null;
+  // Proof Engine (flagged): read-only, scoped to the subscription this customer owns.
+  const proof =
+    proofOn && tab === "proof"
+      ? await loadProofDashboard(prismaProofStores, sub, { now, recommendations: tracking.recommendations.map((r) => ({ title: r.title, action: r.action })) })
       : null;
   const planName = findPlan(view.planKey)?.name ?? "AI Visibility Monitoring";
   const notice = typeof searchParams?.notice === "string" ? searchParams.notice.slice(0, 200) : null;
@@ -103,7 +116,7 @@ export default async function MonitoringAccountDashboardPage({
           </p>
         ) : null}
 
-        <MonitoringTabs subscriptionId={sub.id} active={tab} />
+        <MonitoringTabs subscriptionId={sub.id} active={tab} showProof={proofOn} />
         {notice ? <p role="status" className="mt-4 text-sm text-severity-warning">{notice}</p> : null}
 
         {tab === "overview" ? (
@@ -151,6 +164,7 @@ export default async function MonitoringAccountDashboardPage({
           />
         ) : null}
         {tab === "improvements" && improvements ? <ImprovementsSection subscriptionId={sub.id} d={improvements} /> : null}
+        {tab === "proof" && proof ? <ProofSection d={proof} /> : null}
         {tab === "settings" ? (
           <MonitoringSettingsSection
             subscriptionId={sub.id}

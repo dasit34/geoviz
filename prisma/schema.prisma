@@ -1302,21 +1302,21 @@ model MonitoringSubscription {
   planKey       String
   stripePriceId String?
 
-  stripeSubscriptionId    String  @unique
+  stripeSubscriptionId       String   @unique
   /// Earlier Stripe subscriptions for this same monitoring record. A
   /// reactivation reattaches the new Stripe subscription here (history,
   /// questions, and competitors carry over); late events for any id in
   /// this list are ignored, never re-created as a new record.
   priorStripeSubscriptionIds String[] @default([])
-  stripeCustomerId        String?
+  stripeCustomerId           String?
 
   /// Signed-in account that owns this monitoring record (monitoring-only
   /// customer login). Null until linked by email — linking is lazy and
   /// idempotent (src/lib/monitoring/auth/).
-  customerId String?
-  customer   MonitoringCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId              String?
+  customer                MonitoringCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   /// Set from checkout.session.completed; null until that event lands.
-  stripeCheckoutSessionId String? @unique
+  stripeCheckoutSessionId String?             @unique
 
   /// Stripe subscription status, verbatim ("active" | "trialing" |
   /// "past_due" | "canceled" | "unpaid" | "incomplete" |
@@ -1367,6 +1367,10 @@ model MonitoringSubscription {
   businessFactSheets BusinessFactSheet[]
   improvementTasks   ImprovementTask[]
 
+  // Proof Engine v1 (src/lib/monitoring/proof/).
+  trackingQuestionSets TrackingQuestionSet[]
+  proofExperiments     ProofExperiment[]
+
   duplicateSubscriptions MonitoringDuplicateSubscription[]
 
   @@unique([email, siteKey])
@@ -1399,20 +1403,20 @@ model MonitoringDuplicateSubscription {
 
   // Automatic compensation (all nullable / defaulted — additive).
   /// Short-lived claim so concurrent webhook deliveries compensate serially.
-  compensationClaimedAt  DateTime?
+  compensationClaimedAt DateTime?
   /// Set once the duplicate is confirmed canceled in Stripe.
-  canceledInStripeAt     DateTime?
+  canceledInStripeAt    DateTime?
   /// "pending" | "refunded" | "nothing_to_refund" | "failed"
-  refundStatus           String    @default("pending")
-  refundedAmount         Int       @default(0)
-  refundCurrency         String?
-  stripeRefundIds        String[]  @default([])
-  compensatedAt          DateTime?
-  lastError              String?
-  customerNotifiedAt     DateTime?
-  adminNotifiedAt        DateTime?
+  refundStatus          String    @default("pending")
+  refundedAmount        Int       @default(0)
+  refundCurrency        String?
+  stripeRefundIds       String[]  @default([])
+  compensatedAt         DateTime?
+  lastError             String?
+  customerNotifiedAt    DateTime?
+  adminNotifiedAt       DateTime?
   /// Append-only audit trail: [{ at, action, detail }].
-  history                Json      @default("[]")
+  history               Json      @default("[]")
 
   @@index([monitoringSubscriptionId])
   @@index([compensatedAt])
@@ -1426,7 +1430,7 @@ model MonitoringDuplicateSubscription {
 /// does (30 min), so an expired lease can never coexist with a payable
 /// session. Stripe idempotency keys are derived from (leaseKey, attempt).
 model MonitoringCheckoutLease {
-  leaseKey                 String    @id
+  leaseKey                 String   @id
   email                    String
   siteKey                  String
   /// "new" | "reactivation"
@@ -1434,12 +1438,12 @@ model MonitoringCheckoutLease {
   monitoringSubscriptionId String?
   /// "open" | "completed" | "released"
   status                   String
-  attempt                  Int       @default(1)
-  stripeCheckoutSessionId  String?   @unique
+  attempt                  Int      @default(1)
+  stripeCheckoutSessionId  String?  @unique
   checkoutUrl              String?
   expiresAt                DateTime
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 }
 
 /// Monitoring customer account — the ONLY customer login in GeoViz
@@ -1591,31 +1595,35 @@ model TrackedCompetitor {
 /// a retried or concurrent trigger resumes the same cycle instead of
 /// starting a second one.
 model MonitoringCycle {
-  id               String                 @id @default(cuid())
-  subscriptionId   String
-  subscription     MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  cycleKey         String
+  id                 String                 @id @default(cuid())
+  subscriptionId     String
+  subscription       MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  cycleKey           String
   /// "scheduler" | "manual"
-  trigger          String
+  trigger            String
   /// "running" | "completed" | "partial" | "failed" | "needs_review"
-  status           String
+  status             String
   /// Snapshot of what this cycle covered (for honest comparisons).
-  promptIds        Json
-  providers        Json
+  promptIds          Json
+  providers          Json
   /// Tracked competitors at run time: Array<{id, name, normalizedName, domain}>.
-  competitors      Json
+  competitors        Json
   /// Metrics computed when the cycle finished (versioned, see metrics.ts).
-  summary          Json?
-  metricsVersion   String?
+  summary            Json?
+  metricsVersion     String?
   /// Samples per (question, AI system) this cycle was planned with.
-  samplesPerPrompt Int                    @default(1)
+  samplesPerPrompt   Int                    @default(1)
   /// Samples whose provider outcome is unknown (possibly billed) — operator review.
-  unknownOutcomes  Int                    @default(0)
+  unknownOutcomes    Int                    @default(0)
   /// Sum of per-sample cost (provider-reported where available, else estimated).
-  estimatedCostUsd Decimal?               @db.Decimal(10, 6)
-  startedAt        DateTime               @default(now())
-  completedAt      DateTime?
-  lastError        String?
+  estimatedCostUsd   Decimal?               @db.Decimal(10, 6)
+  startedAt          DateTime               @default(now())
+  completedAt        DateTime?
+  lastError          String?
+  /// Proof Engine v1: the approved question-set version this cycle measured
+  /// (null = cycles before a fixed baseline existed).
+  questionSetId      String?
+  questionSetVersion Int?
 
   results PromptRunResult[]
 
@@ -1881,9 +1889,10 @@ model ImprovementTask {
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 
-  drafts        ImprovementDraft[]
-  events        ImprovementEvent[]
-  verifications ImprovementVerification[]
+  drafts          ImprovementDraft[]
+  events          ImprovementEvent[]
+  verifications   ImprovementVerification[]
+  proofExperiment ProofExperiment?
 
   @@index([subscriptionId, status])
   @@index([subscriptionId, dedupeKey])
@@ -1951,4 +1960,92 @@ model ImprovementVerification {
 
   @@index([status, nextRetryAt])
   @@index([taskId, createdAt])
+}
+
+// ─── Proof Engine v1 (src/lib/monitoring/proof/) ────────────────────────────
+/// A versioned, reviewable set of up to 10 monitoring questions — the fixed
+/// measurement baseline. Items are editable only while "draft"; once
+/// approved/active (or measured) the wording and version are frozen —
+/// changes create version n+1. Activation syncs TrackedPrompt rows (text is
+/// never edited; questions outside the set are deactivated, not deleted).
+model TrackingQuestionSet {
+  id               String                 @id @default(cuid())
+  subscriptionId   String
+  subscription     MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  version          Int
+  /// "draft" | "approved" | "active" | "retired"
+  status           String                 @default("draft")
+  /// Context the questions were generated from (recorded for comparability).
+  businessCategory String?
+  city             String?
+  state            String?
+  serviceArea      String?
+  /// Generator that proposed the questions (e.g. "proof-questions@1.0.0", or "operator").
+  generatorVersion String
+  notes            String?
+  createdAt        DateTime               @default(now())
+  approvedAt       DateTime?
+  approvedBy       String?
+  activatedAt      DateTime?
+  /// First cycle that measured this set — after this the set is permanently frozen.
+  firstMeasuredAt  DateTime?
+  retiredAt        DateTime?
+
+  items       TrackingQuestionSetItem[]
+  experiments ProofExperiment[]
+
+  @@unique([subscriptionId, version])
+  @@index([subscriptionId, status])
+}
+
+model TrackingQuestionSetItem {
+  id              String              @id @default(cuid())
+  questionSetId   String
+  questionSet     TrackingQuestionSet @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+  position        Int
+  text            String
+  normalizedText  String
+  /// "branded_accuracy" | "unbranded_discovery" | "service_specific" | "local_commercial_intent" | "competitor_comparison"
+  intent          String
+  rationale       String?
+  /// The TrackedPrompt this question is measured as (set when the set is activated).
+  trackedPromptId String?
+
+  @@unique([questionSetId, normalizedText])
+  @@index([questionSetId, position])
+}
+
+/// One improvement experiment: a frozen baseline measurement, the improvement
+/// task (action / target URL / approval / implementation / independent
+/// verification — reused from ImprovementTask, not copied), the follow-up
+/// measurement and a recorded outcome. Outcomes describe change observed
+/// AFTER implementation — never causation.
+model ProofExperiment {
+  id                 String                 @id @default(cuid())
+  subscriptionId     String
+  subscription       MonitoringSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  improvementTaskId  String                 @unique
+  improvementTask    ImprovementTask        @relation(fields: [improvementTaskId], references: [id], onDelete: Cascade)
+  questionSetId      String
+  questionSet        TrackingQuestionSet    @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+  questionSetVersion Int
+  /// Frozen at creation: the completed cycle measured before the change.
+  baselineCycleId    String
+  /// Recommendation id + evidence snapshot the experiment was created from.
+  findingId          String
+  findingEvidence    Json
+  /// Audit/visibility category the action is expected to affect (e.g. "structured_data").
+  expectedCategory   String
+  followUpCycleId    String?
+  /// "improvement_observed" | "decline_observed" | "no_material_change" | "implementation_not_verified" | "measurement_not_comparable" | "insufficient_evidence"
+  outcome            String?
+  outcomeReason      String?
+  outcomeVersion     String?
+  /// Frozen numbers behind the recorded outcome.
+  assessment         Json?
+  assessedAt         DateTime?
+  isFixture          Boolean                @default(false)
+  createdAt          DateTime               @default(now())
+
+  @@index([subscriptionId, createdAt])
 }

@@ -54,6 +54,8 @@
     "test:monitoring": "tsx scripts/run-no-db-tests.ts --only monitoring",
     "test:tracking": "tsx scripts/run-no-db-tests.ts --only tracking",
     "test:no-db": "tsx scripts/run-no-db-tests.ts",
+    "test:proof": "tsx scripts/run-no-db-tests.ts --only proof",
+    "proof:geoviz-proposal": "tsx scripts/proof-geoviz-proposal.ts",
     "test:score-source-parity": "tsx scripts/test-score-source-parity.ts",
     "test:report-payload-parity": "tsx scripts/test-report-payload-parity.ts",
     "test:decimal-leakage": "tsx scripts/test-decimal-leakage.ts",

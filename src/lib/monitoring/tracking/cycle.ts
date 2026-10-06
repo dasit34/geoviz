@@ -72,6 +72,8 @@ export interface TrackingStore {
     competitors: CompetitorRef[];
     samplesPerPrompt: number;
     now: Date;
+    /** Proof Engine: the fixed question-set version this cycle measures (null = none). */
+    questionSet?: { id: string; version: number } | null;
   }): Promise<{ cycle: CycleRecord; created: boolean }>;
   reopenCycle(cycleId: string): Promise<void>;
   getPromptTexts(promptIds: string[]): Promise<Array<{ id: string; text: string }>>;
@@ -143,6 +145,8 @@ export async function runMonitoringCycle(args: {
   now: () => Date;
   /** Operator-only: re-issue unknown-outcome samples (may double-charge). */
   retryUnknown?: boolean;
+  /** Proof Engine: tag the cycle with the fixed question-set version it measures. */
+  questionSet?: { id: string; version: number } | null;
 }): Promise<RunCycleResult> {
   if (args.activePrompts.length === 0) return { outcome: "skipped", reason: "no active tracked questions" };
   if (args.providers.length === 0) return { outcome: "skipped", reason: "plan grants no tracking providers" };
@@ -157,6 +161,7 @@ export async function runMonitoringCycle(args: {
     competitors: args.activeCompetitors,
     samplesPerPrompt: Math.max(1, args.samplesPerPrompt),
     now: args.now(),
+    questionSet: args.questionSet ?? null,
   });
   if (FINAL_CYCLE_STATUSES.has(cycle.status)) return { outcome: "already_completed", cycleId: cycle.id, status: cycle.status };
   if (cycle.status === "needs_review") {
