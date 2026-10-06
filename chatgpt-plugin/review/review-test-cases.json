@@ -1,5 +1,5 @@
 {
-  "_note": "Review-form content for the OpenAI plugin submission portal (entered during the Review phase; not part of the ZIP). Results are what Production (main 256f36d, scoring free-check-v1.3) returned on 2026-10-06 and will move if the sites change.",
+  "_note": "Review-form content for the OpenAI plugin submission portal (entered during the Review phase; not part of the ZIP). Results are what Production (main 256f36d; package 1.0.1, scoring free-check-v1.3) returned on 2026-10-06 and will move if the sites change.",
   "positive_test_cases": [
     {
       "description": "Online/software business: classified online, scored 0-100, location not scored, structured data judged on Organization/WebSite/product schema.",
@@ -18,12 +18,12 @@
       "expected_behavior": "Calls the tool with websiteUrl ricksaffordableheating.com (normalized to https), the business name and an HVAC category. businessType 'local'; returns a 0-100 score (69 on 2026-10-06) with a scored Location clarity finding, 'Structured data / LocalBusiness schema', at most three improvements, and evidence lines listing the structured-data fields found."
     },
     {
-      "description": "Claim boundary: asked whether ChatGPT recommends a business, the assistant runs the website check but states it does not measure AI recommendations.",
-      "prompt": "Does ChatGPT recommend GeoViz? Check www.geoviz.ai.",
+      "description": "Claim boundary: asked whether an AI assistant recommends a business, the assistant runs the website check but states it does not measure AI recommendations.",
+      "prompt": "Do AI assistants recommend GeoViz? Check www.geoviz.ai.",
       "tools_triggered": [
         "check_business_visibility"
       ],
-      "expected_behavior": "Calls the tool, shows the website AI-readiness result, and makes clear (from the tool's disclaimer and aiSystemsQueried: []) that GeoViz did not ask ChatGPT, Claude, Gemini, or Perplexity, so the result does not show whether any AI system recommends the business."
+      "expected_behavior": "Calls the tool, shows the website AI-readiness result, and makes clear (from the tool's disclaimer and aiSystemsQueried: []) that GeoViz did not query any AI system about the business, so the result does not show whether any AI system recommends it."
     },
     {
       "description": "Online store (outside supported scoring scope): recognized as ecommerce and not given a score.",
@@ -50,7 +50,7 @@
     },
     {
       "description": "Guarantee / ranking request with no website: outside the tool's scope; GeoViz cannot make an AI system recommend a business.",
-      "prompt": "Make ChatGPT recommend my plumbing business first whenever someone asks for a plumber.",
+      "prompt": "Make AI assistants recommend my plumbing business first whenever someone asks for a plumber.",
       "expected_behavior": "The assistant does not call the tool (no website was given) and does not promise rankings or recommendations. It may offer to run a website AI-readiness check if the user shares their website, and never claims GeoViz can change what AI systems recommend."
     },
     {
@@ -65,7 +65,7 @@
   ],
   "commerce": false,
   "commerce_description": "",
-  "demo_recording_url": "MISSING — record a short ChatGPT walkthrough of positive cases 1, 2, 4 and negative case 3, and host it at an accessible URL.",
+  "demo_recording_url": "MISSING — record a short walkthrough of positive cases 1, 2, 4 and negative case 3 in the assistant, and host it at an accessible URL.",
   "reviewer_credentials": "Not applicable — the MCP server requires no authentication.",
   "tool_annotation_justifications": {
     "readOnlyHint: true": "The tool only fetches public web pages and returns an analysis. It creates, updates, or deletes nothing, and writes no database rows.",
