@@ -46,6 +46,13 @@ export type SampleEntry = {
   businessNameMatch?: string;
   /** One-line summary used in card-style listings. */
   archetypeBlurb: string;
+  /**
+   * Unlisted samples keep their URL and their historical rows, but are
+   * never shown in the "Additional sample audits" grid, never featured
+   * (even via GEO_VIZ_FEATURED_SAMPLE), and render with noindex,nofollow.
+   * Use for a sample whose current report would be misleading.
+   */
+  unlisted?: boolean;
 };
 
 export const SAMPLE_REGISTRY: SampleEntry[] = [
@@ -56,6 +63,12 @@ export const SAMPLE_REGISTRY: SampleEntry[] = [
     businessName: "GeoViz",
     archetypeBlurb:
       "Self-audit of GeoViz's own public website — the SaaS product behind these reports.",
+    // Unlisted (2026-10-06): the only published GeoViz self-audit is a stale
+    // May 2026 legacy report (19/100), and the paid audit still scores an
+    // online software business against local-business criteria. Keep it
+    // out of listings and search until that logic supports online businesses;
+    // don't rescore or delete it in the meantime.
+    unlisted: true,
   },
   {
     slug: "charles-boyk-law",
@@ -94,8 +107,18 @@ export function getFeaturedSlug(): SampleSlug {
   const raw = (process.env.GEO_VIZ_FEATURED_SAMPLE ?? "")
     .trim()
     .toLowerCase();
-  const valid = SAMPLE_REGISTRY.find((e) => e.slug === raw);
+  const valid = SAMPLE_REGISTRY.find((e) => e.slug === raw && !e.unlisted);
   return (valid?.slug ?? "ohio-roofing-siding") as SampleSlug;
+}
+
+/** Robots metadata for a sample page: unlisted samples are kept out of search. */
+export function sampleRobots(entry: SampleEntry): { index: false; follow: false } | undefined {
+  return entry.unlisted ? { index: false, follow: false } : undefined;
+}
+
+/** Registry entries that may appear in listings (unlisted samples excluded). */
+export function listedSampleEntries(): SampleEntry[] {
+  return SAMPLE_REGISTRY.filter((entry) => !entry.unlisted);
 }
 
 export function findSampleEntryBySlug(slug: string): SampleEntry | null {
@@ -195,7 +218,8 @@ export async function findSampleAudit(entry: SampleEntry) {
 export async function findAvailableSamples(): Promise<SampleEntry[]> {
   if (!isDatabaseConfigured()) return [];
   const results = await Promise.all(
-    SAMPLE_REGISTRY.map(async (entry) => {
+    // Unlisted samples are never offered in listings.
+    listedSampleEntries().map(async (entry) => {
       const row = await findSampleAudit(entry);
       return row ? entry : null;
     }),
