@@ -543,6 +543,17 @@ behind `GEO_MODULE_MONITORING_ENABLED`, off in Production):**
     (strictly guarded).
   - **Limits:** template copy, not tailored writing; raw-HTML checks only;
     citation/listing checks are manual; before/after is correlation only.
+- **Proof Engine v1** (`src/lib/monitoring/proof/`, branch
+  `feat/geoviz-proof-engine-v1`, migration `20261007100000_proof_engine_v1`,
+  additive, NOT merged): fixed versioned question sets
+  (`TrackingQuestionSet`, ≤ 10, five intents, frozen once approved/measured;
+  cycles tagged with set id + version), read-time answer evidence (provider
+  citations only, explicit-only sentiment), experiments (`ProofExperiment`,
+  one per approved `ImprovementTask`, frozen baseline, six outcome states
+  `proof-outcome@1.0.0`, never causal), proof view + monthly owner summary.
+  Operator: `/admin/proof/<subscriptionId>`; customer "Proof" tab needs
+  `GEO_MODULE_PROOF_ENGINE_ENABLED=true` (off). Details:
+  `docs/proof-engine/README.md`. Tests: `npm run test:proof`.
 - **Not built yet:** alerts, JS-rendered snapshots/verification,
   automated fixes, CMS publishing.
 

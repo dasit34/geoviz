@@ -58,10 +58,13 @@ export function toResultForMetrics(r: {
 }
 
 export const prismaTrackingStore: TrackingStore = {
-  async getOrCreateCycle({ subscriptionId, cycleKey, trigger, promptIds, providers, competitors, samplesPerPrompt, now }) {
+  async getOrCreateCycle({ subscriptionId, cycleKey, trigger, promptIds, providers, competitors, samplesPerPrompt, now, questionSet }) {
     try {
       const row = await prisma.monitoringCycle.create({
-        data: { subscriptionId, cycleKey, trigger, status: "running", promptIds, providers, competitors, samplesPerPrompt, startedAt: now },
+        data: {
+          subscriptionId, cycleKey, trigger, status: "running", promptIds, providers, competitors, samplesPerPrompt, startedAt: now,
+          questionSetId: questionSet?.id ?? null, questionSetVersion: questionSet?.version ?? null,
+        },
       });
       return { cycle: toCycleRecord(row), created: true };
     } catch (err) {

@@ -21,7 +21,9 @@ export const MONITORING_TABS = [
   { key: "improvements", label: "Improvements" },
   { key: "settings", label: "Settings" },
 ] as const;
-export type MonitoringTabKey = (typeof MONITORING_TABS)[number]["key"];
+/** Proof Engine v1 tab — shown only when GEO_MODULE_PROOF_ENGINE_ENABLED is on. */
+export const PROOF_TAB = { key: "proof", label: "Proof" } as const;
+export type MonitoringTabKey = (typeof MONITORING_TABS)[number]["key"] | typeof PROOF_TAB.key;
 
 export const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI (GPT-4.1 mini)",
@@ -42,10 +44,11 @@ function Change({ d, asPoints }: { d: MetricDelta | null | undefined; asPoints?:
   return <span className={tone}>{`${sign}${v}${asPoints ? "" : " pts"}`}</span>;
 }
 
-export function MonitoringTabs({ subscriptionId, active }: { subscriptionId: string; active: MonitoringTabKey }) {
+export function MonitoringTabs({ subscriptionId, active, showProof = false }: { subscriptionId: string; active: MonitoringTabKey; showProof?: boolean }) {
+  const tabs: ReadonlyArray<{ key: MonitoringTabKey; label: string }> = showProof ? [...MONITORING_TABS, PROOF_TAB] : MONITORING_TABS;
   return (
     <nav className="mt-10 flex flex-wrap gap-1 border-b border-white/10" aria-label="Monitoring sections">
-      {MONITORING_TABS.map((t) => (
+      {tabs.map((t) => (
         <a
           key={t.key}
           href={`/monitoring/account/${subscriptionId}?tab=${t.key}`}
